@@ -49,6 +49,10 @@ export type ActiveChallengeSummary = {
   endsAt: number;
 };
 
+export type ChallengeCompletionNotifier = {
+  onChallengeCompleted: (challengeId: string) => Promise<void>;
+};
+
 export type CompletedChallengeParticipant = {
   userId: string;
   solvedAt: number | null;
@@ -141,8 +145,13 @@ export class ChallengeService {
     private codeforces: CodeforcesClient,
     private clock: ChallengeClock = {
       nowSeconds: () => Math.floor(Date.now() / 1000),
-    }
+    },
+    private completionNotifier?: ChallengeCompletionNotifier
   ) {}
+
+  setCompletionNotifier(notifier?: ChallengeCompletionNotifier): void {
+    this.completionNotifier = notifier;
+  }
 
   getLastTickAt(): string | null {
     return this.lastTickAt;
@@ -735,6 +744,18 @@ export class ChallengeService {
       return;
     }
     await message.edit({ embeds: [embed] });
+
+    if (this.completionNotifier) {
+      try {
+        await this.completionNotifier.onChallengeCompleted(challenge.id);
+      } catch (error) {
+        logWarn("Challenge completion notifier failed.", {
+          challengeId: challenge.id,
+          guildId: challenge.serverId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 
   private async buildCancelledEmbed({

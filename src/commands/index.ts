@@ -5,6 +5,7 @@ import { compareCommand } from "./compare.js";
 import { contestCommand } from "./contest.js";
 import { contestRemindersCommand } from "./contestReminders.js";
 import { contestsCommand } from "./contests.js";
+import { handleAdminCommand } from "./handleAdmin.js";
 import { handlesCommand } from "./handles.js";
 import { healthCommand } from "./health.js";
 import { helpCommand } from "./help.js";
@@ -23,6 +24,7 @@ import { refreshCommand } from "./refresh.js";
 import { registerCommand, relinkCommand, unlinkCommand } from "./register.js";
 import { statsCommand } from "./stats.js";
 import { suggestCommand } from "./suggest.js";
+import { tournamentCommand } from "./tournament.js";
 import type { Command } from "./types.js";
 
 export const commandList: Command[] = [
@@ -33,6 +35,7 @@ export const commandList: Command[] = [
   contestRemindersCommand,
   contestCommand,
   contestsCommand,
+  handleAdminCommand,
   handlesCommand,
   historyCommand,
   leaderboardCommand,
@@ -51,6 +54,7 @@ export const commandList: Command[] = [
   unlinkCommand,
   suggestCommand,
   statsCommand,
+  tournamentCommand,
   helpCommand,
   healthCommand,
 ];

@@ -101,6 +101,7 @@ export type PracticeRemindersTable = {
   hour_utc: number;
   minute_utc: number;
   utc_offset_minutes: number;
+  days_of_week: string | null;
   rating_ranges: string;
   tags: string;
   role_id: string | null;
@@ -131,6 +132,62 @@ export type PracticePreferencesTable = {
   updated_at: Generated<string>;
 };
 
+export type TournamentsTable = {
+  id: string;
+  guild_id: string;
+  channel_id: string;
+  host_user_id: string;
+  format: string;
+  status: string;
+  length_minutes: number;
+  round_count: number;
+  current_round: number;
+  rating_ranges: string;
+  tags: string;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type TournamentParticipantsTable = {
+  tournament_id: string;
+  user_id: string;
+  seed: number;
+  score: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  eliminated: number;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type TournamentRoundsTable = {
+  id: string;
+  tournament_id: string;
+  round_number: number;
+  status: string;
+  problem_contest_id: number;
+  problem_index: string;
+  problem_name: string;
+  problem_rating: number;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type TournamentMatchesTable = {
+  id: string;
+  tournament_id: string;
+  round_id: string;
+  match_number: number;
+  challenge_id: string | null;
+  player1_id: string;
+  player2_id: string | null;
+  winner_id: string | null;
+  status: string;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
@@ -146,4 +203,8 @@ export type Database = {
   practice_posts: PracticePostsTable;
   practice_suggestions: PracticeSuggestionsTable;
   practice_preferences: PracticePreferencesTable;
+  tournaments: TournamentsTable;
+  tournament_participants: TournamentParticipantsTable;
+  tournament_rounds: TournamentRoundsTable;
+  tournament_matches: TournamentMatchesTable;
 };

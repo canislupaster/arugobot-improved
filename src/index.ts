@@ -20,6 +20,7 @@ import {
 import { PracticeSuggestionService } from "./services/practiceSuggestions.js";
 import { ProblemService } from "./services/problems.js";
 import { StoreService } from "./services/store.js";
+import { TournamentService } from "./services/tournaments.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo } from "./utils/logger.js";
 
@@ -51,6 +52,8 @@ async function main() {
     maxSolvedPages: config.codeforcesSolvedMaxPages,
   });
   const challenges = new ChallengeService(db, store, codeforces);
+  const tournaments = new TournamentService(db, problems, store, challenges);
+  challenges.setCompletionNotifier(tournaments);
   const practiceReminders = new PracticeReminderService(db, problems, store);
   const practiceSuggestions = new PracticeSuggestionService(problems, store);
 
@@ -192,6 +195,7 @@ async function main() {
         codeforces,
         problems,
         store,
+        tournaments,
       },
     };
     await handleCommandInteraction(interaction, commandMap, context, cooldowns, correlationId);

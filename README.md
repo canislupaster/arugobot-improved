@@ -4,7 +4,7 @@ Edit this file to document project structure and any features you add or are pur
 
 # TODO
 
-- Extend to tournaments with any number of participants and various formats (Swiss, elimination, etc).
+- Extend tournament reporting (per-round summaries, improved tie-breakers, and richer standings).
 
 When this TODO list clears up, continue adding ideas!
 
@@ -27,6 +27,12 @@ The following commands are available to you:
   Use `tags` to require tags and prefix `-` to exclude tags (e.g. `dp, greedy, -math`).
   Set `open` to allow anyone in the server to join before the host starts.
   Use `max_participants` to raise the lobby cap (2-10, default 5).
+
+- **/tournament** `create|status|advance|cancel`
+
+  Runs multi-round tournaments with Swiss or elimination formats. Use `create` to open a lobby, pick
+  format, match length, rating ranges, tags, and (optionally) Swiss round count. Use `advance` to
+  start the next round after all matches finish. `status` shows standings and the current round.
 
 - **/rating** `[user]`
 
@@ -104,6 +110,10 @@ The following commands are available to you:
 
   Lists linked Codeforces handles for the server.
 
+- **/handleadmin** `set|unlink|status` `user` `[handle]`
+
+  Admin-only handle management (link/update, unlink, or inspect a user's handle).
+
 - **/health**
 
   Admin-only diagnostics (uptime, memory, DB status, last error).
@@ -141,7 +151,7 @@ The following commands are available to you:
 
 - **/practicereminders** `set|status|clear|preview|post`
 
-  Configure daily practice problem reminders (admin only). Use `set` to choose a channel, time, optional `utc_offset` (e.g. `+02:00`, `-05:30`, `Z`), rating ranges, optional tags, and an optional role mention. If `utc_offset` is omitted the time is interpreted as UTC.
+  Configure practice problem reminders (admin only). Use `set` to choose a channel, time, optional `utc_offset` (e.g. `+02:00`, `-05:30`, `Z`), optional `days` (e.g. `mon,wed,fri`, `weekdays`, `weekends`), rating ranges, optional tags, and an optional role mention. If `utc_offset` is omitted the time is interpreted as UTC.
   Use `post` to send a practice problem immediately (optionally `force` to send even if one was posted today).
 
 ## Installation
