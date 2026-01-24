@@ -112,9 +112,7 @@ export const tournamentRecapsCommand: Command = {
           context.client
         );
         if (result.status === "no_subscription") {
-          await interaction.editReply(
-            "No tournament recap auto-posts configured for this server."
-          );
+          await interaction.editReply("No tournament recap auto-posts configured for this server.");
           return;
         }
         if (result.status === "no_completed") {

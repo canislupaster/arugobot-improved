@@ -32,9 +32,7 @@ export const contestsCommand: Command = {
         .setDescription("Only show contests matching keywords (comma-separated)")
     )
     .addStringOption((option) =>
-      option
-        .setName("exclude")
-        .setDescription("Hide contests matching keywords (comma-separated)")
+      option.setName("exclude").setDescription("Hide contests matching keywords (comma-separated)")
     ),
   async execute(interaction, context) {
     const limit = interaction.options.getInteger("limit") ?? MAX_CONTESTS;

@@ -7,9 +7,7 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
     options: {
       getInteger: jest.fn().mockReturnValue(null),
-      getString: jest.fn()
-        .mockReturnValueOnce("div. 2")
-        .mockReturnValueOnce("kotlin"),
+      getString: jest.fn().mockReturnValueOnce("div. 2").mockReturnValueOnce("kotlin"),
     },
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),

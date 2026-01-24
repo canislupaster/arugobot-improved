@@ -3,6 +3,8 @@ import { ChannelType, type ChatInputCommandInteraction } from "discord.js";
 import { practiceRemindersCommand } from "../../src/commands/practiceReminders.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
     commandName: "practicereminders",
@@ -83,12 +85,61 @@ describe("practiceRemindersCommand", () => {
       9,
       0,
       0,
+      ALL_DAYS,
       [{ min: 800, max: 3500 }],
       "",
       null
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Practice reminders enabled in <#channel-1> (daily at 09:00 UTC).",
+      ephemeral: true,
+    });
+  });
+
+  it("sets practice reminders with custom days", async () => {
+    const channel = {
+      id: "channel-1",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn((name: string) => {
+          if (name === "days") {
+            return "mon,wed,fri";
+          }
+          return null;
+        }),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      correlationId: "corr-2b",
+      services: {
+        practiceReminders: {
+          setSubscription: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.setSubscription).toHaveBeenCalledWith(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      [1, 3, 5],
+      [{ min: 800, max: 3500 }],
+      "",
+      null
+    );
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Practice reminders enabled in <#channel-1> (mon, wed, fri at 09:00 UTC).",
       ephemeral: true,
     });
   });
@@ -162,6 +213,7 @@ describe("practiceRemindersCommand", () => {
       10,
       0,
       0,
+      ALL_DAYS,
       [{ min: 800, max: 3500 }],
       "",
       "role-1"
@@ -218,6 +270,7 @@ describe("practiceRemindersCommand", () => {
       6,
       30,
       150,
+      ALL_DAYS,
       [{ min: 800, max: 3500 }],
       "",
       null
@@ -289,6 +342,7 @@ describe("practiceRemindersCommand", () => {
               hourUtc: 9,
               minuteUtc: 0,
               utcOffsetMinutes: 0,
+              daysOfWeek: ALL_DAYS,
               ratingRanges: [{ min: 800, max: 1000 }],
               tags: "",
               roleId: null,

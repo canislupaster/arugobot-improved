@@ -10,7 +10,12 @@ import { ContestStandingsService } from "../../src/services/contestStandings.js"
 
 const hashHandles = (handles: string[]): string =>
   createHash("sha1")
-    .update(handles.map((handle) => handle.toLowerCase()).sort().join("|"))
+    .update(
+      handles
+        .map((handle) => handle.toLowerCase())
+        .sort()
+        .join("|")
+    )
     .digest("hex");
 
 describe("ContestStandingsService", () => {

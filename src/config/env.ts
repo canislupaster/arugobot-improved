@@ -68,10 +68,7 @@ export function loadConfig(): AppConfig {
     2000
   );
   const codeforcesTimeoutMs = parseNumber(process.env.CODEFORCES_TIMEOUT_MS ?? "10000", 10000);
-  const codeforcesSolvedMaxPages = parseNumber(
-    process.env.CODEFORCES_SOLVED_MAX_PAGES ?? "10",
-    10
-  );
+  const codeforcesSolvedMaxPages = parseNumber(process.env.CODEFORCES_SOLVED_MAX_PAGES ?? "10", 10);
 
   return {
     discordToken,

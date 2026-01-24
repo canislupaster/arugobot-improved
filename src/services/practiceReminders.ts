@@ -18,6 +18,7 @@ import type { StoreService } from "./store.js";
 const DEFAULT_RATING_RANGES: RatingRange[] = [{ min: 800, max: 3500 }];
 const MAX_HANDLES_FOR_SOLVED = 10;
 const POST_RETENTION_DAYS = 120;
+const DEFAULT_DAYS_OF_WEEK = [0, 1, 2, 3, 4, 5, 6];
 
 export type PracticeReminder = {
   guildId: string;
@@ -25,6 +26,7 @@ export type PracticeReminder = {
   hourUtc: number;
   minuteUtc: number;
   utcOffsetMinutes: number;
+  daysOfWeek: number[];
   ratingRanges: RatingRange[];
   tags: string;
   roleId: string | null;
@@ -78,22 +80,77 @@ function parseRatingRanges(raw: string | null | undefined): RatingRange[] {
   }
 }
 
-function getTodayStartUtcMs(now: Date): number {
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0);
+function normalizeDaysOfWeek(days: number[]): number[] {
+  const normalized = new Set<number>();
+  for (const day of days) {
+    if (Number.isInteger(day) && day >= 0 && day <= 6) {
+      normalized.add(day);
+    }
+  }
+  const sorted = Array.from(normalized.values()).sort((a, b) => a - b);
+  return sorted.length > 0 ? sorted : DEFAULT_DAYS_OF_WEEK.slice();
 }
 
-export function getNextScheduledUtcMs(now: Date, hourUtc: number, minuteUtc: number): number {
-  const todayScheduled = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-    hourUtc,
-    minuteUtc,
+function parseDaysOfWeek(raw: string | null | undefined): number[] {
+  if (!raw) {
+    return DEFAULT_DAYS_OF_WEEK.slice();
+  }
+  try {
+    const parsed = JSON.parse(raw) as number[];
+    if (!Array.isArray(parsed)) {
+      return DEFAULT_DAYS_OF_WEEK.slice();
+    }
+    return normalizeDaysOfWeek(parsed);
+  } catch {
+    return DEFAULT_DAYS_OF_WEEK.slice();
+  }
+}
+
+function getLocalDayForUtcMs(utcMs: number, offsetMinutes: number): number {
+  const adjusted = new Date(utcMs + offsetMinutes * 60 * 1000);
+  return adjusted.getUTCDay();
+}
+
+function getLocalDayStartUtcMs(now: Date, offsetMinutes: number): number {
+  const adjusted = new Date(now.getTime() + offsetMinutes * 60 * 1000);
+  const localStart = Date.UTC(
+    adjusted.getUTCFullYear(),
+    adjusted.getUTCMonth(),
+    adjusted.getUTCDate(),
+    0,
+    0,
     0,
     0
   );
-  if (now.getTime() <= todayScheduled) {
-    return todayScheduled;
+  return localStart - offsetMinutes * 60 * 1000;
+}
+
+export function getNextScheduledUtcMs(
+  now: Date,
+  hourUtc: number,
+  minuteUtc: number,
+  daysOfWeek: number[] = DEFAULT_DAYS_OF_WEEK,
+  utcOffsetMinutes = 0
+): number {
+  const normalizedDays = normalizeDaysOfWeek(daysOfWeek);
+  const nowMs = now.getTime();
+  for (let offset = 0; offset <= 7; offset += 1) {
+    const candidate = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + offset,
+      hourUtc,
+      minuteUtc,
+      0,
+      0
+    );
+    if (candidate < nowMs) {
+      continue;
+    }
+    const localDay = getLocalDayForUtcMs(candidate, utcOffsetMinutes);
+    if (normalizedDays.includes(localDay)) {
+      return candidate;
+    }
   }
   return Date.UTC(
     now.getUTCFullYear(),
@@ -148,6 +205,7 @@ export class PracticeReminderService {
         "hour_utc",
         "minute_utc",
         "utc_offset_minutes",
+        "days_of_week",
         "rating_ranges",
         "tags",
         "role_id",
@@ -164,6 +222,7 @@ export class PracticeReminderService {
       hourUtc: row.hour_utc,
       minuteUtc: row.minute_utc,
       utcOffsetMinutes: row.utc_offset_minutes ?? 0,
+      daysOfWeek: parseDaysOfWeek(row.days_of_week),
       ratingRanges: parseRatingRanges(row.rating_ranges),
       tags: row.tags ?? "",
       roleId: row.role_id ?? null,
@@ -180,6 +239,7 @@ export class PracticeReminderService {
         "hour_utc",
         "minute_utc",
         "utc_offset_minutes",
+        "days_of_week",
         "rating_ranges",
         "tags",
         "role_id",
@@ -192,6 +252,7 @@ export class PracticeReminderService {
       hourUtc: row.hour_utc,
       minuteUtc: row.minute_utc,
       utcOffsetMinutes: row.utc_offset_minutes ?? 0,
+      daysOfWeek: parseDaysOfWeek(row.days_of_week),
       ratingRanges: parseRatingRanges(row.rating_ranges),
       tags: row.tags ?? "",
       roleId: row.role_id ?? null,
@@ -228,10 +289,12 @@ export class PracticeReminderService {
     hourUtc: number,
     minuteUtc: number,
     utcOffsetMinutes: number,
+    daysOfWeek: number[],
     ratingRanges: RatingRange[],
     tags: string,
     roleId: string | null
   ): Promise<void> {
+    const normalizedDays = normalizeDaysOfWeek(daysOfWeek);
     const timestamp = new Date().toISOString();
     await this.db
       .insertInto("practice_reminders")
@@ -241,6 +304,7 @@ export class PracticeReminderService {
         hour_utc: hourUtc,
         minute_utc: minuteUtc,
         utc_offset_minutes: utcOffsetMinutes,
+        days_of_week: JSON.stringify(normalizedDays),
         rating_ranges: JSON.stringify(ratingRanges),
         tags,
         role_id: roleId,
@@ -254,6 +318,7 @@ export class PracticeReminderService {
           hour_utc: hourUtc,
           minute_utc: minuteUtc,
           utc_offset_minutes: utcOffsetMinutes,
+          days_of_week: JSON.stringify(normalizedDays),
           rating_ranges: JSON.stringify(ratingRanges),
           tags,
           role_id: roleId,
@@ -280,7 +345,9 @@ export class PracticeReminderService {
     const nextScheduledAt = getNextScheduledUtcMs(
       new Date(),
       subscription.hourUtc,
-      subscription.minuteUtc
+      subscription.minuteUtc,
+      subscription.daysOfWeek,
+      subscription.utcOffsetMinutes
     );
     return {
       subscription,
@@ -303,7 +370,7 @@ export class PracticeReminderService {
     }
 
     const now = new Date();
-    const todayStart = getTodayStartUtcMs(now);
+    const todayStart = getLocalDayStartUtcMs(now, subscription.utcOffsetMinutes);
     const lastSentAt = subscription.lastSentAt ? Date.parse(subscription.lastSentAt) : 0;
     if (!force && Number.isFinite(lastSentAt) && lastSentAt >= todayStart) {
       return {
@@ -381,9 +448,9 @@ export class PracticeReminderService {
       }
 
       const now = new Date();
-      const todayStart = getTodayStartUtcMs(now);
 
       for (const subscription of subscriptions) {
+        const todayStart = getLocalDayStartUtcMs(now, subscription.utcOffsetMinutes);
         const scheduleMs = Date.UTC(
           now.getUTCFullYear(),
           now.getUTCMonth(),
@@ -393,6 +460,10 @@ export class PracticeReminderService {
           0,
           0
         );
+        const scheduleDay = getLocalDayForUtcMs(scheduleMs, subscription.utcOffsetMinutes);
+        if (!subscription.daysOfWeek.includes(scheduleDay)) {
+          continue;
+        }
         if (now.getTime() < scheduleMs) {
           continue;
         }

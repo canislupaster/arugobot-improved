@@ -3,17 +3,17 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { compareCommand } from "../../src/commands/compare.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (
-  overrides: Record<string, unknown> = {}
-): ChatInputCommandInteraction =>
+const createInteraction = (overrides: Record<string, unknown> = {}): ChatInputCommandInteraction =>
   ({
     commandName: "compare",
     user: { id: "user-1", username: "User" },
     guild: { id: "guild-1" },
     options: {
-      getUser: jest.fn().mockImplementation((name: string) =>
-        name === "user1" ? { id: "user-2", username: "Other" } : null
-      ),
+      getUser: jest
+        .fn()
+        .mockImplementation((name: string) =>
+          name === "user1" ? { id: "user-2", username: "Other" } : null
+        ),
       getString: jest.fn().mockReturnValue(null),
     },
     deferReply: jest.fn().mockResolvedValue(undefined),
@@ -74,9 +74,11 @@ describe("compareCommand", () => {
   it("renders comparison for users and handles", async () => {
     const interaction = createInteraction({
       options: {
-        getUser: jest.fn().mockImplementation((name: string) =>
-          name === "user1" ? { id: "user-2", username: "Other" } : null
-        ),
+        getUser: jest
+          .fn()
+          .mockImplementation((name: string) =>
+            name === "user1" ? { id: "user-2", username: "Other" } : null
+          ),
         getString: jest.fn().mockReturnValue("petr"),
       },
     });

@@ -52,7 +52,7 @@ function formatMatchLine(
 function escapeCsv(value: string | number | null | undefined): string {
   const text = value === null || value === undefined ? "" : String(value);
   if (/[",\n]/.test(text)) {
-    return `"${text.replace(/"/g, "\"\"")}"`;
+    return `"${text.replace(/"/g, '""')}"`;
   }
   return text;
 }
@@ -135,55 +135,59 @@ export function formatTournamentRecapCsv(recap: TournamentRecap): string {
 
   for (const participant of standings) {
     const handle = participantHandles[participant.userId] ?? "";
-    rows.push([
-      "standings",
-      "",
-      "",
-      participant.userId,
-      handle,
-      "",
-      "",
-      "",
-      "",
-      entry.status,
-      "",
-      "",
-      "",
-      participant.score,
-      participant.wins,
-      participant.losses,
-      participant.draws,
-      entry.format === "swiss" ? participant.tiebreak : "",
-      participant.seed,
-      participant.eliminated ? "1" : "0",
-    ].map(escapeCsv));
+    rows.push(
+      [
+        "standings",
+        "",
+        "",
+        participant.userId,
+        handle,
+        "",
+        "",
+        "",
+        "",
+        entry.status,
+        "",
+        "",
+        "",
+        participant.score,
+        participant.wins,
+        participant.losses,
+        participant.draws,
+        entry.format === "swiss" ? participant.tiebreak : "",
+        participant.seed,
+        participant.eliminated ? "1" : "0",
+      ].map(escapeCsv)
+    );
   }
 
   for (const round of rounds) {
     const problemId = `${round.problem.contestId}${round.problem.index}`;
     for (const match of round.matches) {
-      rows.push([
-        "match",
-        round.roundNumber,
-        match.matchNumber,
-        match.player1Id,
-        participantHandles[match.player1Id] ?? "",
-        match.player2Id ?? "",
-        match.player2Id ? participantHandles[match.player2Id] ?? "" : "",
-        match.winnerId ?? "",
-        match.winnerId ? participantHandles[match.winnerId] ?? "" : "",
-        match.isDraw ? "draw" : match.status,
-        problemId,
-        round.problem.name,
-        round.problem.rating ?? "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-      ].map(escapeCsv));
+      rows.push(
+        [
+          "match",
+          round.roundNumber,
+          match.matchNumber,
+          match.player1Id,
+          participantHandles[match.player1Id] ?? "",
+          match.player2Id ?? "",
+          match.player2Id ? (participantHandles[match.player2Id] ?? "") : "",
+          match.winnerId ?? "",
+          match.winnerId ? (participantHandles[match.winnerId] ?? "") : "",
+          match.isDraw ? "draw" : match.status,
+          problemId,
+          round.problem.name,
+          round.problem.rating ?? "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+        ].map(escapeCsv)
+      );
     }
   }
 

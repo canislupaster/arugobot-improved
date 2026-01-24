@@ -60,7 +60,9 @@ describe("suggestCommand", () => {
         problems: {
           ensureProblemsLoaded: jest
             .fn()
-            .mockResolvedValue([{ contestId: 1000, index: "A", name: "Test", rating: 800, tags: [] }]),
+            .mockResolvedValue([
+              { contestId: 1000, index: "A", name: "Test", rating: 800, tags: [] },
+            ]),
         },
         store: {
           resolveHandle: jest

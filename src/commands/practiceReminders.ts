@@ -11,8 +11,12 @@ const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
 const DEFAULT_HOUR_UTC = 9;
 const DEFAULT_MINUTE_UTC = 0;
+const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const MIN_OFFSET_MINUTES = -12 * 60;
 const MAX_OFFSET_MINUTES = 14 * 60;
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS = [1, 2, 3, 4, 5];
+const WEEKENDS = [0, 6];
 
 function formatRanges(ranges: RatingRange[]): string {
   return ranges
@@ -30,6 +34,104 @@ function formatUtcOffset(minutes: number): string {
   const hours = Math.floor(absoluteMinutes / 60);
   const remainder = absoluteMinutes % 60;
   return `UTC${sign}${hours.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`;
+}
+
+function formatDaysLabel(days: number[]): string {
+  const normalized = Array.from(new Set(days)).sort((a, b) => a - b);
+  if (normalized.length === DEFAULT_DAYS.length) {
+    return "Daily";
+  }
+  if (normalized.length === WEEKDAYS.length && WEEKDAYS.every((day) => normalized.includes(day))) {
+    return "Weekdays";
+  }
+  if (normalized.length === WEEKENDS.length && WEEKENDS.every((day) => normalized.includes(day))) {
+    return "Weekends";
+  }
+  return normalized.map((day) => DAY_LABELS[day] ?? "?").join(", ");
+}
+
+function resolveDayToken(token: string): number | null {
+  switch (token) {
+    case "sun":
+    case "sunday":
+      return 0;
+    case "mon":
+    case "monday":
+      return 1;
+    case "tue":
+    case "tues":
+    case "tuesday":
+      return 2;
+    case "wed":
+    case "wednesday":
+      return 3;
+    case "thu":
+    case "thur":
+    case "thurs":
+    case "thursday":
+      return 4;
+    case "fri":
+    case "friday":
+      return 5;
+    case "sat":
+    case "saturday":
+      return 6;
+    default:
+      return null;
+  }
+}
+
+function parseDaysInput(raw: string | null | undefined): { days: number[] } | { error: string } {
+  if (!raw || !raw.trim()) {
+    return { days: DEFAULT_DAYS.slice() };
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (["daily", "everyday", "all", "every"].includes(normalized)) {
+    return { days: DEFAULT_DAYS.slice() };
+  }
+  if (["weekday", "weekdays"].includes(normalized)) {
+    return { days: WEEKDAYS.slice() };
+  }
+  if (["weekend", "weekends"].includes(normalized)) {
+    return { days: WEEKENDS.slice() };
+  }
+
+  const tokens = normalized.split(/[\s,]+/u).filter(Boolean);
+  const days = new Set<number>();
+  for (const token of tokens) {
+    if (token.includes("-")) {
+      const [startRaw, endRaw] = token.split("-", 2);
+      const start = resolveDayToken(startRaw ?? "");
+      const end = resolveDayToken(endRaw ?? "");
+      if (start === null || end === null) {
+        return { error: `Invalid day range: ${token}` };
+      }
+      if (start <= end) {
+        for (let day = start; day <= end; day += 1) {
+          days.add(day);
+        }
+      } else {
+        for (let day = start; day <= 6; day += 1) {
+          days.add(day);
+        }
+        for (let day = 0; day <= end; day += 1) {
+          days.add(day);
+        }
+      }
+      continue;
+    }
+
+    const resolved = resolveDayToken(token);
+    if (resolved === null) {
+      return { error: `Invalid day: ${token}` };
+    }
+    days.add(resolved);
+  }
+
+  if (days.size === 0) {
+    return { error: "Select at least one day for reminders." };
+  }
+  return { days: Array.from(days.values()).sort((a, b) => a - b) };
 }
 
 function normalizeMinutes(totalMinutes: number): number {
@@ -72,12 +174,12 @@ function parseUtcOffset(raw: string): { minutes: number } | { error: string } {
 export const practiceRemindersCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("practicereminders")
-    .setDescription("Configure daily practice problem reminders")
+    .setDescription("Configure practice problem reminders")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand((subcommand) =>
       subcommand
         .setName("set")
-        .setDescription("Enable daily practice reminders")
+        .setDescription("Enable practice reminders")
         .addChannelOption((option) =>
           option
             .setName("channel")
@@ -121,6 +223,11 @@ export const practiceRemindersCommand: Command = {
         )
         .addStringOption((option) =>
           option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
+        )
+        .addStringOption((option) =>
+          option
+            .setName("days")
+            .setDescription("Days to post (e.g. mon,wed,fri, weekdays, weekends)")
         )
     )
     .addSubcommand((subcommand) =>
@@ -167,7 +274,9 @@ export const practiceRemindersCommand: Command = {
         const nextScheduledMs = getNextScheduledUtcMs(
           new Date(),
           subscription.hourUtc,
-          subscription.minuteUtc
+          subscription.minuteUtc,
+          subscription.daysOfWeek,
+          subscription.utcOffsetMinutes
         );
         const localTime = toLocalTime(
           subscription.hourUtc,
@@ -205,6 +314,7 @@ export const practiceRemindersCommand: Command = {
               value: subscription.tags.trim() ? subscription.tags.trim() : "None",
               inline: false,
             },
+            { name: "Days", value: formatDaysLabel(subscription.daysOfWeek), inline: true },
             {
               name: "Next run",
               value: `${formatDiscordTimestamp(nextScheduledSeconds)} (${formatDiscordRelativeTime(
@@ -261,6 +371,7 @@ export const practiceRemindersCommand: Command = {
         const maxRatingOption = interaction.options.getInteger("max_rating");
         const rangesRaw = interaction.options.getString("ranges");
         const tags = interaction.options.getString("tags")?.trim() ?? "";
+        const daysRaw = interaction.options.getString("days");
         const role = interaction.options.getRole("role");
         const roleId = role?.id ?? null;
         let utcOffsetMinutes = 0;
@@ -286,6 +397,12 @@ export const practiceRemindersCommand: Command = {
           return;
         }
 
+        const parsedDays = parseDaysInput(daysRaw);
+        if ("error" in parsedDays) {
+          await interaction.reply({ content: parsedDays.error, ephemeral: true });
+          return;
+        }
+
         const utcTime = toUtcTime(hourInput, minuteInput, utcOffsetMinutes);
         await context.services.practiceReminders.setSubscription(
           guildId,
@@ -293,6 +410,7 @@ export const practiceRemindersCommand: Command = {
           utcTime.hour,
           utcTime.minute,
           utcOffsetMinutes,
+          parsedDays.days,
           rangeResult.ranges,
           tags,
           roleId
@@ -302,12 +420,13 @@ export const practiceRemindersCommand: Command = {
         const localLabel = `${formatHourMinute(hourInput, minuteInput)} (${formatUtcOffset(
           utcOffsetMinutes
         )})`;
+        const dayLabel = formatDaysLabel(parsedDays.days);
         const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
         await interaction.reply({
           content:
             utcOffsetMinutes === 0
-              ? `Practice reminders enabled in <#${channel.id}> (daily at ${utcLabel})${roleMention}.`
-              : `Practice reminders enabled in <#${channel.id}> (daily at ${localLabel}; ${utcLabel})${roleMention}.`,
+              ? `Practice reminders enabled in <#${channel.id}> (${dayLabel.toLowerCase()} at ${utcLabel})${roleMention}.`
+              : `Practice reminders enabled in <#${channel.id}> (${dayLabel.toLowerCase()} at ${localLabel}; ${utcLabel})${roleMention}.`,
           ephemeral: true,
         });
         return;
@@ -346,6 +465,7 @@ export const practiceRemindersCommand: Command = {
               value: formatHourMinute(preview.subscription.hourUtc, preview.subscription.minuteUtc),
               inline: true,
             },
+            { name: "Days", value: formatDaysLabel(preview.subscription.daysOfWeek), inline: true },
             ...(preview.subscription.utcOffsetMinutes !== 0
               ? [
                   {

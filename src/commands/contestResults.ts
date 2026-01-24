@@ -129,11 +129,7 @@ function buildContestEmbed(contest: Contest): EmbedBuilder {
   return embed;
 }
 
-function buildTargetHandles(
-  existing: Map<string, TargetHandle>,
-  handle: string,
-  label: string
-) {
+function buildTargetHandles(existing: Map<string, TargetHandle>, handle: string, label: string) {
   const key = handle.toLowerCase();
   if (existing.has(key)) {
     return;
@@ -353,7 +349,10 @@ export const contestResultsCommand: Command = {
       }
 
       if (missing.length > 0) {
-        const preview = missing.slice(0, 10).map((entry) => entry.label).join(", ");
+        const preview = missing
+          .slice(0, 10)
+          .map((entry) => entry.label)
+          .join(", ");
         const suffix = missing.length > 10 ? `\n...and ${missing.length - 10} more.` : "";
         embed.addFields({
           name: "Not found",

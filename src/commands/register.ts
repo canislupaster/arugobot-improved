@@ -15,14 +15,14 @@ import type { Command } from "./types.js";
 const VERIFICATION_TIMEOUT_MS = 60000;
 const VERIFICATION_POLL_MS = 5000;
 
-async function validateHandle(
+type HandleVerificationResult = "ok" | "verification_failed" | "error";
+
+async function verifyHandleOwnership(
   channelReply: (content: string) => Promise<unknown>,
-  serverId: string,
-  userId: string,
   handle: string,
   context: Parameters<Command["execute"]>[1],
   logContext: LogContext
-): Promise<"ok" | "handle_exists" | "already_linked" | "verification_failed" | "error"> {
+): Promise<HandleVerificationResult> {
   let problems: Awaited<ReturnType<typeof context.services.problems.ensureProblemsLoaded>>;
   try {
     problems = await context.services.problems.ensureProblemsLoaded();
@@ -56,17 +56,7 @@ async function validateHandle(
     return "verification_failed";
   }
 
-  const insertResult = await context.services.store.insertUser(serverId, userId, handle);
-  if (insertResult === "handle_exists") {
-    return "handle_exists";
-  }
-  if (insertResult === "already_linked") {
-    return "already_linked";
-  }
-  if (insertResult === "ok") {
-    return "ok";
-  }
-  return "error";
+  return "ok";
 }
 
 export const registerCommand: Command = {
@@ -114,26 +104,127 @@ export const registerCommand: Command = {
       return;
     }
 
-    const result = await validateHandle(
+    const verification = await verifyHandleOwnership(
       (content) => interaction.editReply(content),
-      guildId,
-      interaction.user.id,
       resolvedHandle,
       context,
       logContext
     );
 
-    if (result === "ok") {
-      await interaction.editReply(`Handle set to ${resolvedHandle}.`);
-    } else if (result === "verification_failed") {
-      await interaction.editReply("Verification failed.");
-    } else if (result === "handle_exists") {
-      await interaction.editReply("Handle has been taken.");
-    } else if (result === "already_linked") {
-      await interaction.editReply("You already linked a handle.");
-    } else {
+    if (verification === "ok") {
+      const insertResult = await context.services.store.insertUser(
+        guildId,
+        interaction.user.id,
+        resolvedHandle
+      );
+      if (insertResult === "ok") {
+        await interaction.editReply(`Handle set to ${resolvedHandle}.`);
+        return;
+      }
+      if (insertResult === "handle_exists") {
+        await interaction.editReply("Handle has been taken.");
+        return;
+      }
+      if (insertResult === "already_linked") {
+        await interaction.editReply("You already linked a handle.");
+        return;
+      }
       await interaction.editReply("Some error (maybe Codeforces is down).");
+      return;
     }
+
+    if (verification === "verification_failed") {
+      await interaction.editReply("Verification failed.");
+      return;
+    }
+
+    await interaction.editReply("Some error (maybe Codeforces is down).");
+  },
+};
+
+export const relinkCommand: Command = {
+  data: new SlashCommandBuilder()
+    .setName("relink")
+    .setDescription("Updates your linked Codeforces handle")
+    .addStringOption((option) =>
+      option.setName("handle").setDescription("New Codeforces handle").setRequired(true)
+    ),
+  async execute(interaction, context) {
+    if (!interaction.guild) {
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
+      return;
+    }
+    const guildId = interaction.guild.id;
+    const newHandle = interaction.options.getString("handle", true);
+    const logContext: LogContext = {
+      correlationId: context.correlationId,
+      command: "relink",
+      guildId,
+      userId: interaction.user.id,
+    };
+
+    const currentHandle = await context.services.store.getHandle(guildId, interaction.user.id);
+    if (!currentHandle) {
+      await interaction.reply({
+        content: "You do not have a linked handle yet. Use /register first.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const handleInfo = await context.services.store.resolveHandle(newHandle);
+    if (!handleInfo.exists) {
+      await interaction.editReply("Invalid handle.");
+      return;
+    }
+    const resolvedHandle = handleInfo.canonicalHandle ?? newHandle;
+    if (currentHandle.toLowerCase() === resolvedHandle.toLowerCase()) {
+      await interaction.editReply("That handle is already linked to your account.");
+      return;
+    }
+    if (await context.services.store.handleExists(guildId, resolvedHandle)) {
+      await interaction.editReply("Handle taken in this server.");
+      return;
+    }
+
+    const verification = await verifyHandleOwnership(
+      (content) => interaction.editReply(content),
+      resolvedHandle,
+      context,
+      logContext
+    );
+    if (verification !== "ok") {
+      await interaction.editReply(
+        verification === "verification_failed"
+          ? "Verification failed."
+          : "Some error (maybe Codeforces is down)."
+      );
+      return;
+    }
+
+    const updateResult = await context.services.store.updateUserHandle(
+      guildId,
+      interaction.user.id,
+      resolvedHandle
+    );
+    if (updateResult === "ok") {
+      await interaction.editReply(`Handle updated to ${resolvedHandle}.`);
+      return;
+    }
+    if (updateResult === "handle_exists") {
+      await interaction.editReply("Handle taken in this server.");
+      return;
+    }
+    if (updateResult === "not_linked") {
+      await interaction.editReply("You do not have a linked handle yet.");
+      return;
+    }
+    await interaction.editReply("Some error (maybe Codeforces is down).");
   },
 };
 

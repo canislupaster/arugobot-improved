@@ -5,8 +5,7 @@ export type ProblemReference = {
 };
 
 const CONTEST_URL_PATTERN = /codeforces\.com\/contest\/(\d+)\/problem\/([A-Za-z0-9]+)/i;
-const PROBLEMSET_URL_PATTERN =
-  /codeforces\.com\/problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/i;
+const PROBLEMSET_URL_PATTERN = /codeforces\.com\/problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/i;
 const ID_PATTERN = /^(\d+)([A-Za-z][A-Za-z0-9]*)$/;
 
 export function parseProblemReference(raw: string): ProblemReference | null {

@@ -26,9 +26,7 @@ export const compareCommand: Command = {
     .addUserOption((option) => option.setName("user3").setDescription("Another user to compare"))
     .addUserOption((option) => option.setName("user4").setDescription("Another user to compare"))
     .addStringOption((option) =>
-      option
-        .setName("handles")
-        .setDescription("Comma or space separated handles to compare")
+      option.setName("handles").setDescription("Comma or space separated handles to compare")
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {
@@ -74,9 +72,7 @@ export const compareCommand: Command = {
       for (const user of userOptions) {
         const handle = await context.services.store.getHandle(interaction.guild.id, user!.id);
         if (!handle) {
-          await interaction.editReply(
-            `User <@${user!.id}> does not have a linked handle.`
-          );
+          await interaction.editReply(`User <@${user!.id}> does not have a linked handle.`);
           return;
         }
         const normalized = handle.toLowerCase();
@@ -112,9 +108,7 @@ export const compareCommand: Command = {
         return;
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle("Codeforces comparison")
-        .setColor(0x3498db);
+      const embed = new EmbedBuilder().setTitle("Codeforces comparison").setColor(0x3498db);
 
       let stale = false;
       for (const target of targets) {

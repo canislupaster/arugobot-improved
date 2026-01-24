@@ -16,6 +16,8 @@ const createMockClient = (send: jest.Mock) =>
     },
   }) as unknown as Client;
 
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
 describe("PracticeReminderService", () => {
   let db: Kysely<Database>;
 
@@ -62,6 +64,7 @@ describe("PracticeReminderService", () => {
       9,
       0,
       0,
+      ALL_DAYS,
       [{ min: 800, max: 1400 }],
       "",
       "role-1"
@@ -155,6 +158,7 @@ describe("PracticeReminderService", () => {
       9,
       0,
       0,
+      ALL_DAYS,
       [{ min: 800, max: 1400 }],
       "",
       null
@@ -166,6 +170,52 @@ describe("PracticeReminderService", () => {
       .execute();
     const subscription = await service.getSubscription("guild-1");
     expect(subscription?.lastSentAt).toBe(new Date(nowMs).toISOString());
+
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("skips reminders on non-matching days", async () => {
+    const nowMs = Date.UTC(2024, 0, 2, 10, 0, 0);
+    jest.useFakeTimers().setSystemTime(new Date(nowMs));
+
+    const problems = [
+      {
+        contestId: 200,
+        index: "B",
+        name: "Sample",
+        rating: 1200,
+        tags: ["dp"],
+      },
+    ];
+
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue(problems),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      [1],
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
 
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
@@ -194,6 +244,7 @@ describe("PracticeReminderService", () => {
       6,
       30,
       150,
+      ALL_DAYS,
       [{ min: 800, max: 1400 }],
       "",
       null
@@ -235,6 +286,7 @@ describe("PracticeReminderService", () => {
       9,
       0,
       0,
+      ALL_DAYS,
       [{ min: 800, max: 1400 }],
       "",
       "role-2"
@@ -287,6 +339,7 @@ describe("PracticeReminderService", () => {
       9,
       0,
       0,
+      ALL_DAYS,
       [{ min: 1500, max: 1500 }],
       "",
       null

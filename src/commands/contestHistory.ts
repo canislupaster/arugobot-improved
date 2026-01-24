@@ -22,7 +22,8 @@ export const contestHistoryCommand: Command = {
     )
     .addIntegerOption((option) =>
       option
-        .setName("limit").setDescription(`Number of contests to show (1-${MAX_LIMIT})`)
+        .setName("limit")
+        .setDescription(`Number of contests to show (1-${MAX_LIMIT})`)
         .setMinValue(1)
         .setMaxValue(MAX_LIMIT)
     ),

@@ -112,7 +112,9 @@ export const profileCommand: Command = {
         );
         totalChallenges = recentHistory.total;
         recentLines = recentHistory.entries
-          .map((entry) => buildProblemLine(entry.problemId, entry.name, entry.contestId, entry.index))
+          .map((entry) =>
+            buildProblemLine(entry.problemId, entry.name, entry.contestId, entry.index)
+          )
           .join("\n");
 
         if (totalChallenges === 0) {
@@ -163,31 +165,34 @@ export const profileCommand: Command = {
         : "Unknown";
 
       const title = handleInput ? `Profile: ${displayHandle}` : `Profile: ${targetName}`;
-      const embed = new EmbedBuilder().setTitle(title).setColor(0x3498db).addFields(
-        { name: "Handle", value: displayHandle, inline: true },
-        ...(linkedUserId
-          ? [
-              {
-                name: "Linked user",
-                value: linkedUserId === targetId ? targetMention : `<@${linkedUserId}>`,
-                inline: true,
-              },
-            ]
-          : []),
-        ...(linkedUserId
-          ? [
-              {
-                name: "Rating",
-                value: botRating !== null && botRating >= 0 ? String(botRating) : "Unknown",
-                inline: true,
-              },
-              { name: "Challenges", value: String(totalChallenges), inline: true },
-            ]
-          : []),
-        { name: "CF rating", value: cfRating, inline: true },
-        { name: "CF max", value: cfMaxRating, inline: true },
-        { name: "CF last online", value: cfLastOnline, inline: true }
-      );
+      const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setColor(0x3498db)
+        .addFields(
+          { name: "Handle", value: displayHandle, inline: true },
+          ...(linkedUserId
+            ? [
+                {
+                  name: "Linked user",
+                  value: linkedUserId === targetId ? targetMention : `<@${linkedUserId}>`,
+                  inline: true,
+                },
+              ]
+            : []),
+          ...(linkedUserId
+            ? [
+                {
+                  name: "Rating",
+                  value: botRating !== null && botRating >= 0 ? String(botRating) : "Unknown",
+                  inline: true,
+                },
+                { name: "Challenges", value: String(totalChallenges), inline: true },
+              ]
+            : []),
+          { name: "CF rating", value: cfRating, inline: true },
+          { name: "CF max", value: cfMaxRating, inline: true },
+          { name: "CF last online", value: cfLastOnline, inline: true }
+        );
 
       if (linkedUserId) {
         embed.addFields({
