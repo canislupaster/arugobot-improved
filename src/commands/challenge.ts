@@ -493,7 +493,7 @@ export const challengeCommand: Command = {
             return;
           }
           participants.set(button.user.id, button.user);
-          lobbyEmbed.spliceFields(2, 1, {
+          lobbyEmbed.spliceFields(3, 1, {
             name: "Users",
             value: await buildUsersValue([...participants.values()]),
             inline: false,
@@ -515,7 +515,7 @@ export const challengeCommand: Command = {
             return;
           }
           participants.delete(button.user.id);
-          lobbyEmbed.spliceFields(2, 1, {
+          lobbyEmbed.spliceFields(3, 1, {
             name: "Users",
             value: await buildUsersValue([...participants.values()]),
             inline: false,
