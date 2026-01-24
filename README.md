@@ -205,6 +205,7 @@ Optional environment variables:
 
 ```bash
 pnpm install
+pnpm approve-builds
 pnpm run dev
 ```
 
@@ -217,6 +218,39 @@ The bot serves a Hono-powered dashboard for global stats and per-guild leaderboa
 By default it listens on `http://localhost:8787` (override with `WEB_HOST`/`WEB_PORT`).
 Only guilds that opt in via `/dashboard set public:true` appear on the public pages.
 The overview includes global contest participation cards sourced from cached rating changes.
+
+## Deployment (Supervisor + Caddy)
+
+Sample configs live in `deploy/` and assume you are running on a Linux host with `systemd`.
+
+1. Install dependencies and allow native build scripts:
+
+```bash
+pnpm install
+pnpm approve-builds
+```
+
+2. Configure Supervisor (update the Node + project paths):
+
+```bash
+sudo cp deploy/supervisor.conf /etc/supervisor/conf.d/arugobot.conf
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl status
+```
+
+3. Configure Caddy (update the domain name):
+
+```bash
+sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+4. Confirm the web server responds:
+
+```bash
+curl -I http://127.0.0.1:8787
+```
 
 Quality gates:
 
@@ -233,3 +267,9 @@ To typecheck and run the production bot (tsx runtime, no JS build output):
 pnpm run build
 pnpm start
 ```
+
+## Future TODOs
+
+- Add CSV exports for guild leaderboards in the web dashboard.
+- Add per-guild contest reminder presets for common series (Div 2, Educational).
+- Add a lightweight status page that reports last Codeforces sync and cache age.
