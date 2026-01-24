@@ -5,7 +5,12 @@ import {
   version as discordJsVersion,
 } from "discord.js";
 
-import { getCommandCount } from "../services/metrics.js";
+import {
+  getCommandCount,
+  getCommandUsageSummary,
+  getLastCommandAt,
+  getUniqueCommandCount,
+} from "../services/metrics.js";
 import { getLastError } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
@@ -75,10 +80,27 @@ export const healthCommand: Command = {
         { name: "Active tournaments", value: String(activeTournaments), inline: true },
         { name: "Tournament recaps", value: String(recapCount), inline: true },
         { name: "Commands handled", value: String(getCommandCount()), inline: true },
+        { name: "Unique commands", value: String(getUniqueCommandCount()), inline: true },
         { name: "Node", value: process.version, inline: true },
         { name: "discord.js", value: discordJsVersion, inline: true },
         { name: "Bot version", value: process.env.npm_package_version ?? "unknown", inline: true }
       );
+
+    const lastCommandAt = getLastCommandAt();
+    if (lastCommandAt) {
+      embed.addFields({ name: "Last command", value: lastCommandAt, inline: true });
+    }
+
+    const topCommands = getCommandUsageSummary(5);
+    if (topCommands.length > 0) {
+      const lines = topCommands
+        .map(
+          (entry) =>
+            `/${entry.name}: ${entry.count} (avg ${entry.avgLatencyMs}ms, ok ${entry.successRate}%)`
+        )
+        .join("\n");
+      embed.addFields({ name: "Top commands", value: lines, inline: false });
+    }
 
     if (lastError) {
       embed.addFields({

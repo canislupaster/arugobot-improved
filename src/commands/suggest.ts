@@ -51,9 +51,7 @@ export const suggestCommand: Command = {
       option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
     )
     .addStringOption((option) =>
-      option
-        .setName("tags")
-        .setDescription("Problem tags (e.g. dp, greedy, -math)")
+      option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
     )
     .addStringOption((option) =>
       option
@@ -119,18 +117,22 @@ export const suggestCommand: Command = {
     const validHandles: string[] = [];
     const badHandles: string[] = [];
     const excludedIds = new Set<string>();
+    let staleHandles = 0;
 
     for (const handle of handles) {
       const handleInfo = await context.services.store.resolveHandle(handle);
       if (handleInfo.exists) {
         const canonicalHandle = handleInfo.canonicalHandle ?? handle;
-        const solved = await context.services.store.getSolvedProblems(canonicalHandle);
-        if (!solved) {
+        const solvedResult = await context.services.store.getSolvedProblemsResult(canonicalHandle);
+        if (!solvedResult) {
           await interaction.editReply("Something went wrong. Try again in a bit.");
           return;
         }
+        if (solvedResult.isStale) {
+          staleHandles += 1;
+        }
         validHandles.push(canonicalHandle);
-        for (const solvedId of solved) {
+        for (const solvedId of solvedResult.solved) {
           excludedIds.add(solvedId);
         }
       } else {
@@ -161,6 +163,11 @@ export const suggestCommand: Command = {
       .setTitle("Problem suggestions")
       .setDescription(description || "No suggestions found.")
       .setColor(getColor(Math.round((minRating + maxRating) / 2)));
+    if (staleHandles > 0) {
+      embed.setFooter({
+        text: `Some solved lists may be stale (${staleHandles}/${validHandles.length}).`,
+      });
+    }
 
     await interaction.editReply({ embeds: [embed] });
 

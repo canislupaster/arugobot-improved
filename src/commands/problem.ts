@@ -16,6 +16,7 @@ type SolvedSummary = {
   checkedHandles: number;
   skippedHandles: number;
   staleHandles: number;
+  unavailableHandles: number;
   totalLinked: number;
 };
 
@@ -33,23 +34,30 @@ async function getSolvedSummary(
   const skippedHandles = Math.max(0, linkedUsers.length - limitedUsers.length);
   const solvedBy: string[] = [];
   let staleHandles = 0;
+  let unavailableHandles = 0;
+  let checkedHandles = 0;
 
   for (const user of limitedUsers) {
-    const solved = await store.getSolvedProblems(user.handle);
-    if (!solved) {
-      staleHandles += 1;
+    const solvedResult = await store.getSolvedProblemsResult(user.handle);
+    if (!solvedResult) {
+      unavailableHandles += 1;
       continue;
     }
-    if (solved.includes(problemId)) {
+    checkedHandles += 1;
+    if (solvedResult.isStale) {
+      staleHandles += 1;
+    }
+    if (solvedResult.solved.includes(problemId)) {
       solvedBy.push(`<@${user.userId}>`);
     }
   }
 
   return {
     solvedBy,
-    checkedHandles: limitedUsers.length - staleHandles,
+    checkedHandles,
     skippedHandles,
     staleHandles,
+    unavailableHandles,
     totalLinked: linkedUsers.length,
   };
 }
@@ -96,7 +104,11 @@ export const problemCommand: Command = {
         .setColor(problem.rating ? getColor(problem.rating) : 0x3498db)
         .addFields(
           { name: "Problem id", value: `${problem.contestId}${problem.index}`, inline: true },
-          { name: "Rating", value: problem.rating ? String(problem.rating) : "Unrated", inline: true },
+          {
+            name: "Rating",
+            value: problem.rating ? String(problem.rating) : "Unrated",
+            inline: true,
+          },
           {
             name: "Tags",
             value: problem.tags.length > 0 ? problem.tags.join(", ") : "None",
@@ -113,7 +125,7 @@ export const problemCommand: Command = {
         if (summary.totalLinked > 0) {
           let solvedValue = "No linked users have solved this yet.";
           if (summary.checkedHandles === 0) {
-            solvedValue = "No fresh solved data available.";
+            solvedValue = "No solved data available.";
           } else if (summary.solvedBy.length > 0) {
             const displayed = summary.solvedBy.slice(0, MAX_SOLVED_DISPLAY);
             const extra = summary.solvedBy.length - displayed.length;
@@ -135,6 +147,9 @@ export const problemCommand: Command = {
           }
           if (summary.staleHandles > 0) {
             notes.push(`${summary.staleHandles} handle(s) stale`);
+          }
+          if (summary.unavailableHandles > 0) {
+            notes.push(`${summary.unavailableHandles} handle(s) unavailable`);
           }
           if (notes.length > 0) {
             embed.setFooter({ text: notes.join(" • ") });

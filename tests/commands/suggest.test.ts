@@ -37,4 +37,45 @@ describe("suggestCommand", () => {
       ephemeral: true,
     });
   });
+
+  it("adds a footer when solved data is stale", async () => {
+    const interaction = {
+      options: {
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn((name: string) => {
+          if (name === "handles") {
+            return "tourist";
+          }
+          return null;
+        }),
+      },
+      deferReply: jest.fn().mockResolvedValue(undefined),
+      editReply: jest.fn().mockResolvedValue(undefined),
+      reply: jest.fn().mockResolvedValue(undefined),
+      followUp: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ChatInputCommandInteraction;
+
+    const context = {
+      services: {
+        problems: {
+          ensureProblemsLoaded: jest
+            .fn()
+            .mockResolvedValue([{ contestId: 1000, index: "A", name: "Test", rating: 800, tags: [] }]),
+        },
+        store: {
+          resolveHandle: jest
+            .fn()
+            .mockResolvedValue({ exists: true, canonicalHandle: "tourist", source: "api" }),
+          getSolvedProblemsResult: jest
+            .fn()
+            .mockResolvedValue({ solved: [], source: "cache", isStale: true }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await suggestCommand.execute(interaction, context);
+
+    const replyArg = (interaction.editReply as jest.Mock).mock.calls[0]?.[0];
+    expect(replyArg.embeds[0].data.footer?.text).toContain("stale");
+  });
 });

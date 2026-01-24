@@ -121,7 +121,7 @@ The following commands are available to you:
 
 - **/health**
 
-  Admin-only diagnostics (uptime, memory, DB status, last error).
+  Admin-only diagnostics (uptime, memory, DB status, last error, command usage/latency).
 
 - **/refresh** `[scope]`
 

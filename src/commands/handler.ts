@@ -1,11 +1,25 @@
 import { PermissionFlagsBits, type ChatInputCommandInteraction } from "discord.js";
 
-import { incrementCommandCount } from "../services/metrics.js";
+import { recordCommandResult } from "../services/metrics.js";
 import type { CommandContext } from "../types/commandContext.js";
 import type { CooldownManager } from "../utils/cooldown.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
+
+function buildLogContext(
+  interaction: ChatInputCommandInteraction,
+  correlationId: string,
+  latencyMs: number
+) {
+  return {
+    correlationId,
+    command: interaction.commandName,
+    guildId: interaction.guildId ?? undefined,
+    userId: interaction.user.id,
+    latencyMs,
+  };
+}
 
 export async function handleCommandInteraction(
   interaction: ChatInputCommandInteraction,
@@ -14,14 +28,11 @@ export async function handleCommandInteraction(
   cooldowns: CooldownManager,
   correlationId: string
 ): Promise<void> {
+  const startTime = Date.now();
+  const getLatencyMs = () => Date.now() - startTime;
   const command = commands.get(interaction.commandName);
   if (!command) {
-    logWarn("Unknown command.", {
-      correlationId,
-      command: interaction.commandName,
-      guildId: interaction.guildId ?? undefined,
-      userId: interaction.user.id,
-    });
+    logWarn("Unknown command.", buildLogContext(interaction, correlationId, getLatencyMs()));
     await interaction.reply({ content: "Unknown command.", ephemeral: true });
     return;
   }
@@ -29,12 +40,10 @@ export async function handleCommandInteraction(
   if (command.adminOnly && interaction.inGuild()) {
     const memberPermissions = interaction.memberPermissions;
     if (!memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-      logWarn("Command blocked (permissions).", {
-        correlationId,
-        command: interaction.commandName,
-        guildId: interaction.guildId ?? undefined,
-        userId: interaction.user.id,
-      });
+      logWarn(
+        "Command blocked (permissions).",
+        buildLogContext(interaction, correlationId, getLatencyMs())
+      );
       await interaction.reply({
         content: "You do not have permission to use this command.",
         ephemeral: true,
@@ -46,10 +55,7 @@ export async function handleCommandInteraction(
   const cooldown = cooldowns.isAllowed(interaction.user.id);
   if (!cooldown.allowed) {
     logWarn("Command blocked (cooldown).", {
-      correlationId,
-      command: interaction.commandName,
-      guildId: interaction.guildId ?? undefined,
-      userId: interaction.user.id,
+      ...buildLogContext(interaction, correlationId, getLatencyMs()),
       retryAfterSeconds: cooldown.retryAfterSeconds,
     });
     await interaction.reply({
@@ -59,31 +65,16 @@ export async function handleCommandInteraction(
     return;
   }
 
-  const startTime = Date.now();
-  incrementCommandCount();
-  logInfo("Command received.", {
-    correlationId,
-    command: interaction.commandName,
-    guildId: interaction.guildId ?? undefined,
-    userId: interaction.user.id,
-  });
+  logInfo("Command received.", buildLogContext(interaction, correlationId, getLatencyMs()));
 
+  let success = false;
   try {
     await command.execute(interaction, context);
-    logInfo("Command completed.", {
-      correlationId,
-      command: interaction.commandName,
-      guildId: interaction.guildId ?? undefined,
-      userId: interaction.user.id,
-      latencyMs: Date.now() - startTime,
-    });
+    success = true;
+    logInfo("Command completed.", buildLogContext(interaction, correlationId, getLatencyMs()));
   } catch (error) {
     logError("Command failed.", {
-      correlationId,
-      command: interaction.commandName,
-      guildId: interaction.guildId ?? undefined,
-      userId: interaction.user.id,
-      latencyMs: Date.now() - startTime,
+      ...buildLogContext(interaction, correlationId, getLatencyMs()),
       error: error instanceof Error ? error.message : String(error),
     });
     if (interaction.deferred || interaction.replied) {
@@ -91,5 +82,7 @@ export async function handleCommandInteraction(
     } else {
       await interaction.reply({ content: "Something went wrong.", ephemeral: true });
     }
+  } finally {
+    recordCommandResult(interaction.commandName, getLatencyMs(), success);
   }
 }

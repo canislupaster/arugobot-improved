@@ -41,7 +41,11 @@ describe("problemCommand", () => {
         },
         store: {
           getLinkedUsers: jest.fn().mockResolvedValue([]),
-          getSolvedProblems: jest.fn().mockResolvedValue([]),
+          getSolvedProblemsResult: jest.fn().mockResolvedValue({
+            solved: [],
+            source: "cache",
+            isStale: false,
+          }),
         },
       },
     } as unknown as CommandContext;
@@ -59,21 +63,26 @@ describe("problemCommand", () => {
       correlationId: "corr-2",
       services: {
         problems: {
-          ensureProblemsLoaded: jest.fn().mockResolvedValue([
-            { contestId: 1000, index: "A", name: "Test", rating: 800, tags: [] },
-          ]),
-          getProblemDict: jest.fn().mockReturnValue(
-            new Map([
-              [
-                "1000A",
-                { contestId: 1000, index: "A", name: "Test", rating: 800, tags: [] },
-              ],
-            ])
-          ),
+          ensureProblemsLoaded: jest
+            .fn()
+            .mockResolvedValue([
+              { contestId: 1000, index: "A", name: "Test", rating: 800, tags: [] },
+            ]),
+          getProblemDict: jest
+            .fn()
+            .mockReturnValue(
+              new Map([
+                ["1000A", { contestId: 1000, index: "A", name: "Test", rating: 800, tags: [] }],
+              ])
+            ),
         },
         store: {
           getLinkedUsers: jest.fn().mockResolvedValue([{ userId: "user-1", handle: "tourist" }]),
-          getSolvedProblems: jest.fn().mockResolvedValue(["1000A"]),
+          getSolvedProblemsResult: jest.fn().mockResolvedValue({
+            solved: ["1000A"],
+            source: "cache",
+            isStale: false,
+          }),
         },
       },
     } as unknown as CommandContext;
