@@ -1,7 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
+import { privateFlags } from "../utils/discordFlags.js";
 import { resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
@@ -52,7 +52,7 @@ export const practicePrefsCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
+        ...privateFlags,
       });
       return;
     }
@@ -67,7 +67,7 @@ export const practicePrefsCommand: Command = {
         if (!preferences) {
           await interaction.reply({
             content: "No practice preferences saved yet. Use /practiceprefs set to configure.",
-            ...ephemeralFlags,
+            ...privateFlags,
           });
           return;
         }
@@ -85,7 +85,7 @@ export const practicePrefsCommand: Command = {
           )
           .setFooter({ text: `Updated ${preferences.updatedAt}` });
 
-        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+        await interaction.reply({ embeds: [embed], ...privateFlags });
         return;
       }
 
@@ -95,7 +95,7 @@ export const practicePrefsCommand: Command = {
           content: removed
             ? "Practice preferences cleared."
             : "No saved practice preferences to clear.",
-          ...ephemeralFlags,
+          ...privateFlags,
         });
         return;
       }
@@ -114,7 +114,7 @@ export const practicePrefsCommand: Command = {
         if (!ratingInputProvided && !tagsInputProvided) {
           await interaction.reply({
             content: "Provide rating ranges or tags to update your preferences.",
-            ...ephemeralFlags,
+            ...privateFlags,
           });
           return;
         }
@@ -132,7 +132,7 @@ export const practicePrefsCommand: Command = {
             defaultMax: DEFAULT_MAX_RATING,
           });
           if (rangeResult.error) {
-            await interaction.reply({ content: rangeResult.error, ...ephemeralFlags });
+            await interaction.reply({ content: rangeResult.error, ...privateFlags });
             return;
           }
           ratingRanges = rangeResult.ranges;
@@ -151,7 +151,7 @@ export const practicePrefsCommand: Command = {
           content: `Practice preferences updated. Ranges: ${formatRanges(
             ratingRanges
           )}. Tags: ${tags.trim() ? tags.trim() : "None"}.`,
-          ...ephemeralFlags,
+          ...privateFlags,
         });
         return;
       }
@@ -161,7 +161,7 @@ export const practicePrefsCommand: Command = {
         interaction,
         context.correlationId
       );
-      await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
+      await interaction.reply({ content: "Something went wrong.", ...privateFlags });
     }
   },
 };

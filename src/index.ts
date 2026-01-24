@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { ServerType } from "@hono/node-server";
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import { sql } from "kysely";
 
@@ -15,6 +16,8 @@ import { ContestRatingChangesService } from "./services/contestRatingChanges.js"
 import { ContestReminderService, contestReminderIntervalMs } from "./services/contestReminders.js";
 import { ContestService } from "./services/contests.js";
 import { ContestStandingsService } from "./services/contestStandings.js";
+import { GuildSettingsService } from "./services/guildSettings.js";
+import { MetricsService } from "./services/metrics.js";
 import {
   PracticeReminderService,
   practiceReminderIntervalMs,
@@ -25,8 +28,10 @@ import { RatingChangesService } from "./services/ratingChanges.js";
 import { StoreService } from "./services/store.js";
 import { TournamentRecapService } from "./services/tournamentRecaps.js";
 import { TournamentService } from "./services/tournaments.js";
+import { WebsiteService } from "./services/website.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo, logWarn } from "./utils/logger.js";
+import { startWebServer } from "./web/server.js";
 
 type ContestListResponse = Array<{ id: number }>;
 
@@ -49,9 +54,11 @@ async function main() {
     timeoutMs: config.codeforcesTimeoutMs,
   });
   const cache = new CodeforcesCacheService(db);
+  const guildSettings = new GuildSettingsService(db);
   const contests = new ContestService(codeforces, cache);
   const contestRatingChanges = new ContestRatingChangesService(db, codeforces);
   const contestStandings = new ContestStandingsService(db, codeforces);
+  const metrics = new MetricsService(db);
   const contestReminders = new ContestReminderService(db, contests);
   const problems = new ProblemService(codeforces, cache);
   const ratingChanges = new RatingChangesService(db, codeforces);
@@ -64,6 +71,7 @@ async function main() {
   challenges.setCompletionNotifier(tournaments);
   const practiceReminders = new PracticeReminderService(db, problems, store);
   const practiceSuggestions = new PracticeSuggestionService(problems, store);
+  const website = new WebsiteService(db, store, guildSettings);
 
   const commandSummaries = commandList.map((command) => ({
     name: command.data.name,
@@ -79,6 +87,7 @@ async function main() {
   let challengeInterval: NodeJS.Timeout | null = null;
   let contestReminderInterval: NodeJS.Timeout | null = null;
   let practiceReminderInterval: NodeJS.Timeout | null = null;
+  let webServer: ServerType | null = null;
   let shuttingDown = false;
   let isChallengeTicking = false;
 
@@ -201,6 +210,8 @@ async function main() {
         contestReminders,
         contestRatingChanges,
         contestStandings,
+        guildSettings,
+        metrics,
         practiceReminders,
         practiceSuggestions,
         codeforces,
@@ -229,6 +240,12 @@ async function main() {
     if (practiceReminderInterval) {
       clearInterval(practiceReminderInterval);
     }
+    if (webServer) {
+      await new Promise<void>((resolve) => {
+        webServer?.close(() => resolve());
+      });
+      webServer = null;
+    }
     await client.destroy();
     await destroyDb();
     logInfo("Shutdown complete.");
@@ -242,6 +259,8 @@ async function main() {
   process.on("uncaughtException", (error) => {
     logError(`Uncaught exception: ${String(error)}`);
   });
+
+  webServer = startWebServer({ host: config.webHost, port: config.webPort }, { website, client });
 
   await validateConnectivity();
   await client.login(config.discordToken);

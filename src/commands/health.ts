@@ -5,13 +5,7 @@ import {
   version as discordJsVersion,
 } from "discord.js";
 
-import {
-  getCommandCount,
-  getCommandUsageSummary,
-  getLastCommandAt,
-  getUniqueCommandCount,
-} from "../services/metrics.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
+import { privateFlags } from "../utils/discordFlags.js";
 import { getLastError } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
@@ -26,7 +20,7 @@ export const healthCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
+        ...privateFlags,
       });
       return;
     }
@@ -42,18 +36,35 @@ export const healthCommand: Command = {
     const contestLastError = context.services.contests.getLastError();
     const contestRatingChangesLastError = context.services.contestRatingChanges.getLastError();
     const ratingChangesLastError = context.services.ratingChanges.getLastError();
-    const reminderCount = await context.services.contestReminders.getSubscriptionCount();
+    const [
+      reminderCount,
+      practiceReminderCount,
+      activeChallenges,
+      activeTournaments,
+      recapCount,
+      commandCount,
+      uniqueCommandCount,
+      lastCommandAt,
+      topCommands,
+    ] = await Promise.all([
+      context.services.contestReminders.getSubscriptionCount(),
+      context.services.practiceReminders.getSubscriptionCount(),
+      context.services.challenges.getActiveCount(),
+      context.services.tournaments.getActiveCount(),
+      context.services.tournamentRecaps.getSubscriptionCount(),
+      context.services.metrics.getCommandCount(),
+      context.services.metrics.getUniqueCommandCount(),
+      context.services.metrics.getLastCommandAt(),
+      context.services.metrics.getCommandUsageSummary(5),
+    ]);
+
     const reminderLastTick = context.services.contestReminders.getLastTickAt();
     const reminderLastError = context.services.contestReminders.getLastError();
-    const practiceReminderCount = await context.services.practiceReminders.getSubscriptionCount();
     const practiceReminderLastTick = context.services.practiceReminders.getLastTickAt();
     const practiceReminderLastError = context.services.practiceReminders.getLastError();
-    const activeChallenges = await context.services.challenges.getActiveCount();
     const challengeLastTick = context.services.challenges.getLastTickAt();
     const challengeLastError = context.services.challenges.getLastError();
-    const activeTournaments = await context.services.tournaments.getActiveCount();
     const tournamentLastError = context.services.tournaments.getLastError();
-    const recapCount = await context.services.tournamentRecaps.getSubscriptionCount();
     const recapLastError = context.services.tournamentRecaps.getLastError();
     const cacheAgeSeconds =
       lastRefreshAt > 0 ? Math.floor((Date.now() - lastRefreshAt) / 1000) : null;
@@ -82,19 +93,17 @@ export const healthCommand: Command = {
         { name: "Active challenges", value: String(activeChallenges), inline: true },
         { name: "Active tournaments", value: String(activeTournaments), inline: true },
         { name: "Tournament recaps", value: String(recapCount), inline: true },
-        { name: "Commands handled", value: String(getCommandCount()), inline: true },
-        { name: "Unique commands", value: String(getUniqueCommandCount()), inline: true },
+        { name: "Commands handled", value: String(commandCount), inline: true },
+        { name: "Unique commands", value: String(uniqueCommandCount), inline: true },
         { name: "Node", value: process.version, inline: true },
         { name: "discord.js", value: discordJsVersion, inline: true },
         { name: "Bot version", value: process.env.npm_package_version ?? "unknown", inline: true }
       );
 
-    const lastCommandAt = getLastCommandAt();
     if (lastCommandAt) {
       embed.addFields({ name: "Last command", value: lastCommandAt, inline: true });
     }
 
-    const topCommands = getCommandUsageSummary(5);
     if (topCommands.length > 0) {
       const lines = topCommands
         .map(
@@ -211,6 +220,6 @@ export const healthCommand: Command = {
       });
     }
 
-    await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+    await interaction.reply({ embeds: [embed], ...privateFlags });
   },
 };

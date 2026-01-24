@@ -14,7 +14,7 @@ import {
 
 import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
+import { ephemeralFlags, privateFlags } from "../utils/discordFlags.js";
 import { formatTime } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -331,7 +331,7 @@ export const tournamentCommand: Command = {
             if (selection.user.id !== interaction.user.id) {
               await selection.reply({
                 content: "Only the command user can use this menu.",
-                ...ephemeralFlags,
+                ...privateFlags,
               });
               return;
             }
@@ -344,7 +344,7 @@ export const tournamentCommand: Command = {
               HISTORY_DETAIL_STANDINGS_LIMIT
             );
             if (!detail) {
-              await selection.reply({ content: "Tournament not found.", ...ephemeralFlags });
+              await selection.reply({ content: "Tournament not found.", ...privateFlags });
               return;
             }
             const detailEmbed = buildHistoryDetailEmbed(detail);
@@ -357,7 +357,7 @@ export const tournamentCommand: Command = {
               context.correlationId
             );
             if (!selection.replied) {
-              await selection.reply({ content: "Something went wrong.", ...ephemeralFlags });
+              await selection.reply({ content: "Something went wrong.", ...privateFlags });
             }
           }
         });
@@ -372,7 +372,7 @@ export const tournamentCommand: Command = {
             if (button.user.id !== interaction.user.id) {
               await button.reply({
                 content: "Only the command user can use this button.",
-                ...ephemeralFlags,
+                ...privateFlags,
               });
               return;
             }
@@ -384,12 +384,12 @@ export const tournamentCommand: Command = {
             if (!selectedTournamentId) {
               await button.reply({
                 content: "Select a tournament first.",
-                ...ephemeralFlags,
+                ...privateFlags,
               });
               return;
             }
 
-            await button.deferReply({ ...ephemeralFlags });
+            await button.deferReply({ ...privateFlags });
             const recap = await context.services.tournaments.getRecap(
               guildId,
               selectedTournamentId
@@ -413,7 +413,7 @@ export const tournamentCommand: Command = {
               context.correlationId
             );
             if (!button.replied) {
-              await button.reply({ content: "Something went wrong.", ...ephemeralFlags });
+              await button.reply({ content: "Something went wrong.", ...privateFlags });
             }
           }
         });
@@ -602,7 +602,10 @@ export const tournamentCommand: Command = {
       if (subcommand === "cancel") {
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
-          await interaction.reply({ content: "No active tournament to cancel.", ...ephemeralFlags });
+          await interaction.reply({
+            content: "No active tournament to cancel.",
+            ...ephemeralFlags,
+          });
           return;
         }
 
@@ -718,13 +721,13 @@ export const tournamentCommand: Command = {
         collector.on("collect", async (button) => {
           if (button.customId === joinId) {
             if (participants.has(button.user.id)) {
-              await button.reply({ content: "You already joined.", ...ephemeralFlags });
+              await button.reply({ content: "You already joined.", ...privateFlags });
               return;
             }
             if (participants.size >= maxParticipants) {
               await button.reply({
                 content: `Lobby is full (max ${maxParticipants}).`,
-                ...ephemeralFlags,
+                ...privateFlags,
               });
               return;
             }
@@ -738,7 +741,7 @@ export const tournamentCommand: Command = {
                 content: `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
                   challenge.endsAt
                 )}).`,
-                ...ephemeralFlags,
+                ...privateFlags,
               });
               return;
             }
@@ -746,7 +749,7 @@ export const tournamentCommand: Command = {
             if (!linked) {
               await button.reply({
                 content: "Link a handle with /register first.",
-                ...ephemeralFlags,
+                ...privateFlags,
               });
               return;
             }
@@ -762,13 +765,13 @@ export const tournamentCommand: Command = {
 
           if (button.customId === leaveId) {
             if (!participants.has(button.user.id)) {
-              await button.reply({ content: "You are not in this lobby.", ...ephemeralFlags });
+              await button.reply({ content: "You are not in this lobby.", ...privateFlags });
               return;
             }
             if (button.user.id === interaction.user.id) {
               await button.reply({
                 content: "The host cannot leave. Use cancel to stop the lobby.",
-                ...ephemeralFlags,
+                ...privateFlags,
               });
               return;
             }
@@ -784,13 +787,13 @@ export const tournamentCommand: Command = {
 
           if (button.customId === startId) {
             if (button.user.id !== interaction.user.id) {
-              await button.reply({ content: "Only the host can start.", ...ephemeralFlags });
+              await button.reply({ content: "Only the host can start.", ...privateFlags });
               return;
             }
             if (participants.size < MIN_PARTICIPANTS) {
               await button.reply({
                 content: `Need at least ${MIN_PARTICIPANTS} participants to start.`,
-                ...ephemeralFlags,
+                ...privateFlags,
               });
               return;
             }
@@ -802,7 +805,7 @@ export const tournamentCommand: Command = {
 
           if (button.customId === cancelId) {
             if (button.user.id !== interaction.user.id) {
-              await button.reply({ content: "Only the host can cancel.", ...ephemeralFlags });
+              await button.reply({ content: "Only the host can cancel.", ...privateFlags });
               return;
             }
             lobbyEmbed.setDescription("Tournament cancelled.");

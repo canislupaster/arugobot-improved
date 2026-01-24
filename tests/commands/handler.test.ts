@@ -3,7 +3,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { handleCommandInteraction } from "../../src/commands/handler.js";
 import type { Command } from "../../src/commands/types.js";
 import { CooldownManager } from "../../src/utils/cooldown.js";
-import { ephemeralFlags } from "../../src/utils/discordFlags.js";
+import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -20,6 +20,14 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
   }) as unknown as ChatInputCommandInteraction;
 
 describe("handleCommandInteraction", () => {
+  const metrics = {
+    recordCommandResult: jest.fn().mockResolvedValue(undefined),
+  };
+
+  beforeEach(() => {
+    metrics.recordCommandResult.mockClear();
+  });
+
   it("replies when command is unknown", async () => {
     const interaction = createInteraction({ commandName: "missing" });
     const context = {
@@ -27,7 +35,7 @@ describe("handleCommandInteraction", () => {
       config: {} as never,
       commandSummaries: [],
       correlationId: "corr-1",
-      services: {} as never,
+      services: { metrics } as never,
     };
     const cooldowns = new CooldownManager(1, 1);
 
@@ -35,7 +43,7 @@ describe("handleCommandInteraction", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Unknown command.",
-      ...ephemeralFlags,
+      ...publicFlags,
     });
   });
 
@@ -51,7 +59,7 @@ describe("handleCommandInteraction", () => {
       config: {} as never,
       commandSummaries: [],
       correlationId: "corr-2",
-      services: {} as never,
+      services: { metrics } as never,
     };
     const cooldowns = new CooldownManager(0, 0);
 
@@ -78,7 +86,7 @@ describe("handleCommandInteraction", () => {
       config: {} as never,
       commandSummaries: [],
       correlationId: "corr-3",
-      services: {} as never,
+      services: { metrics } as never,
     };
     const cooldowns = new CooldownManager(0, 0);
 
@@ -92,7 +100,7 @@ describe("handleCommandInteraction", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Something went wrong.",
-      ...ephemeralFlags,
+      ...publicFlags,
     });
   });
 });

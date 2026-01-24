@@ -1,10 +1,6 @@
 # For AI agents:
 
-Edit this file to document project structure and any features you add or are pursuing.
-
-# TODO
-
-When this TODO list clears up, continue adding ideas!
+Edit this file to document project structure and any features you have added. The Github issue list should be used to document all in-progress work.
 
 # ArugoBot
 
@@ -13,6 +9,7 @@ Discord bot with all you need to practice competitive programming and compete ag
 ## Usage
 
 The following commands are available to you:
+Most command responses are public; handle-linking and admin diagnostics remain ephemeral.
 
 - **/challenge problem** `length` `problem` `[user1..user9]` `[open]` `[max_participants]`
 
@@ -38,6 +35,11 @@ The following commands are available to you:
 
   Configure automatic tournament recap posts. Use `set` to choose a channel and optional role mention.
   `post` sends the latest completed tournament recap immediately.
+
+- **/dashboard** `set|status|clear`
+
+  Admin-only web dashboard visibility. Use `set` to opt in/out of the public dashboard,
+  `status` to see the current setting, and `clear` to reset to private.
 
 - **/rating** `[user]`
 
@@ -190,6 +192,8 @@ Optional environment variables:
 - `CODEFORCES_REQUEST_DELAY_MS` (default `2000`)
 - `CODEFORCES_TIMEOUT_MS` (default `10000`)
 - `CODEFORCES_SOLVED_MAX_PAGES` (default `10`, set `0` for unlimited)
+- `WEB_HOST` (default `0.0.0.0`)
+- `WEB_PORT` (default `8787`)
 
 ```bash
 pnpm install
@@ -198,6 +202,13 @@ pnpm run dev
 
 The bot runs database migrations on startup.
 Problem and contest caches are persisted in the database to keep basic functionality available during Codeforces outages.
+
+## Web dashboard
+
+The bot serves a Hono-powered dashboard for global stats and per-guild leaderboards.
+By default it listens on `http://localhost:8787` (override with `WEB_HOST`/`WEB_PORT`).
+Only guilds that opt in via `/dashboard set public:true` appear on the public pages.
+The overview includes global contest participation cards sourced from cached rating changes.
 
 Quality gates:
 

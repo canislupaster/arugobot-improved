@@ -2,7 +2,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { challengesCommand } from "../../src/commands/challenges.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { ephemeralFlags } from "../../src/utils/discordFlags.js";
+import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -53,7 +53,7 @@ describe("challengesCommand", () => {
     await challengesCommand.execute(interaction, context);
 
     expect(interaction.reply).toHaveBeenCalledWith(
-      expect.objectContaining({ ...ephemeralFlags, embeds: expect.any(Array) })
+      expect.objectContaining({ ...publicFlags, embeds: expect.any(Array) })
     );
   });
 
@@ -91,7 +91,7 @@ describe("challengesCommand", () => {
     await challengesCommand.execute(interaction, context);
 
     expect(interaction.reply).toHaveBeenCalledWith(
-      expect.objectContaining({ ...ephemeralFlags, embeds: expect.any(Array) })
+      expect.objectContaining({ ...publicFlags, embeds: expect.any(Array) })
     );
   });
 
@@ -115,7 +115,7 @@ describe("challengesCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No active challenges to cancel.",
-      ...ephemeralFlags,
+      ...publicFlags,
     });
   });
 
@@ -153,7 +153,7 @@ describe("challengesCommand", () => {
     await challengesCommand.execute(interaction, context);
 
     expect(interaction.reply).toHaveBeenCalledWith(
-      expect.objectContaining({ ...ephemeralFlags, embeds: expect.any(Array) })
+      expect.objectContaining({ ...publicFlags, embeds: expect.any(Array) })
     );
   });
 });

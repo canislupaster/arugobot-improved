@@ -2,7 +2,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { parseHandles, suggestCommand } from "../../src/commands/suggest.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { ephemeralFlags } from "../../src/utils/discordFlags.js";
+import { publicFlags } from "../../src/utils/discordFlags.js";
 
 describe("parseHandles", () => {
   it("splits by comma and whitespace", () => {
@@ -35,7 +35,7 @@ describe("suggestCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Use rating, min/max, or ranges, not a mix.",
-      ...ephemeralFlags,
+      ...publicFlags,
     });
   });
 
