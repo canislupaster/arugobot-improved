@@ -828,21 +828,66 @@ export class StoreService {
   }
 
   async getSolvedProblems(handle: string, ttlMs = SOLVED_CACHE_TTL_MS): Promise<string[] | null> {
+    const key = this.normalizeHandle(handle);
     let result: string[] = [];
     let newLast = -1;
+    let row:
+      | {
+          handle: string;
+          solved: string;
+          last_sub: number;
+          updated_at: string;
+        }
+      | undefined;
 
     try {
-      const row = await this.db
+      const candidates = key === handle ? [key] : [key, handle];
+      let rows = await this.db
         .selectFrom("ac")
-        .select(["solved", "last_sub", "updated_at"])
-        .where("handle", "=", handle)
-        .executeTakeFirst();
+        .select(["handle", "solved", "last_sub", "updated_at"])
+        .where("handle", "in", candidates)
+        .execute();
+
+      if (rows.length === 0) {
+        rows = await this.db
+          .selectFrom("ac")
+          .select(["handle", "solved", "last_sub", "updated_at"])
+          .where((eb) => eb.fn("lower", [eb.ref("handle")]), "=", key)
+          .execute();
+      }
+
+      row = rows.find((entry) => entry.handle === key) ?? rows[0];
+
+      const legacy =
+        row && row.handle !== key ? row : rows.find((entry) => entry.handle === handle);
+      if (!rows.find((entry) => entry.handle === key) && legacy) {
+        await this.db.transaction().execute(async (trx) => {
+          await trx
+            .insertInto("ac")
+            .values({
+              handle: key,
+              solved: legacy.solved,
+              last_sub: legacy.last_sub,
+              updated_at: legacy.updated_at,
+            })
+            .onConflict((oc) =>
+              oc.column("handle").doUpdateSet({
+                solved: legacy.solved,
+                last_sub: legacy.last_sub,
+                updated_at: legacy.updated_at,
+              })
+            )
+            .execute();
+          await trx.deleteFrom("ac").where("handle", "=", legacy.handle).execute();
+        });
+        row = { ...legacy, handle: key };
+      }
 
       if (row) {
         if (isCacheFresh(row.updated_at, ttlMs)) {
           return parseJsonArray<string>(row.solved, []);
         }
-        logInfo("Small query.");
+        logInfo("Solved list incremental refresh.", { handle: key });
         const prevLast = row.last_sub;
         const currentList = parseJsonArray<string>(row.solved, []);
         try {
@@ -865,13 +910,14 @@ export class StoreService {
               }
             } else {
               found = true;
-              logInfo("Small query worked.");
+              logInfo("Solved list incremental refresh hit cached marker.", { handle: key });
               result = currentList;
               break;
             }
           }
 
           if (!found) {
+            logInfo("Solved list incremental refresh fell back to full sync.", { handle: key });
             const { solved, lastSubId } = await this.fetchLargeSolvedList(handle);
             result = solved;
             if (lastSubId !== null) {
@@ -883,7 +929,7 @@ export class StoreService {
           return null;
         }
       } else {
-        logInfo("Large query.");
+        logInfo("Solved list full refresh.", { handle: key });
         try {
           const { solved, lastSubId } = await this.fetchLargeSolvedList(handle);
           result = solved;
@@ -906,7 +952,7 @@ export class StoreService {
         await this.db
           .insertInto("ac")
           .values({
-            handle,
+            handle: key,
             solved: JSON.stringify(result),
             last_sub: newLast,
             updated_at: new Date().toISOString(),
@@ -925,6 +971,25 @@ export class StoreService {
     }
 
     return result;
+  }
+
+  async refreshHandles(): Promise<{ checked: number; updated: number }> {
+    const handles = await this.getHandles();
+    const uniqueHandles = Array.from(new Set(handles));
+    let updated = 0;
+
+    for (const existingHandle of uniqueHandles) {
+      const resolution = await this.resolveHandle(existingHandle);
+      if (!resolution.exists || !resolution.canonicalHandle) {
+        continue;
+      }
+      if (resolution.canonicalHandle !== existingHandle) {
+        await this.updateHandle(existingHandle, resolution.canonicalHandle);
+        updated += 1;
+      }
+    }
+
+    return { checked: uniqueHandles.length, updated };
   }
 
   private async fetchLargeSolvedList(
@@ -971,15 +1036,5 @@ export class StoreService {
       });
     }
     return { solved: result, lastSubId };
-  }
-
-  async getNewHandle(handle: string): Promise<string> {
-    const result = await this.resolveHandle(handle);
-    return result.exists && result.canonicalHandle ? result.canonicalHandle : handle;
-  }
-
-  async handleExistsOnCf(handle: string): Promise<boolean> {
-    const result = await this.resolveHandle(handle);
-    return result.exists;
   }
 }

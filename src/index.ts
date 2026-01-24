@@ -87,17 +87,6 @@ async function main() {
     }
   }
 
-  async function fixHandles() {
-    const handles = await store.getHandles();
-    for (const handle of handles) {
-      const newHandle = await store.getNewHandle(handle);
-      if (newHandle !== handle) {
-        logInfo(`Change from ${handle} to ${newHandle}.`);
-        await store.updateHandle(handle, newHandle);
-      }
-    }
-  }
-
   let isParsing = false;
   async function parseData() {
     if (shuttingDown) {
@@ -111,7 +100,8 @@ async function main() {
       logInfo("Parsing data...");
       await problems.refreshProblems(true);
       logInfo("Fixing handles...");
-      await fixHandles();
+      const refreshSummary = await store.refreshHandles();
+      logInfo("Handle refresh complete.", refreshSummary);
       logInfo("Data parsing complete.");
     } catch (error) {
       logError(`Error during parsing: ${String(error)}`);

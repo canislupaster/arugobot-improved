@@ -118,6 +118,36 @@ describe("StoreService", () => {
     expect(stats.topRating).toBeNull();
   });
 
+  it("refreshes handles to canonical casing", async () => {
+    await store.insertUser("guild-1", "user-1", "tourist");
+    mockClient.request.mockResolvedValueOnce([{ handle: "Tourist" }]);
+
+    const summary = await store.refreshHandles();
+
+    expect(summary.checked).toBe(1);
+    expect(summary.updated).toBe(1);
+    const handle = await store.getHandle("guild-1", "user-1");
+    expect(handle).toBe("Tourist");
+  });
+
+  it("normalizes solved cache handles", async () => {
+    await db
+      .insertInto("ac")
+      .values({
+        handle: "Tourist",
+        solved: JSON.stringify(["1A"]),
+        last_sub: 10,
+        updated_at: new Date().toISOString(),
+      })
+      .execute();
+
+    const solved = await store.getSolvedProblems("tourist");
+
+    expect(solved).toEqual(["1A"]);
+    const rows = await db.selectFrom("ac").select("handle").execute();
+    expect(rows).toEqual([{ handle: "tourist" }]);
+  });
+
   it("caches Codeforces profile data and serves stale cache on failure", async () => {
     mockClient.request.mockResolvedValueOnce([
       {
