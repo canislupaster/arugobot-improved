@@ -63,6 +63,14 @@ export const contestRemindersCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("preview").setDescription("Preview the next scheduled reminder")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("post")
+        .setDescription("Post a contest reminder immediately")
+        .addBooleanOption((option) =>
+          option.setName("force").setDescription("Send even if a reminder was already posted")
+        )
     ),
   adminOnly: true,
   async execute(interaction, context) {
@@ -256,6 +264,53 @@ export const contestRemindersCommand: Command = {
         }
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
+
+      if (subcommand === "post") {
+        const force = interaction.options.getBoolean("force") ?? false;
+        await interaction.deferReply({ ephemeral: true });
+        const result = await context.services.contestReminders.sendManualReminder(
+          guildId,
+          context.client,
+          force
+        );
+
+        if (result.status === "no_subscription") {
+          await interaction.editReply("No contest reminders configured for this server.");
+          return;
+        }
+
+        if (result.status === "channel_missing") {
+          await interaction.editReply(
+            "Configured channel is missing or invalid. Use /contestreminders set to update it."
+          );
+          return;
+        }
+
+        if (result.status === "no_contest") {
+          await interaction.editReply("No upcoming contests found with the current filters.");
+          return;
+        }
+
+        if (result.status === "already_notified") {
+          await interaction.editReply(
+            `A reminder for ${result.contestName} was already posted at ${result.notifiedAt}. Use force to send another.`
+          );
+          return;
+        }
+
+        if (result.status === "sent") {
+          const staleNote = result.isStale ? " (used cached contest data)" : "";
+          await interaction.editReply(
+            `Posted a reminder for ${result.contestName} in <#${result.channelId}>.${staleNote}`
+          );
+          return;
+        }
+
+        await interaction.editReply(
+          "Unable to send a contest reminder right now. Try again later."
+        );
         return;
       }
     } catch (error) {

@@ -210,4 +210,60 @@ describe("ContestReminderService", () => {
     resolveRefresh();
     await Promise.all([first, second]);
   });
+
+  it("sends manual reminders for the next contest", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.getUpcomingContests.mockReturnValue([
+      {
+        id: 501,
+        name: "Manual Round",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 30 * 60,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestReminderService(db, contestService);
+    await service.setSubscription("guild-1", "channel-1", 30, null, [], []);
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    const result = await service.sendManualReminder("guild-1", client, false);
+
+    expect(result.status).toBe("sent");
+    expect(send).toHaveBeenCalledTimes(1);
+    const notifications = await db.selectFrom("contest_notifications").selectAll().execute();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.contest_id).toBe(501);
+  });
+
+  it("reports already-notified contests when posting manually", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.getUpcomingContests.mockReturnValue([
+      {
+        id: 601,
+        name: "Manual Round",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 30 * 60,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    await db
+      .insertInto("contest_notifications")
+      .values({ guild_id: "guild-1", contest_id: 601, notified_at: new Date().toISOString() })
+      .execute();
+
+    const service = new ContestReminderService(db, contestService);
+    await service.setSubscription("guild-1", "channel-1", 30, null, [], []);
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    const result = await service.sendManualReminder("guild-1", client, false);
+
+    expect(result.status).toBe("already_notified");
+    expect(send).not.toHaveBeenCalled();
+  });
 });

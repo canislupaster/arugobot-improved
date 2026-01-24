@@ -12,10 +12,13 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
       getSubcommand: jest.fn(),
       getChannel: jest.fn(),
       getInteger: jest.fn(),
+      getBoolean: jest.fn(),
       getRole: jest.fn(),
       getString: jest.fn(),
     },
     reply: jest.fn().mockResolvedValue(undefined),
+    deferReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
 
@@ -56,9 +59,7 @@ describe("contestRemindersCommand", () => {
         getChannel: jest.fn().mockReturnValue(channel),
         getInteger: jest.fn().mockReturnValue(null),
         getRole: jest.fn().mockReturnValue({ id: "role-1" }),
-        getString: jest.fn()
-          .mockReturnValueOnce("div. 2")
-          .mockReturnValueOnce("kotlin"),
+        getString: jest.fn().mockReturnValueOnce("div. 2").mockReturnValueOnce("kotlin"),
       },
     });
     const context = {
@@ -185,5 +186,37 @@ describe("contestRemindersCommand", () => {
       content: "No contest reminders configured for this server.",
       ephemeral: true,
     });
+  });
+
+  it("posts a manual reminder for the next contest", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("post"),
+        getBoolean: jest.fn().mockReturnValue(false),
+      },
+    });
+    const context = {
+      correlationId: "corr-6",
+      client: {} as never,
+      services: {
+        contestReminders: {
+          sendManualReminder: jest.fn().mockResolvedValue({
+            status: "sent",
+            contestId: 123,
+            contestName: "CF Round",
+            channelId: "channel-1",
+            minutesBefore: 30,
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRemindersCommand.execute(interaction, context);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Posted a reminder for CF Round in <#channel-1>."
+    );
   });
 });

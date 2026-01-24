@@ -27,6 +27,21 @@ export type ContestReminder = {
   excludeKeywords: string[];
 };
 
+export type ManualContestReminderResult =
+  | { status: "no_subscription" }
+  | { status: "channel_missing"; channelId: string }
+  | { status: "no_contest" }
+  | { status: "already_notified"; contestId: number; contestName: string; notifiedAt: string }
+  | {
+      status: "sent";
+      contestId: number;
+      contestName: string;
+      channelId: string;
+      minutesBefore: number;
+      isStale: boolean;
+    }
+  | { status: "error"; message: string };
+
 type ContestProvider = Pick<ContestService, "refresh" | "getUpcomingContests">;
 
 export class ContestReminderService {
@@ -145,6 +160,96 @@ export class ContestReminderService {
     return Number(result.numDeletedRows ?? 0) > 0;
   }
 
+  async sendManualReminder(
+    guildId: string,
+    client: Client,
+    force = false
+  ): Promise<ManualContestReminderResult> {
+    const subscription = await this.getSubscription(guildId);
+    if (!subscription) {
+      return { status: "no_subscription" };
+    }
+
+    const channel = await client.channels.fetch(subscription.channelId).catch(() => null);
+    if (
+      !channel ||
+      (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
+    ) {
+      return { status: "channel_missing", channelId: subscription.channelId };
+    }
+
+    let isStale = false;
+    try {
+      await this.contests.refresh();
+    } catch (error) {
+      isStale = true;
+      const message = error instanceof Error ? error.message : String(error);
+      this.lastError = { message, timestamp: new Date().toISOString() };
+      logWarn("Contest reminder refresh failed; using cached contests.", { error: message });
+    }
+
+    const upcoming = this.contests.getUpcomingContests();
+    const filtered = filterContestsByKeywords(upcoming, {
+      includeKeywords: subscription.includeKeywords,
+      excludeKeywords: subscription.excludeKeywords,
+    });
+
+    if (filtered.length === 0) {
+      return { status: "no_contest" };
+    }
+
+    const contest = filtered[0]!;
+    if (!force) {
+      const notification = await this.getNotification(subscription.guildId, contest.id);
+      if (notification) {
+        return {
+          status: "already_notified",
+          contestId: contest.id,
+          contestName: contest.name,
+          notifiedAt: notification.notified_at,
+        };
+      }
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const secondsUntil = Math.max(0, contest.startTimeSeconds - nowSeconds);
+    const embed = buildReminderEmbed(contest, secondsUntil);
+    try {
+      const mention = subscription.roleId ? `<@&${subscription.roleId}>` : undefined;
+      await channel.send({
+        content: mention,
+        allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+        embeds: [embed],
+      });
+      await this.markNotified(subscription.guildId, contest.id);
+      logInfo("Contest reminder sent (manual).", {
+        guildId: subscription.guildId,
+        channelId: subscription.channelId,
+        contestId: contest.id,
+        minutesBefore: subscription.minutesBefore,
+        isStale,
+      });
+      return {
+        status: "sent",
+        contestId: contest.id,
+        contestName: contest.name,
+        channelId: subscription.channelId,
+        minutesBefore: subscription.minutesBefore,
+        isStale,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.lastError = { message, timestamp: new Date().toISOString() };
+      logWarn("Contest reminder send failed (manual).", {
+        guildId: subscription.guildId,
+        channelId: subscription.channelId,
+        contestId: contest.id,
+        error: message,
+      });
+      return { status: "error", message };
+    }
+  }
+
   async runTick(client: Client): Promise<void> {
     if (this.isTicking) {
       return;
@@ -256,13 +361,21 @@ export class ContestReminderService {
   }
 
   private async wasNotified(guildId: string, contestId: number): Promise<boolean> {
+    const notification = await this.getNotification(guildId, contestId);
+    return Boolean(notification);
+  }
+
+  private async getNotification(
+    guildId: string,
+    contestId: number
+  ): Promise<{ notified_at: string } | null> {
     const row = await this.db
       .selectFrom("contest_notifications")
-      .select("contest_id")
+      .select("notified_at")
       .where("guild_id", "=", guildId)
       .where("contest_id", "=", contestId)
       .executeTakeFirst();
-    return Boolean(row);
+    return row ?? null;
   }
 
   private async markNotified(guildId: string, contestId: number): Promise<void> {

@@ -133,10 +133,11 @@ The following commands are available to you:
 
   Shows details for a contest by id, URL, or name.
 
-- **/contestreminders** `set|status|clear|preview`
+- **/contestreminders** `set|status|clear|preview|post`
 
   Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time,
   optional role mention, and optional keyword filters (`include`/`exclude`, comma-separated).
+  Use `post` to send a reminder immediately (optionally `force` to send even if one was already posted).
 
 - **/practicereminders** `set|status|clear|preview|post`
 
