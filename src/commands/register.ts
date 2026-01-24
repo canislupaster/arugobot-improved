@@ -7,55 +7,13 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 
+import { waitForCompilationError } from "../services/verification.js";
 import { logError, type LogContext } from "../utils/logger.js";
-import { sleep } from "../utils/sleep.js";
 
 import type { Command } from "./types.js";
 
 const VERIFICATION_TIMEOUT_MS = 60000;
-
-type SubmissionResponse = Array<{
-  verdict?: string;
-  contestId?: number;
-  problem: { index: string; contestId?: number };
-  creationTimeSeconds: number;
-}>;
-
-type RequestFn = <T>(
-  endpoint: string,
-  params?: Record<string, string | number | boolean>
-) => Promise<T>;
-
-async function gotSubmission(
-  contestId: number,
-  handle: string,
-  index: string,
-  startTime: number,
-  logContext: LogContext,
-  request: RequestFn
-): Promise<boolean> {
-  try {
-    const result = await request<SubmissionResponse>("contest.status", {
-      contestId,
-      handle,
-      from: 1,
-      count: 10,
-    });
-
-    for (const submission of result) {
-      if (
-        submission.problem.index === index &&
-        submission.verdict === "COMPILATION_ERROR" &&
-        submission.contestId === contestId
-      ) {
-        return submission.creationTimeSeconds > startTime;
-      }
-    }
-  } catch (error) {
-    logError(`Error getting submission: ${String(error)}`, logContext);
-  }
-  return false;
-}
+const VERIFICATION_POLL_MS = 5000;
 
 async function validateHandle(
   channelReply: (content: string) => Promise<unknown>,
@@ -81,19 +39,20 @@ async function validateHandle(
   const startTime = Math.floor(Date.now() / 1000);
 
   await channelReply(
-    `Submit a compilation error to the following problem in the next 60 seconds:\nhttps://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`
+    `Submit a compilation error to the following problem in the next 60 seconds:\nhttps://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}\nI will confirm as soon as I see it.`
   );
-  await sleep(VERIFICATION_TIMEOUT_MS);
 
-  const hasSubmission = await gotSubmission(
-    problem.contestId,
+  const verified = await waitForCompilationError({
+    contestId: problem.contestId,
     handle,
-    problem.index,
-    startTime,
+    index: problem.index,
+    startTimeSeconds: startTime,
+    timeoutMs: VERIFICATION_TIMEOUT_MS,
+    pollIntervalMs: VERIFICATION_POLL_MS,
     logContext,
-    context.services.codeforces.request.bind(context.services.codeforces)
-  );
-  if (!hasSubmission) {
+    request: context.services.codeforces.request.bind(context.services.codeforces),
+  });
+  if (!verified) {
     return "verification_failed";
   }
 

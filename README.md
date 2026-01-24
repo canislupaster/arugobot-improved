@@ -4,7 +4,6 @@ Edit this file to document project structure and any features you add or are pur
 
 # TODO
 
-- Register should confirm instantly once the compilation error is submitted.
 - Add arbitrary problem difficulty ranges for suggest/challenge.
 - Allow open challenges in which everyone is invited to accept before the challenge creator starts the challenge.
 - Extend to tournaments with any number of participants and various formats (Swiss, elimination, etc).
