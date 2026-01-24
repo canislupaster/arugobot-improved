@@ -56,13 +56,27 @@ describe("PracticeReminderService", () => {
       } as never
     );
 
-    await service.setSubscription("guild-1", "channel-1", 9, 0, [{ min: 800, max: 1400 }], "");
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      [{ min: 800, max: 1400 }],
+      "",
+      "role-1"
+    );
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
     await service.runTick(client);
 
     expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({
+      content: "<@&role-1>",
+      allowedMentions: { roles: ["role-1"] },
+      embeds: expect.any(Array),
+    });
     const posts = await db.selectFrom("practice_posts").selectAll().execute();
     expect(posts).toHaveLength(1);
     expect(posts[0]?.problem_id).toBe("100A");
@@ -94,7 +108,16 @@ describe("PracticeReminderService", () => {
       } as never
     );
 
-    await service.setSubscription("guild-1", "channel-1", 9, 0, [{ min: 800, max: 1400 }], "");
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
     await db
       .updateTable("practice_reminders")
       .set({ last_sent_at: new Date(nowMs).toISOString() })
@@ -109,6 +132,86 @@ describe("PracticeReminderService", () => {
     await service.runTick(client);
 
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("stores UTC offset minutes with the subscription", async () => {
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue([]),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      6,
+      30,
+      150,
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
+
+    const subscription = await service.getSubscription("guild-1");
+    expect(subscription?.utcOffsetMinutes).toBe(150);
+  });
+
+  it("sends manual reminders and blocks duplicate sends without force", async () => {
+    const nowMs = Date.UTC(2024, 0, 1, 10, 0, 0);
+    jest.useFakeTimers().setSystemTime(new Date(nowMs));
+
+    const problems = [
+      {
+        contestId: 150,
+        index: "D",
+        name: "Manual",
+        rating: 1100,
+        tags: ["greedy"],
+      },
+    ];
+
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue(problems),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      [{ min: 800, max: 1400 }],
+      "",
+      "role-2"
+    );
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    const first = await service.sendManualReminder("guild-1", client, false);
+    expect(first.status).toBe("sent");
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({
+      content: "<@&role-2>",
+      allowedMentions: { roles: ["role-2"] },
+      embeds: expect.any(Array),
+    });
+
+    const second = await service.sendManualReminder("guild-1", client, false);
+    expect(second.status).toBe("already_sent");
   });
 
   it("builds a preview when configured", async () => {
@@ -137,7 +240,16 @@ describe("PracticeReminderService", () => {
       } as never
     );
 
-    await service.setSubscription("guild-1", "channel-1", 9, 0, [{ min: 1500, max: 1500 }], "");
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      [{ min: 1500, max: 1500 }],
+      "",
+      null
+    );
 
     const preview = await service.getPreview("guild-1");
 

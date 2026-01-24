@@ -42,6 +42,12 @@ export type CfRecentSubmissionsTable = {
   last_fetched: Generated<string>;
 };
 
+export type CfCacheTable = {
+  key: string;
+  payload: string;
+  last_fetched: Generated<string>;
+};
+
 export type ChallengesTable = {
   id: string;
   server_id: string;
@@ -94,8 +100,10 @@ export type PracticeRemindersTable = {
   channel_id: string;
   hour_utc: number;
   minute_utc: number;
+  utc_offset_minutes: number;
   rating_ranges: string;
   tags: string;
+  role_id: string | null;
   last_sent_at: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;
@@ -107,16 +115,25 @@ export type PracticePostsTable = {
   sent_at: Generated<string>;
 };
 
+export type PracticeSuggestionsTable = {
+  guild_id: string;
+  user_id: string;
+  problem_id: string;
+  suggested_at: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
   cf_handles: CfHandlesTable;
   cf_profiles: CfProfilesTable;
   cf_recent_submissions: CfRecentSubmissionsTable;
+  cf_cache: CfCacheTable;
   challenges: ChallengesTable;
   challenge_participants: ChallengeParticipantsTable;
   contest_reminders: ContestRemindersTable;
   contest_notifications: ContestNotificationsTable;
   practice_reminders: PracticeRemindersTable;
   practice_posts: PracticePostsTable;
+  practice_suggestions: PracticeSuggestionsTable;
 };

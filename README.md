@@ -128,7 +128,7 @@ The following commands are available to you:
 
 - **/practicereminders** `set|status|clear|preview|post`
 
-  Configure daily practice problem reminders (admin only). Use `set` to choose a channel, UTC time, rating ranges, optional tags, and an optional role mention.
+  Configure daily practice problem reminders (admin only). Use `set` to choose a channel, time, optional `utc_offset` (e.g. `+02:00`, `-05:30`, `Z`), rating ranges, optional tags, and an optional role mention. If `utc_offset` is omitted the time is interpreted as UTC.
   Use `post` to send a practice problem immediately (optionally `force` to send even if one was posted today).
 
 ## Installation

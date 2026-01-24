@@ -24,8 +24,10 @@ export type PracticeReminder = {
   channelId: string;
   hourUtc: number;
   minuteUtc: number;
+  utcOffsetMinutes: number;
   ratingRanges: RatingRange[];
   tags: string;
+  roleId: string | null;
   lastSentAt: string | null;
 };
 
@@ -37,6 +39,14 @@ export type PracticeReminderPreview = {
   staleHandles: number;
   candidateCount: number;
 };
+
+export type ManualReminderResult =
+  | { status: "sent"; problemId: string; channelId: string }
+  | { status: "no_subscription" }
+  | { status: "already_sent"; lastSentAt: string }
+  | { status: "channel_missing"; channelId: string }
+  | { status: "no_problem"; candidateCount: number }
+  | { status: "error"; message: string };
 
 type PracticeSelectionResult = {
   problem: Problem | null;
@@ -101,6 +111,10 @@ function formatRatingRanges(ranges: RatingRange[]): string {
     .join(", ");
 }
 
+function buildRoleMention(roleId: string | null): string | undefined {
+  return roleId ? `<@&${roleId}>` : undefined;
+}
+
 export class PracticeReminderService {
   private lastTickAt: string | null = null;
   private lastError: { message: string; timestamp: string } | null = null;
@@ -128,8 +142,10 @@ export class PracticeReminderService {
         "channel_id",
         "hour_utc",
         "minute_utc",
+        "utc_offset_minutes",
         "rating_ranges",
         "tags",
+        "role_id",
         "last_sent_at",
       ])
       .where("guild_id", "=", guildId)
@@ -142,8 +158,10 @@ export class PracticeReminderService {
       channelId: row.channel_id,
       hourUtc: row.hour_utc,
       minuteUtc: row.minute_utc,
+      utcOffsetMinutes: row.utc_offset_minutes ?? 0,
       ratingRanges: parseRatingRanges(row.rating_ranges),
       tags: row.tags ?? "",
+      roleId: row.role_id ?? null,
       lastSentAt: row.last_sent_at ?? null,
     };
   }
@@ -156,8 +174,10 @@ export class PracticeReminderService {
         "channel_id",
         "hour_utc",
         "minute_utc",
+        "utc_offset_minutes",
         "rating_ranges",
         "tags",
+        "role_id",
         "last_sent_at",
       ])
       .execute();
@@ -166,8 +186,10 @@ export class PracticeReminderService {
       channelId: row.channel_id,
       hourUtc: row.hour_utc,
       minuteUtc: row.minute_utc,
+      utcOffsetMinutes: row.utc_offset_minutes ?? 0,
       ratingRanges: parseRatingRanges(row.rating_ranges),
       tags: row.tags ?? "",
+      roleId: row.role_id ?? null,
       lastSentAt: row.last_sent_at ?? null,
     }));
   }
@@ -185,8 +207,10 @@ export class PracticeReminderService {
     channelId: string,
     hourUtc: number,
     minuteUtc: number,
+    utcOffsetMinutes: number,
     ratingRanges: RatingRange[],
-    tags: string
+    tags: string,
+    roleId: string | null
   ): Promise<void> {
     const timestamp = new Date().toISOString();
     await this.db
@@ -196,8 +220,10 @@ export class PracticeReminderService {
         channel_id: channelId,
         hour_utc: hourUtc,
         minute_utc: minuteUtc,
+        utc_offset_minutes: utcOffsetMinutes,
         rating_ranges: JSON.stringify(ratingRanges),
         tags,
+        role_id: roleId,
         last_sent_at: null,
         created_at: timestamp,
         updated_at: timestamp,
@@ -207,8 +233,10 @@ export class PracticeReminderService {
           channel_id: channelId,
           hour_utc: hourUtc,
           minute_utc: minuteUtc,
+          utc_offset_minutes: utcOffsetMinutes,
           rating_ranges: JSON.stringify(ratingRanges),
           tags,
+          role_id: roleId,
           updated_at: timestamp,
         })
       )
@@ -242,6 +270,69 @@ export class PracticeReminderService {
       staleHandles: selection.staleHandles,
       candidateCount: selection.candidateCount,
     };
+  }
+
+  async sendManualReminder(
+    guildId: string,
+    client: Client,
+    force = false
+  ): Promise<ManualReminderResult> {
+    const subscription = await this.getSubscription(guildId);
+    if (!subscription) {
+      return { status: "no_subscription" };
+    }
+
+    const now = new Date();
+    const todayStart = getTodayStartUtcMs(now);
+    const lastSentAt = subscription.lastSentAt ? Date.parse(subscription.lastSentAt) : 0;
+    if (!force && Number.isFinite(lastSentAt) && lastSentAt >= todayStart) {
+      return {
+        status: "already_sent",
+        lastSentAt: subscription.lastSentAt ?? new Date().toISOString(),
+      };
+    }
+
+    const channel = await client.channels.fetch(subscription.channelId).catch(() => null);
+    if (
+      !channel ||
+      (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
+    ) {
+      return { status: "channel_missing", channelId: subscription.channelId };
+    }
+
+    try {
+      await this.cleanupPosts();
+      const selection = await this.selectProblem(subscription);
+      if (!selection.problem) {
+        return { status: "no_problem", candidateCount: selection.candidateCount };
+      }
+
+      const embed = this.buildPracticeEmbed(subscription, selection.problem, selection);
+      const mention = buildRoleMention(subscription.roleId);
+      await channel.send({
+        content: mention,
+        allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+        embeds: [embed],
+      });
+      await this.markPosted(subscription.guildId, selection.problem);
+      await this.updateLastSent(subscription.guildId);
+      const problemId = getProblemId(selection.problem);
+      logInfo("Practice reminder sent (manual).", {
+        guildId: subscription.guildId,
+        channelId: subscription.channelId,
+        problemId,
+      });
+      return { status: "sent", problemId, channelId: subscription.channelId };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.lastError = { message, timestamp: new Date().toISOString() };
+      logWarn("Manual practice reminder failed.", {
+        guildId: subscription.guildId,
+        channelId: subscription.channelId,
+        error: message,
+      });
+      return { status: "error", message };
+    }
   }
 
   async runTick(client: Client): Promise<void> {
@@ -313,7 +404,12 @@ export class PracticeReminderService {
 
         const embed = this.buildPracticeEmbed(subscription, selection.problem, selection);
         try {
-          await channel.send({ embeds: [embed] });
+          const mention = buildRoleMention(subscription.roleId);
+          await channel.send({
+            content: mention,
+            allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+            embeds: [embed],
+          });
           await this.markPosted(subscription.guildId, selection.problem);
           await this.updateLastSent(subscription.guildId);
           logInfo("Practice reminder sent.", {

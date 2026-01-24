@@ -13,8 +13,12 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
       getChannel: jest.fn(),
       getInteger: jest.fn(),
       getString: jest.fn(),
+      getBoolean: jest.fn(),
+      getRole: jest.fn(),
     },
     reply: jest.fn().mockResolvedValue(undefined),
+    deferReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
 
@@ -26,6 +30,8 @@ describe("practiceRemindersCommand", () => {
         getChannel: jest.fn(),
         getInteger: jest.fn(),
         getString: jest.fn(),
+        getBoolean: jest.fn(),
+        getRole: jest.fn(),
       },
     });
     const context = {
@@ -56,6 +62,8 @@ describe("practiceRemindersCommand", () => {
         getChannel: jest.fn().mockReturnValue(channel),
         getInteger: jest.fn().mockReturnValue(null),
         getString: jest.fn().mockReturnValue(null),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(null),
       },
     });
     const context = {
@@ -74,8 +82,10 @@ describe("practiceRemindersCommand", () => {
       "channel-1",
       9,
       0,
+      0,
       [{ min: 800, max: 3500 }],
-      ""
+      "",
+      null
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Practice reminders enabled in <#channel-1> (daily at 09:00 UTC).",
@@ -90,6 +100,8 @@ describe("practiceRemindersCommand", () => {
         getChannel: jest.fn(),
         getInteger: jest.fn(),
         getString: jest.fn(),
+        getBoolean: jest.fn(),
+        getRole: jest.fn(),
       },
     });
     const context = {
@@ -109,6 +121,152 @@ describe("practiceRemindersCommand", () => {
     });
   });
 
+  it("sets practice reminders with a role mention", async () => {
+    const channel = {
+      id: "channel-2",
+      type: ChannelType.GuildText,
+    };
+    const role = { id: "role-1" };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn((name: string) => {
+          if (name === "hour_utc") {
+            return 10;
+          }
+          if (name === "minute_utc") {
+            return 0;
+          }
+          return null;
+        }),
+        getString: jest.fn().mockReturnValue(null),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(role),
+      },
+    });
+    const context = {
+      correlationId: "corr-3b",
+      services: {
+        practiceReminders: {
+          setSubscription: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.setSubscription).toHaveBeenCalledWith(
+      "guild-1",
+      "channel-2",
+      10,
+      0,
+      0,
+      [{ min: 800, max: 3500 }],
+      "",
+      "role-1"
+    );
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        "Practice reminders enabled in <#channel-2> (daily at 10:00 UTC) (mentioning <@&role-1>).",
+      ephemeral: true,
+    });
+  });
+
+  it("accepts a UTC offset and converts local time to UTC", async () => {
+    const channel = {
+      id: "channel-3",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn((name: string) => {
+          if (name === "hour_utc") {
+            return 9;
+          }
+          if (name === "minute_utc") {
+            return 0;
+          }
+          return null;
+        }),
+        getString: jest.fn((name: string) => {
+          if (name === "utc_offset") {
+            return "+02:30";
+          }
+          return null;
+        }),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      correlationId: "corr-3c",
+      services: {
+        practiceReminders: {
+          setSubscription: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.setSubscription).toHaveBeenCalledWith(
+      "guild-1",
+      "channel-3",
+      6,
+      30,
+      150,
+      [{ min: 800, max: 3500 }],
+      "",
+      null
+    );
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        "Practice reminders enabled in <#channel-3> (daily at 09:00 (UTC+02:30); 06:30 UTC).",
+      ephemeral: true,
+    });
+  });
+
+  it("rejects invalid UTC offsets", async () => {
+    const channel = {
+      id: "channel-4",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn((name: string) => {
+          if (name === "utc_offset") {
+            return "+25:00";
+          }
+          return null;
+        }),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      correlationId: "corr-3d",
+      services: {
+        practiceReminders: {
+          setSubscription: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.setSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "UTC offset must be between -12:00 and +14:00.",
+      ephemeral: true,
+    });
+  });
+
   it("previews the next reminder when configured", async () => {
     const interaction = createInteraction({
       options: {
@@ -116,6 +274,8 @@ describe("practiceRemindersCommand", () => {
         getChannel: jest.fn(),
         getInteger: jest.fn(),
         getString: jest.fn(),
+        getBoolean: jest.fn(),
+        getRole: jest.fn(),
       },
     });
     const context = {
@@ -128,8 +288,10 @@ describe("practiceRemindersCommand", () => {
               channelId: "channel-1",
               hourUtc: 9,
               minuteUtc: 0,
+              utcOffsetMinutes: 0,
               ratingRanges: [{ min: 800, max: 1000 }],
               tags: "",
+              roleId: null,
               lastSentAt: null,
             },
             nextScheduledAt: 1_700_000_000_000,
@@ -153,5 +315,42 @@ describe("practiceRemindersCommand", () => {
     const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds[0].data.title).toBe("Practice reminder preview");
     expect(payload.ephemeral).toBe(true);
+  });
+
+  it("posts a practice reminder immediately", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("post"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getRole: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-5",
+      client: { user: { id: "bot-1" } },
+      services: {
+        practiceReminders: {
+          sendManualReminder: jest.fn().mockResolvedValue({
+            status: "sent",
+            problemId: "100A",
+            channelId: "channel-1",
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.sendManualReminder).toHaveBeenCalledWith(
+      "guild-1",
+      context.client,
+      false
+    );
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Posted a practice problem in <#channel-1>."
+    );
   });
 });
