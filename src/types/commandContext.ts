@@ -5,6 +5,7 @@ import type { ChallengeService } from "../services/challenges.js";
 import type { CodeforcesClient } from "../services/codeforces.js";
 import type { ContestReminderService } from "../services/contestReminders.js";
 import type { ContestService } from "../services/contests.js";
+import type { ContestStandingsService } from "../services/contestStandings.js";
 import type { PracticeReminderService } from "../services/practiceReminders.js";
 import type { PracticeSuggestionService } from "../services/practiceSuggestions.js";
 import type { ProblemService } from "../services/problems.js";
@@ -21,6 +22,7 @@ export type CommandContext = {
     challenges: ChallengeService;
     contests: ContestService;
     contestReminders: ContestReminderService;
+    contestStandings: ContestStandingsService;
     practiceReminders: PracticeReminderService;
     practiceSuggestions: PracticeSuggestionService;
     codeforces: CodeforcesClient;

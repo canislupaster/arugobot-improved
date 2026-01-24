@@ -13,6 +13,7 @@ import { CodeforcesClient } from "./services/codeforces.js";
 import { CodeforcesCacheService } from "./services/codeforcesCache.js";
 import { ContestReminderService, contestReminderIntervalMs } from "./services/contestReminders.js";
 import { ContestService } from "./services/contests.js";
+import { ContestStandingsService } from "./services/contestStandings.js";
 import {
   PracticeReminderService,
   practiceReminderIntervalMs,
@@ -47,6 +48,7 @@ async function main() {
   });
   const cache = new CodeforcesCacheService(db);
   const contests = new ContestService(codeforces, cache);
+  const contestStandings = new ContestStandingsService(db, codeforces);
   const contestReminders = new ContestReminderService(db, contests);
   const problems = new ProblemService(codeforces, cache);
   const store = new StoreService(db, codeforces, {
@@ -193,6 +195,7 @@ async function main() {
         challenges,
         contests,
         contestReminders,
+        contestStandings,
         practiceReminders,
         practiceSuggestions,
         codeforces,

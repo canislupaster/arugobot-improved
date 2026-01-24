@@ -148,6 +148,10 @@ The following commands are available to you:
 
   Shows details for a contest by id, URL, or name.
 
+- **/contestresults** `query` `[limit]` `[user1..user4]` `[handles]`
+
+  Shows standings for linked users (or specified handles) in a contest.
+
 - **/contestreminders** `set|status|clear|preview|post`
 
   Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time,
