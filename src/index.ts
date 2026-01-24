@@ -10,12 +10,14 @@ import { initDb, destroyDb } from "./db/database.js";
 import { migrateToLatest } from "./db/migrator.js";
 import { ChallengeService, challengeUpdateIntervalMs } from "./services/challenges.js";
 import { CodeforcesClient } from "./services/codeforces.js";
+import { CodeforcesCacheService } from "./services/codeforcesCache.js";
 import { ContestReminderService, contestReminderIntervalMs } from "./services/contestReminders.js";
 import { ContestService } from "./services/contests.js";
 import {
   PracticeReminderService,
   practiceReminderIntervalMs,
 } from "./services/practiceReminders.js";
+import { PracticeSuggestionService } from "./services/practiceSuggestions.js";
 import { ProblemService } from "./services/problems.js";
 import { StoreService } from "./services/store.js";
 import { CooldownManager } from "./utils/cooldown.js";
@@ -41,14 +43,16 @@ async function main() {
     requestDelayMs: config.codeforcesRequestDelayMs,
     timeoutMs: config.codeforcesTimeoutMs,
   });
-  const contests = new ContestService(codeforces);
+  const cache = new CodeforcesCacheService(db);
+  const contests = new ContestService(codeforces, cache);
   const contestReminders = new ContestReminderService(db, contests);
-  const problems = new ProblemService(codeforces);
+  const problems = new ProblemService(codeforces, cache);
   const store = new StoreService(db, codeforces, {
     maxSolvedPages: config.codeforcesSolvedMaxPages,
   });
   const challenges = new ChallengeService(db, store, codeforces);
   const practiceReminders = new PracticeReminderService(db, problems, store);
+  const practiceSuggestions = new PracticeSuggestionService(problems, store);
 
   const commandSummaries = commandList.map((command) => ({
     name: command.data.name,
@@ -184,6 +188,7 @@ async function main() {
         contests,
         contestReminders,
         practiceReminders,
+        practiceSuggestions,
         codeforces,
         problems,
         store,

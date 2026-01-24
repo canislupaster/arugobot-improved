@@ -55,6 +55,10 @@ The following commands are available to you:
 
   Links your CF account.
 
+- **/relink** `handle`
+
+  Updates your linked CF handle (use if you changed your Codeforces handle).
+
 - **/unlink**
 
   Unlinks your CF account and erases all progress.
@@ -63,6 +67,13 @@ The following commands are available to you:
 
   Gives some problems in the rating range that none of the CF accounts have done (defaults to 800-3500).
   If `handles` is omitted, uses linked handles in the server.
+  Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
+  Use `tags` to require tags and prefix `-` to exclude tags (e.g. `dp, greedy, -math`).
+
+- **/practice** `rating|min_rating|max_rating|ranges` `[tags]` `[user]` `[handle]`
+
+  Suggests a single unsolved practice problem for a linked user or a Codeforces handle.
+  If `handle` is omitted, uses the linked handle for `user` (or yourself).
   Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
   Use `tags` to require tags and prefix `-` to exclude tags (e.g. `dp, greedy, -math`).
 
@@ -108,9 +119,10 @@ The following commands are available to you:
 
   Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time, and optional role mention.
 
-- **/practicereminders** `set|status|clear|preview`
+- **/practicereminders** `set|status|clear|preview|post`
 
-  Configure daily practice problem reminders (admin only). Use `set` to choose a channel, UTC time, rating ranges, and optional tags.
+  Configure daily practice problem reminders (admin only). Use `set` to choose a channel, UTC time, rating ranges, optional tags, and an optional role mention.
+  Use `post` to send a practice problem immediately (optionally `force` to send even if one was posted today).
 
 ## Installation
 
@@ -136,6 +148,7 @@ pnpm run dev
 ```
 
 The bot runs database migrations on startup.
+Problem and contest caches are persisted in the database to keep basic functionality available during Codeforces outages.
 
 Quality gates:
 

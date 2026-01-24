@@ -9,13 +9,14 @@ import { helpCommand } from "./help.js";
 import { historyCommand } from "./history.js";
 import { leaderboardCommand } from "./leaderboard.js";
 import { pingCommand } from "./ping.js";
+import { practiceCommand } from "./practice.js";
 import { practiceRemindersCommand } from "./practiceReminders.js";
 import { problemCommand } from "./problem.js";
 import { profileCommand } from "./profile.js";
 import { ratingCommand } from "./rating.js";
 import { recentCommand } from "./recent.js";
 import { refreshCommand } from "./refresh.js";
-import { registerCommand, unlinkCommand } from "./register.js";
+import { registerCommand, relinkCommand, unlinkCommand } from "./register.js";
 import { statsCommand } from "./stats.js";
 import { suggestCommand } from "./suggest.js";
 import type { Command } from "./types.js";
@@ -30,6 +31,7 @@ export const commandList: Command[] = [
   historyCommand,
   leaderboardCommand,
   pingCommand,
+  practiceCommand,
   practiceRemindersCommand,
   problemCommand,
   profileCommand,
@@ -37,6 +39,7 @@ export const commandList: Command[] = [
   ratingCommand,
   recentCommand,
   registerCommand,
+  relinkCommand,
   unlinkCommand,
   suggestCommand,
   statsCommand,
