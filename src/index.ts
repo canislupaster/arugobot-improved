@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Client, GatewayIntentBits } from "discord.js";
+import { Client, Events, GatewayIntentBits } from "discord.js";
 import { sql } from "kysely";
 
 import { handleCommandInteraction } from "./commands/handler.js";
@@ -8,6 +8,7 @@ import { commandData, commandList, commandMap } from "./commands/index.js";
 import { loadConfig, validateConfig } from "./config/env.js";
 import { initDb, destroyDb } from "./db/database.js";
 import { migrateToLatest } from "./db/migrator.js";
+import { ChallengeService, challengeUpdateIntervalMs } from "./services/challenges.js";
 import { CodeforcesClient } from "./services/codeforces.js";
 import { ContestService } from "./services/contests.js";
 import { ProblemService } from "./services/problems.js";
@@ -38,6 +39,7 @@ async function main() {
   const contests = new ContestService(codeforces);
   const problems = new ProblemService(codeforces);
   const store = new StoreService(db, codeforces);
+  const challenges = new ChallengeService(db, store, codeforces);
 
   const commandSummaries = commandList.map((command) => ({
     name: command.data.name,
@@ -50,7 +52,9 @@ async function main() {
 
   const cooldowns = new CooldownManager(3, 1);
   let parseInterval: NodeJS.Timeout | null = null;
+  let challengeInterval: NodeJS.Timeout | null = null;
   let shuttingDown = false;
+  let isChallengeTicking = false;
 
   async function validateConnectivity() {
     try {
@@ -105,7 +109,7 @@ async function main() {
     }
   }
 
-  client.once("ready", async () => {
+  client.once(Events.ClientReady, async () => {
     logInfo(`Logged in as ${client.user?.tag ?? "unknown"}`);
 
     if (client.application) {
@@ -130,9 +134,23 @@ async function main() {
 
     await parseData();
     parseInterval = setInterval(parseData, 60 * 60 * 1000);
+
+    const tickChallenges = async () => {
+      if (shuttingDown || isChallengeTicking) {
+        return;
+      }
+      isChallengeTicking = true;
+      try {
+        await challenges.runTick(client);
+      } finally {
+        isChallengeTicking = false;
+      }
+    };
+    await tickChallenges();
+    challengeInterval = setInterval(tickChallenges, challengeUpdateIntervalMs);
   });
 
-  client.on("interactionCreate", async (interaction) => {
+  client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand()) {
       return;
     }
@@ -142,7 +160,7 @@ async function main() {
       config,
       commandSummaries,
       correlationId,
-      services: { contests, codeforces, problems, store },
+      services: { challenges, contests, codeforces, problems, store },
     };
     await handleCommandInteraction(interaction, commandMap, context, cooldowns, correlationId);
   });
@@ -152,6 +170,9 @@ async function main() {
     logInfo(`Shutting down (${signal})...`);
     if (parseInterval) {
       clearInterval(parseInterval);
+    }
+    if (challengeInterval) {
+      clearInterval(challengeInterval);
     }
     await client.destroy();
     await destroyDb();

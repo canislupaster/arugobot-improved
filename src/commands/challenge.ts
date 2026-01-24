@@ -16,91 +16,13 @@ import {
 } from "../utils/problemSelection.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
-import { sleep } from "../utils/sleep.js";
 
 import type { Command } from "./types.js";
 
 const VALID_LENGTHS = new Set([40, 60, 80]);
-const UPDATE_INTERVAL_SECONDS = 30;
 const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
-
-type ContestStatusResponse = Array<{
-  verdict?: string;
-  creationTimeSeconds: number;
-  problem: {
-    contestId: number;
-    index: string;
-  };
-}>;
-
-async function gotAc(
-  contestId: number,
-  problemIndex: string,
-  handle: string,
-  length: number,
-  startTime: number,
-  logContext: LogContext,
-  request: <T>(endpoint: string, params?: Record<string, string | number | boolean>) => Promise<T>
-): Promise<boolean> {
-  try {
-    const response = await request<ContestStatusResponse>("contest.status", {
-      contestId,
-      handle,
-      from: 1,
-      count: 100,
-    });
-    for (const item of response) {
-      const id = `${item.problem.contestId}${item.problem.index}`;
-      if (
-        id === `${contestId}${problemIndex}` &&
-        item.verdict === "OK" &&
-        item.creationTimeSeconds <= startTime + length * 60 &&
-        item.creationTimeSeconds >= startTime
-      ) {
-        return true;
-      }
-    }
-    return false;
-  } catch (error) {
-    logError(`Error during challenge: ${String(error)}`, logContext);
-    return false;
-  }
-}
-
-async function checkAc(
-  serverId: string,
-  userId: string,
-  contestId: number,
-  problemIndex: string,
-  problemRating: number,
-  length: number,
-  startTime: number,
-  logContext: LogContext,
-  context: Parameters<Command["execute"]>[1]
-): Promise<number> {
-  const handle = await context.services.store.getHandle(serverId, userId);
-  if (!handle) {
-    return 0;
-  }
-  if (
-    await gotAc(
-      contestId,
-      problemIndex,
-      handle,
-      length,
-      startTime,
-      logContext,
-      context.services.codeforces.request.bind(context.services.codeforces)
-    )
-  ) {
-    const rating = await context.services.store.getRating(serverId, userId);
-    const [, up] = getRatingChanges(rating, problemRating, length);
-    await context.services.store.updateRating(serverId, userId, rating + up);
-    return 1;
-  }
-  return 0;
-}
+const OPEN_LOBBY_TIMEOUT_MS = 5 * 60 * 1000;
 
 function buildProblemLink(contestId: number, index: string, name: string) {
   return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
@@ -139,9 +61,10 @@ export const challengeCommand: Command = {
       option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
     )
     .addStringOption((option) =>
-      option
-        .setName("ranges")
-        .setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
+      option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
+    )
+    .addBooleanOption((option) =>
+      option.setName("open").setDescription("Allow anyone to join before starting")
     )
     .addUserOption((option) => option.setName("user1").setDescription("Participant 1 (optional)"))
     .addUserOption((option) => option.setName("user2").setDescription("Participant 2 (optional)"))
@@ -160,6 +83,7 @@ export const challengeCommand: Command = {
     const minRatingOption = interaction.options.getInteger("min_rating");
     const maxRatingOption = interaction.options.getInteger("max_rating");
     const rangesRaw = interaction.options.getString("ranges");
+    const openLobby = interaction.options.getBoolean("open") ?? false;
     const length = interaction.options.getInteger("length", true);
 
     if (!VALID_LENGTHS.has(length)) {
@@ -197,7 +121,7 @@ export const challengeCommand: Command = {
       return;
     }
 
-    const participantUsers = uniqueUsers(
+    let participantUsers = uniqueUsers(
       [
         interaction.user,
         interaction.options.getUser("user1"),
@@ -315,232 +239,310 @@ export const challengeCommand: Command = {
       }
     }
 
-    const confirmEmbed = new EmbedBuilder()
-      .setTitle("Confirm challenge")
-      .setDescription("All participants must confirm within 30 seconds.")
-      .setColor(0x3498db)
-      .addFields(
-        { name: "Time", value: formatTime(length * 60), inline: false },
-        {
-          name: "Problem",
-          value: buildProblemLink(problem.contestId, problem.index, problem.name),
-          inline: false,
-        }
-      );
-
-    let usersValue = "";
-    for (const user of participantUsers) {
-      const rating = await context.services.store.getRating(interaction.guild.id, user.id);
-      const [down, up] = getRatingChanges(rating, problem.rating!, length);
-      usersValue += `- ${user} (${rating}) (don't solve: ${down}, solve: ${up})\n`;
-    }
-    confirmEmbed.addFields({ name: "Users", value: usersValue, inline: false });
-
-    const confirmId = `challenge_confirm_${interaction.id}`;
-    const cancelId = `challenge_cancel_${interaction.id}`;
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(confirmId).setLabel("Confirm").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary)
-    );
-
-    const response = await interaction.reply({
-      embeds: [confirmEmbed],
-      components: [row],
-      fetchReply: true,
-    });
-
-    const confirmed = new Set<string>();
-    const collector = response.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      time: 30000,
-    });
-
-    collector.on("collect", async (button) => {
-      if (!participantUsers.some((user) => user.id === button.user.id)) {
-        await button.reply({ content: "You are not part of this challenge.", ephemeral: true });
-        return;
-      }
-
-      if (button.customId === cancelId) {
-        if (button.user.id !== interaction.user.id) {
-          await button.reply({ content: "Only the host can cancel.", ephemeral: true });
-          return;
-        }
-        confirmEmbed.setDescription("Challenge cancelled.");
-        await button.update({ embeds: [confirmEmbed], components: [] });
-        collector.stop("cancelled");
-        return;
-      }
-
-      confirmed.add(button.user.id);
-      const confirmedValue = participantUsers
-        .map((user) =>
-          confirmed.has(user.id) ? `- ${user} :white_check_mark:` : `- ${user} :hourglass:`
-        )
-        .join("\n");
-      confirmEmbed.spliceFields(2, 1, { name: "Users", value: confirmedValue, inline: false });
-      await button.update({ embeds: [confirmEmbed], components: [row] });
-
-      if (confirmed.size === participantUsers.length) {
-        collector.stop("confirmed");
-      }
-    });
-
-    const status = await new Promise<string>((resolve) => {
-      collector.on("end", (_collected, reason) => resolve(reason));
-    });
-
-    if (status !== "confirmed") {
-      if (status !== "cancelled") {
-        confirmEmbed.setDescription("Confirmation failed.");
-        await interaction.editReply({ embeds: [confirmEmbed], components: [] });
-      }
-      return;
-    }
-
-    confirmEmbed.setDescription("Challenge confirmed.");
-    await interaction.editReply({ embeds: [confirmEmbed], components: [] });
-
-    for (const user of participantUsers) {
-      await context.services.store.addToHistory(interaction.guild.id, user.id, problemId);
-    }
-
-    const challengeEmbed = new EmbedBuilder()
-      .setTitle("Challenge")
-      .setColor(0x3498db)
-      .addFields(
-        { name: "Time", value: formatTime(length * 60), inline: false },
-        {
-          name: "Problem",
-          value: buildProblemLink(problem.contestId, problem.index, problem.name),
-          inline: false,
-        }
-      );
-
-    const solved = participantUsers.map(() => 0);
-    const startTime = Math.floor(Date.now() / 1000);
-    const baseLogContext: LogContext = {
+    const logContext: LogContext = {
       correlationId: context.correlationId,
       command: "challenge",
       guildId: interaction.guild.id,
+      userId: interaction.user.id,
     };
+
+    const buildUsersValue = async (users: User[]) => {
+      let value = "";
+      for (const user of users) {
+        const rating = await context.services.store.getRating(interaction.guild.id, user.id);
+        const [down, up] = getRatingChanges(rating, problem.rating!, length);
+        value += `- ${user} (${rating}) (don't solve: ${down}, solve: ${up})\n`;
+      }
+      return value || "No participants yet.";
+    };
+
+    const confirmParticipants = async (): Promise<boolean> => {
+      const confirmEmbed = new EmbedBuilder()
+        .setTitle("Confirm challenge")
+        .setDescription("All participants must confirm within 30 seconds.")
+        .setColor(0x3498db)
+        .addFields(
+          { name: "Time", value: formatTime(length * 60), inline: false },
+          {
+            name: "Problem",
+            value: buildProblemLink(problem.contestId, problem.index, problem.name),
+            inline: false,
+          }
+        )
+        .addFields({
+          name: "Users",
+          value: await buildUsersValue(participantUsers),
+          inline: false,
+        });
+
+      const confirmId = `challenge_confirm_${interaction.id}`;
+      const cancelId = `challenge_cancel_${interaction.id}`;
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(confirmId)
+          .setLabel("Confirm")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+      );
+
+      const response = await interaction.reply({
+        embeds: [confirmEmbed],
+        components: [row],
+        fetchReply: true,
+      });
+
+      const confirmed = new Set<string>();
+      const collector = response.createMessageComponentCollector({
+        componentType: ComponentType.Button,
+        time: 30000,
+      });
+
+      collector.on("collect", async (button) => {
+        if (!participantUsers.some((user) => user.id === button.user.id)) {
+          await button.reply({ content: "You are not part of this challenge.", ephemeral: true });
+          return;
+        }
+
+        if (button.customId === cancelId) {
+          if (button.user.id !== interaction.user.id) {
+            await button.reply({ content: "Only the host can cancel.", ephemeral: true });
+            return;
+          }
+          confirmEmbed.setDescription("Challenge cancelled.");
+          await button.update({ embeds: [confirmEmbed], components: [] });
+          collector.stop("cancelled");
+          return;
+        }
+
+        confirmed.add(button.user.id);
+        const confirmedValue = participantUsers
+          .map((user) =>
+            confirmed.has(user.id) ? `- ${user} :white_check_mark:` : `- ${user} :hourglass:`
+          )
+          .join("\n");
+        confirmEmbed.spliceFields(2, 1, { name: "Users", value: confirmedValue, inline: false });
+        await button.update({ embeds: [confirmEmbed], components: [row] });
+
+        if (confirmed.size === participantUsers.length) {
+          collector.stop("confirmed");
+        }
+      });
+
+      const status = await new Promise<string>((resolve) => {
+        collector.on("end", (_collected, reason) => resolve(reason));
+      });
+
+      if (status !== "confirmed") {
+        if (status !== "cancelled") {
+          confirmEmbed.setDescription("Confirmation failed.");
+          await interaction.editReply({ embeds: [confirmEmbed], components: [] });
+        }
+        return false;
+      }
+
+      confirmEmbed.setDescription("Challenge confirmed.");
+      await interaction.editReply({ embeds: [confirmEmbed], components: [] });
+      return true;
+    };
+
+    const runOpenLobby = async (): Promise<User[] | null> => {
+      const participants = new Map(participantUsers.map((user) => [user.id, user]));
+      const lobbyEmbed = new EmbedBuilder()
+        .setTitle("Open challenge lobby")
+        .setDescription("Click Join to participate. The host can start when ready.")
+        .setColor(0x3498db)
+        .addFields(
+          { name: "Time", value: formatTime(length * 60), inline: false },
+          {
+            name: "Problem",
+            value: buildProblemLink(problem.contestId, problem.index, problem.name),
+            inline: false,
+          },
+          { name: "Users", value: await buildUsersValue([...participants.values()]), inline: false }
+        );
+
+      const joinId = `challenge_join_${interaction.id}`;
+      const startId = `challenge_start_${interaction.id}`;
+      const cancelId = `challenge_cancel_${interaction.id}`;
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(joinId).setLabel("Join").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(startId).setLabel("Start").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+      );
+
+      const response = await interaction.reply({
+        embeds: [lobbyEmbed],
+        components: [row],
+        fetchReply: true,
+      });
+
+      const collector = response.createMessageComponentCollector({
+        componentType: ComponentType.Button,
+        time: OPEN_LOBBY_TIMEOUT_MS,
+      });
+
+      collector.on("collect", async (button) => {
+        if (button.customId === joinId) {
+          if (participants.has(button.user.id)) {
+            await button.reply({ content: "You already joined.", ephemeral: true });
+            return;
+          }
+          if (participants.size >= 5) {
+            await button.reply({ content: "Lobby is full (max 5).", ephemeral: true });
+            return;
+          }
+          const linked = await context.services.store.handleLinked(
+            interaction.guild.id,
+            button.user.id
+          );
+          if (!linked) {
+            await button.reply({ content: "Link a handle with /register first.", ephemeral: true });
+            return;
+          }
+          const history = await context.services.store.getHistoryList(
+            interaction.guild.id,
+            button.user.id
+          );
+          if (history.includes(problemId)) {
+            await button.reply({
+              content: "You have already done this problem in a prior challenge.",
+              ephemeral: true,
+            });
+            return;
+          }
+          const handle = await context.services.store.getHandle(
+            interaction.guild.id,
+            button.user.id
+          );
+          if (!handle) {
+            await button.reply({
+              content: "Missing handle data. Try again in a bit.",
+              ephemeral: true,
+            });
+            return;
+          }
+          const solved = await context.services.store.getSolvedProblems(handle);
+          if (!solved) {
+            await button.reply({
+              content: "Unable to verify solved problems right now. Try again later.",
+              ephemeral: true,
+            });
+            return;
+          }
+          if (solved.includes(problemId)) {
+            await button.reply({
+              content: "You have already solved this problem on Codeforces.",
+              ephemeral: true,
+            });
+            return;
+          }
+          participants.set(button.user.id, button.user);
+          lobbyEmbed.spliceFields(2, 1, {
+            name: "Users",
+            value: await buildUsersValue([...participants.values()]),
+            inline: false,
+          });
+          await button.update({ embeds: [lobbyEmbed], components: [row] });
+          return;
+        }
+
+        if (button.customId === startId) {
+          if (button.user.id !== interaction.user.id) {
+            await button.reply({ content: "Only the host can start.", ephemeral: true });
+            return;
+          }
+          lobbyEmbed.setDescription("Challenge starting.");
+          await button.update({ embeds: [lobbyEmbed], components: [] });
+          collector.stop("started");
+          return;
+        }
+
+        if (button.customId === cancelId) {
+          if (button.user.id !== interaction.user.id) {
+            await button.reply({ content: "Only the host can cancel.", ephemeral: true });
+            return;
+          }
+          lobbyEmbed.setDescription("Challenge cancelled.");
+          await button.update({ embeds: [lobbyEmbed], components: [] });
+          collector.stop("cancelled");
+        }
+      });
+
+      const status = await new Promise<string>((resolve) => {
+        collector.on("end", (_collected, reason) => resolve(reason));
+      });
+
+      if (status !== "started") {
+        if (status !== "cancelled") {
+          lobbyEmbed.setDescription("Lobby timed out.");
+          await interaction.editReply({ embeds: [lobbyEmbed], components: [] });
+        }
+        return null;
+      }
+
+      return [...participants.values()];
+    };
+
+    if (openLobby) {
+      const lobbyUsers = await runOpenLobby();
+      if (!lobbyUsers) {
+        return;
+      }
+      participantUsers = lobbyUsers;
+    } else {
+      const confirmed = await confirmParticipants();
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const startTime = Math.floor(Date.now() / 1000);
+    const participants = participantUsers.map((user, index) => ({
+      userId: user.id,
+      position: index,
+      solvedAt: null,
+    }));
+
+    const challengeEmbed = await context.services.challenges.buildActiveEmbed({
+      serverId: interaction.guild.id,
+      problem: {
+        contestId: problem.contestId,
+        index: problem.index,
+        name: problem.name,
+        rating: problem.rating!,
+      },
+      lengthMinutes: length,
+      timeLeftSeconds: length * 60,
+      participants,
+    });
 
     const challengeMessage = await interaction.followUp({
       embeds: [challengeEmbed],
       fetchReply: true,
     });
 
-    for (let elapsed = 0; elapsed < length * 60; elapsed += UPDATE_INTERVAL_SECONDS) {
-      const nextTime = startTime * 1000 + (elapsed + UPDATE_INTERVAL_SECONDS) * 1000;
-
-      const index = Math.floor(elapsed / UPDATE_INTERVAL_SECONDS) % participantUsers.length;
-      if (solved[index] === 0) {
-        solved[index] = await checkAc(
-          interaction.guild.id,
-          participantUsers[index].id,
-          problem.contestId,
-          problem.index,
-          problem.rating!,
-          length,
-          startTime,
-          { ...baseLogContext, userId: participantUsers[index].id },
-          context
-        );
-      }
-
-      const loopEmbed = new EmbedBuilder()
-        .setTitle("Challenge")
-        .setColor(0x3498db)
-        .addFields(
-          {
-            name: "Time",
-            value: formatTime(length * 60 - (elapsed + UPDATE_INTERVAL_SECONDS)),
-            inline: false,
-          },
-          {
-            name: "Problem",
-            value: buildProblemLink(problem.contestId, problem.index, problem.name),
-            inline: false,
-          }
-        );
-
-      let loopUsersValue = "";
-      for (let i = 0; i < participantUsers.length; i += 1) {
-        const rating = await context.services.store.getRating(
-          interaction.guild.id,
-          participantUsers[i].id
-        );
-        const [down, up] = getRatingChanges(rating, problem.rating!, length);
-        if (solved[i] === 0) {
-          loopUsersValue += `- ${participantUsers[i]} (${rating}) (don't solve: ${down}, solve: ${up}) :hourglass:\n`;
-        } else {
-          loopUsersValue += `- ${participantUsers[i]} (${rating}) :white_check_mark:\n`;
-        }
-      }
-      loopEmbed.addFields({ name: "Users", value: loopUsersValue, inline: false });
-
-      const waitMs = nextTime - Date.now();
-      if (waitMs > 0) {
-        await sleep(waitMs);
-      }
-
-      await challengeMessage.edit({ embeds: [loopEmbed] });
-      if (solved.reduce((sum, value) => sum + value, 0) === participantUsers.length) {
-        break;
-      }
-    }
-
-    for (let i = 0; i < participantUsers.length; i += 1) {
-      if (solved[i] === 0) {
-        solved[i] = await checkAc(
-          interaction.guild.id,
-          participantUsers[i].id,
-          problem.contestId,
-          problem.index,
-          problem.rating!,
-          length,
-          startTime,
-          { ...baseLogContext, userId: participantUsers[i].id },
-          context
-        );
-        if (solved[i] === 0) {
-          const rating = await context.services.store.getRating(
-            interaction.guild.id,
-            participantUsers[i].id
-          );
-          const [down] = getRatingChanges(rating, problem.rating!, length);
-          await context.services.store.updateRating(
-            interaction.guild.id,
-            participantUsers[i].id,
-            rating + down
-          );
-        }
-        await sleep(2000);
-      }
-    }
-
-    const resultEmbed = new EmbedBuilder()
-      .setTitle("Challenge results")
-      .setColor(0x3498db)
-      .addFields({
-        name: "Problem",
-        value: buildProblemLink(problem.contestId, problem.index, problem.name),
-        inline: false,
+    try {
+      await context.services.challenges.createChallenge({
+        serverId: interaction.guild.id,
+        channelId: interaction.channelId,
+        messageId: challengeMessage.id,
+        hostUserId: interaction.user.id,
+        problem: {
+          contestId: problem.contestId,
+          index: problem.index,
+          name: problem.name,
+          rating: problem.rating!,
+        },
+        lengthMinutes: length,
+        participants: participantUsers.map((user) => user.id),
+        startedAt: startTime,
       });
-
-    let resultUsersValue = "";
-    for (let i = 0; i < participantUsers.length; i += 1) {
-      const rating = await context.services.store.getRating(
-        interaction.guild.id,
-        participantUsers[i].id
-      );
-      if (solved[i] === 0) {
-        resultUsersValue += `- ${participantUsers[i]} (${rating}) :x:\n`;
-      } else {
-        resultUsersValue += `- ${participantUsers[i]} (${rating}) :white_check_mark:\n`;
-      }
+    } catch (error) {
+      logError(`Failed to start challenge: ${String(error)}`, logContext);
+      await challengeMessage.edit({
+        content: "Failed to start challenge. Please try again.",
+        embeds: [],
+      });
     }
-    resultEmbed.addFields({ name: "Users", value: resultUsersValue, inline: false });
-    await challengeMessage.edit({ embeds: [resultEmbed] });
   },
 };

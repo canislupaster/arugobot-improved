@@ -33,6 +33,9 @@ export const healthCommand: Command = {
     const lastRefreshAt = context.services.problems.getLastRefreshAt();
     const contestRefreshAt = context.services.contests.getLastRefreshAt();
     const contestLastError = context.services.contests.getLastError();
+    const activeChallenges = await context.services.challenges.getActiveCount();
+    const challengeLastTick = context.services.challenges.getLastTickAt();
+    const challengeLastError = context.services.challenges.getLastError();
     const cacheAgeSeconds =
       lastRefreshAt > 0 ? Math.floor((Date.now() - lastRefreshAt) / 1000) : null;
     const contestCacheAgeSeconds =
@@ -55,6 +58,7 @@ export const healthCommand: Command = {
           value: contestCacheAgeSeconds === null ? "Unknown" : `${contestCacheAgeSeconds}s`,
           inline: true,
         },
+        { name: "Active challenges", value: String(activeChallenges), inline: true },
         { name: "Commands handled", value: String(getCommandCount()), inline: true },
         { name: "Node", value: process.version, inline: true },
         { name: "discord.js", value: discordJsVersion, inline: true },
@@ -82,10 +86,24 @@ export const healthCommand: Command = {
         inline: false,
       });
     }
+    if (challengeLastError) {
+      embed.addFields({
+        name: "Challenge loop last error",
+        value: `${challengeLastError.timestamp} - ${challengeLastError.message}`,
+        inline: false,
+      });
+    }
     if (cfLastSuccessAt) {
       embed.addFields({
         name: "Codeforces last success",
         value: cfLastSuccessAt,
+        inline: false,
+      });
+    }
+    if (challengeLastTick) {
+      embed.addFields({
+        name: "Challenge loop last tick",
+        value: challengeLastTick,
         inline: false,
       });
     }

@@ -1,0 +1,517 @@
+import { randomUUID } from "node:crypto";
+
+import { EmbedBuilder, type Client, type Message } from "discord.js";
+import { type Kysely } from "kysely";
+
+import type { Database } from "../db/types.js";
+import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { formatTime, getRatingChanges } from "../utils/rating.js";
+
+import type { CodeforcesClient } from "./codeforces.js";
+import type { StoreService } from "./store.js";
+
+export type ChallengeStatus = "active" | "completed" | "cancelled";
+
+export type ChallengeProblem = {
+  contestId: number;
+  index: string;
+  name: string;
+  rating: number;
+};
+
+export type ChallengeParticipant = {
+  userId: string;
+  position: number;
+  solvedAt: number | null;
+};
+
+export type ActiveChallenge = {
+  id: string;
+  serverId: string;
+  channelId: string;
+  messageId: string;
+  hostUserId: string;
+  problem: ChallengeProblem;
+  lengthMinutes: number;
+  startedAt: number;
+  endsAt: number;
+  status: ChallengeStatus;
+  checkIndex: number;
+  participants: ChallengeParticipant[];
+};
+
+type ChallengeClock = {
+  nowSeconds: () => number;
+};
+
+type ContestStatusResponse = Array<{
+  verdict?: string;
+  creationTimeSeconds: number;
+  problem: {
+    contestId: number;
+    index: string;
+  };
+}>;
+
+const UPDATE_INTERVAL_SECONDS = 30;
+
+function buildProblemLink(problem: ChallengeProblem): string {
+  return `[${problem.index}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index})`;
+}
+
+function pickNextUnsolved(
+  participants: ChallengeParticipant[],
+  startIndex: number
+): ChallengeParticipant | null {
+  if (participants.length === 0) {
+    return null;
+  }
+  for (let offset = 0; offset < participants.length; offset += 1) {
+    const index = (startIndex + offset) % participants.length;
+    const participant = participants[index];
+    if (participant && participant.solvedAt === null) {
+      return participant;
+    }
+  }
+  return null;
+}
+
+async function fetchMessage(
+  client: Client,
+  channelId: string,
+  messageId: string
+): Promise<Message | null> {
+  try {
+    const channel = await client.channels.fetch(channelId);
+    if (!channel || !channel.isTextBased()) {
+      return null;
+    }
+    const message = await channel.messages.fetch(messageId);
+    return message;
+  } catch {
+    return null;
+  }
+}
+
+export class ChallengeService {
+  private lastTickAt: string | null = null;
+  private lastError: { message: string; timestamp: string } | null = null;
+
+  constructor(
+    private db: Kysely<Database>,
+    private store: StoreService,
+    private codeforces: CodeforcesClient,
+    private clock: ChallengeClock = {
+      nowSeconds: () => Math.floor(Date.now() / 1000),
+    }
+  ) {}
+
+  getLastTickAt(): string | null {
+    return this.lastTickAt;
+  }
+
+  getLastError(): { message: string; timestamp: string } | null {
+    return this.lastError;
+  }
+
+  async getActiveCount(): Promise<number> {
+    const row = await this.db
+      .selectFrom("challenges")
+      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .where("status", "=", "active")
+      .executeTakeFirst();
+    return row?.count ?? 0;
+  }
+
+  async createChallenge({
+    serverId,
+    channelId,
+    messageId,
+    hostUserId,
+    problem,
+    lengthMinutes,
+    participants,
+    startedAt,
+  }: {
+    serverId: string;
+    channelId: string;
+    messageId: string;
+    hostUserId: string;
+    problem: ChallengeProblem;
+    lengthMinutes: number;
+    participants: string[];
+    startedAt: number;
+  }): Promise<string> {
+    const id = randomUUID();
+    const endsAt = startedAt + lengthMinutes * 60;
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+        .insertInto("challenges")
+        .values({
+          id,
+          server_id: serverId,
+          channel_id: channelId,
+          message_id: messageId,
+          host_user_id: hostUserId,
+          problem_contest_id: problem.contestId,
+          problem_index: problem.index,
+          problem_name: problem.name,
+          problem_rating: problem.rating,
+          length_minutes: lengthMinutes,
+          status: "active",
+          started_at: startedAt,
+          ends_at: endsAt,
+          check_index: 0,
+          updated_at: new Date().toISOString(),
+        })
+        .execute();
+
+      const rows = participants.map((userId, position) => ({
+        challenge_id: id,
+        user_id: userId,
+        position,
+        solved_at: null,
+        updated_at: new Date().toISOString(),
+      }));
+      await trx.insertInto("challenge_participants").values(rows).execute();
+    });
+
+    for (const userId of participants) {
+      await this.store.addToHistory(serverId, userId, `${problem.contestId}${problem.index}`);
+    }
+
+    logInfo("Challenge created.", { challengeId: id, guildId: serverId });
+    return id;
+  }
+
+  async runTick(client: Client): Promise<void> {
+    const nowSeconds = this.clock.nowSeconds();
+    this.lastTickAt = new Date().toISOString();
+
+    let challenges: ActiveChallenge[] = [];
+    try {
+      challenges = await this.getActiveChallenges();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.lastError = { message, timestamp: new Date().toISOString() };
+      logError("Failed to load challenges.", { error: message });
+      return;
+    }
+
+    if (challenges.length > 0) {
+      logInfo("Processing challenge tick.", { activeChallenges: challenges.length });
+    }
+
+    for (const challenge of challenges) {
+      const logContext = { challengeId: challenge.id, guildId: challenge.serverId };
+      try {
+        const allSolved = challenge.participants.every(
+          (participant) => participant.solvedAt !== null
+        );
+        if (allSolved || nowSeconds >= challenge.endsAt) {
+          await this.finalizeChallenge(challenge, client);
+          continue;
+        }
+
+        await this.checkOneParticipant(challenge);
+        await this.updateChallengeMessage(challenge, client, nowSeconds);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.lastError = { message, timestamp: new Date().toISOString() };
+        logError("Challenge tick failed.", { ...logContext, error: message });
+      }
+    }
+  }
+
+  async buildActiveEmbed({
+    serverId,
+    problem,
+    lengthMinutes,
+    timeLeftSeconds,
+    participants,
+  }: {
+    serverId: string;
+    problem: ChallengeProblem;
+    lengthMinutes: number;
+    timeLeftSeconds: number;
+    participants: ChallengeParticipant[];
+  }): Promise<EmbedBuilder> {
+    const embed = new EmbedBuilder()
+      .setTitle("Challenge")
+      .setColor(0x3498db)
+      .addFields(
+        { name: "Time", value: formatTime(Math.max(0, timeLeftSeconds)), inline: false },
+        { name: "Problem", value: buildProblemLink(problem), inline: false }
+      );
+
+    const ratings = await this.getRatings(serverId, participants);
+    const usersValue = participants
+      .sort((a, b) => a.position - b.position)
+      .map((participant) => {
+        const rating = ratings.get(participant.userId) ?? 0;
+        if (participant.solvedAt !== null) {
+          return `- <@${participant.userId}> (${rating}) :white_check_mark:`;
+        }
+        const [down, up] = getRatingChanges(rating, problem.rating, lengthMinutes);
+        return `- <@${participant.userId}> (${rating}) (don't solve: ${down}, solve: ${up}) :hourglass:`;
+      })
+      .join("\n");
+    embed.addFields({ name: "Users", value: usersValue || "No participants.", inline: false });
+    return embed;
+  }
+
+  async buildResultsEmbed({
+    serverId,
+    problem,
+    participants,
+  }: {
+    serverId: string;
+    problem: ChallengeProblem;
+    participants: ChallengeParticipant[];
+  }): Promise<EmbedBuilder> {
+    const embed = new EmbedBuilder()
+      .setTitle("Challenge results")
+      .setColor(0x3498db)
+      .addFields({ name: "Problem", value: buildProblemLink(problem), inline: false });
+
+    const ratings = await this.getRatings(serverId, participants);
+    const usersValue = participants
+      .sort((a, b) => a.position - b.position)
+      .map((participant) => {
+        const rating = ratings.get(participant.userId) ?? 0;
+        if (participant.solvedAt !== null) {
+          return `- <@${participant.userId}> (${rating}) :white_check_mark:`;
+        }
+        return `- <@${participant.userId}> (${rating}) :x:`;
+      })
+      .join("\n");
+
+    embed.addFields({ name: "Users", value: usersValue || "No participants.", inline: false });
+    return embed;
+  }
+
+  private async getActiveChallenges(): Promise<ActiveChallenge[]> {
+    const rows = await this.db
+      .selectFrom("challenges")
+      .selectAll()
+      .where("status", "=", "active")
+      .execute();
+    if (rows.length === 0) {
+      return [];
+    }
+    const participants = await this.db
+      .selectFrom("challenge_participants")
+      .selectAll()
+      .where(
+        "challenge_id",
+        "in",
+        rows.map((row) => row.id)
+      )
+      .execute();
+
+    const grouped = new Map<string, ChallengeParticipant[]>();
+    for (const participant of participants) {
+      const list = grouped.get(participant.challenge_id) ?? [];
+      list.push({
+        userId: participant.user_id,
+        position: participant.position,
+        solvedAt: participant.solved_at ?? null,
+      });
+      grouped.set(participant.challenge_id, list);
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      serverId: row.server_id,
+      channelId: row.channel_id,
+      messageId: row.message_id,
+      hostUserId: row.host_user_id,
+      problem: {
+        contestId: row.problem_contest_id,
+        index: row.problem_index,
+        name: row.problem_name,
+        rating: row.problem_rating,
+      },
+      lengthMinutes: row.length_minutes,
+      status: row.status as ChallengeStatus,
+      startedAt: row.started_at,
+      endsAt: row.ends_at,
+      checkIndex: row.check_index,
+      participants: (grouped.get(row.id) ?? []).sort((a, b) => a.position - b.position),
+    }));
+  }
+
+  private async updateChallengeMessage(
+    challenge: ActiveChallenge,
+    client: Client,
+    nowSeconds: number
+  ): Promise<void> {
+    const timeLeftSeconds = Math.max(0, challenge.endsAt - nowSeconds);
+    const embed = await this.buildActiveEmbed({
+      serverId: challenge.serverId,
+      problem: challenge.problem,
+      lengthMinutes: challenge.lengthMinutes,
+      timeLeftSeconds,
+      participants: challenge.participants,
+    });
+    const message = await fetchMessage(client, challenge.channelId, challenge.messageId);
+    if (!message) {
+      logWarn("Challenge message missing; skipping update.", {
+        challengeId: challenge.id,
+        guildId: challenge.serverId,
+      });
+      return;
+    }
+    await message.edit({ embeds: [embed] });
+  }
+
+  private async checkOneParticipant(challenge: ActiveChallenge): Promise<void> {
+    const candidate = pickNextUnsolved(challenge.participants, challenge.checkIndex);
+    const nextIndex = (challenge.checkIndex + 1) % Math.max(challenge.participants.length, 1);
+    await this.db
+      .updateTable("challenges")
+      .set({ check_index: nextIndex, updated_at: new Date().toISOString() })
+      .where("id", "=", challenge.id)
+      .execute();
+
+    if (!candidate) {
+      return;
+    }
+
+    const solved = await this.checkSolve(challenge, candidate);
+    if (solved) {
+      candidate.solvedAt = this.clock.nowSeconds();
+    }
+  }
+
+  private async checkSolve(
+    challenge: ActiveChallenge,
+    participant: ChallengeParticipant
+  ): Promise<boolean> {
+    const handle = await this.store.getHandle(challenge.serverId, participant.userId);
+    if (!handle) {
+      logWarn("Missing handle for challenge participant.", {
+        challengeId: challenge.id,
+        userId: participant.userId,
+      });
+      return false;
+    }
+    const solved = await this.gotAc(
+      challenge.problem.contestId,
+      challenge.problem.index,
+      handle,
+      challenge.lengthMinutes,
+      challenge.startedAt
+    );
+    if (!solved) {
+      return false;
+    }
+
+    await this.markSolved(challenge, participant.userId);
+    return true;
+  }
+
+  private async markSolved(challenge: ActiveChallenge, userId: string): Promise<void> {
+    const nowSeconds = this.clock.nowSeconds();
+    await this.db
+      .updateTable("challenge_participants")
+      .set({ solved_at: nowSeconds, updated_at: new Date().toISOString() })
+      .where("challenge_id", "=", challenge.id)
+      .where("user_id", "=", userId)
+      .execute();
+
+    const rating = await this.store.getRating(challenge.serverId, userId);
+    const [, up] = getRatingChanges(rating, challenge.problem.rating, challenge.lengthMinutes);
+    await this.store.updateRating(challenge.serverId, userId, rating + up);
+  }
+
+  private async finalizeChallenge(challenge: ActiveChallenge, client: Client): Promise<void> {
+    const nowSeconds = this.clock.nowSeconds();
+    const participants = challenge.participants;
+
+    for (const participant of participants) {
+      if (participant.solvedAt !== null) {
+        continue;
+      }
+      const solved = await this.checkSolve(challenge, participant);
+      if (solved) {
+        participant.solvedAt = nowSeconds;
+        continue;
+      }
+      const rating = await this.store.getRating(challenge.serverId, participant.userId);
+      const [down] = getRatingChanges(rating, challenge.problem.rating, challenge.lengthMinutes);
+      await this.store.updateRating(challenge.serverId, participant.userId, rating + down);
+    }
+
+    await this.db
+      .updateTable("challenges")
+      .set({ status: "completed", updated_at: new Date().toISOString() })
+      .where("id", "=", challenge.id)
+      .execute();
+
+    const embed = await this.buildResultsEmbed({
+      serverId: challenge.serverId,
+      problem: challenge.problem,
+      participants,
+    });
+    const message = await fetchMessage(client, challenge.channelId, challenge.messageId);
+    if (!message) {
+      logWarn("Challenge message missing; skipping results update.", {
+        challengeId: challenge.id,
+        guildId: challenge.serverId,
+      });
+      return;
+    }
+    await message.edit({ embeds: [embed] });
+  }
+
+  private async gotAc(
+    contestId: number,
+    problemIndex: string,
+    handle: string,
+    lengthMinutes: number,
+    startTime: number
+  ): Promise<boolean> {
+    try {
+      const response = await this.codeforces.request<ContestStatusResponse>("contest.status", {
+        contestId,
+        handle,
+        from: 1,
+        count: 100,
+      });
+      for (const item of response) {
+        const id = `${item.problem.contestId}${item.problem.index}`;
+        if (
+          id === `${contestId}${problemIndex}` &&
+          item.verdict === "OK" &&
+          item.creationTimeSeconds <= startTime + lengthMinutes * 60 &&
+          item.creationTimeSeconds >= startTime
+        ) {
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      logError(`Error during challenge check: ${String(error)}`, {
+        contestId,
+        handle,
+      });
+      return false;
+    }
+  }
+
+  private async getRatings(
+    serverId: string,
+    participants: ChallengeParticipant[]
+  ): Promise<Map<string, number>> {
+    const ratings = await Promise.all(
+      participants.map(async (participant) => ({
+        userId: participant.userId,
+        rating: await this.store.getRating(serverId, participant.userId),
+      }))
+    );
+    return new Map(ratings.map((entry) => [entry.userId, entry.rating]));
+  }
+}
+
+export const challengeUpdateIntervalMs = UPDATE_INTERVAL_SECONDS * 1000;

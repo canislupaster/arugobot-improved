@@ -1,6 +1,7 @@
 import type { Client } from "discord.js";
 
 import type { AppConfig } from "../config/env.js";
+import type { ChallengeService } from "../services/challenges.js";
 import type { CodeforcesClient } from "../services/codeforces.js";
 import type { ContestService } from "../services/contests.js";
 import type { ProblemService } from "../services/problems.js";
@@ -12,6 +13,7 @@ export type CommandContext = {
   commandSummaries: Array<{ name: string; description: string }>;
   correlationId: string;
   services: {
+    challenges: ChallengeService;
     contests: ContestService;
     codeforces: CodeforcesClient;
     problems: ProblemService;

@@ -42,10 +42,40 @@ export type CfRecentSubmissionsTable = {
   last_fetched: Generated<string>;
 };
 
+export type ChallengesTable = {
+  id: string;
+  server_id: string;
+  channel_id: string;
+  message_id: string;
+  host_user_id: string;
+  problem_contest_id: number;
+  problem_index: string;
+  problem_name: string;
+  problem_rating: number;
+  length_minutes: number;
+  status: string;
+  started_at: number;
+  ends_at: number;
+  check_index: number;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type ChallengeParticipantsTable = {
+  challenge_id: string;
+  user_id: string;
+  position: number;
+  solved_at: number | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
   cf_handles: CfHandlesTable;
   cf_profiles: CfProfilesTable;
   cf_recent_submissions: CfRecentSubmissionsTable;
+  challenges: ChallengesTable;
+  challenge_participants: ChallengeParticipantsTable;
 };
