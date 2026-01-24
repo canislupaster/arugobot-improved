@@ -382,4 +382,97 @@ describe("TournamentService", () => {
     expect(matches).toHaveLength(2);
     expect(matches[1]?.isDraw).toBe(true);
   });
+
+  it("returns completed tournament history with winners and participant counts", async () => {
+    const service = new TournamentService(db, {} as never, {} as never, {} as never);
+    const nowIso = new Date("2026-01-24T10:00:00.000Z").toISOString();
+    const laterIso = new Date("2026-01-24T12:00:00.000Z").toISOString();
+
+    await db
+      .insertInto("tournaments")
+      .values([
+        {
+          id: "tournament-1",
+          guild_id: "guild-1",
+          channel_id: "channel-1",
+          host_user_id: "host-1",
+          format: "swiss",
+          status: "completed",
+          length_minutes: 40,
+          round_count: 3,
+          current_round: 3,
+          rating_ranges: "[]",
+          tags: "",
+          created_at: nowIso,
+          updated_at: laterIso,
+        },
+        {
+          id: "tournament-2",
+          guild_id: "guild-1",
+          channel_id: "channel-1",
+          host_user_id: "host-2",
+          format: "elimination",
+          status: "cancelled",
+          length_minutes: 60,
+          round_count: 2,
+          current_round: 1,
+          rating_ranges: "[]",
+          tags: "",
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("tournament_participants")
+      .values([
+        {
+          tournament_id: "tournament-1",
+          user_id: "user-1",
+          seed: 1,
+          score: 3,
+          wins: 3,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          tournament_id: "tournament-1",
+          user_id: "user-2",
+          seed: 2,
+          score: 1,
+          wins: 1,
+          losses: 2,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          tournament_id: "tournament-2",
+          user_id: "user-3",
+          seed: 1,
+          score: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    const history = await service.getHistoryPage("guild-1", 1, 5);
+
+    expect(history.total).toBe(2);
+    expect(history.entries[0]?.id).toBe("tournament-1");
+    expect(history.entries[0]?.participantCount).toBe(2);
+    expect(history.entries[0]?.winnerId).toBe("user-1");
+    expect(history.entries[1]?.id).toBe("tournament-2");
+    expect(history.entries[1]?.winnerId).toBeNull();
+  });
 });

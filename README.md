@@ -28,11 +28,12 @@ The following commands are available to you:
   Set `open` to allow anyone in the server to join before the host starts.
   Use `max_participants` to raise the lobby cap (2-10, default 5).
 
-- **/tournament** `create|status|advance|cancel`
+- **/tournament** `create|status|advance|cancel|history`
 
   Runs multi-round tournaments with Swiss or elimination formats. Use `create` to open a lobby, pick
   format, match length, rating ranges, tags, and (optionally) Swiss round count. Use `advance` to
   start the next round after all matches finish. `status` shows standings, recent rounds, and the current round.
+  `history` lists recently completed or cancelled tournaments for the server.
 
 - **/rating** `[user]`
 

@@ -12,6 +12,18 @@ const createInteraction = () =>
     reply: jest.fn().mockResolvedValue(undefined),
   }) as unknown as ChatInputCommandInteraction;
 
+const createHistoryInteraction = () =>
+  ({
+    options: {
+      getSubcommand: jest.fn().mockReturnValue("history"),
+      getInteger: jest.fn().mockReturnValue(1),
+    },
+    guild: { id: "guild-1" },
+    reply: jest.fn().mockResolvedValue(undefined),
+    deferReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(undefined),
+  }) as unknown as ChatInputCommandInteraction;
+
 describe("tournamentCommand", () => {
   it("shows round summaries and tiebreak standings", async () => {
     const interaction = createInteraction();
@@ -122,5 +134,41 @@ describe("tournamentCommand", () => {
     expect(roundsField?.value).toContain("Round 1");
     const matchesField = fields.find((field) => field.name === "Current round matches");
     expect(matchesField?.value).toContain("vs");
+  });
+
+  it("renders tournament history entries", async () => {
+    const interaction = createHistoryInteraction();
+    const context = {
+      services: {
+        tournaments: {
+          getHistoryPage: jest.fn().mockResolvedValue({
+            total: 1,
+            entries: [
+              {
+                id: "tournament-1",
+                format: "swiss",
+                status: "completed",
+                lengthMinutes: 40,
+                roundCount: 3,
+                ratingRanges: [],
+                tags: "",
+                createdAt: "2026-01-24T10:00:00.000Z",
+                updatedAt: "2026-01-24T12:00:00.000Z",
+                participantCount: 8,
+                winnerId: "user-1",
+              },
+            ],
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await tournamentCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0].data;
+    const fields = (embed.fields ?? []) as Array<{ name: string; value: string }>;
+    const historyField = fields.find((field) => field.name === "Recent tournaments");
+    expect(historyField?.value).toContain("Winner: <@user-1>");
   });
 });

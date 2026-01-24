@@ -68,6 +68,25 @@ export type TournamentRoundSummary = {
   problem: Problem;
 };
 
+export type TournamentHistoryEntry = {
+  id: string;
+  format: TournamentFormat;
+  status: TournamentStatus;
+  lengthMinutes: number;
+  roundCount: number;
+  ratingRanges: RatingRange[];
+  tags: string;
+  createdAt: string;
+  updatedAt: string;
+  participantCount: number;
+  winnerId: string | null;
+};
+
+export type TournamentHistoryPage = {
+  total: number;
+  entries: TournamentHistoryEntry[];
+};
+
 export type TournamentStartResult = {
   tournamentId: string;
   round: TournamentRoundSummary;
@@ -135,6 +154,78 @@ export class TournamentService implements ChallengeCompletionNotifier {
       return null;
     }
     return this.mapTournament(row);
+  }
+
+  async getHistoryPage(
+    guildId: string,
+    page: number,
+    pageSize: number
+  ): Promise<TournamentHistoryPage> {
+    const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+    const limit = Math.max(1, pageSize);
+    const offset = (safePage - 1) * limit;
+
+    const countRow = await this.db
+      .selectFrom("tournaments")
+      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .where("guild_id", "=", guildId)
+      .where("status", "in", ["completed", "cancelled"])
+      .executeTakeFirst();
+    const total = Number(countRow?.count ?? 0);
+    if (total === 0) {
+      return { total: 0, entries: [] };
+    }
+
+    const rows = await this.db
+      .selectFrom("tournaments")
+      .selectAll()
+      .where("guild_id", "=", guildId)
+      .where("status", "in", ["completed", "cancelled"])
+      .orderBy("updated_at", "desc")
+      .limit(limit)
+      .offset(offset)
+      .execute();
+
+    if (rows.length === 0) {
+      return { total, entries: [] };
+    }
+
+    const tournamentIds = rows.map((row) => row.id);
+    const participantRows = await this.db
+      .selectFrom("tournament_participants")
+      .select(({ fn }) => ["tournament_id", fn.count<number>("user_id").as("count")])
+      .where("tournament_id", "in", tournamentIds)
+      .groupBy("tournament_id")
+      .execute();
+    const participantCounts = new Map(
+      participantRows.map((row) => [row.tournament_id, Number(row.count)])
+    );
+
+    const entries = await Promise.all(
+      rows.map(async (row) => {
+        const tournament = this.mapTournament(row);
+        const participantCount = participantCounts.get(tournament.id) ?? 0;
+        const winnerId =
+          tournament.status === "completed"
+            ? await this.getTournamentWinnerId(tournament.id, tournament.format)
+            : null;
+        return {
+          id: tournament.id,
+          format: tournament.format,
+          status: tournament.status,
+          lengthMinutes: tournament.lengthMinutes,
+          roundCount: tournament.roundCount,
+          ratingRanges: tournament.ratingRanges,
+          tags: tournament.tags,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          participantCount,
+          winnerId,
+        };
+      })
+    );
+
+    return { total, entries };
   }
 
   async listParticipants(tournamentId: string): Promise<TournamentParticipant[]> {
@@ -252,10 +343,7 @@ export class TournamentService implements ChallengeCompletionNotifier {
     };
   }
 
-  async listRoundSummaries(
-    tournamentId: string,
-    limit = 5
-  ): Promise<TournamentRoundSummary[]> {
+  async listRoundSummaries(tournamentId: string, limit = 5): Promise<TournamentRoundSummary[]> {
     const safeLimit = Math.max(1, Math.floor(limit));
     const rounds = await this.db
       .selectFrom("tournament_rounds")
@@ -328,13 +416,7 @@ export class TournamentService implements ChallengeCompletionNotifier {
 
     const matches = await this.db
       .selectFrom("tournament_matches")
-      .select([
-        "match_number",
-        "player1_id",
-        "player2_id",
-        "winner_id",
-        "status",
-      ])
+      .select(["match_number", "player1_id", "player2_id", "winner_id", "status"])
       .where("round_id", "=", round.id)
       .orderBy("match_number", "asc")
       .execute();
@@ -599,6 +681,20 @@ export class TournamentService implements ChallengeCompletionNotifier {
   private async listActiveParticipants(tournamentId: string): Promise<TournamentParticipant[]> {
     const participants = await this.listParticipants(tournamentId);
     return participants.filter((participant) => !participant.eliminated);
+  }
+
+  private async getTournamentWinnerId(
+    tournamentId: string,
+    format: TournamentFormat
+  ): Promise<string | null> {
+    const standings = await this.getStandings(tournamentId, format);
+    if (standings.length === 0) {
+      return null;
+    }
+    if (format === "elimination") {
+      return standings.find((entry) => !entry.eliminated)?.userId ?? standings[0]?.userId ?? null;
+    }
+    return standings[0]?.userId ?? null;
   }
 
   private async startRound(

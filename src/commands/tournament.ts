@@ -9,6 +9,7 @@ import {
   type User,
 } from "discord.js";
 
+import type { TournamentHistoryEntry } from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatTime } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
@@ -25,6 +26,7 @@ const MAX_PARTICIPANTS = 64;
 const OPEN_LOBBY_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_SWISS_MIN_ROUNDS = 3;
 const MAX_SWISS_ROUNDS = 10;
+const HISTORY_PAGE_SIZE = 5;
 
 type TournamentFormat = "swiss" | "elimination";
 
@@ -41,6 +43,21 @@ function buildUsersValue(users: User[]): string {
     return "No participants yet.";
   }
   return users.map((user) => `- ${user}`).join("\n");
+}
+
+function formatHistoryTimestamp(isoTimestamp: string): string {
+  const parsed = Date.parse(isoTimestamp);
+  if (!Number.isFinite(parsed)) {
+    return "Unknown time";
+  }
+  return formatDiscordRelativeTime(Math.floor(parsed / 1000));
+}
+
+function formatHistoryLine(entry: TournamentHistoryEntry): string {
+  const statusLabel = entry.status === "completed" ? "Completed" : "Cancelled";
+  const winnerLabel = entry.winnerId ? `<@${entry.winnerId}>` : "None";
+  const timestamp = formatHistoryTimestamp(entry.updatedAt);
+  return `- ${statusLabel} • ${formatTournamentFormat(entry.format)} • ${entry.participantCount} players • ${entry.roundCount} rounds • ${entry.lengthMinutes}m • Winner: ${winnerLabel} • ${timestamp}`;
 }
 
 export const tournamentCommand: Command = {
@@ -110,6 +127,14 @@ export const tournamentCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("cancel").setDescription("Cancel the active tournament")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("history")
+        .setDescription("Show recently completed or cancelled tournaments")
+        .addIntegerOption((option) =>
+          option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
+        )
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {
@@ -124,6 +149,37 @@ export const tournamentCommand: Command = {
     const subcommand = interaction.options.getSubcommand();
 
     try {
+      if (subcommand === "history") {
+        const page = interaction.options.getInteger("page") ?? 1;
+        if (!Number.isInteger(page) || page < 1) {
+          await interaction.reply({ content: "Invalid page.", ephemeral: true });
+          return;
+        }
+        await interaction.deferReply({ ephemeral: true });
+        const history = await context.services.tournaments.getHistoryPage(
+          guildId,
+          page,
+          HISTORY_PAGE_SIZE
+        );
+        if (history.total === 0) {
+          await interaction.editReply("No completed tournaments yet.");
+          return;
+        }
+        if (history.entries.length === 0) {
+          await interaction.editReply("Empty page.");
+          return;
+        }
+        const totalPages = Math.max(1, Math.ceil(history.total / HISTORY_PAGE_SIZE));
+        const lines = history.entries.map((entry) => formatHistoryLine(entry));
+        const embed = new EmbedBuilder()
+          .setTitle("Tournament history")
+          .setDescription(`Page ${page} of ${totalPages}`)
+          .setColor(0x3498db)
+          .addFields({ name: "Recent tournaments", value: lines.join("\n"), inline: false });
+        await interaction.editReply({ embeds: [embed] });
+        return;
+      }
+
       if (subcommand === "status") {
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
@@ -143,9 +199,7 @@ export const tournamentCommand: Command = {
           .slice(0, 10)
           .map((participant, index) => {
             const tiebreak =
-              tournament.format === "swiss"
-                ? ` • TB ${formatScore(participant.tiebreak)}`
-                : "";
+              tournament.format === "swiss" ? ` • TB ${formatScore(participant.tiebreak)}` : "";
             const status = participant.eliminated ? " • eliminated" : "";
             return `${index + 1}. <@${participant.userId}> • ${formatScore(
               participant.score
