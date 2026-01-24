@@ -8,7 +8,12 @@ import {
   type User,
 } from "discord.js";
 
-import { logError } from "../utils/logger.js";
+import { logError, type LogContext } from "../utils/logger.js";
+import {
+  filterProblemsByRatingRange,
+  getProblemId,
+  selectRandomProblem,
+} from "../utils/problemSelection.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
 import { sleep } from "../utils/sleep.js";
 
@@ -16,6 +21,8 @@ import type { Command } from "./types.js";
 
 const VALID_LENGTHS = new Set([40, 60, 80]);
 const UPDATE_INTERVAL_SECONDS = 30;
+const MIN_RATING = 800;
+const MAX_RATING = 3500;
 
 type ContestStatusResponse = Array<{
   verdict?: string;
@@ -32,10 +39,8 @@ async function gotAc(
   handle: string,
   length: number,
   startTime: number,
-  request: <T>(
-    endpoint: string,
-    params?: Record<string, string | number | boolean>
-  ) => Promise<T>
+  logContext: LogContext,
+  request: <T>(endpoint: string, params?: Record<string, string | number | boolean>) => Promise<T>
 ): Promise<boolean> {
   try {
     const response = await request<ContestStatusResponse>("contest.status", {
@@ -57,7 +62,7 @@ async function gotAc(
     }
     return false;
   } catch (error) {
-    logError(`Error during challenge: ${String(error)}`);
+    logError(`Error during challenge: ${String(error)}`, logContext);
     return false;
   }
 }
@@ -70,6 +75,7 @@ async function checkAc(
   problemRating: number,
   length: number,
   startTime: number,
+  logContext: LogContext,
   context: Parameters<Command["execute"]>[1]
 ): Promise<number> {
   const handle = await context.services.store.getHandle(serverId, userId);
@@ -83,6 +89,7 @@ async function checkAc(
       handle,
       length,
       startTime,
+      logContext,
       context.services.codeforces.request.bind(context.services.codeforces)
     )
   ) {
@@ -96,6 +103,36 @@ async function checkAc(
 
 function buildProblemLink(contestId: number, index: string, name: string) {
   return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
+}
+
+function resolveRatingRange(
+  rating: number | null,
+  minRating: number | null,
+  maxRating: number | null
+): { minRating: number; maxRating: number; error?: string } {
+  if (rating !== null && (minRating !== null || maxRating !== null)) {
+    return { minRating: 0, maxRating: 0, error: "Use either rating or min/max, not both." };
+  }
+
+  if (rating === null && minRating === null && maxRating === null) {
+    return { minRating: 0, maxRating: 0, error: "Provide a problem id or a rating range." };
+  }
+
+  const resolvedMin = rating ?? minRating ?? MIN_RATING;
+  const resolvedMax = rating ?? maxRating ?? MAX_RATING;
+
+  if (resolvedMin < MIN_RATING || resolvedMax > MAX_RATING) {
+    return {
+      minRating: 0,
+      maxRating: 0,
+      error: `Ratings must be between ${MIN_RATING} and ${MAX_RATING}.`,
+    };
+  }
+  if (resolvedMin > resolvedMax) {
+    return { minRating: 0, maxRating: 0, error: "Minimum rating cannot exceed maximum rating." };
+  }
+
+  return { minRating: resolvedMin, maxRating: resolvedMax };
 }
 
 function uniqueUsers(users: User[]): User[] {
@@ -113,39 +150,39 @@ export const challengeCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("challenge")
     .setDescription("Starts a challenge")
-    .addStringOption((option) =>
-      option.setName("problem").setDescription("Problem id, e.g. 1000A").setRequired(true)
-    )
+    .addStringOption((option) => option.setName("problem").setDescription("Problem id, e.g. 1000A"))
     .addIntegerOption((option) =>
       option
         .setName("length")
         .setDescription("Challenge length in minutes")
         .setRequired(true)
-        .addChoices(
-          { name: "40", value: 40 },
-          { name: "60", value: 60 },
-          { name: "80", value: 80 }
-        )
+        .addChoices({ name: "40", value: 40 }, { name: "60", value: 60 }, { name: "80", value: 80 })
     )
-    .addUserOption((option) =>
-      option.setName("user1").setDescription("Participant 1 (optional)")
+    .addIntegerOption((option) =>
+      option.setName("rating").setDescription(`Exact problem rating (${MIN_RATING}-${MAX_RATING})`)
     )
-    .addUserOption((option) =>
-      option.setName("user2").setDescription("Participant 2 (optional)")
+    .addIntegerOption((option) =>
+      option.setName("min_rating").setDescription(`Minimum rating (${MIN_RATING}-${MAX_RATING})`)
     )
-    .addUserOption((option) =>
-      option.setName("user3").setDescription("Participant 3 (optional)")
+    .addIntegerOption((option) =>
+      option.setName("max_rating").setDescription(`Maximum rating (${MIN_RATING}-${MAX_RATING})`)
     )
-    .addUserOption((option) =>
-      option.setName("user4").setDescription("Participant 4 (optional)")
-    ),
+    .addUserOption((option) => option.setName("user1").setDescription("Participant 1 (optional)"))
+    .addUserOption((option) => option.setName("user2").setDescription("Participant 2 (optional)"))
+    .addUserOption((option) => option.setName("user3").setDescription("Participant 3 (optional)"))
+    .addUserOption((option) => option.setName("user4").setDescription("Participant 4 (optional)")),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
-    const problemIdRaw = interaction.options.getString("problem", true);
-    const problemId = problemIdRaw.toUpperCase();
+    const problemIdRaw = interaction.options.getString("problem");
+    const rating = interaction.options.getInteger("rating");
+    const minRatingOption = interaction.options.getInteger("min_rating");
+    const maxRatingOption = interaction.options.getInteger("max_rating");
     const length = interaction.options.getInteger("length", true);
 
     if (!VALID_LENGTHS.has(length)) {
@@ -156,23 +193,29 @@ export const challengeCommand: Command = {
       return;
     }
 
-    const problemDict = context.services.problems.getProblemDict();
-    const problem = problemDict.get(problemId);
-    if (!problem) {
+    if (problemIdRaw && (rating !== null || minRatingOption !== null || maxRatingOption !== null)) {
       await interaction.reply({
-        content: "Invalid problem. Make sure it is in the correct format (e.g., 1000A).",
+        content: "Provide either a problem id or a rating range, not both.",
         ephemeral: true,
       });
       return;
     }
 
-    const participantUsers = uniqueUsers([
-      interaction.user,
-      interaction.options.getUser("user1"),
-      interaction.options.getUser("user2"),
-      interaction.options.getUser("user3"),
-      interaction.options.getUser("user4"),
-    ].filter(Boolean) as User[]);
+    const range = resolveRatingRange(rating, minRatingOption, maxRatingOption);
+    if (!problemIdRaw && range.error) {
+      await interaction.reply({ content: range.error, ephemeral: true });
+      return;
+    }
+
+    const participantUsers = uniqueUsers(
+      [
+        interaction.user,
+        interaction.options.getUser("user1"),
+        interaction.options.getUser("user2"),
+        interaction.options.getUser("user3"),
+        interaction.options.getUser("user4"),
+      ].filter(Boolean) as User[]
+    );
 
     if (participantUsers.length > 5) {
       await interaction.reply({ content: "Too many users (limit is 5).", ephemeral: true });
@@ -187,6 +230,89 @@ export const challengeCommand: Command = {
         });
         return;
       }
+    }
+
+    const problems = await context.services.problems.ensureProblemsLoaded();
+    if (problems.length === 0) {
+      await interaction.reply({
+        content: "Problem cache not ready yet. Try again in a bit.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    let problemId = "";
+    let problem: (typeof problems)[number] | null = null;
+
+    if (problemIdRaw) {
+      problemId = problemIdRaw.toUpperCase();
+      const problemDict = context.services.problems.getProblemDict();
+      problem = problemDict.get(problemId) ?? null;
+      if (!problem) {
+        await interaction.reply({
+          content: "Invalid problem. Make sure it is in the correct format (e.g., 1000A).",
+          ephemeral: true,
+        });
+        return;
+      }
+    } else {
+      const { minRating, maxRating } = range;
+      const candidates = filterProblemsByRatingRange(problems, minRating, maxRating);
+      if (candidates.length === 0) {
+        await interaction.reply({
+          content: "No problems found in that rating range.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const excludedIds = new Set<string>();
+      for (const user of participantUsers) {
+        const history = await context.services.store.getHistoryList(interaction.guild.id, user.id);
+        for (const problemId of history) {
+          excludedIds.add(problemId);
+        }
+      }
+
+      for (const user of participantUsers) {
+        const handle = await context.services.store.getHandle(interaction.guild.id, user.id);
+        if (!handle) {
+          await interaction.reply({
+            content: "Missing handle data. Try again in a bit.",
+            ephemeral: true,
+          });
+          return;
+        }
+        const solved = await context.services.store.getSolvedProblems(handle);
+        if (!solved) {
+          await interaction.reply({
+            content: "Unable to fetch solved problems right now. Try again later.",
+            ephemeral: true,
+          });
+          return;
+        }
+        for (const solvedId of solved) {
+          excludedIds.add(solvedId);
+        }
+      }
+
+      problem = selectRandomProblem(candidates, excludedIds);
+      if (!problem) {
+        await interaction.reply({
+          content: "No unsolved problems found for this group in that rating range.",
+          ephemeral: true,
+        });
+        return;
+      }
+      problemId = getProblemId(problem);
+    }
+
+    if (!problem) {
+      await interaction.reply({
+        content: "Problem selection failed. Try again in a moment.",
+        ephemeral: true,
+      });
+      return;
     }
 
     for (const user of participantUsers) {
@@ -206,7 +332,11 @@ export const challengeCommand: Command = {
       .setColor(0x3498db)
       .addFields(
         { name: "Time", value: formatTime(length * 60), inline: false },
-        { name: "Problem", value: buildProblemLink(problem.contestId, problem.index, problem.name), inline: false }
+        {
+          name: "Problem",
+          value: buildProblemLink(problem.contestId, problem.index, problem.name),
+          inline: false,
+        }
       );
 
     let usersValue = "";
@@ -255,7 +385,9 @@ export const challengeCommand: Command = {
 
       confirmed.add(button.user.id);
       const confirmedValue = participantUsers
-        .map((user) => (confirmed.has(user.id) ? `- ${user} :white_check_mark:` : `- ${user} :hourglass:`))
+        .map((user) =>
+          confirmed.has(user.id) ? `- ${user} :white_check_mark:` : `- ${user} :hourglass:`
+        )
         .join("\n");
       confirmEmbed.spliceFields(2, 1, { name: "Users", value: confirmedValue, inline: false });
       await button.update({ embeds: [confirmEmbed], components: [row] });
@@ -289,13 +421,25 @@ export const challengeCommand: Command = {
       .setColor(0x3498db)
       .addFields(
         { name: "Time", value: formatTime(length * 60), inline: false },
-        { name: "Problem", value: buildProblemLink(problem.contestId, problem.index, problem.name), inline: false }
+        {
+          name: "Problem",
+          value: buildProblemLink(problem.contestId, problem.index, problem.name),
+          inline: false,
+        }
       );
 
     const solved = participantUsers.map(() => 0);
     const startTime = Math.floor(Date.now() / 1000);
+    const baseLogContext: LogContext = {
+      correlationId: context.correlationId,
+      command: "challenge",
+      guildId: interaction.guild.id,
+    };
 
-    const challengeMessage = await interaction.followUp({ embeds: [challengeEmbed], fetchReply: true });
+    const challengeMessage = await interaction.followUp({
+      embeds: [challengeEmbed],
+      fetchReply: true,
+    });
 
     for (let elapsed = 0; elapsed < length * 60; elapsed += UPDATE_INTERVAL_SECONDS) {
       const nextTime = startTime * 1000 + (elapsed + UPDATE_INTERVAL_SECONDS) * 1000;
@@ -310,6 +454,7 @@ export const challengeCommand: Command = {
           problem.rating!,
           length,
           startTime,
+          { ...baseLogContext, userId: participantUsers[index].id },
           context
         );
       }
@@ -318,13 +463,24 @@ export const challengeCommand: Command = {
         .setTitle("Challenge")
         .setColor(0x3498db)
         .addFields(
-          { name: "Time", value: formatTime(length * 60 - (elapsed + UPDATE_INTERVAL_SECONDS)), inline: false },
-          { name: "Problem", value: buildProblemLink(problem.contestId, problem.index, problem.name), inline: false }
+          {
+            name: "Time",
+            value: formatTime(length * 60 - (elapsed + UPDATE_INTERVAL_SECONDS)),
+            inline: false,
+          },
+          {
+            name: "Problem",
+            value: buildProblemLink(problem.contestId, problem.index, problem.name),
+            inline: false,
+          }
         );
 
       let loopUsersValue = "";
       for (let i = 0; i < participantUsers.length; i += 1) {
-        const rating = await context.services.store.getRating(interaction.guild.id, participantUsers[i].id);
+        const rating = await context.services.store.getRating(
+          interaction.guild.id,
+          participantUsers[i].id
+        );
         const [down, up] = getRatingChanges(rating, problem.rating!, length);
         if (solved[i] === 0) {
           loopUsersValue += `- ${participantUsers[i]} (${rating}) (don't solve: ${down}, solve: ${up}) :hourglass:\n`;
@@ -355,12 +511,20 @@ export const challengeCommand: Command = {
           problem.rating!,
           length,
           startTime,
+          { ...baseLogContext, userId: participantUsers[i].id },
           context
         );
         if (solved[i] === 0) {
-          const rating = await context.services.store.getRating(interaction.guild.id, participantUsers[i].id);
+          const rating = await context.services.store.getRating(
+            interaction.guild.id,
+            participantUsers[i].id
+          );
           const [down] = getRatingChanges(rating, problem.rating!, length);
-          await context.services.store.updateRating(interaction.guild.id, participantUsers[i].id, rating + down);
+          await context.services.store.updateRating(
+            interaction.guild.id,
+            participantUsers[i].id,
+            rating + down
+          );
         }
         await sleep(2000);
       }
@@ -377,7 +541,10 @@ export const challengeCommand: Command = {
 
     let resultUsersValue = "";
     for (let i = 0; i < participantUsers.length; i += 1) {
-      const rating = await context.services.store.getRating(interaction.guild.id, participantUsers[i].id);
+      const rating = await context.services.store.getRating(
+        interaction.guild.id,
+        participantUsers[i].id
+      );
       if (solved[i] === 0) {
         resultUsersValue += `- ${participantUsers[i]} (${rating}) :x:\n`;
       } else {

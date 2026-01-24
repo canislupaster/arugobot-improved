@@ -33,6 +33,13 @@ export class ProblemService {
     return this.lastRefresh;
   }
 
+  async ensureProblemsLoaded(): Promise<Problem[]> {
+    if (this.problems.length === 0) {
+      await this.refreshProblems(true);
+    }
+    return this.problems;
+  }
+
   async refreshProblems(force = false): Promise<void> {
     const now = Date.now();
     if (!force && now - this.lastRefresh < 60 * 60 * 1000) {

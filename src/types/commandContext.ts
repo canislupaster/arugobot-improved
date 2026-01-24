@@ -10,6 +10,7 @@ export type CommandContext = {
   client: Client;
   config: AppConfig;
   commandSummaries: Array<{ name: string; description: string }>;
+  correlationId: string;
   services: {
     contests: ContestService;
     codeforces: CodeforcesClient;

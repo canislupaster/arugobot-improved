@@ -1,6 +1,10 @@
 import { Colors } from "discord.js";
 
-export function getRatingChanges(oldRating: number, problemRating: number, length: number): [number, number] {
+export function getRatingChanges(
+  oldRating: number,
+  problemRating: number,
+  length: number
+): [number, number] {
   const adjusted = problemRating + 50 * ((80 - length) / 20);
   const magnitude = 16;
   const expected = 1 / (1 + 10 ** ((adjusted - oldRating) / 500));

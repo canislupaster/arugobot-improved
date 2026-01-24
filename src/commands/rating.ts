@@ -1,7 +1,7 @@
 import type { Chart, ChartConfiguration, ChartOptions, Plugin } from "chart.js";
 import { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import { logError } from "../utils/logger.js";
+import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
 
@@ -117,14 +117,16 @@ export const ratingCommand: Command = {
     .addUserOption((option) => option.setName("user").setDescription("User to inspect")),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
     const member = interaction.options.getMember("user");
     const user = interaction.options.getUser("user") ?? interaction.user;
     const targetId = user.id;
-    const targetName =
-      member && "displayName" in member ? member.displayName : user.username;
+    const targetName = member && "displayName" in member ? member.displayName : user.username;
     const targetMention = member && "toString" in member ? member.toString() : user.toString();
 
     await interaction.deferReply();
@@ -159,7 +161,7 @@ export const ratingCommand: Command = {
 
       await interaction.editReply({ files: [attachment], embeds: [embed] });
     } catch (error) {
-      logError(`Something went wrong: ${String(error)}`);
+      logCommandError(`Rating chart failed: ${String(error)}`, interaction, context.correlationId);
       await interaction.editReply(
         "Something went wrong while rendering the rating graph. Try again later."
       );

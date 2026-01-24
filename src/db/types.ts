@@ -36,9 +36,16 @@ export type CfProfilesTable = {
   last_fetched: Generated<string>;
 };
 
+export type CfRecentSubmissionsTable = {
+  handle: string;
+  submissions: string;
+  last_fetched: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
   cf_handles: CfHandlesTable;
   cf_profiles: CfProfilesTable;
+  cf_recent_submissions: CfRecentSubmissionsTable;
 };

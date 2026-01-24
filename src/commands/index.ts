@@ -8,6 +8,7 @@ import { leaderboardCommand } from "./leaderboard.js";
 import { pingCommand } from "./ping.js";
 import { profileCommand } from "./profile.js";
 import { ratingCommand } from "./rating.js";
+import { recentCommand } from "./recent.js";
 import { registerCommand, unlinkCommand } from "./register.js";
 import { statsCommand } from "./stats.js";
 import { suggestCommand } from "./suggest.js";
@@ -22,6 +23,7 @@ export const commandList: Command[] = [
   pingCommand,
   profileCommand,
   ratingCommand,
+  recentCommand,
   registerCommand,
   unlinkCommand,
   suggestCommand,

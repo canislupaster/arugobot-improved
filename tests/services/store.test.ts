@@ -115,4 +115,28 @@ describe("StoreService", () => {
     expect(second?.isStale).toBe(true);
     expect(second?.profile.rating).toBe(3700);
   });
+
+  it("caches recent submissions and serves stale cache on failure", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        id: 123,
+        verdict: "OK",
+        contestId: 1000,
+        problem: { contestId: 1000, index: "A", name: "Test Problem" },
+        creationTimeSeconds: 999,
+        programmingLanguage: "GNU C++17",
+      },
+    ]);
+
+    const first = await store.getRecentSubmissions("tourist", 5);
+    expect(first?.source).toBe("api");
+    expect(first?.isStale).toBe(false);
+    expect(first?.submissions[0]?.id).toBe(123);
+
+    mockClient.request.mockRejectedValueOnce(new Error("CF down"));
+    const second = await store.getRecentSubmissions("tourist", 5, 0);
+    expect(second?.source).toBe("cache");
+    expect(second?.isStale).toBe(true);
+    expect(second?.submissions[0]?.name).toBe("Test Problem");
+  });
 });

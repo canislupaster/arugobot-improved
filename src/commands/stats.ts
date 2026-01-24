@@ -1,16 +1,17 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import { logError } from "../utils/logger.js";
+import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
 
 export const statsCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("stats")
-    .setDescription("Shows server challenge stats"),
+  data: new SlashCommandBuilder().setName("stats").setDescription("Shows server challenge stats"),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
 
@@ -41,7 +42,7 @@ export const statsCommand: Command = {
 
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
-      logError(`Error in stats: ${String(error)}`);
+      logCommandError(`Error in stats: ${String(error)}`, interaction, context.correlationId);
       await interaction.reply({ content: "Something went wrong.", ephemeral: true });
     }
   },

@@ -1,6 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import { logError } from "../utils/logger.js";
+import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
 
@@ -13,7 +13,10 @@ export const historyCommand: Command = {
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
     const page = interaction.options.getInteger("page") ?? 1;
@@ -53,8 +56,11 @@ export const historyCommand: Command = {
         if (!problem) {
           continue;
         }
-        const delta = historyData.ratingHistory[index + 1] - historyData.ratingHistory[index];
-        content += `- [${problemId}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}) (rating change: ${delta})\n`;
+        const previous = historyData.ratingHistory[index];
+        const next = historyData.ratingHistory[index + 1];
+        const delta = Number.isFinite(previous) && Number.isFinite(next) ? next - previous : null;
+        const deltaLabel = delta === null ? "N/A" : String(delta);
+        content += `- [${problemId}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}) (rating change: ${deltaLabel})\n`;
       }
 
       const embed = new EmbedBuilder()
@@ -65,7 +71,7 @@ export const historyCommand: Command = {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error) {
-      logError(`Error in history: ${String(error)}`);
+      logCommandError(`Error in history: ${String(error)}`, interaction, context.correlationId);
       await interaction.reply({ content: "Something went wrong.", ephemeral: true });
     }
   },

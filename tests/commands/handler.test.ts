@@ -25,17 +25,12 @@ describe("handleCommandInteraction", () => {
       client: {} as never,
       config: {} as never,
       commandSummaries: [],
+      correlationId: "corr-1",
       services: {} as never,
     };
     const cooldowns = new CooldownManager(1, 1);
 
-    await handleCommandInteraction(
-      interaction,
-      new Map(),
-      context,
-      cooldowns,
-      "corr-1"
-    );
+    await handleCommandInteraction(interaction, new Map(), context, cooldowns, "corr-1");
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Unknown command.",
@@ -54,6 +49,7 @@ describe("handleCommandInteraction", () => {
       client: {} as never,
       config: {} as never,
       commandSummaries: [],
+      correlationId: "corr-2",
       services: {} as never,
     };
     const cooldowns = new CooldownManager(0, 0);
@@ -80,6 +76,7 @@ describe("handleCommandInteraction", () => {
       client: {} as never,
       config: {} as never,
       commandSummaries: [],
+      correlationId: "corr-3",
       services: {} as never,
     };
     const cooldowns = new CooldownManager(0, 0);

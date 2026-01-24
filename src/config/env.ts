@@ -55,8 +55,7 @@ export function validateConfig(config: AppConfig): string[] {
 export function loadConfig(): AppConfig {
   const discordToken = process.env.DISCORD_TOKEN?.trim() ?? "";
   const databaseUrl = process.env.DATABASE_URL?.trim() ?? "";
-  const environment =
-    (process.env.NODE_ENV as AppConfig["environment"]) ?? "development";
+  const environment = (process.env.NODE_ENV as AppConfig["environment"]) ?? "development";
   const discordGuildId = process.env.DISCORD_GUILD_ID?.trim() || undefined;
   const codeforcesApiBaseUrl =
     process.env.CODEFORCES_API_BASE_URL?.trim() || "https://codeforces.com/api";
@@ -64,10 +63,7 @@ export function loadConfig(): AppConfig {
     process.env.CODEFORCES_REQUEST_DELAY_MS ?? "2000",
     2000
   );
-  const codeforcesTimeoutMs = parseNumber(
-    process.env.CODEFORCES_TIMEOUT_MS ?? "10000",
-    10000
-  );
+  const codeforcesTimeoutMs = parseNumber(process.env.CODEFORCES_TIMEOUT_MS ?? "10000", 10000);
 
   return {
     discordToken,

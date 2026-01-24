@@ -1,7 +1,10 @@
-import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, version as discordJsVersion } from "discord.js";
-import { sql } from "kysely";
+import {
+  EmbedBuilder,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+  version as discordJsVersion,
+} from "discord.js";
 
-import { getDb } from "../db/database.js";
 import { getCommandCount } from "../services/metrics.js";
 import { getLastError } from "../utils/logger.js";
 
@@ -15,19 +18,15 @@ export const healthCommand: Command = {
   adminOnly: true,
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
     const uptimeSeconds = Math.floor(process.uptime());
     const memory = process.memoryUsage();
-    const db = getDb();
-    let dbOk = false;
-    try {
-      await sql`select 1`.execute(db);
-      dbOk = true;
-    } catch {
-      dbOk = false;
-    }
+    const dbOk = await context.services.store.checkDb();
     const lastError = getLastError();
     const cfLastError = context.services.codeforces.getLastError();
     const cfLastSuccessAt = context.services.codeforces.getLastSuccessAt();

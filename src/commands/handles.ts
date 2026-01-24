@@ -1,6 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import { logError } from "../utils/logger.js";
+import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
 
@@ -15,7 +15,10 @@ export const handlesCommand: Command = {
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
     const page = interaction.options.getInteger("page") ?? 1;
@@ -53,7 +56,7 @@ export const handlesCommand: Command = {
 
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
-      logError(`Error in handles: ${String(error)}`);
+      logCommandError(`Error in handles: ${String(error)}`, interaction, context.correlationId);
       await interaction.reply({ content: "Something went wrong.", ephemeral: true });
     }
   },

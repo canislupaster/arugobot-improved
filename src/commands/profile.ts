@@ -1,6 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import { logError } from "../utils/logger.js";
+import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -24,14 +24,16 @@ export const profileCommand: Command = {
     .addUserOption((option) => option.setName("user").setDescription("User to inspect")),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
     const member = interaction.options.getMember("user");
     const user = interaction.options.getUser("user") ?? interaction.user;
     const targetId = user.id;
-    const targetName =
-      member && "displayName" in member ? member.displayName : user.username;
+    const targetName = member && "displayName" in member ? member.displayName : user.username;
 
     try {
       const handle = await context.services.store.getHandle(interaction.guild.id, targetId);
@@ -98,7 +100,7 @@ export const profileCommand: Command = {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error) {
-      logError(`Error in profile: ${String(error)}`);
+      logCommandError(`Error in profile: ${String(error)}`, interaction, context.correlationId);
       await interaction.reply({ content: "Something went wrong.", ephemeral: true });
     }
   },

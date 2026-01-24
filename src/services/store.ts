@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { logError, logInfo } from "../utils/logger.js";
@@ -9,7 +9,9 @@ export type UserStatusResponse = Array<{
   id: number;
   verdict?: string;
   contestId?: number;
-  problem: { contestId?: number; index: string };
+  problem: { contestId?: number; index: string; name?: string };
+  creationTimeSeconds: number;
+  programmingLanguage?: string;
 }>;
 
 export type UserInfoResponse = Array<{
@@ -35,6 +37,8 @@ type ServerStats = {
 
 const HANDLE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 60 * 60 * 1000;
+const RECENT_SUBMISSIONS_TTL_MS = 5 * 60 * 1000;
+const RECENT_SUBMISSIONS_FETCH_COUNT = 20;
 
 export type CodeforcesProfile = {
   handle: string;
@@ -49,6 +53,22 @@ export type CodeforcesProfile = {
 
 export type CodeforcesProfileResult = {
   profile: CodeforcesProfile;
+  source: "cache" | "api";
+  isStale: boolean;
+};
+
+export type RecentSubmission = {
+  id: number;
+  contestId: number | null;
+  index: string;
+  name: string;
+  verdict: string | null;
+  creationTimeSeconds: number;
+  programmingLanguage: string | null;
+};
+
+export type RecentSubmissionsResult = {
+  submissions: RecentSubmission[];
   source: "cache" | "api";
   isStale: boolean;
 };
@@ -72,7 +92,10 @@ function parseJsonArray<T>(raw: string | null | undefined, fallback: T[]): T[] {
 }
 
 export class StoreService {
-  constructor(private db: Kysely<Database>, private cfClient: CodeforcesClient) {}
+  constructor(
+    private db: Kysely<Database>,
+    private cfClient: CodeforcesClient
+  ) {}
 
   private normalizeHandle(handle: string): string {
     return handle.trim().toLowerCase();
@@ -102,6 +125,16 @@ export class StoreService {
 
   private isHandleValid(handle: string): boolean {
     return /^[-_a-zA-Z0-9]+$/.test(handle);
+  }
+
+  async checkDb(): Promise<boolean> {
+    try {
+      await sql`select 1`.execute(this.db);
+      return true;
+    } catch (error) {
+      logError(`Database connectivity failed: ${String(error)}`);
+      return false;
+    }
   }
 
   async getHandles(): Promise<string[]> {
@@ -308,6 +341,75 @@ export class StoreService {
       logError(`Request error: ${String(error)}`);
       if (cached) {
         return { profile: this.mapProfileRow(cached), source: "cache", isStale: true };
+      }
+      return null;
+    }
+  }
+
+  async getRecentSubmissions(
+    handle: string,
+    limit = 10,
+    ttlMs = RECENT_SUBMISSIONS_TTL_MS
+  ): Promise<RecentSubmissionsResult | null> {
+    const key = this.normalizeHandle(handle);
+    let cached: { submissions: string; last_fetched: string } | undefined;
+
+    try {
+      cached = await this.db
+        .selectFrom("cf_recent_submissions")
+        .select(["submissions", "last_fetched"])
+        .where("handle", "=", key)
+        .executeTakeFirst();
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+    }
+
+    if (cached?.last_fetched) {
+      const lastFetchedAt = Date.parse(cached.last_fetched);
+      if (Number.isFinite(lastFetchedAt)) {
+        const ageMs = Date.now() - lastFetchedAt;
+        if (ageMs >= 0 && ageMs <= ttlMs) {
+          const submissions = parseJsonArray<RecentSubmission>(cached.submissions, []);
+          return { submissions: submissions.slice(0, limit), source: "cache", isStale: false };
+        }
+      }
+    }
+
+    try {
+      const response = await this.cfClient.request<UserStatusResponse>("user.status", {
+        handle,
+        from: 1,
+        count: Math.max(limit, RECENT_SUBMISSIONS_FETCH_COUNT),
+      });
+      const submissions: RecentSubmission[] = response.map((submission) => ({
+        id: submission.id,
+        contestId: submission.problem.contestId ?? submission.contestId ?? null,
+        index: submission.problem.index,
+        name: submission.problem.name ?? "Unknown problem",
+        verdict: submission.verdict ?? null,
+        creationTimeSeconds: submission.creationTimeSeconds,
+        programmingLanguage: submission.programmingLanguage ?? null,
+      }));
+      await this.db
+        .insertInto("cf_recent_submissions")
+        .values({
+          handle: key,
+          submissions: JSON.stringify(submissions),
+          last_fetched: new Date().toISOString(),
+        })
+        .onConflict((oc) =>
+          oc.column("handle").doUpdateSet({
+            submissions: JSON.stringify(submissions),
+            last_fetched: new Date().toISOString(),
+          })
+        )
+        .execute();
+      return { submissions: submissions.slice(0, limit), source: "api", isStale: false };
+    } catch (error) {
+      logError(`Request error: ${String(error)}`);
+      if (cached) {
+        const submissions = parseJsonArray<RecentSubmission>(cached.submissions, []);
+        return { submissions: submissions.slice(0, limit), source: "cache", isStale: true };
       }
       return null;
     }

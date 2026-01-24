@@ -7,7 +7,7 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 
-import { logError } from "../utils/logger.js";
+import { logError, type LogContext } from "../utils/logger.js";
 import { sleep } from "../utils/sleep.js";
 
 import type { Command } from "./types.js";
@@ -31,6 +31,7 @@ async function gotSubmission(
   handle: string,
   index: string,
   startTime: number,
+  logContext: LogContext,
   request: RequestFn
 ): Promise<boolean> {
   try {
@@ -51,7 +52,7 @@ async function gotSubmission(
       }
     }
   } catch (error) {
-    logError(`Error getting submission: ${String(error)}`);
+    logError(`Error getting submission: ${String(error)}`, logContext);
   }
   return false;
 }
@@ -61,17 +62,15 @@ async function validateHandle(
   serverId: string,
   userId: string,
   handle: string,
-  context: Parameters<Command["execute"]>[1]
+  context: Parameters<Command["execute"]>[1],
+  logContext: LogContext
 ): Promise<"ok" | "handle_exists" | "already_linked" | "verification_failed" | "error"> {
-  let problems = context.services.problems.getProblems();
-  if (problems.length === 0) {
-    try {
-      await context.services.problems.refreshProblems(true);
-      problems = context.services.problems.getProblems();
-    } catch (error) {
-      logError(`Failed to get problems: ${String(error)}`);
-      return "error";
-    }
+  let problems: Awaited<ReturnType<typeof context.services.problems.ensureProblemsLoaded>>;
+  try {
+    problems = await context.services.problems.ensureProblemsLoaded();
+  } catch (error) {
+    logError(`Failed to get problems: ${String(error)}`, logContext);
+    return "error";
   }
 
   if (problems.length === 0) {
@@ -91,6 +90,7 @@ async function validateHandle(
     handle,
     problem.index,
     startTime,
+    logContext,
     context.services.codeforces.request.bind(context.services.codeforces)
   );
   if (!hasSubmission) {
@@ -119,11 +119,20 @@ export const registerCommand: Command = {
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
     const guildId = interaction.guild.id;
     const handle = interaction.options.getString("handle", true);
+    const logContext: LogContext = {
+      correlationId: context.correlationId,
+      command: "register",
+      guildId,
+      userId: interaction.user.id,
+    };
 
     await interaction.deferReply({ ephemeral: true });
 
@@ -151,7 +160,8 @@ export const registerCommand: Command = {
       guildId,
       interaction.user.id,
       resolvedHandle,
-      context
+      context,
+      logContext
     );
 
     if (result === "ok") {
@@ -174,7 +184,10 @@ export const unlinkCommand: Command = {
     .setDescription("Unlinks your Codeforces handle and erases progress"),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
       return;
     }
     const guildId = interaction.guild.id;

@@ -1,6 +1,10 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import { formatDiscordRelativeTime, formatDiscordTimestamp, formatDuration } from "../utils/time.js";
+import {
+  formatDiscordRelativeTime,
+  formatDiscordTimestamp,
+  formatDuration,
+} from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
@@ -53,10 +57,7 @@ export const contestsCommand: Command = {
       const ongoingLines = ongoing
         .map((contest) => {
           const endsAt = contest.startTimeSeconds + contest.durationSeconds;
-          return buildContestLine(
-            contest,
-            `(ends ${formatDiscordRelativeTime(endsAt)})`
-          );
+          return buildContestLine(contest, `(ends ${formatDiscordRelativeTime(endsAt)})`);
         })
         .join("\n");
       embed.addFields({ name: "Ongoing", value: ongoingLines, inline: false });

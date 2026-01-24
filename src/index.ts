@@ -141,6 +141,7 @@ async function main() {
       client,
       config,
       commandSummaries,
+      correlationId,
       services: { contests, codeforces, problems, store },
     };
     await handleCommandInteraction(interaction, commandMap, context, cooldowns, correlationId);

@@ -2,7 +2,10 @@ export class CooldownManager {
   private userCooldowns = new Map<string, number>();
   private lastGlobal = 0;
 
-  constructor(private userCooldownSeconds: number, private globalCooldownSeconds: number) {}
+  constructor(
+    private userCooldownSeconds: number,
+    private globalCooldownSeconds: number
+  ) {}
 
   isAllowed(userId: string): { allowed: boolean; retryAfterSeconds: number } {
     const now = Date.now() / 1000;

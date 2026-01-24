@@ -35,7 +35,10 @@ export async function handleCommandInteraction(
         guildId: interaction.guildId ?? undefined,
         userId: interaction.user.id,
       });
-      await interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
+      await interaction.reply({
+        content: "You do not have permission to use this command.",
+        ephemeral: true,
+      });
       return;
     }
   }
