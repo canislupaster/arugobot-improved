@@ -249,6 +249,14 @@ sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 ```
 
+Sample Caddyfile (TLS via subdomain + reverse proxy):
+
+```text
+arugobot.purduecpu.com {
+  reverse_proxy http://localhost:8787
+}
+```
+
 4. Confirm the web server responds:
 
 ```bash
