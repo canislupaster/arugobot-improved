@@ -2,7 +2,9 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import {
   filterProblemsByRatingRanges,
+  filterProblemsByTags,
   getProblemId,
+  parseTagFilters,
   selectRandomProblems,
 } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
@@ -46,9 +48,12 @@ export const suggestCommand: Command = {
       option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
     )
     .addStringOption((option) =>
+      option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
+    )
+    .addStringOption((option) =>
       option
-        .setName("ranges")
-        .setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
+        .setName("tags")
+        .setDescription("Problem tags (e.g. dp, greedy, -math)")
     )
     .addStringOption((option) =>
       option
@@ -60,6 +65,7 @@ export const suggestCommand: Command = {
     const minRatingOption = interaction.options.getInteger("min_rating");
     const maxRatingOption = interaction.options.getInteger("max_rating");
     const rangesRaw = interaction.options.getString("ranges");
+    const tagsRaw = interaction.options.getString("tags");
     const rawHandles = interaction.options.getString("handles") ?? "";
     const rangeResult = resolveRatingRanges({
       rating,
@@ -103,9 +109,11 @@ export const suggestCommand: Command = {
       return;
     }
 
-    const possibleProblems = filterProblemsByRatingRanges(problems, ranges);
+    const tagFilters = parseTagFilters(tagsRaw);
+    const ratedProblems = filterProblemsByRatingRanges(problems, ranges);
+    const possibleProblems = filterProblemsByTags(ratedProblems, tagFilters);
     if (possibleProblems.length === 0) {
-      await interaction.editReply("No problems found in that rating range.");
+      await interaction.editReply("No problems found in that rating range and tag filter.");
       return;
     }
     const validHandles: string[] = [];

@@ -2,8 +2,60 @@ import type { Problem } from "../services/problems.js";
 
 import type { RatingRange } from "./ratingRanges.js";
 
+export type TagFilters = {
+  include: string[];
+  exclude: string[];
+};
+
 export function getProblemId(problem: Problem): string {
   return `${problem.contestId}${problem.index}`;
+}
+
+export function parseTagFilters(raw: string | null | undefined): TagFilters {
+  const include = new Set<string>();
+  const exclude = new Set<string>();
+  if (!raw) {
+    return { include: [], exclude: [] };
+  }
+  for (const token of raw.split(/[,\s]+/)) {
+    const trimmed = token.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const isExcluded = trimmed.startsWith("-");
+    const tag = (isExcluded ? trimmed.slice(1) : trimmed).toLowerCase();
+    if (!tag) {
+      continue;
+    }
+    if (isExcluded) {
+      exclude.add(tag);
+    } else {
+      include.add(tag);
+    }
+  }
+  return { include: [...include], exclude: [...exclude] };
+}
+
+export function filterProblemsByTags(problems: Problem[], filters: TagFilters): Problem[] {
+  if (filters.include.length === 0 && filters.exclude.length === 0) {
+    return problems;
+  }
+  const includeSet = new Set(filters.include.map((tag) => tag.toLowerCase()));
+  const excludeSet = new Set(filters.exclude.map((tag) => tag.toLowerCase()));
+  return problems.filter((problem) => {
+    const tags = new Set(problem.tags.map((tag) => tag.toLowerCase()));
+    for (const tag of excludeSet) {
+      if (tags.has(tag)) {
+        return false;
+      }
+    }
+    for (const tag of includeSet) {
+      if (!tags.has(tag)) {
+        return false;
+      }
+    }
+    return true;
+  });
 }
 
 export function filterProblemsByRatingRange(

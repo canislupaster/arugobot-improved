@@ -11,7 +11,9 @@ import {
 import { logError, type LogContext } from "../utils/logger.js";
 import {
   filterProblemsByRatingRanges,
+  filterProblemsByTags,
   getProblemId,
+  parseTagFilters,
   selectRandomProblem,
 } from "../utils/problemSelection.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
@@ -63,6 +65,11 @@ export const challengeCommand: Command = {
     .addStringOption((option) =>
       option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
     )
+    .addStringOption((option) =>
+      option
+        .setName("tags")
+        .setDescription("Problem tags (e.g. dp, greedy, -math)")
+    )
     .addBooleanOption((option) =>
       option.setName("open").setDescription("Allow anyone to join before starting")
     )
@@ -84,6 +91,7 @@ export const challengeCommand: Command = {
     const minRatingOption = interaction.options.getInteger("min_rating");
     const maxRatingOption = interaction.options.getInteger("max_rating");
     const rangesRaw = interaction.options.getString("ranges");
+    const tagsRaw = interaction.options.getString("tags");
     const openLobby = interaction.options.getBoolean("open") ?? false;
     const length = interaction.options.getInteger("length", true);
 
@@ -100,7 +108,8 @@ export const challengeCommand: Command = {
       (rating !== null ||
         minRatingOption !== null ||
         maxRatingOption !== null ||
-        rangesRaw !== null)
+        rangesRaw !== null ||
+        tagsRaw !== null)
     ) {
       await interaction.reply({
         content: "Provide either a problem id or a rating range, not both.",
@@ -171,10 +180,12 @@ export const challengeCommand: Command = {
         return;
       }
     } else {
-      const candidates = filterProblemsByRatingRanges(problems, rangeResult.ranges);
+      const tagFilters = parseTagFilters(tagsRaw);
+      const ratedCandidates = filterProblemsByRatingRanges(problems, rangeResult.ranges);
+      const candidates = filterProblemsByTags(ratedCandidates, tagFilters);
       if (candidates.length === 0) {
         await interaction.reply({
-          content: "No problems found in that rating range.",
+          content: "No problems found for that rating range and tag filter.",
           ephemeral: true,
         });
         return;
@@ -392,10 +403,7 @@ export const challengeCommand: Command = {
             await button.reply({ content: "Lobby is full (max 5).", ephemeral: true });
             return;
           }
-          const linked = await context.services.store.handleLinked(
-            guildId,
-            button.user.id
-          );
+          const linked = await context.services.store.handleLinked(guildId, button.user.id);
           if (!linked) {
             await button.reply({ content: "Link a handle with /register first.", ephemeral: true });
             return;
