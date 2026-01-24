@@ -1006,8 +1006,6 @@ export class StoreService {
         from: index,
         count: 5000,
       });
-      logInfo(String(response.length));
-      logInfo(String(index));
 
       if (response.length === 0) {
         break;

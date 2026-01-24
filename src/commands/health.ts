@@ -31,6 +31,7 @@ export const healthCommand: Command = {
     const cfLastError = context.services.codeforces.getLastError();
     const cfLastSuccessAt = context.services.codeforces.getLastSuccessAt();
     const lastRefreshAt = context.services.problems.getLastRefreshAt();
+    const problemLastError = context.services.problems.getLastError();
     const contestRefreshAt = context.services.contests.getLastRefreshAt();
     const contestLastError = context.services.contests.getLastError();
     const reminderCount = await context.services.contestReminders.getSubscriptionCount();
@@ -77,6 +78,13 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Last error",
         value: `${lastError.timestamp} - ${lastError.message}`,
+        inline: false,
+      });
+    }
+    if (problemLastError) {
+      embed.addFields({
+        name: "Problem cache last error",
+        value: `${problemLastError.timestamp} - ${problemLastError.message}`,
         inline: false,
       });
     }

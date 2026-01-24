@@ -49,6 +49,24 @@ export type ActiveChallengeSummary = {
   endsAt: number;
 };
 
+export type CompletedChallengeParticipant = {
+  userId: string;
+  solvedAt: number | null;
+  ratingDelta: number | null;
+};
+
+export type CompletedChallengeSummary = {
+  id: string;
+  serverId: string;
+  channelId: string;
+  hostUserId: string;
+  problem: ChallengeProblem;
+  startedAt: number;
+  endsAt: number;
+  completedAt: number | null;
+  participants: CompletedChallengeParticipant[];
+};
+
 type ChallengeClock = {
   nowSeconds: () => number;
 };
@@ -66,6 +84,17 @@ const UPDATE_INTERVAL_SECONDS = 30;
 
 function buildProblemLink(problem: ChallengeProblem): string {
   return `[${problem.index}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index})`;
+}
+
+function parseIsoToSeconds(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return null;
+  }
+  return Math.floor(timestamp / 1000);
 }
 
 function pickNextUnsolved(
@@ -179,6 +208,82 @@ export class ChallengeService {
 
   async listActiveChallenges(serverId: string): Promise<ActiveChallenge[]> {
     return this.getActiveChallenges(serverId);
+  }
+
+  async listActiveChallengesForUser(serverId: string, userId: string): Promise<ActiveChallenge[]> {
+    const challenges = await this.getActiveChallenges(serverId);
+    return challenges.filter((challenge) =>
+      challenge.participants.some((participant) => participant.userId === userId)
+    );
+  }
+
+  async listRecentCompletedChallenges(
+    serverId: string,
+    limit = 5
+  ): Promise<CompletedChallengeSummary[]> {
+    const safeLimit = Math.max(1, Math.floor(limit));
+    const rows = await this.db
+      .selectFrom("challenges")
+      .select([
+        "id",
+        "server_id",
+        "channel_id",
+        "host_user_id",
+        "problem_contest_id",
+        "problem_index",
+        "problem_name",
+        "problem_rating",
+        "started_at",
+        "ends_at",
+        "updated_at",
+      ])
+      .where("server_id", "=", serverId)
+      .where("status", "=", "completed")
+      .orderBy("updated_at", "desc")
+      .limit(safeLimit)
+      .execute();
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const participants = await this.db
+      .selectFrom("challenge_participants")
+      .select(["challenge_id", "user_id", "solved_at", "rating_delta"])
+      .where(
+        "challenge_id",
+        "in",
+        rows.map((row) => row.id)
+      )
+      .execute();
+
+    const grouped = new Map<string, CompletedChallengeParticipant[]>();
+    for (const participant of participants) {
+      const list = grouped.get(participant.challenge_id) ?? [];
+      list.push({
+        userId: participant.user_id,
+        solvedAt: participant.solved_at ?? null,
+        ratingDelta: participant.rating_delta ?? null,
+      });
+      grouped.set(participant.challenge_id, list);
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      serverId: row.server_id,
+      channelId: row.channel_id,
+      hostUserId: row.host_user_id,
+      problem: {
+        contestId: row.problem_contest_id,
+        index: row.problem_index,
+        name: row.problem_name,
+        rating: row.problem_rating,
+      },
+      startedAt: row.started_at,
+      endsAt: row.ends_at,
+      completedAt: parseIsoToSeconds(row.updated_at),
+      participants: grouped.get(row.id) ?? [],
+    }));
   }
 
   async createChallenge({

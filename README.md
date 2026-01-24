@@ -70,10 +70,11 @@ The following commands are available to you:
 
   Prints the help message.
 
-- **/challenges** `list` `[limit]` | `cancel` | `mine`
+- **/challenges** `list` `[limit]` | `cancel` | `mine` | `recent` `[limit]`
 
   Lists active challenges for the server or lets the host/admin cancel one.
   Use `mine` to see your active challenge.
+  Use `recent` to see recently completed challenges for the server.
 
 - **/handles** `[page]`
 

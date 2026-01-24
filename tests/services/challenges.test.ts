@@ -219,4 +219,91 @@ describe("ChallengeService", () => {
     const summaries = await service.getActiveChallengesForUsers("guild-1", ["user-1"]);
     expect(summaries.size).toBe(0);
   });
+
+  it("returns active challenges for a user", async () => {
+    const store = new StoreService(db, mockCodeforces as never);
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.insertUser("guild-1", "user-2", "petr");
+
+    const service = new ChallengeService(db, store, mockCodeforces as never);
+
+    await service.createChallenge({
+      serverId: "guild-1",
+      channelId: "channel-1",
+      messageId: "message-1",
+      hostUserId: "user-1",
+      problem: { contestId: 1000, index: "A", name: "Test", rating: 1200 },
+      lengthMinutes: 40,
+      participants: ["user-1"],
+      startedAt: 1000,
+    });
+
+    await service.createChallenge({
+      serverId: "guild-1",
+      channelId: "channel-2",
+      messageId: "message-2",
+      hostUserId: "user-2",
+      problem: { contestId: 1201, index: "B", name: "Test 2", rating: 1300 },
+      lengthMinutes: 40,
+      participants: ["user-2"],
+      startedAt: 1000,
+    });
+
+    const userChallenges = await service.listActiveChallengesForUser("guild-1", "user-1");
+    expect(userChallenges).toHaveLength(1);
+    expect(userChallenges[0]?.channelId).toBe("channel-1");
+  });
+
+  it("lists recent completed challenges in descending completion order", async () => {
+    const store = new StoreService(db, mockCodeforces as never);
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.insertUser("guild-1", "user-2", "petr");
+
+    const service = new ChallengeService(db, store, mockCodeforces as never);
+
+    const firstId = await service.createChallenge({
+      serverId: "guild-1",
+      channelId: "channel-1",
+      messageId: "message-1",
+      hostUserId: "user-1",
+      problem: { contestId: 1000, index: "A", name: "Test", rating: 1200 },
+      lengthMinutes: 40,
+      participants: ["user-1"],
+      startedAt: 1000,
+    });
+    const secondId = await service.createChallenge({
+      serverId: "guild-1",
+      channelId: "channel-2",
+      messageId: "message-2",
+      hostUserId: "user-2",
+      problem: { contestId: 1200, index: "B", name: "Test 2", rating: 1300 },
+      lengthMinutes: 40,
+      participants: ["user-2"],
+      startedAt: 2000,
+    });
+
+    await db
+      .updateTable("challenges")
+      .set({ status: "completed", updated_at: "2024-01-02T00:00:00.000Z" })
+      .where("id", "=", firstId)
+      .execute();
+    await db
+      .updateTable("challenges")
+      .set({ status: "completed", updated_at: "2024-01-03T00:00:00.000Z" })
+      .where("id", "=", secondId)
+      .execute();
+    await db
+      .updateTable("challenge_participants")
+      .set({ solved_at: 1100, rating_delta: 10 })
+      .where("challenge_id", "=", firstId)
+      .execute();
+
+    const recent = await service.listRecentCompletedChallenges("guild-1", 2);
+
+    expect(recent).toHaveLength(2);
+    expect(recent[0]?.id).toBe(secondId);
+    expect(recent[1]?.id).toBe(firstId);
+    expect(recent[1]?.participants).toHaveLength(1);
+    expect(recent[1]?.completedAt).toBe(Math.floor(Date.parse("2024-01-02T00:00:00.000Z") / 1000));
+  });
 });
