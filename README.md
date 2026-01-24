@@ -19,6 +19,9 @@ The following commands are available to you:
 - **/leaderboard** `[page]`
 
   Shows a page of the server leaderboard.
+- **/profile** `[user]`
+
+  Shows a linked handle, rating, and recent activity.
 - **/register** `handle`
 
   Links your CF account.
@@ -28,6 +31,7 @@ The following commands are available to you:
 - **/suggest** `rating` `[handles]`
 
   Gives some problems at a given rating that none of the CF accounts have done.
+  If `handles` is omitted, uses linked handles in the server.
 - **/help**
 
   Prints the help message.

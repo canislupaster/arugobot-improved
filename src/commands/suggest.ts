@@ -4,6 +4,23 @@ import { getColor } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
 
+export function parseHandles(raw: string): string[] {
+  const seen = new Set<string>();
+  const handles: string[] = [];
+  for (const handle of raw.split(/[,\s]+/)) {
+    const trimmed = handle.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      handles.push(trimmed);
+    }
+  }
+  return handles;
+}
+
 export const suggestCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("suggest")
@@ -22,10 +39,17 @@ export const suggestCommand: Command = {
   async execute(interaction, context) {
     const rating = interaction.options.getInteger("rating", true);
     const rawHandles = interaction.options.getString("handles") ?? "";
-    const handles = rawHandles
-      .split(/[,\s]+/)
-      .map((handle) => handle.trim())
-      .filter(Boolean);
+    let handles = parseHandles(rawHandles);
+    if (handles.length === 0 && interaction.guild) {
+      handles = await context.services.store.getHandlesForServer(interaction.guild.id);
+    }
+    if (handles.length === 0) {
+      await interaction.reply({
+        content: "Provide handles or run this command in a server with linked users.",
+        ephemeral: true,
+      });
+      return;
+    }
 
     if (handles.length > 5) {
       await interaction.reply({ content: "Too many people (limit is 5).", ephemeral: true });
@@ -50,8 +74,10 @@ export const suggestCommand: Command = {
     const badHandles: string[] = [];
 
     for (const handle of handles) {
-      if (await context.services.store.handleExistsOnCf(handle)) {
-        const solved = await context.services.store.getSolvedProblems(handle);
+      const handleInfo = await context.services.store.resolveHandle(handle);
+      if (handleInfo.exists) {
+        const canonicalHandle = handleInfo.canonicalHandle ?? handle;
+        const solved = await context.services.store.getSolvedProblems(canonicalHandle);
         if (!solved) {
           await interaction.reply({
             content: "Something went wrong. Try again in a bit.",

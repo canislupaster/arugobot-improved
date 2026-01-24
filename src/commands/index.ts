@@ -4,6 +4,7 @@ import { helpCommand } from "./help.js";
 import { historyCommand } from "./history.js";
 import { leaderboardCommand } from "./leaderboard.js";
 import { pingCommand } from "./ping.js";
+import { profileCommand } from "./profile.js";
 import { ratingCommand } from "./rating.js";
 import { registerCommand, unlinkCommand } from "./register.js";
 import { suggestCommand } from "./suggest.js";
@@ -14,6 +15,7 @@ export const commandList: Command[] = [
   historyCommand,
   leaderboardCommand,
   pingCommand,
+  profileCommand,
   ratingCommand,
   registerCommand,
   unlinkCommand,
