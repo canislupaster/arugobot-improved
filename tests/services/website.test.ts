@@ -313,9 +313,7 @@ describe("WebsiteService", () => {
     const overview = await website.getGuildOverview("guild-1");
     expect(overview?.contestActivity.contestCount).toBe(1);
     expect(overview?.contestActivity.participantCount).toBe(1);
-    expect(overview?.contestActivity.recentContests[0]?.contestName).toBe(
-      "Codeforces Round 101"
-    );
+    expect(overview?.contestActivity.recentContests[0]?.contestName).toBe("Codeforces Round 101");
   });
 
   it("summarizes global contest activity for public guilds", async () => {

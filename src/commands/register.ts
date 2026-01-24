@@ -5,6 +5,8 @@ import {
   ComponentType,
   EmbedBuilder,
   SlashCommandBuilder,
+  type ChatInputCommandInteraction,
+  type Message,
 } from "discord.js";
 
 import { waitForCompilationError } from "../services/verification.js";
@@ -15,11 +17,17 @@ import type { Command } from "./types.js";
 
 const VERIFICATION_TIMEOUT_MS = 60000;
 const VERIFICATION_POLL_MS = 5000;
+const VERIFICATION_CANCEL_LABEL = "Cancel verification";
 
-type HandleVerificationResult = "ok" | "verification_failed" | "error";
+type HandleVerificationResult = "ok" | "verification_failed" | "cancelled" | "error";
+
+type CancelCollector = {
+  waitForCancel: Promise<boolean>;
+  stop: () => void;
+};
 
 async function verifyHandleOwnership(
-  channelReply: (content: string) => Promise<unknown>,
+  interaction: ChatInputCommandInteraction,
   handle: string,
   context: Parameters<Command["execute"]>[1],
   logContext: LogContext
@@ -38,10 +46,26 @@ async function verifyHandleOwnership(
 
   const problem = problems[Math.floor(Math.random() * problems.length)];
   const startTime = Math.floor(Date.now() / 1000);
-
-  await channelReply(
-    `Submit a compilation error to the following problem in the next 60 seconds:\nhttps://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}\nI will confirm as soon as I see it.`
+  const abortController = new AbortController();
+  const cancelId = `cancel_verification:${context.correlationId}`;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(cancelId)
+      .setStyle(ButtonStyle.Danger)
+      .setLabel(VERIFICATION_CANCEL_LABEL)
   );
+
+  const promptMessage = await interaction.editReply({
+    content: `Submit a compilation error to the following problem in the next 60 seconds:\nhttps://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}\nI will confirm as soon as I see it.`,
+    components: [row],
+  });
+
+  const cancelCollector = hasComponentCollector(promptMessage)
+    ? createCancelCollector(promptMessage, interaction.user.id, cancelId, abortController)
+    : {
+        waitForCancel: Promise.resolve(false),
+        stop: () => {},
+      };
 
   const verified = await waitForCompilationError({
     contestId: problem.contestId,
@@ -52,12 +76,70 @@ async function verifyHandleOwnership(
     pollIntervalMs: VERIFICATION_POLL_MS,
     logContext,
     request: context.services.codeforces.request.bind(context.services.codeforces),
+    signal: abortController.signal,
   });
+  cancelCollector.stop();
+  const cancelled = await cancelCollector.waitForCancel;
+  if (cancelled) {
+    return "cancelled";
+  }
   if (!verified) {
     return "verification_failed";
   }
 
   return "ok";
+}
+
+function hasComponentCollector(message: unknown): message is Message {
+  return (
+    typeof message === "object" &&
+    message !== null &&
+    "createMessageComponentCollector" in message &&
+    typeof (message as Message).createMessageComponentCollector === "function"
+  );
+}
+
+function createCancelCollector(
+  message: Message,
+  userId: string,
+  customId: string,
+  abortController: AbortController
+): CancelCollector {
+  let resolved = false;
+  let stop = () => {};
+  const waitForCancel = new Promise<boolean>((resolve) => {
+    const collector = message.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: VERIFICATION_TIMEOUT_MS,
+    });
+    stop = () => collector.stop("finished");
+    const finish = (result: boolean) => {
+      if (resolved) {
+        return;
+      }
+      resolved = true;
+      resolve(result);
+    };
+
+    collector.on("collect", async (button) => {
+      if (button.customId !== customId) {
+        await button.reply({ content: "Unknown action.", ephemeral: true });
+        return;
+      }
+      if (button.user.id !== userId) {
+        await button.reply({ content: "Only the requester can cancel.", ephemeral: true });
+        return;
+      }
+      abortController.abort();
+      await button.update({ content: "Verification canceled.", components: [] });
+      finish(true);
+      collector.stop("cancelled");
+    });
+
+    collector.on("end", () => finish(false));
+  });
+
+  return { waitForCancel, stop };
 }
 
 export const registerCommand: Command = {
@@ -106,7 +188,7 @@ export const registerCommand: Command = {
     }
 
     const verification = await verifyHandleOwnership(
-      (content) => interaction.editReply(content),
+      interaction,
       resolvedHandle,
       context,
       logContext
@@ -131,6 +213,10 @@ export const registerCommand: Command = {
         return;
       }
       await interaction.editReply("Some error (maybe Codeforces is down).");
+      return;
+    }
+
+    if (verification === "cancelled") {
       return;
     }
 
@@ -194,11 +280,14 @@ export const relinkCommand: Command = {
     }
 
     const verification = await verifyHandleOwnership(
-      (content) => interaction.editReply(content),
+      interaction,
       resolvedHandle,
       context,
       logContext
     );
+    if (verification === "cancelled") {
+      return;
+    }
     if (verification !== "ok") {
       await interaction.editReply(
         verification === "verification_failed"

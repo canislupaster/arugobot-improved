@@ -54,7 +54,11 @@ export type ContestActivitySummary = {
   lookbackDays: number;
   contestCount: number;
   participantCount: number;
-  recentContests: Array<{ contestId: number; contestName: string; ratingUpdateTimeSeconds: number }>;
+  recentContests: Array<{
+    contestId: number;
+    contestName: string;
+    ratingUpdateTimeSeconds: number;
+  }>;
 };
 
 export type GuildOverview = {
@@ -414,10 +418,7 @@ export class WebsiteService {
           }
           hasEntry = true;
           const existing = contestMap.get(change.contestId);
-          if (
-            !existing ||
-            change.ratingUpdateTimeSeconds > existing.ratingUpdateTimeSeconds
-          ) {
+          if (!existing || change.ratingUpdateTimeSeconds > existing.ratingUpdateTimeSeconds) {
             contestMap.set(change.contestId, {
               contestId: change.contestId,
               contestName: change.contestName,

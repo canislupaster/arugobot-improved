@@ -68,10 +68,12 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 - **/register** `handle`
 
   Links your CF account.
+  Verification prompts include a cancel button if you need to stop the flow.
 
 - **/relink** `handle`
 
   Updates your linked CF handle (use if you changed your Codeforces handle).
+  Verification prompts include a cancel button if you need to stop the flow.
 
 - **/unlink**
 

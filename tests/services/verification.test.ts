@@ -67,4 +67,33 @@ describe("waitForCompilationError", () => {
     expect(result).toBe(false);
     expect(request).toHaveBeenCalledTimes(3);
   });
+
+  it("stops polling when aborted", async () => {
+    const request = jest.fn().mockResolvedValue([]);
+    const controller = new AbortController();
+    let now = 0;
+    const clock = {
+      now: () => now,
+      sleep: async (ms: number) => {
+        now += ms;
+        controller.abort();
+      },
+    };
+
+    const result = await waitForCompilationError({
+      contestId: 321,
+      handle: "mika",
+      index: "C",
+      startTimeSeconds: 100,
+      timeoutMs: 20000,
+      pollIntervalMs: 5000,
+      logContext: { correlationId: "test-3" },
+      request: request as RequestFn,
+      clock,
+      signal: controller.signal,
+    });
+
+    expect(result).toBe(false);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
 });

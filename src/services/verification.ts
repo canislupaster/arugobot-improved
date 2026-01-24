@@ -28,6 +28,7 @@ type CompilationErrorCheckOptions = {
   logContext: LogContext;
   request: RequestFn;
   clock?: VerificationClock;
+  signal?: AbortSignal;
 };
 
 async function hasCompilationError(
@@ -71,11 +72,24 @@ export async function waitForCompilationError({
   logContext,
   request,
   clock,
+  signal,
 }: CompilationErrorCheckOptions): Promise<boolean> {
   const timer = clock ?? { now: Date.now, sleep };
   const deadline = timer.now() + timeoutMs;
+  const abortPromise =
+    signal &&
+    new Promise<void>((resolve) => {
+      if (signal.aborted) {
+        resolve();
+        return;
+      }
+      signal.addEventListener("abort", () => resolve(), { once: true });
+    });
 
   while (timer.now() < deadline) {
+    if (signal?.aborted) {
+      return false;
+    }
     const found = await hasCompilationError(
       contestId,
       handle,
@@ -87,12 +101,23 @@ export async function waitForCompilationError({
     if (found) {
       return true;
     }
+    if (signal?.aborted) {
+      return false;
+    }
 
     const remainingMs = deadline - timer.now();
     if (remainingMs <= 0) {
       break;
     }
-    await timer.sleep(Math.min(pollIntervalMs, remainingMs));
+    const waitMs = Math.min(pollIntervalMs, remainingMs);
+    if (abortPromise) {
+      await Promise.race([timer.sleep(waitMs), abortPromise]);
+      if (signal?.aborted) {
+        return false;
+      }
+    } else {
+      await timer.sleep(waitMs);
+    }
   }
 
   return false;
