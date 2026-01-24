@@ -22,7 +22,7 @@ import { ProblemService } from "./services/problems.js";
 import { StoreService } from "./services/store.js";
 import { TournamentService } from "./services/tournaments.js";
 import { CooldownManager } from "./utils/cooldown.js";
-import { logError, logInfo } from "./utils/logger.js";
+import { logError, logInfo, logWarn } from "./utils/logger.js";
 
 type ContestListResponse = Array<{ id: number }>;
 
@@ -89,8 +89,9 @@ async function main() {
       });
       logInfo("Codeforces connectivity ok.", { contestCount: contests.length });
     } catch (error) {
-      logError(`Codeforces connectivity failed: ${String(error)}`);
-      throw error;
+      logWarn(`Codeforces connectivity failed; continuing with cached data.`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
