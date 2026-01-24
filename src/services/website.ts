@@ -3,8 +3,8 @@ import { sql, type Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { logError } from "../utils/logger.js";
 
+import type { ContestActivityService } from "./contestActivity.js";
 import type { GuildSettingsService } from "./guildSettings.js";
-import type { RatingChange } from "./ratingChanges.js";
 import type { StoreService } from "./store.js";
 
 type ServerStats = Awaited<ReturnType<StoreService["getServerStats"]>>;
@@ -77,28 +77,12 @@ const DEFAULT_ACTIVITY_DAYS = 30;
 const DEFAULT_TOURNAMENT_LIMIT = 3;
 const DEFAULT_CONTEST_ACTIVITY_DAYS = 90;
 
-function parseRatingChangesPayload(payload: string): RatingChange[] {
-  try {
-    const parsed = JSON.parse(payload) as RatingChange[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.filter(
-      (entry) =>
-        Number.isFinite(entry.contestId) &&
-        Number.isFinite(entry.ratingUpdateTimeSeconds) &&
-        typeof entry.contestName === "string"
-    );
-  } catch {
-    return [];
-  }
-}
-
 export class WebsiteService {
   constructor(
     private readonly db: Kysely<Database>,
     private readonly store: StoreService,
-    private readonly settings: GuildSettingsService
+    private readonly settings: GuildSettingsService,
+    private readonly contestActivity: ContestActivityService
   ) {}
 
   async getGlobalOverview(): Promise<GlobalOverview> {
@@ -181,7 +165,7 @@ export class WebsiteService {
         .where("guild_id", "in", publicGuildIds)
         .executeTakeFirst();
 
-      const contestActivity = await this.getGlobalContestActivity(
+      const contestActivity = await this.contestActivity.getGlobalContestActivity(
         publicGuildIds,
         DEFAULT_CONTEST_ACTIVITY_DAYS
       );
@@ -333,7 +317,10 @@ export class WebsiteService {
       const activity = await this.store.getChallengeActivity(guildId, sinceIso, 5);
 
       const contestActivityDays = options?.contestActivityDays ?? DEFAULT_CONTEST_ACTIVITY_DAYS;
-      const contestActivity = await this.getContestActivity(roster, contestActivityDays);
+      const contestActivity = await this.contestActivity.getContestActivityForRoster(roster, {
+        lookbackDays: contestActivityDays,
+        recentLimit: 4,
+      });
 
       const tournaments = await this.db
         .selectFrom("tournaments")
@@ -382,156 +369,5 @@ export class WebsiteService {
     }
   }
 
-  private async getContestActivity(
-    roster: RosterEntry[],
-    lookbackDays: number
-  ): Promise<ContestActivitySummary> {
-    const handles = roster.map((row) => row.handle.trim().toLowerCase()).filter(Boolean);
-    if (handles.length === 0) {
-      return {
-        lookbackDays,
-        contestCount: 0,
-        participantCount: 0,
-        recentContests: [],
-      };
-    }
-
-    try {
-      const rows = await this.db
-        .selectFrom("cf_rating_changes")
-        .select(["handle", "payload"])
-        .where("handle", "in", handles)
-        .execute();
-      const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
-      const contestMap = new Map<
-        number,
-        { contestId: number; contestName: string; ratingUpdateTimeSeconds: number }
-      >();
-      const participantSet = new Set<string>();
-
-      for (const row of rows) {
-        const changes = parseRatingChangesPayload(row.payload);
-        let hasEntry = false;
-        for (const change of changes) {
-          if (change.ratingUpdateTimeSeconds < cutoffSeconds) {
-            continue;
-          }
-          hasEntry = true;
-          const existing = contestMap.get(change.contestId);
-          if (!existing || change.ratingUpdateTimeSeconds > existing.ratingUpdateTimeSeconds) {
-            contestMap.set(change.contestId, {
-              contestId: change.contestId,
-              contestName: change.contestName,
-              ratingUpdateTimeSeconds: change.ratingUpdateTimeSeconds,
-            });
-          }
-        }
-        if (hasEntry) {
-          participantSet.add(row.handle);
-        }
-      }
-
-      const recentContests = Array.from(contestMap.values())
-        .sort((a, b) => b.ratingUpdateTimeSeconds - a.ratingUpdateTimeSeconds)
-        .slice(0, 4);
-
-      return {
-        lookbackDays,
-        contestCount: contestMap.size,
-        participantCount: participantSet.size,
-        recentContests,
-      };
-    } catch (error) {
-      logError(`Database error (contest activity): ${String(error)}`);
-      return {
-        lookbackDays,
-        contestCount: 0,
-        participantCount: 0,
-        recentContests: [],
-      };
-    }
-  }
-
-  private async getGlobalContestActivity(
-    publicGuildIds: string[],
-    lookbackDays: number
-  ): Promise<GlobalOverview["contestActivity"]> {
-    if (publicGuildIds.length === 0) {
-      return {
-        lookbackDays,
-        contestCount: 0,
-        participantCount: 0,
-        lastContestAt: null,
-      };
-    }
-
-    try {
-      const handleRows = await this.db
-        .selectFrom("users")
-        .select("handle")
-        .where("server_id", "in", publicGuildIds)
-        .execute();
-      const handles = Array.from(
-        new Set(
-          handleRows
-            .map((row) => row.handle.trim().toLowerCase())
-            .filter((handle) => handle.length > 0)
-        )
-      );
-      if (handles.length === 0) {
-        return {
-          lookbackDays,
-          contestCount: 0,
-          participantCount: 0,
-          lastContestAt: null,
-        };
-      }
-
-      const rows = await this.db
-        .selectFrom("cf_rating_changes")
-        .select(["handle", "payload"])
-        .where("handle", "in", handles)
-        .execute();
-      const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
-      const contestMap = new Map<number, number>();
-      const participantSet = new Set<string>();
-      let lastContestAt: number | null = null;
-
-      for (const row of rows) {
-        const changes = parseRatingChangesPayload(row.payload);
-        let hasEntry = false;
-        for (const change of changes) {
-          if (change.ratingUpdateTimeSeconds < cutoffSeconds) {
-            continue;
-          }
-          hasEntry = true;
-          contestMap.set(
-            change.contestId,
-            Math.max(contestMap.get(change.contestId) ?? 0, change.ratingUpdateTimeSeconds)
-          );
-          if (!lastContestAt || change.ratingUpdateTimeSeconds > lastContestAt) {
-            lastContestAt = change.ratingUpdateTimeSeconds;
-          }
-        }
-        if (hasEntry) {
-          participantSet.add(row.handle);
-        }
-      }
-
-      return {
-        lookbackDays,
-        contestCount: contestMap.size,
-        participantCount: participantSet.size,
-        lastContestAt,
-      };
-    } catch (error) {
-      logError(`Database error (global contest activity): ${String(error)}`);
-      return {
-        lookbackDays,
-        contestCount: 0,
-        participantCount: 0,
-        lastContestAt: null,
-      };
-    }
-  }
+  // contest activity lives in ContestActivityService
 }

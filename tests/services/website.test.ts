@@ -4,6 +4,7 @@ import { createDb } from "../../src/db/database.js";
 import { migrateToLatest } from "../../src/db/migrator.js";
 import type { Database } from "../../src/db/types.js";
 import type { CodeforcesClient } from "../../src/services/codeforces.js";
+import { ContestActivityService } from "../../src/services/contestActivity.js";
 import { GuildSettingsService } from "../../src/services/guildSettings.js";
 import { StoreService } from "../../src/services/store.js";
 import { WebsiteService } from "../../src/services/website.js";
@@ -21,7 +22,8 @@ describe("WebsiteService", () => {
     await migrateToLatest(db);
     store = new StoreService(db, mockCodeforces);
     settings = new GuildSettingsService(db);
-    website = new WebsiteService(db, store, settings);
+    const contestActivity = new ContestActivityService(db, store);
+    website = new WebsiteService(db, store, settings, contestActivity);
 
     await db
       .insertInto("users")

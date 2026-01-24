@@ -12,6 +12,7 @@ import { migrateToLatest } from "./db/migrator.js";
 import { ChallengeService, challengeUpdateIntervalMs } from "./services/challenges.js";
 import { CodeforcesClient } from "./services/codeforces.js";
 import { CodeforcesCacheService } from "./services/codeforcesCache.js";
+import { ContestActivityService } from "./services/contestActivity.js";
 import { ContestRatingChangesService } from "./services/contestRatingChanges.js";
 import { ContestReminderService, contestReminderIntervalMs } from "./services/contestReminders.js";
 import { ContestService } from "./services/contests.js";
@@ -65,13 +66,14 @@ async function main() {
   const store = new StoreService(db, codeforces, {
     maxSolvedPages: config.codeforcesSolvedMaxPages,
   });
+  const contestActivity = new ContestActivityService(db, store);
   const challenges = new ChallengeService(db, store, codeforces);
   const tournaments = new TournamentService(db, problems, store, challenges);
   const tournamentRecaps = new TournamentRecapService(db, tournaments);
   challenges.setCompletionNotifier(tournaments);
   const practiceReminders = new PracticeReminderService(db, problems, store);
   const practiceSuggestions = new PracticeSuggestionService(problems, store);
-  const website = new WebsiteService(db, store, guildSettings);
+  const website = new WebsiteService(db, store, guildSettings, contestActivity);
 
   const commandSummaries = commandList.map((command) => ({
     name: command.data.name,
@@ -210,6 +212,7 @@ async function main() {
         contestReminders,
         contestRatingChanges,
         contestStandings,
+        contestActivity,
         guildSettings,
         metrics,
         practiceReminders,

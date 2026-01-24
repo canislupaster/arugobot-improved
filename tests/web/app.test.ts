@@ -1,0 +1,86 @@
+import { Kysely } from "kysely";
+
+import { createDb } from "../../src/db/database.js";
+import { migrateToLatest } from "../../src/db/migrator.js";
+import type { Database } from "../../src/db/types.js";
+import type { CodeforcesClient } from "../../src/services/codeforces.js";
+import { ContestActivityService } from "../../src/services/contestActivity.js";
+import { GuildSettingsService } from "../../src/services/guildSettings.js";
+import { StoreService } from "../../src/services/store.js";
+import { WebsiteService } from "../../src/services/website.js";
+import { createWebApp } from "../../src/web/app.js";
+
+const mockCodeforces = { request: jest.fn() } as unknown as CodeforcesClient;
+
+describe("web app", () => {
+  let db: Kysely<Database>;
+  let website: WebsiteService;
+
+  beforeEach(async () => {
+    db = createDb(":memory:");
+    await migrateToLatest(db);
+    const store = new StoreService(db, mockCodeforces);
+    const settings = new GuildSettingsService(db);
+    const contestActivity = new ContestActivityService(db, store);
+    website = new WebsiteService(db, store, settings, contestActivity);
+
+    await db
+      .insertInto("users")
+      .values({
+        server_id: "guild-1",
+        user_id: "user-1",
+        handle: "alice",
+        rating: 1500,
+        history: "[]",
+        rating_history: "[]",
+      })
+      .execute();
+
+    await db
+      .insertInto("guild_settings")
+      .values({ guild_id: "guild-1", dashboard_public: 1 })
+      .execute();
+  });
+
+  afterEach(async () => {
+    await db.destroy();
+  });
+
+  it("renders the home page", async () => {
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Global snapshot");
+    expect(body).toContain("Guild One");
+  });
+
+  it("renders a guild page", async () => {
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/guilds/guild-1");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Guild One");
+  });
+
+  it("returns 404 for unknown guilds", async () => {
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map() },
+      } as never,
+    });
+    const response = await app.request("http://localhost/guilds/missing");
+    expect(response.status).toBe(404);
+  });
+});
