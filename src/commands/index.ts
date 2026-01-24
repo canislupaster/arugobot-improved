@@ -13,6 +13,7 @@ import { practiceRemindersCommand } from "./practiceReminders.js";
 import { profileCommand } from "./profile.js";
 import { ratingCommand } from "./rating.js";
 import { recentCommand } from "./recent.js";
+import { refreshCommand } from "./refresh.js";
 import { registerCommand, unlinkCommand } from "./register.js";
 import { statsCommand } from "./stats.js";
 import { suggestCommand } from "./suggest.js";
@@ -30,6 +31,7 @@ export const commandList: Command[] = [
   pingCommand,
   practiceRemindersCommand,
   profileCommand,
+  refreshCommand,
   ratingCommand,
   recentCommand,
   registerCommand,

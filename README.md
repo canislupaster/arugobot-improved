@@ -83,6 +83,10 @@ The following commands are available to you:
 
   Admin-only diagnostics (uptime, memory, DB status, last error).
 
+- **/refresh** `[scope]`
+
+  Admin-only refresh of cached Codeforces data (problems, contests, and handle canonicalization).
+
 - **/ping**
 
   Quick liveness check.
