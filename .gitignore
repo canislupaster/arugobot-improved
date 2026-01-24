@@ -1,0 +1,10 @@
+token.txt
+bot_data.db
+__pycache__/
+commands/__pycache__
+bot.log
+node_modules/
+dist/
+.env
+coverage/
+.pnpm-store/
