@@ -13,7 +13,7 @@ export const healthCommand: Command = {
     .setDescription("Shows diagnostics for this bot instance")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   adminOnly: true,
-  async execute(interaction) {
+  async execute(interaction, context) {
     if (!interaction.guild) {
       await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
       return;
@@ -29,6 +29,11 @@ export const healthCommand: Command = {
       dbOk = false;
     }
     const lastError = getLastError();
+    const cfLastError = context.services.codeforces.getLastError();
+    const cfLastSuccessAt = context.services.codeforces.getLastSuccessAt();
+    const lastRefreshAt = context.services.problems.getLastRefreshAt();
+    const cacheAgeSeconds =
+      lastRefreshAt > 0 ? Math.floor((Date.now() - lastRefreshAt) / 1000) : null;
 
     const embed = new EmbedBuilder()
       .setTitle("ArugoBot Health")
@@ -37,6 +42,11 @@ export const healthCommand: Command = {
         { name: "Uptime", value: `${uptimeSeconds}s`, inline: true },
         { name: "Memory", value: `${Math.round(memory.rss / 1024 / 1024)} MB`, inline: true },
         { name: "DB", value: dbOk ? "OK" : "Failed", inline: true },
+        {
+          name: "Problem cache age",
+          value: cacheAgeSeconds === null ? "Unknown" : `${cacheAgeSeconds}s`,
+          inline: true,
+        },
         { name: "Commands handled", value: String(getCommandCount()), inline: true },
         { name: "Node", value: process.version, inline: true },
         { name: "discord.js", value: discordJsVersion, inline: true },
@@ -47,6 +57,20 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Last error",
         value: `${lastError.timestamp} - ${lastError.message}`,
+        inline: false,
+      });
+    }
+    if (cfLastError) {
+      embed.addFields({
+        name: "Codeforces last error",
+        value: `${cfLastError.timestamp} - ${cfLastError.message}`,
+        inline: false,
+      });
+    }
+    if (cfLastSuccessAt) {
+      embed.addFields({
+        name: "Codeforces last success",
+        value: cfLastSuccessAt,
         inline: false,
       });
     }

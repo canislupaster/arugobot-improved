@@ -18,7 +18,15 @@ export type AcTable = {
   updated_at: Generated<string>;
 };
 
+export type CfHandlesTable = {
+  handle: string;
+  canonical_handle: string | null;
+  exists: number;
+  last_checked: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
+  cf_handles: CfHandlesTable;
 };

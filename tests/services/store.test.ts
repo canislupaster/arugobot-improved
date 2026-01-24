@@ -49,4 +49,20 @@ describe("StoreService", () => {
     const duplicateLink = await store.insertUser("guild-1", "user-1", "petr");
     expect(duplicateLink).toBe("already_linked");
   });
+
+  it("caches handle resolution results", async () => {
+    mockClient.request.mockResolvedValueOnce([{ handle: "Tourist" }]);
+
+    const first = await store.resolveHandle("tourist");
+    expect(first.exists).toBe(true);
+    expect(first.canonicalHandle).toBe("Tourist");
+    expect(first.source).toBe("api");
+    expect(mockClient.request).toHaveBeenCalledTimes(1);
+
+    const second = await store.resolveHandle("tourist");
+    expect(second.exists).toBe(true);
+    expect(second.canonicalHandle).toBe("Tourist");
+    expect(second.source).toBe("cache");
+    expect(mockClient.request).toHaveBeenCalledTimes(1);
+  });
 });

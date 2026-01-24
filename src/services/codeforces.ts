@@ -40,6 +40,8 @@ class RateLimiter {
 
 export class CodeforcesClient {
   private limiter: RateLimiter;
+  private lastError: { message: string; endpoint: string; timestamp: string } | null = null;
+  private lastSuccessAt: string | null = null;
 
   constructor(private options: RequestOptions) {
     this.limiter = new RateLimiter(options.requestDelayMs);
@@ -67,6 +69,7 @@ export class CodeforcesClient {
           const comment = data.comment ?? "Unknown Codeforces error";
           throw new Error(comment);
         }
+        this.lastSuccessAt = new Date().toISOString();
         return data.result;
       } finally {
         clearTimeout(timeout);
@@ -79,6 +82,12 @@ export class CodeforcesClient {
         return await this.limiter.schedule(attempt);
       } catch (error) {
         if (attemptIndex >= retries) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.lastError = {
+            message,
+            endpoint,
+            timestamp: new Date().toISOString(),
+          };
           throw error;
         }
         const waitMs = this.options.requestDelayMs * (attemptIndex + 1);
@@ -92,5 +101,13 @@ export class CodeforcesClient {
     }
 
     throw new Error("Unreachable");
+  }
+
+  getLastError() {
+    return this.lastError;
+  }
+
+  getLastSuccessAt() {
+    return this.lastSuccessAt;
   }
 }

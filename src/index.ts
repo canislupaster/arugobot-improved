@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { Client, GatewayIntentBits } from "discord.js";
+import { sql } from "kysely";
 
 import { handleCommandInteraction } from "./commands/handler.js";
 import { commandData, commandList, commandMap } from "./commands/index.js";
-import { loadConfig } from "./config/env.js";
+import { loadConfig, validateConfig } from "./config/env.js";
 import { initDb, destroyDb } from "./db/database.js";
 import { migrateToLatest } from "./db/migrator.js";
 import { CodeforcesClient } from "./services/codeforces.js";
@@ -13,8 +14,18 @@ import { StoreService } from "./services/store.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo } from "./utils/logger.js";
 
+type ContestListResponse = Array<{ id: number }>;
+
 async function main() {
   const config = loadConfig();
+  const configErrors = validateConfig(config);
+  if (configErrors.length > 0) {
+    for (const error of configErrors) {
+      logError(error);
+    }
+    throw new Error("Configuration validation failed.");
+  }
+  logInfo("Configuration loaded.", { environment: config.environment });
   const db = initDb(config.databaseUrl);
   await migrateToLatest(db);
 
@@ -37,6 +48,27 @@ async function main() {
 
   const cooldowns = new CooldownManager(3, 1);
   let parseInterval: NodeJS.Timeout | null = null;
+  let shuttingDown = false;
+
+  async function validateConnectivity() {
+    try {
+      await sql`select 1`.execute(db);
+      logInfo("Database connectivity ok.");
+    } catch (error) {
+      logError(`Database connectivity failed: ${String(error)}`);
+      throw error;
+    }
+
+    try {
+      const contests = await codeforces.request<ContestListResponse>("contest.list", {
+        gym: false,
+      });
+      logInfo("Codeforces connectivity ok.", { contestCount: contests.length });
+    } catch (error) {
+      logError(`Codeforces connectivity failed: ${String(error)}`);
+      throw error;
+    }
+  }
 
   async function fixHandles() {
     const handles = await store.getHandles();
@@ -51,6 +83,9 @@ async function main() {
 
   let isParsing = false;
   async function parseData() {
+    if (shuttingDown) {
+      return;
+    }
     if (isParsing) {
       return;
     }
@@ -110,6 +145,7 @@ async function main() {
   });
 
   const shutdown = async (signal: string) => {
+    shuttingDown = true;
     logInfo(`Shutting down (${signal})...`);
     if (parseInterval) {
       clearInterval(parseInterval);
@@ -121,7 +157,14 @@ async function main() {
 
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("unhandledRejection", (reason) => {
+    logError(`Unhandled rejection: ${String(reason)}`);
+  });
+  process.on("uncaughtException", (error) => {
+    logError(`Uncaught exception: ${String(error)}`);
+  });
 
+  await validateConnectivity();
   await client.login(config.discordToken);
 }
 

@@ -127,13 +127,14 @@ export const registerCommand: Command = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const existsOnCf = await context.services.store.handleExistsOnCf(handle);
-    if (!existsOnCf) {
+    const handleInfo = await context.services.store.resolveHandle(handle);
+    if (!handleInfo.exists) {
       await interaction.editReply("Invalid handle.");
       return;
     }
+    const resolvedHandle = handleInfo.canonicalHandle ?? handle;
 
-    if (await context.services.store.handleExists(guildId, handle)) {
+    if (await context.services.store.handleExists(guildId, resolvedHandle)) {
       await interaction.editReply("Handle taken in this server.");
       return;
     }
@@ -149,12 +150,12 @@ export const registerCommand: Command = {
       (content) => interaction.editReply(content),
       guildId,
       interaction.user.id,
-      handle,
+      resolvedHandle,
       context
     );
 
     if (result === "ok") {
-      await interaction.editReply(`Handle set to ${handle}.`);
+      await interaction.editReply(`Handle set to ${resolvedHandle}.`);
     } else if (result === "verification_failed") {
       await interaction.editReply("Verification failed.");
     } else if (result === "handle_exists") {

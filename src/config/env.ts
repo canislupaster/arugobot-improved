@@ -25,6 +25,35 @@ function parseNumber(value: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function isValidUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function validateConfig(config: AppConfig): string[] {
+  const errors: string[] = [];
+  if (!config.discordToken) {
+    errors.push("DISCORD_TOKEN is missing.");
+  }
+  if (!config.databaseUrl) {
+    errors.push("DATABASE_URL is missing.");
+  }
+  if (!isValidUrl(config.codeforcesApiBaseUrl)) {
+    errors.push("CODEFORCES_API_BASE_URL must be a valid http(s) URL.");
+  }
+  if (config.codeforcesRequestDelayMs <= 0) {
+    errors.push("CODEFORCES_REQUEST_DELAY_MS must be greater than 0.");
+  }
+  if (config.codeforcesTimeoutMs <= 0) {
+    errors.push("CODEFORCES_TIMEOUT_MS must be greater than 0.");
+  }
+  return errors;
+}
+
 export function loadConfig(): AppConfig {
   const discordToken = requireEnv("DISCORD_TOKEN");
   const databaseUrl = requireEnv("DATABASE_URL");

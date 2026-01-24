@@ -29,6 +29,10 @@ export class ProblemService {
     return this.problemDict;
   }
 
+  getLastRefreshAt(): number {
+    return this.lastRefresh;
+  }
+
   async refreshProblems(force = false): Promise<void> {
     const now = Date.now();
     if (!force && now - this.lastRefresh < 60 * 60 * 1000) {

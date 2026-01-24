@@ -19,6 +19,14 @@ type HistoryWithRatings = {
   ratingHistory: number[];
 };
 
+const HANDLE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+type HandleResolution = {
+  exists: boolean;
+  canonicalHandle: string | null;
+  source: "cache" | "api";
+};
+
 function parseJsonArray<T>(raw: string | null | undefined, fallback: T[]): T[] {
   if (!raw) {
     return fallback;
@@ -34,9 +42,31 @@ function parseJsonArray<T>(raw: string | null | undefined, fallback: T[]): T[] {
 export class StoreService {
   constructor(private db: Kysely<Database>, private cfClient: CodeforcesClient) {}
 
+  private normalizeHandle(handle: string): string {
+    return handle.trim().toLowerCase();
+  }
+
+  private isHandleValid(handle: string): boolean {
+    return /^[-_a-zA-Z0-9]+$/.test(handle);
+  }
+
   async getHandles(): Promise<string[]> {
     try {
       const rows = await this.db.selectFrom("users").select("handle").execute();
+      return rows.map((row) => row.handle);
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return [];
+    }
+  }
+
+  async getHandlesForServer(serverId: string): Promise<string[]> {
+    try {
+      const rows = await this.db
+        .selectFrom("users")
+        .select("handle")
+        .where("server_id", "=", serverId)
+        .execute();
       return rows.map((row) => row.handle);
     } catch (error) {
       logError(`Database error: ${String(error)}`);
@@ -53,6 +83,89 @@ export class StoreService {
         .execute();
     } catch (error) {
       logError(`Database error: ${String(error)}`);
+    }
+  }
+
+  async resolveHandle(handle: string, ttlMs = HANDLE_CACHE_TTL_MS): Promise<HandleResolution> {
+    if (!this.isHandleValid(handle)) {
+      return { exists: false, canonicalHandle: null, source: "cache" };
+    }
+
+    const key = this.normalizeHandle(handle);
+    try {
+      const cached = await this.db
+        .selectFrom("cf_handles")
+        .select(["canonical_handle", "exists", "last_checked"])
+        .where("handle", "=", key)
+        .executeTakeFirst();
+
+      if (cached?.last_checked) {
+        const lastCheckedAt = Date.parse(cached.last_checked);
+        if (Number.isFinite(lastCheckedAt)) {
+          const ageMs = Date.now() - lastCheckedAt;
+          if (ageMs >= 0 && ageMs <= ttlMs) {
+            return {
+              exists: cached.exists === 1,
+              canonicalHandle: cached.canonical_handle,
+              source: "cache",
+            };
+          }
+        }
+      }
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+    }
+
+    try {
+      const response = await this.cfClient.request<UserInfoResponse>("user.info", {
+        handles: handle,
+      });
+      const canonicalHandle = response[0]?.handle ?? null;
+      const exists = Boolean(canonicalHandle);
+      await this.db
+        .insertInto("cf_handles")
+        .values({
+          handle: key,
+          canonical_handle: canonicalHandle,
+          exists: exists ? 1 : 0,
+          last_checked: new Date().toISOString(),
+        })
+        .onConflict((oc) =>
+          oc.column("handle").doUpdateSet({
+            canonical_handle: canonicalHandle,
+            exists: exists ? 1 : 0,
+            last_checked: new Date().toISOString(),
+          })
+        )
+        .execute();
+      return { exists, canonicalHandle, source: "api" };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isNotFound = message.toLowerCase().includes("not found");
+      if (isNotFound) {
+        try {
+          await this.db
+            .insertInto("cf_handles")
+            .values({
+              handle: key,
+              canonical_handle: null,
+              exists: 0,
+              last_checked: new Date().toISOString(),
+            })
+            .onConflict((oc) =>
+              oc.column("handle").doUpdateSet({
+                canonical_handle: null,
+                exists: 0,
+                last_checked: new Date().toISOString(),
+              })
+            )
+            .execute();
+        } catch (dbError) {
+          logError(`Database error: ${String(dbError)}`);
+        }
+      }
+      logError(`Request error: ${message}`);
+      return { exists: false, canonicalHandle: null, source: "api" };
     }
   }
 
@@ -420,32 +533,12 @@ export class StoreService {
   }
 
   async getNewHandle(handle: string): Promise<string> {
-    try {
-      const response = await this.cfClient.request<UserInfoResponse>("user.info", {
-        handles: handle,
-      });
-      if (!response[0]) {
-        return handle;
-      }
-      return response[0].handle;
-    } catch (error) {
-      logError(`Access error: ${String(error)}`);
-      return handle;
-    }
+    const result = await this.resolveHandle(handle);
+    return result.exists && result.canonicalHandle ? result.canonicalHandle : handle;
   }
 
   async handleExistsOnCf(handle: string): Promise<boolean> {
-    if (!/^[-_a-zA-Z0-9]+$/.test(handle)) {
-      return false;
-    }
-    try {
-      const response = await this.cfClient.request<UserInfoResponse>("user.info", {
-        handles: handle,
-      });
-      return response[0]?.handle.toLowerCase() === handle.toLowerCase();
-    } catch (error) {
-      logError(`Request error: ${String(error)}`);
-      return false;
-    }
+    const result = await this.resolveHandle(handle);
+    return result.exists;
   }
 }
