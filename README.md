@@ -4,7 +4,6 @@ Edit this file to document project structure and any features you add or are pur
 
 # TODO
 
-- Add arbitrary problem difficulty ranges for suggest/challenge.
 - Allow open challenges in which everyone is invited to accept before the challenge creator starts the challenge.
 - Extend to tournaments with any number of participants and various formats (Swiss, elimination, etc).
 - Update challenges and other state in a central loop using the database instead of during the command invocation, so they seamlessly resume after restarts.
@@ -23,9 +22,10 @@ The following commands are available to you:
 
   Starts a challenge.
 
-- **/challenge** `length` `rating|min_rating|max_rating` `[user1..user4]`
+- **/challenge** `length` `rating|min_rating|max_rating|ranges` `[user1..user4]`
 
-  Starts a challenge by selecting a random unsolved problem in the rating range.
+  Starts a challenge by selecting a random unsolved problem in the rating range (defaults to 800-3500).
+  Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
 
 - **/rating** `[user]`
 
@@ -43,9 +43,9 @@ The following commands are available to you:
 
   Shows a linked handle, rating, Codeforces profile info, and recent activity.
 
-- **/recent** `[user]` `[limit]`
+- **/recent** `[user]` `[handle]` `[limit]`
 
-  Shows recent Codeforces submissions for a linked user.
+  Shows recent Codeforces submissions for a linked user or a handle.
 
 - **/register** `handle`
 
@@ -55,10 +55,11 @@ The following commands are available to you:
 
   Unlinks your CF account and erases all progress.
 
-- **/suggest** `rating|min_rating|max_rating` `[handles]`
+- **/suggest** `rating|min_rating|max_rating|ranges` `[handles]`
 
-  Gives some problems in the rating range that none of the CF accounts have done.
+  Gives some problems in the rating range that none of the CF accounts have done (defaults to 800-3500).
   If `handles` is omitted, uses linked handles in the server.
+  Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
 
 - **/help**
 

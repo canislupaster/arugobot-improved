@@ -1,6 +1,7 @@
 import type { Problem } from "../../src/services/problems.js";
 import {
   filterProblemsByRatingRange,
+  filterProblemsByRatingRanges,
   getProblemId,
   selectRandomProblem,
   selectRandomProblems,
@@ -21,6 +22,14 @@ describe("problemSelection", () => {
   it("filters problems by rating range", () => {
     const filtered = filterProblemsByRatingRange(problems, 1000, 1400);
     expect(filtered.map(getProblemId)).toEqual(["1B"]);
+  });
+
+  it("filters problems by multiple rating ranges", () => {
+    const filtered = filterProblemsByRatingRanges(problems, [
+      { min: 700, max: 900 },
+      { min: 1400, max: 1600 },
+    ]);
+    expect(filtered.map(getProblemId)).toEqual(["1A", "2A"]);
   });
 
   it("selects random problems excluding solved ids", () => {

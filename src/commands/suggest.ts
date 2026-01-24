@@ -1,16 +1,17 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import {
-  filterProblemsByRatingRange,
+  filterProblemsByRatingRanges,
   getProblemId,
   selectRandomProblems,
 } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
+import { resolveRatingRanges } from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
 
-const MIN_RATING = 800;
-const MAX_RATING = 3500;
+const DEFAULT_MIN_RATING = 800;
+const DEFAULT_MAX_RATING = 3500;
 const MAX_SUGGESTIONS = 10;
 const MAX_HANDLES = 5;
 
@@ -31,52 +32,23 @@ export function parseHandles(raw: string): string[] {
   return handles;
 }
 
-function resolveRatingRange(
-  rating: number | null,
-  minRating: number | null,
-  maxRating: number | null
-): { minRating: number; maxRating: number; error?: string } {
-  if (rating !== null && (minRating !== null || maxRating !== null)) {
-    return { minRating: 0, maxRating: 0, error: "Use either rating or min/max, not both." };
-  }
-
-  if (rating === null && minRating === null && maxRating === null) {
-    return {
-      minRating: 0,
-      maxRating: 0,
-      error: "Provide a rating or a min/max rating range.",
-    };
-  }
-
-  const resolvedMin = rating ?? minRating ?? MIN_RATING;
-  const resolvedMax = rating ?? maxRating ?? MAX_RATING;
-
-  if (resolvedMin < MIN_RATING || resolvedMax > MAX_RATING) {
-    return {
-      minRating: 0,
-      maxRating: 0,
-      error: `Ratings must be between ${MIN_RATING} and ${MAX_RATING}.`,
-    };
-  }
-  if (resolvedMin > resolvedMax) {
-    return { minRating: 0, maxRating: 0, error: "Minimum rating cannot exceed maximum rating." };
-  }
-
-  return { minRating: resolvedMin, maxRating: resolvedMax };
-}
-
 export const suggestCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("suggest")
     .setDescription("Gives problems at a given rating that the handles have not solved")
     .addIntegerOption((option) =>
-      option.setName("rating").setDescription(`Exact problem rating (${MIN_RATING}-${MAX_RATING})`)
+      option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
     )
     .addIntegerOption((option) =>
-      option.setName("min_rating").setDescription(`Minimum rating (${MIN_RATING}-${MAX_RATING})`)
+      option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
     )
     .addIntegerOption((option) =>
-      option.setName("max_rating").setDescription(`Maximum rating (${MIN_RATING}-${MAX_RATING})`)
+      option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("ranges")
+        .setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
     )
     .addStringOption((option) =>
       option
@@ -87,13 +59,21 @@ export const suggestCommand: Command = {
     const rating = interaction.options.getInteger("rating");
     const minRatingOption = interaction.options.getInteger("min_rating");
     const maxRatingOption = interaction.options.getInteger("max_rating");
+    const rangesRaw = interaction.options.getString("ranges");
     const rawHandles = interaction.options.getString("handles") ?? "";
-    const range = resolveRatingRange(rating, minRatingOption, maxRatingOption);
-    if (range.error) {
-      await interaction.reply({ content: range.error, ephemeral: true });
+    const rangeResult = resolveRatingRanges({
+      rating,
+      minRating: minRatingOption,
+      maxRating: maxRatingOption,
+      rangesRaw,
+      defaultMin: DEFAULT_MIN_RATING,
+      defaultMax: DEFAULT_MAX_RATING,
+    });
+    if (rangeResult.error) {
+      await interaction.reply({ content: rangeResult.error, ephemeral: true });
       return;
     }
-    const { minRating, maxRating } = range;
+    const ranges = rangeResult.ranges;
 
     let handles = parseHandles(rawHandles);
     if (handles.length === 0 && interaction.guild) {
@@ -115,18 +95,17 @@ export const suggestCommand: Command = {
       return;
     }
 
+    await interaction.deferReply();
+
     const problems = await context.services.problems.ensureProblemsLoaded();
     if (problems.length === 0) {
-      await interaction.reply({ content: "Try again in a bit.", ephemeral: true });
+      await interaction.editReply("Try again in a bit.");
       return;
     }
 
-    const possibleProblems = filterProblemsByRatingRange(problems, minRating, maxRating);
+    const possibleProblems = filterProblemsByRatingRanges(problems, ranges);
     if (possibleProblems.length === 0) {
-      await interaction.reply({
-        content: "No problems found in that rating range.",
-        ephemeral: true,
-      });
+      await interaction.editReply("No problems found in that rating range.");
       return;
     }
     const validHandles: string[] = [];
@@ -139,10 +118,7 @@ export const suggestCommand: Command = {
         const canonicalHandle = handleInfo.canonicalHandle ?? handle;
         const solved = await context.services.store.getSolvedProblems(canonicalHandle);
         if (!solved) {
-          await interaction.reply({
-            content: "Something went wrong. Try again in a bit.",
-            ephemeral: true,
-          });
+          await interaction.editReply("Something went wrong. Try again in a bit.");
           return;
         }
         validHandles.push(canonicalHandle);
@@ -155,18 +131,8 @@ export const suggestCommand: Command = {
     }
 
     if (validHandles.length === 0) {
-      await interaction.reply({
-        content: "No valid handles found. Check your input and try again.",
-        ephemeral: true,
-      });
+      await interaction.editReply("No valid handles found. Check your input and try again.");
       return;
-    }
-
-    if (badHandles.length > 0) {
-      await interaction.reply({
-        content: `Invalid handle(s) (will be ignored): ${badHandles.join(", ")}.`,
-        ephemeral: true,
-      });
     }
 
     const suggestions = selectRandomProblems(possibleProblems, excludedIds, MAX_SUGGESTIONS);
@@ -181,15 +147,20 @@ export const suggestCommand: Command = {
       }
     }
 
+    const minRating = Math.min(...ranges.map((range) => range.min));
+    const maxRating = Math.max(...ranges.map((range) => range.max));
     const embed = new EmbedBuilder()
       .setTitle("Problem suggestions")
       .setDescription(description || "No suggestions found.")
       .setColor(getColor(Math.round((minRating + maxRating) / 2)));
 
+    await interaction.editReply({ embeds: [embed] });
+
     if (badHandles.length > 0) {
-      await interaction.followUp({ embeds: [embed], ephemeral: true });
-    } else {
-      await interaction.reply({ embeds: [embed] });
+      await interaction.followUp({
+        content: `Invalid handle(s) (ignored): ${badHandles.join(", ")}.`,
+        ephemeral: true,
+      });
     }
   },
 };

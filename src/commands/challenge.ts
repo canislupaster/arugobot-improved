@@ -10,19 +10,20 @@ import {
 
 import { logError, type LogContext } from "../utils/logger.js";
 import {
-  filterProblemsByRatingRange,
+  filterProblemsByRatingRanges,
   getProblemId,
   selectRandomProblem,
 } from "../utils/problemSelection.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
+import { resolveRatingRanges } from "../utils/ratingRanges.js";
 import { sleep } from "../utils/sleep.js";
 
 import type { Command } from "./types.js";
 
 const VALID_LENGTHS = new Set([40, 60, 80]);
 const UPDATE_INTERVAL_SECONDS = 30;
-const MIN_RATING = 800;
-const MAX_RATING = 3500;
+const DEFAULT_MIN_RATING = 800;
+const DEFAULT_MAX_RATING = 3500;
 
 type ContestStatusResponse = Array<{
   verdict?: string;
@@ -105,36 +106,6 @@ function buildProblemLink(contestId: number, index: string, name: string) {
   return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
 }
 
-function resolveRatingRange(
-  rating: number | null,
-  minRating: number | null,
-  maxRating: number | null
-): { minRating: number; maxRating: number; error?: string } {
-  if (rating !== null && (minRating !== null || maxRating !== null)) {
-    return { minRating: 0, maxRating: 0, error: "Use either rating or min/max, not both." };
-  }
-
-  if (rating === null && minRating === null && maxRating === null) {
-    return { minRating: 0, maxRating: 0, error: "Provide a problem id or a rating range." };
-  }
-
-  const resolvedMin = rating ?? minRating ?? MIN_RATING;
-  const resolvedMax = rating ?? maxRating ?? MAX_RATING;
-
-  if (resolvedMin < MIN_RATING || resolvedMax > MAX_RATING) {
-    return {
-      minRating: 0,
-      maxRating: 0,
-      error: `Ratings must be between ${MIN_RATING} and ${MAX_RATING}.`,
-    };
-  }
-  if (resolvedMin > resolvedMax) {
-    return { minRating: 0, maxRating: 0, error: "Minimum rating cannot exceed maximum rating." };
-  }
-
-  return { minRating: resolvedMin, maxRating: resolvedMax };
-}
-
 function uniqueUsers(users: User[]): User[] {
   const seen = new Set<string>();
   return users.filter((user) => {
@@ -159,13 +130,18 @@ export const challengeCommand: Command = {
     )
     .addStringOption((option) => option.setName("problem").setDescription("Problem id, e.g. 1000A"))
     .addIntegerOption((option) =>
-      option.setName("rating").setDescription(`Exact problem rating (${MIN_RATING}-${MAX_RATING})`)
+      option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
     )
     .addIntegerOption((option) =>
-      option.setName("min_rating").setDescription(`Minimum rating (${MIN_RATING}-${MAX_RATING})`)
+      option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
     )
     .addIntegerOption((option) =>
-      option.setName("max_rating").setDescription(`Maximum rating (${MIN_RATING}-${MAX_RATING})`)
+      option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("ranges")
+        .setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
     )
     .addUserOption((option) => option.setName("user1").setDescription("Participant 1 (optional)"))
     .addUserOption((option) => option.setName("user2").setDescription("Participant 2 (optional)"))
@@ -183,6 +159,7 @@ export const challengeCommand: Command = {
     const rating = interaction.options.getInteger("rating");
     const minRatingOption = interaction.options.getInteger("min_rating");
     const maxRatingOption = interaction.options.getInteger("max_rating");
+    const rangesRaw = interaction.options.getString("ranges");
     const length = interaction.options.getInteger("length", true);
 
     if (!VALID_LENGTHS.has(length)) {
@@ -193,7 +170,13 @@ export const challengeCommand: Command = {
       return;
     }
 
-    if (problemIdRaw && (rating !== null || minRatingOption !== null || maxRatingOption !== null)) {
+    if (
+      problemIdRaw &&
+      (rating !== null ||
+        minRatingOption !== null ||
+        maxRatingOption !== null ||
+        rangesRaw !== null)
+    ) {
       await interaction.reply({
         content: "Provide either a problem id or a rating range, not both.",
         ephemeral: true,
@@ -201,9 +184,16 @@ export const challengeCommand: Command = {
       return;
     }
 
-    const range = resolveRatingRange(rating, minRatingOption, maxRatingOption);
-    if (!problemIdRaw && range.error) {
-      await interaction.reply({ content: range.error, ephemeral: true });
+    const rangeResult = resolveRatingRanges({
+      rating,
+      minRating: minRatingOption,
+      maxRating: maxRatingOption,
+      rangesRaw,
+      defaultMin: DEFAULT_MIN_RATING,
+      defaultMax: DEFAULT_MAX_RATING,
+    });
+    if (!problemIdRaw && rangeResult.error) {
+      await interaction.reply({ content: rangeResult.error, ephemeral: true });
       return;
     }
 
@@ -256,8 +246,7 @@ export const challengeCommand: Command = {
         return;
       }
     } else {
-      const { minRating, maxRating } = range;
-      const candidates = filterProblemsByRatingRange(problems, minRating, maxRating);
+      const candidates = filterProblemsByRatingRanges(problems, rangeResult.ranges);
       if (candidates.length === 0) {
         await interaction.reply({
           content: "No problems found in that rating range.",

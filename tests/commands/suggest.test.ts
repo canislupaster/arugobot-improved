@@ -33,7 +33,7 @@ describe("suggestCommand", () => {
     await suggestCommand.execute(interaction, context);
 
     expect(interaction.reply).toHaveBeenCalledWith({
-      content: "Use either rating or min/max, not both.",
+      content: "Use rating, min/max, or ranges, not a mix.",
       ephemeral: true,
     });
   });
