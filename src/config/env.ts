@@ -12,14 +12,6 @@ export type AppConfig = {
   codeforcesTimeoutMs: number;
 };
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
 function parseNumber(value: string, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -42,6 +34,9 @@ export function validateConfig(config: AppConfig): string[] {
   if (!config.databaseUrl) {
     errors.push("DATABASE_URL is missing.");
   }
+  if (config.databaseUrl && !config.databaseUrl.startsWith("sqlite:")) {
+    errors.push("DATABASE_URL must start with sqlite: (e.g. sqlite:./bot_data.db).");
+  }
   if (!isValidUrl(config.codeforcesApiBaseUrl)) {
     errors.push("CODEFORCES_API_BASE_URL must be a valid http(s) URL.");
   }
@@ -51,12 +46,15 @@ export function validateConfig(config: AppConfig): string[] {
   if (config.codeforcesTimeoutMs <= 0) {
     errors.push("CODEFORCES_TIMEOUT_MS must be greater than 0.");
   }
+  if (!["development", "production", "test"].includes(config.environment)) {
+    errors.push("NODE_ENV must be one of development, production, or test.");
+  }
   return errors;
 }
 
 export function loadConfig(): AppConfig {
-  const discordToken = requireEnv("DISCORD_TOKEN");
-  const databaseUrl = requireEnv("DATABASE_URL");
+  const discordToken = process.env.DISCORD_TOKEN?.trim() ?? "";
+  const databaseUrl = process.env.DATABASE_URL?.trim() ?? "";
   const environment =
     (process.env.NODE_ENV as AppConfig["environment"]) ?? "development";
   const discordGuildId = process.env.DISCORD_GUILD_ID?.trim() || undefined;

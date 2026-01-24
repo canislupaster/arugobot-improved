@@ -12,7 +12,14 @@ export type UserStatusResponse = Array<{
   problem: { contestId?: number; index: string };
 }>;
 
-export type UserInfoResponse = Array<{ handle: string }>;
+export type UserInfoResponse = Array<{
+  handle: string;
+  rating?: number;
+  rank?: string;
+  maxRating?: number;
+  maxRank?: string;
+  lastOnlineTimeSeconds?: number;
+}>;
 
 type HistoryWithRatings = {
   history: string[];
@@ -27,6 +34,24 @@ type ServerStats = {
 };
 
 const HANDLE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const PROFILE_CACHE_TTL_MS = 60 * 60 * 1000;
+
+export type CodeforcesProfile = {
+  handle: string;
+  displayHandle: string;
+  rating: number | null;
+  rank: string | null;
+  maxRating: number | null;
+  maxRank: string | null;
+  lastOnlineTimeSeconds: number | null;
+  lastFetched: string;
+};
+
+export type CodeforcesProfileResult = {
+  profile: CodeforcesProfile;
+  source: "cache" | "api";
+  isStale: boolean;
+};
 
 type HandleResolution = {
   exists: boolean;
@@ -51,6 +76,28 @@ export class StoreService {
 
   private normalizeHandle(handle: string): string {
     return handle.trim().toLowerCase();
+  }
+
+  private mapProfileRow(row: {
+    handle: string;
+    display_handle: string;
+    rating: number | null;
+    rank: string | null;
+    max_rating: number | null;
+    max_rank: string | null;
+    last_online: number | null;
+    last_fetched: string;
+  }): CodeforcesProfile {
+    return {
+      handle: row.handle,
+      displayHandle: row.display_handle,
+      rating: row.rating ?? null,
+      rank: row.rank ?? null,
+      maxRating: row.max_rating ?? null,
+      maxRank: row.max_rank ?? null,
+      lastOnlineTimeSeconds: row.last_online ?? null,
+      lastFetched: row.last_fetched,
+    };
   }
 
   private isHandleValid(handle: string): boolean {
@@ -173,6 +220,96 @@ export class StoreService {
       }
       logError(`Request error: ${message}`);
       return { exists: false, canonicalHandle: null, source: "api" };
+    }
+  }
+
+  async getCodeforcesProfile(
+    handle: string,
+    ttlMs = PROFILE_CACHE_TTL_MS
+  ): Promise<CodeforcesProfileResult | null> {
+    const key = this.normalizeHandle(handle);
+    let cached:
+      | {
+          handle: string;
+          display_handle: string;
+          rating: number | null;
+          rank: string | null;
+          max_rating: number | null;
+          max_rank: string | null;
+          last_online: number | null;
+          last_fetched: string;
+        }
+      | undefined;
+
+    try {
+      cached = await this.db
+        .selectFrom("cf_profiles")
+        .select([
+          "handle",
+          "display_handle",
+          "rating",
+          "rank",
+          "max_rating",
+          "max_rank",
+          "last_online",
+          "last_fetched",
+        ])
+        .where("handle", "=", key)
+        .executeTakeFirst();
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+    }
+
+    if (cached?.last_fetched) {
+      const lastFetchedAt = Date.parse(cached.last_fetched);
+      if (Number.isFinite(lastFetchedAt)) {
+        const ageMs = Date.now() - lastFetchedAt;
+        if (ageMs >= 0 && ageMs <= ttlMs) {
+          return { profile: this.mapProfileRow(cached), source: "cache", isStale: false };
+        }
+      }
+    }
+
+    try {
+      const response = await this.cfClient.request<UserInfoResponse>("user.info", {
+        handles: handle,
+      });
+      const profile = response[0];
+      if (!profile) {
+        return null;
+      }
+      const record = {
+        handle: key,
+        display_handle: profile.handle,
+        rating: profile.rating ?? null,
+        rank: profile.rank ?? null,
+        max_rating: profile.maxRating ?? null,
+        max_rank: profile.maxRank ?? null,
+        last_online: profile.lastOnlineTimeSeconds ?? null,
+        last_fetched: new Date().toISOString(),
+      };
+      await this.db
+        .insertInto("cf_profiles")
+        .values(record)
+        .onConflict((oc) =>
+          oc.column("handle").doUpdateSet({
+            display_handle: record.display_handle,
+            rating: record.rating,
+            rank: record.rank,
+            max_rating: record.max_rating,
+            max_rank: record.max_rank,
+            last_online: record.last_online,
+            last_fetched: record.last_fetched,
+          })
+        )
+        .execute();
+      return { profile: this.mapProfileRow(record), source: "api", isStale: false };
+    } catch (error) {
+      logError(`Request error: ${String(error)}`);
+      if (cached) {
+        return { profile: this.mapProfileRow(cached), source: "cache", isStale: true };
+      }
+      return null;
     }
   }
 

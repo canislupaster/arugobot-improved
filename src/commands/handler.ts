@@ -3,7 +3,7 @@ import { PermissionFlagsBits, type ChatInputCommandInteraction } from "discord.j
 import { incrementCommandCount } from "../services/metrics.js";
 import type { CommandContext } from "../types/commandContext.js";
 import type { CooldownManager } from "../utils/cooldown.js";
-import { logError, logInfo } from "../utils/logger.js";
+import { logError, logInfo, logWarn } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
 
@@ -16,6 +16,12 @@ export async function handleCommandInteraction(
 ): Promise<void> {
   const command = commands.get(interaction.commandName);
   if (!command) {
+    logWarn("Unknown command.", {
+      correlationId,
+      command: interaction.commandName,
+      guildId: interaction.guildId ?? undefined,
+      userId: interaction.user.id,
+    });
     await interaction.reply({ content: "Unknown command.", ephemeral: true });
     return;
   }
@@ -23,6 +29,12 @@ export async function handleCommandInteraction(
   if (command.adminOnly && interaction.inGuild()) {
     const memberPermissions = interaction.memberPermissions;
     if (!memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      logWarn("Command blocked (permissions).", {
+        correlationId,
+        command: interaction.commandName,
+        guildId: interaction.guildId ?? undefined,
+        userId: interaction.user.id,
+      });
       await interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
       return;
     }
@@ -30,6 +42,13 @@ export async function handleCommandInteraction(
 
   const cooldown = cooldowns.isAllowed(interaction.user.id);
   if (!cooldown.allowed) {
+    logWarn("Command blocked (cooldown).", {
+      correlationId,
+      command: interaction.commandName,
+      guildId: interaction.guildId ?? undefined,
+      userId: interaction.user.id,
+      retryAfterSeconds: cooldown.retryAfterSeconds,
+    });
     await interaction.reply({
       content: `Too many requests. Try again in ${cooldown.retryAfterSeconds}s.`,
       ephemeral: true,

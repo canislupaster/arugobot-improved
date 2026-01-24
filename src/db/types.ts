@@ -25,8 +25,20 @@ export type CfHandlesTable = {
   last_checked: Generated<string>;
 };
 
+export type CfProfilesTable = {
+  handle: string;
+  display_handle: string;
+  rating: number | null;
+  rank: string | null;
+  max_rating: number | null;
+  max_rank: string | null;
+  last_online: number | null;
+  last_fetched: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
   cf_handles: CfHandlesTable;
+  cf_profiles: CfProfilesTable;
 };

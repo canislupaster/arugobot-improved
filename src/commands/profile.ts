@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logError } from "../utils/logger.js";
+import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
@@ -40,6 +41,7 @@ export const profileCommand: Command = {
       }
 
       const rating = await context.services.store.getRating(interaction.guild.id, targetId);
+      const cfProfile = await context.services.store.getCodeforcesProfile(handle);
       const historyData = await context.services.store.getHistoryWithRatings(
         interaction.guild.id,
         targetId
@@ -60,19 +62,39 @@ export const profileCommand: Command = {
         })
         .join("\n");
 
+      const displayHandle = cfProfile?.profile.displayHandle ?? handle;
+      const cfRating =
+        cfProfile?.profile.rating !== null && cfProfile?.profile.rating !== undefined
+          ? `${cfProfile.profile.rating} (${cfProfile.profile.rank ?? "unrated"})`
+          : "Unrated";
+      const cfMaxRating =
+        cfProfile?.profile.maxRating !== null && cfProfile?.profile.maxRating !== undefined
+          ? `${cfProfile.profile.maxRating} (${cfProfile.profile.maxRank ?? "unknown"})`
+          : "N/A";
+      const cfLastOnline = cfProfile?.profile.lastOnlineTimeSeconds
+        ? formatDiscordRelativeTime(cfProfile.profile.lastOnlineTimeSeconds)
+        : "Unknown";
+
       const embed = new EmbedBuilder()
         .setTitle(`Profile: ${targetName}`)
         .setColor(0x3498db)
         .addFields(
-          { name: "Handle", value: handle, inline: true },
+          { name: "Handle", value: displayHandle, inline: true },
           { name: "Rating", value: rating >= 0 ? String(rating) : "Unknown", inline: true },
           { name: "Challenges", value: String(totalChallenges), inline: true },
+          { name: "CF rating", value: cfRating, inline: true },
+          { name: "CF max", value: cfMaxRating, inline: true },
+          { name: "CF last online", value: cfLastOnline, inline: true },
           {
             name: "Recent problems",
             value: recentLines || "No challenges yet.",
             inline: false,
           }
         );
+
+      if (cfProfile?.isStale) {
+        embed.setFooter({ text: "Codeforces profile data may be stale." });
+      }
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error) {

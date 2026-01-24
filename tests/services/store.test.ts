@@ -91,4 +91,28 @@ describe("StoreService", () => {
     expect(stats.avgRating).toBeNull();
     expect(stats.topRating).toBeNull();
   });
+
+  it("caches Codeforces profile data and serves stale cache on failure", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        handle: "Tourist",
+        rating: 3700,
+        rank: "legendary grandmaster",
+        maxRating: 3800,
+        maxRank: "legendary grandmaster",
+        lastOnlineTimeSeconds: 123,
+      },
+    ]);
+
+    const first = await store.getCodeforcesProfile("tourist");
+    expect(first?.source).toBe("api");
+    expect(first?.isStale).toBe(false);
+    expect(first?.profile.displayHandle).toBe("Tourist");
+
+    mockClient.request.mockRejectedValueOnce(new Error("CF down"));
+    const second = await store.getCodeforcesProfile("tourist", 0);
+    expect(second?.source).toBe("cache");
+    expect(second?.isStale).toBe(true);
+    expect(second?.profile.rating).toBe(3700);
+  });
 });
