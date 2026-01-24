@@ -153,10 +153,7 @@ export const contestResultsCommand: Command = {
     .setName("contestresults")
     .setDescription("Shows standings for linked users in a contest")
     .addStringOption((option) =>
-      option
-        .setName("query")
-        .setDescription("Contest id, URL, name, or latest")
-        .setRequired(true)
+      option.setName("query").setDescription("Contest id, URL, name, or latest").setRequired(true)
     )
     .addIntegerOption((option) =>
       option

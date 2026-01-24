@@ -1,13 +1,10 @@
-type CommandMetric = {
-  count: number;
-  successCount: number;
-  failureCount: number;
-  totalLatencyMs: number;
-  maxLatencyMs: number;
-  lastSeenAt: string;
-};
+import type { Kysely } from "kysely";
+import { sql } from "kysely";
 
-type CommandMetricSummary = {
+import type { Database } from "../db/types.js";
+import { logError } from "../utils/logger.js";
+
+export type CommandMetricSummary = {
   name: string;
   count: number;
   successRate: number;
@@ -16,77 +13,109 @@ type CommandMetricSummary = {
   lastSeenAt: string;
 };
 
-const commandMetrics = new Map<string, CommandMetric>();
-let commandCount = 0;
-let lastCommandAt: string | null = null;
+export class MetricsService {
+  constructor(private readonly db: Kysely<Database>) {}
 
-function getOrCreateMetric(command: string, timestamp: string): CommandMetric {
-  const existing = commandMetrics.get(command);
-  if (existing) {
-    return existing;
+  async recordCommandResult(command: string, latencyMs: number, success: boolean): Promise<void> {
+    const timestamp = new Date().toISOString();
+    const safeLatency = Number.isFinite(latencyMs) ? Math.max(0, Math.round(latencyMs)) : 0;
+    const successDelta = success ? 1 : 0;
+    const failureDelta = success ? 0 : 1;
+    try {
+      await this.db
+        .insertInto("command_metrics")
+        .values({
+          command,
+          count: 1,
+          success_count: successDelta,
+          failure_count: failureDelta,
+          total_latency_ms: safeLatency,
+          max_latency_ms: safeLatency,
+          last_seen_at: timestamp,
+          updated_at: timestamp,
+        })
+        .onConflict((oc) =>
+          oc.column("command").doUpdateSet({
+            count: sql`count + 1`,
+            success_count: sql`success_count + ${successDelta}`,
+            failure_count: sql`failure_count + ${failureDelta}`,
+            total_latency_ms: sql`total_latency_ms + ${safeLatency}`,
+            max_latency_ms: sql`max(max_latency_ms, ${safeLatency})`,
+            last_seen_at: timestamp,
+            updated_at: timestamp,
+          })
+        )
+        .execute();
+    } catch (error) {
+      logError("Failed to record command metrics.", {
+        command,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
-  const metric: CommandMetric = {
-    count: 0,
-    successCount: 0,
-    failureCount: 0,
-    totalLatencyMs: 0,
-    maxLatencyMs: 0,
-    lastSeenAt: timestamp,
-  };
-  commandMetrics.set(command, metric);
-  return metric;
-}
 
-export function recordCommandResult(command: string, latencyMs: number, success: boolean): void {
-  const timestamp = new Date().toISOString();
-  const safeLatency = Number.isFinite(latencyMs) ? Math.max(0, Math.round(latencyMs)) : 0;
-  commandCount += 1;
-  lastCommandAt = timestamp;
-  const metric = getOrCreateMetric(command, timestamp);
-  metric.count += 1;
-  metric.totalLatencyMs += safeLatency;
-  metric.maxLatencyMs = Math.max(metric.maxLatencyMs, safeLatency);
-  metric.lastSeenAt = timestamp;
-  if (success) {
-    metric.successCount += 1;
-  } else {
-    metric.failureCount += 1;
+  async getCommandCount(): Promise<number> {
+    const row = await this.db
+      .selectFrom("command_metrics")
+      .select(({ fn }) => fn.sum<number>("count").as("count"))
+      .executeTakeFirst();
+    return Number(row?.count ?? 0);
   }
-}
 
-export function getCommandCount(): number {
-  return commandCount;
-}
+  async getUniqueCommandCount(): Promise<number> {
+    const row = await this.db
+      .selectFrom("command_metrics")
+      .select(({ fn }) => fn.count<string>("command").as("count"))
+      .executeTakeFirst();
+    return Number(row?.count ?? 0);
+  }
 
-export function getUniqueCommandCount(): number {
-  return commandMetrics.size;
-}
+  async getLastCommandAt(): Promise<string | null> {
+    const row = await this.db
+      .selectFrom("command_metrics")
+      .select(({ fn }) => fn.max<string>("last_seen_at").as("last"))
+      .executeTakeFirst();
+    return row?.last ?? null;
+  }
 
-export function getLastCommandAt(): string | null {
-  return lastCommandAt;
-}
+  async getCommandUsageSummary(limit = 5): Promise<CommandMetricSummary[]> {
+    if (limit <= 0) {
+      return [];
+    }
+    const rows = await this.db
+      .selectFrom("command_metrics")
+      .select([
+        "command",
+        "count",
+        "success_count",
+        "failure_count",
+        "total_latency_ms",
+        "max_latency_ms",
+        "last_seen_at",
+      ])
+      .orderBy("count", "desc")
+      .orderBy("command", "asc")
+      .limit(limit)
+      .execute();
 
-export function getCommandUsageSummary(limit = 5): CommandMetricSummary[] {
-  const summaries = Array.from(commandMetrics.entries()).map(([name, metric]) => {
-    const avgLatencyMs = metric.count > 0 ? Math.round(metric.totalLatencyMs / metric.count) : 0;
-    const successRate =
-      metric.count > 0 ? Math.round((metric.successCount / metric.count) * 100) : 0;
-    return {
-      name,
-      count: metric.count,
-      successRate,
-      avgLatencyMs,
-      maxLatencyMs: metric.maxLatencyMs,
-      lastSeenAt: metric.lastSeenAt,
-    };
-  });
-  return summaries
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, Math.max(0, limit));
-}
+    return rows.map((row) => {
+      const count = Number(row.count ?? 0);
+      const successCount = Number(row.success_count ?? 0);
+      const totalLatencyMs = Number(row.total_latency_ms ?? 0);
+      const avgLatencyMs = count > 0 ? Math.round(totalLatencyMs / count) : 0;
+      const successRate = count > 0 ? Math.round((successCount / count) * 100) : 0;
+      return {
+        name: row.command,
+        count,
+        successRate,
+        avgLatencyMs,
+        maxLatencyMs: Number(row.max_latency_ms ?? 0),
+        lastSeenAt: row.last_seen_at,
+      };
+    });
+  }
 
-export function resetCommandMetrics(): void {
-  commandMetrics.clear();
-  commandCount = 0;
-  lastCommandAt = null;
+  async resetCommandMetrics(): Promise<void> {
+    await this.db.deleteFrom("command_metrics").execute();
+  }
 }

@@ -1,31 +1,41 @@
-import {
-  getCommandCount,
-  getCommandUsageSummary,
-  getLastCommandAt,
-  getUniqueCommandCount,
-  recordCommandResult,
-  resetCommandMetrics,
-} from "../../src/services/metrics.js";
+import { createDb } from "../../src/db/database.js";
+import { migrateToLatest } from "../../src/db/migrator.js";
+import { MetricsService } from "../../src/services/metrics.js";
 
-describe("metrics", () => {
-  beforeEach(() => {
-    resetCommandMetrics();
-  });
+describe("MetricsService", () => {
+  it("tracks command counts and latency in the database", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const metrics = new MetricsService(db);
 
-  it("tracks command counts and latency", () => {
-    recordCommandResult("ping", 120, true);
-    recordCommandResult("ping", 80, false);
-    recordCommandResult("help", 50, true);
+    await metrics.recordCommandResult("ping", 120, true);
+    await metrics.recordCommandResult("ping", 80, false);
+    await metrics.recordCommandResult("help", 50, true);
 
-    expect(getCommandCount()).toBe(3);
-    expect(getUniqueCommandCount()).toBe(2);
-    expect(getLastCommandAt()).toEqual(expect.any(String));
+    expect(await metrics.getCommandCount()).toBe(3);
+    expect(await metrics.getUniqueCommandCount()).toBe(2);
+    expect(await metrics.getLastCommandAt()).toEqual(expect.any(String));
 
-    const summary = getCommandUsageSummary(2);
+    const summary = await metrics.getCommandUsageSummary(2);
     expect(summary[0]?.name).toBe("ping");
     expect(summary[0]?.count).toBe(2);
     expect(summary[0]?.successRate).toBe(50);
     expect(summary[0]?.avgLatencyMs).toBe(100);
     expect(summary[0]?.maxLatencyMs).toBe(120);
+
+    await db.destroy();
+  });
+
+  it("returns empty summary when limit is zero", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const metrics = new MetricsService(db);
+
+    await metrics.recordCommandResult("ping", 10, true);
+
+    const summary = await metrics.getCommandUsageSummary(0);
+    expect(summary).toEqual([]);
+
+    await db.destroy();
   });
 });

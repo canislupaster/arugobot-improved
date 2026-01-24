@@ -10,6 +10,8 @@ describe("validateConfig", () => {
       codeforcesRequestDelayMs: 0,
       codeforcesTimeoutMs: -5,
       codeforcesSolvedMaxPages: -1,
+      webHost: "",
+      webPort: 0,
     });
     expect(errors).toContain("DISCORD_TOKEN is missing.");
     expect(errors).toContain("DATABASE_URL is missing.");
@@ -17,6 +19,8 @@ describe("validateConfig", () => {
     expect(errors).toContain("CODEFORCES_REQUEST_DELAY_MS must be greater than 0.");
     expect(errors).toContain("CODEFORCES_TIMEOUT_MS must be greater than 0.");
     expect(errors).toContain("CODEFORCES_SOLVED_MAX_PAGES must be 0 or greater.");
+    expect(errors).toContain("WEB_HOST is missing.");
+    expect(errors).toContain("WEB_PORT must be a valid port number (1-65535).");
   });
 
   it("validates database URL and NODE_ENV", () => {
@@ -28,6 +32,8 @@ describe("validateConfig", () => {
       codeforcesRequestDelayMs: 1000,
       codeforcesTimeoutMs: 1000,
       codeforcesSolvedMaxPages: 10,
+      webHost: "0.0.0.0",
+      webPort: 8787,
     });
     expect(errors).toContain("DATABASE_URL must start with sqlite: (e.g. sqlite:./bot_data.db).");
     expect(errors).toContain("NODE_ENV must be one of development, production, or test.");

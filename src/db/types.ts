@@ -217,6 +217,25 @@ export type TournamentRecapSettingsTable = {
   updated_at: Generated<string>;
 };
 
+export type CommandMetricsTable = {
+  command: string;
+  count: number;
+  success_count: number;
+  failure_count: number;
+  total_latency_ms: number;
+  max_latency_ms: number;
+  last_seen_at: string;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type GuildSettingsTable = {
+  guild_id: string;
+  dashboard_public: number;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
@@ -240,4 +259,6 @@ export type Database = {
   tournament_rounds: TournamentRoundsTable;
   tournament_matches: TournamentMatchesTable;
   tournament_recap_settings: TournamentRecapSettingsTable;
+  command_metrics: CommandMetricsTable;
+  guild_settings: GuildSettingsTable;
 };

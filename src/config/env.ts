@@ -11,6 +11,8 @@ export type AppConfig = {
   codeforcesRequestDelayMs: number;
   codeforcesTimeoutMs: number;
   codeforcesSolvedMaxPages: number;
+  webHost: string;
+  webPort: number;
 };
 
 function parseNumber(value: string, fallback: number): number {
@@ -53,6 +55,12 @@ export function validateConfig(config: AppConfig): string[] {
   if (!["development", "production", "test"].includes(config.environment)) {
     errors.push("NODE_ENV must be one of development, production, or test.");
   }
+  if (!config.webHost) {
+    errors.push("WEB_HOST is missing.");
+  }
+  if (!Number.isFinite(config.webPort) || config.webPort <= 0 || config.webPort > 65535) {
+    errors.push("WEB_PORT must be a valid port number (1-65535).");
+  }
   return errors;
 }
 
@@ -69,6 +77,8 @@ export function loadConfig(): AppConfig {
   );
   const codeforcesTimeoutMs = parseNumber(process.env.CODEFORCES_TIMEOUT_MS ?? "10000", 10000);
   const codeforcesSolvedMaxPages = parseNumber(process.env.CODEFORCES_SOLVED_MAX_PAGES ?? "10", 10);
+  const webHost = process.env.WEB_HOST?.trim() || "0.0.0.0";
+  const webPort = parseNumber(process.env.WEB_PORT ?? "8787", 8787);
 
   return {
     discordToken,
@@ -79,5 +89,7 @@ export function loadConfig(): AppConfig {
     codeforcesRequestDelayMs,
     codeforcesTimeoutMs,
     codeforcesSolvedMaxPages,
+    webHost,
+    webPort,
   };
 }

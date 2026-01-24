@@ -70,8 +70,6 @@ describe("contestActivityCommand", () => {
 
     await contestActivityCommand.execute(interaction, context);
 
-    expect((interaction.editReply as jest.Mock).mock.calls[0][0]).toContain(
-      "No contest activity"
-    );
+    expect((interaction.editReply as jest.Mock).mock.calls[0][0]).toContain("No contest activity");
   });
 });

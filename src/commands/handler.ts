@@ -1,6 +1,5 @@
 import { PermissionFlagsBits, type ChatInputCommandInteraction } from "discord.js";
 
-import { recordCommandResult } from "../services/metrics.js";
 import type { CommandContext } from "../types/commandContext.js";
 import type { CooldownManager } from "../utils/cooldown.js";
 import { ephemeralFlags } from "../utils/discordFlags.js";
@@ -84,6 +83,10 @@ export async function handleCommandInteraction(
       await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
     }
   } finally {
-    recordCommandResult(interaction.commandName, getLatencyMs(), success);
+    await context.services.metrics.recordCommandResult(
+      interaction.commandName,
+      getLatencyMs(),
+      success
+    );
   }
 }

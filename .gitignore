@@ -8,3 +8,5 @@ dist/
 .env
 coverage/
 .pnpm-store/
+screenlog*.txt
+hardcopy.*

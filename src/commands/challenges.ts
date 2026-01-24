@@ -81,7 +81,10 @@ export const challengesCommand: Command = {
       if (subcommand === "list") {
         const challenges = await context.services.challenges.listActiveChallenges(guildId);
         if (challenges.length === 0) {
-          await interaction.reply({ content: "No active challenges right now.", ...ephemeralFlags });
+          await interaction.reply({
+            content: "No active challenges right now.",
+            ...ephemeralFlags,
+          });
           return;
         }
 

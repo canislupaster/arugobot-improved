@@ -1,7 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 
 import { healthCommand } from "../../src/commands/health.js";
-import { recordCommandResult, resetCommandMetrics } from "../../src/services/metrics.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
 const createInteraction = () =>
@@ -11,17 +10,25 @@ const createInteraction = () =>
   }) as unknown as ChatInputCommandInteraction;
 
 describe("healthCommand", () => {
-  beforeEach(() => {
-    resetCommandMetrics();
-  });
-
   it("renders command usage metrics", async () => {
-    recordCommandResult("ping", 42, true);
-    recordCommandResult("help", 80, true);
-
     const interaction = createInteraction();
     const context = {
       services: {
+        metrics: {
+          getCommandCount: jest.fn().mockResolvedValue(2),
+          getUniqueCommandCount: jest.fn().mockResolvedValue(2),
+          getLastCommandAt: jest.fn().mockResolvedValue(new Date().toISOString()),
+          getCommandUsageSummary: jest.fn().mockResolvedValue([
+            {
+              name: "ping",
+              count: 1,
+              successRate: 100,
+              avgLatencyMs: 42,
+              maxLatencyMs: 42,
+              lastSeenAt: new Date().toISOString(),
+            },
+          ]),
+        },
         store: { checkDb: jest.fn().mockResolvedValue(true) },
         codeforces: {
           getLastError: jest.fn().mockReturnValue(null),

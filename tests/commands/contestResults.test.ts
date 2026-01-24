@@ -105,9 +105,7 @@ describe("contestResultsCommand", () => {
           searchContests: jest.fn(),
         },
         store: {
-          getLinkedUsers: jest.fn().mockResolvedValue([
-            { userId: "user-1", handle: "tourist" },
-          ]),
+          getLinkedUsers: jest.fn().mockResolvedValue([{ userId: "user-1", handle: "tourist" }]),
           getHandle: jest.fn(),
           resolveHandle: jest.fn(),
         },

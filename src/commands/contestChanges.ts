@@ -135,10 +135,7 @@ export const contestChangesCommand: Command = {
     .setName("contestchanges")
     .setDescription("Shows rating changes for linked users in a contest")
     .addStringOption((option) =>
-      option
-        .setName("query")
-        .setDescription("Contest id, URL, name, or latest")
-        .setRequired(true)
+      option.setName("query").setDescription("Contest id, URL, name, or latest").setRequired(true)
     )
     .addIntegerOption((option) =>
       option
