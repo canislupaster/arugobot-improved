@@ -61,7 +61,9 @@ export type TournamentRound = {
 
 export type TournamentRoundSummary = {
   roundNumber: number;
+  status: TournamentRoundStatus;
   matchCount: number;
+  completedCount: number;
   byeCount: number;
   problem: Problem;
 };
@@ -77,6 +79,27 @@ export type TournamentAdvanceResult =
   | { status: "completed"; winnerId: string | null }
   | { status: "started"; round: TournamentRoundSummary }
   | { status: "error"; message: string };
+
+export type TournamentStandingsEntry = {
+  userId: string;
+  seed: number;
+  score: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  eliminated: boolean;
+  tiebreak: number;
+  matchesPlayed: number;
+};
+
+export type TournamentMatchSummary = {
+  matchNumber: number;
+  player1Id: string;
+  player2Id: string | null;
+  winnerId: string | null;
+  status: "pending" | "completed" | "bye";
+  isDraw: boolean;
+};
 
 export class TournamentService implements ChallengeCompletionNotifier {
   private lastError: { message: string; timestamp: string } | null = null;
@@ -131,6 +154,77 @@ export class TournamentService implements ChallengeCompletionNotifier {
     }));
   }
 
+  async getStandings(
+    tournamentId: string,
+    format: TournamentFormat
+  ): Promise<TournamentStandingsEntry[]> {
+    const participants = await this.listParticipants(tournamentId);
+    if (participants.length === 0) {
+      return [];
+    }
+
+    const scores = new Map(participants.map((participant) => [participant.userId, participant]));
+    const tiebreak = new Map<string, number>();
+    const matchesPlayed = new Map<string, number>();
+    for (const participant of participants) {
+      tiebreak.set(participant.userId, 0);
+      matchesPlayed.set(participant.userId, 0);
+    }
+
+    const matches = await this.db
+      .selectFrom("tournament_matches")
+      .select(["player1_id", "player2_id", "status"])
+      .where("tournament_id", "=", tournamentId)
+      .execute();
+
+    for (const match of matches) {
+      if (!match.player2_id) {
+        continue;
+      }
+      const opponentA = scores.get(match.player2_id)?.score ?? 0;
+      const opponentB = scores.get(match.player1_id)?.score ?? 0;
+      tiebreak.set(match.player1_id, (tiebreak.get(match.player1_id) ?? 0) + opponentA);
+      tiebreak.set(match.player2_id, (tiebreak.get(match.player2_id) ?? 0) + opponentB);
+
+      if (match.status === "completed") {
+        matchesPlayed.set(match.player1_id, (matchesPlayed.get(match.player1_id) ?? 0) + 1);
+        matchesPlayed.set(match.player2_id, (matchesPlayed.get(match.player2_id) ?? 0) + 1);
+      }
+    }
+
+    const entries = participants.map((participant) => ({
+      userId: participant.userId,
+      seed: participant.seed,
+      score: participant.score,
+      wins: participant.wins,
+      losses: participant.losses,
+      draws: participant.draws,
+      eliminated: participant.eliminated,
+      tiebreak: tiebreak.get(participant.userId) ?? 0,
+      matchesPlayed: matchesPlayed.get(participant.userId) ?? 0,
+    }));
+
+    entries.sort((a, b) => {
+      if (format === "elimination") {
+        if (a.eliminated !== b.eliminated) {
+          return a.eliminated ? 1 : -1;
+        }
+      }
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      if (b.tiebreak !== a.tiebreak) {
+        return b.tiebreak - a.tiebreak;
+      }
+      if (b.wins !== a.wins) {
+        return b.wins - a.wins;
+      }
+      return a.seed - b.seed;
+    });
+
+    return entries;
+  }
+
   async getCurrentRound(
     tournamentId: string,
     roundNumber: number
@@ -156,6 +250,103 @@ export class TournamentService implements ChallengeCompletionNotifier {
         tags: [],
       },
     };
+  }
+
+  async listRoundSummaries(
+    tournamentId: string,
+    limit = 5
+  ): Promise<TournamentRoundSummary[]> {
+    const safeLimit = Math.max(1, Math.floor(limit));
+    const rounds = await this.db
+      .selectFrom("tournament_rounds")
+      .selectAll()
+      .where("tournament_id", "=", tournamentId)
+      .orderBy("round_number", "desc")
+      .limit(safeLimit)
+      .execute();
+
+    if (rounds.length === 0) {
+      return [];
+    }
+
+    const matches = await this.db
+      .selectFrom("tournament_matches")
+      .select(["round_id", "status", "player2_id"])
+      .where("tournament_id", "=", tournamentId)
+      .execute();
+    const counts = new Map<
+      string,
+      { matchCount: number; completedCount: number; byeCount: number }
+    >();
+    for (const match of matches) {
+      const entry = counts.get(match.round_id) ?? {
+        matchCount: 0,
+        completedCount: 0,
+        byeCount: 0,
+      };
+      const nextEntry = {
+        matchCount: entry.matchCount + 1,
+        completedCount:
+          entry.completedCount + (match.status === "completed" || match.status === "bye" ? 1 : 0),
+        byeCount: entry.byeCount + (match.status === "bye" || !match.player2_id ? 1 : 0),
+      };
+      counts.set(match.round_id, nextEntry);
+    }
+
+    return rounds.map((round) => {
+      const count = counts.get(round.id) ?? { matchCount: 0, completedCount: 0, byeCount: 0 };
+      return {
+        roundNumber: round.round_number,
+        status: round.status as TournamentRoundStatus,
+        matchCount: count.matchCount,
+        completedCount: count.completedCount,
+        byeCount: count.byeCount,
+        problem: {
+          contestId: round.problem_contest_id,
+          index: round.problem_index,
+          name: round.problem_name,
+          rating: round.problem_rating,
+          tags: [],
+        },
+      };
+    });
+  }
+
+  async listRoundMatches(
+    tournamentId: string,
+    roundNumber: number
+  ): Promise<TournamentMatchSummary[]> {
+    const round = await this.db
+      .selectFrom("tournament_rounds")
+      .select(["id"])
+      .where("tournament_id", "=", tournamentId)
+      .where("round_number", "=", roundNumber)
+      .executeTakeFirst();
+    if (!round) {
+      return [];
+    }
+
+    const matches = await this.db
+      .selectFrom("tournament_matches")
+      .select([
+        "match_number",
+        "player1_id",
+        "player2_id",
+        "winner_id",
+        "status",
+      ])
+      .where("round_id", "=", round.id)
+      .orderBy("match_number", "asc")
+      .execute();
+
+    return matches.map((match) => ({
+      matchNumber: match.match_number,
+      player1Id: match.player1_id,
+      player2Id: match.player2_id,
+      winnerId: match.winner_id,
+      status: match.status as TournamentMatchSummary["status"],
+      isDraw: match.status === "completed" && !match.winner_id && Boolean(match.player2_id),
+    }));
   }
 
   async createTournament({
@@ -496,9 +687,12 @@ export class TournamentService implements ChallengeCompletionNotifier {
         .execute();
     }
 
+    const roundStatus: TournamentRoundStatus = pendingCount === 0 ? "completed" : "active";
     return {
       roundNumber,
+      status: roundStatus,
       matchCount: pairings.length,
+      completedCount: byeCount,
       byeCount,
       problem,
     };

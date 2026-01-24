@@ -164,4 +164,222 @@ describe("TournamentService", () => {
       .executeTakeFirstOrThrow();
     expect(round.status).toBe("completed");
   });
+
+  it("computes swiss standings with tiebreakers", async () => {
+    const service = new TournamentService(db, {} as never, {} as never, {} as never);
+    const tournamentId = "tournament-2";
+    const roundId = "round-2";
+    const nowIso = new Date().toISOString();
+
+    await db
+      .insertInto("tournaments")
+      .values({
+        id: tournamentId,
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        host_user_id: "host-1",
+        format: "swiss",
+        status: "active",
+        length_minutes: 40,
+        round_count: 3,
+        current_round: 1,
+        rating_ranges: "[]",
+        tags: "",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_participants")
+      .values([
+        {
+          tournament_id: tournamentId,
+          user_id: "user-1",
+          seed: 1,
+          score: 1,
+          wins: 1,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-2",
+          seed: 2,
+          score: 1,
+          wins: 1,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-3",
+          seed: 3,
+          score: 0.5,
+          wins: 0,
+          losses: 0,
+          draws: 1,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-4",
+          seed: 4,
+          score: 0,
+          wins: 0,
+          losses: 1,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("tournament_rounds")
+      .values({
+        id: roundId,
+        tournament_id: tournamentId,
+        round_number: 1,
+        status: "active",
+        problem_contest_id: 1000,
+        problem_index: "A",
+        problem_name: "Test",
+        problem_rating: 1200,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_matches")
+      .values([
+        {
+          id: "match-1",
+          tournament_id: tournamentId,
+          round_id: roundId,
+          match_number: 1,
+          challenge_id: null,
+          player1_id: "user-1",
+          player2_id: "user-3",
+          winner_id: "user-1",
+          status: "completed",
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          id: "match-2",
+          tournament_id: tournamentId,
+          round_id: roundId,
+          match_number: 2,
+          challenge_id: null,
+          player1_id: "user-2",
+          player2_id: "user-4",
+          winner_id: "user-2",
+          status: "completed",
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    const standings = await service.getStandings(tournamentId, "swiss");
+    expect(standings[0]?.userId).toBe("user-1");
+    expect(standings[1]?.userId).toBe("user-2");
+    expect(standings[0]?.tiebreak).toBe(0.5);
+    expect(standings[1]?.tiebreak).toBe(0);
+  });
+
+  it("summarizes rounds with byes and draws", async () => {
+    const service = new TournamentService(db, {} as never, {} as never, {} as never);
+    const tournamentId = "tournament-3";
+    const roundId = "round-3";
+    const nowIso = new Date().toISOString();
+
+    await db
+      .insertInto("tournaments")
+      .values({
+        id: tournamentId,
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        host_user_id: "host-1",
+        format: "elimination",
+        status: "active",
+        length_minutes: 40,
+        round_count: 3,
+        current_round: 1,
+        rating_ranges: "[]",
+        tags: "",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_rounds")
+      .values({
+        id: roundId,
+        tournament_id: tournamentId,
+        round_number: 1,
+        status: "active",
+        problem_contest_id: 1000,
+        problem_index: "B",
+        problem_name: "Test 2",
+        problem_rating: 1400,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_matches")
+      .values([
+        {
+          id: "match-3",
+          tournament_id: tournamentId,
+          round_id: roundId,
+          match_number: 1,
+          challenge_id: null,
+          player1_id: "user-1",
+          player2_id: null,
+          winner_id: "user-1",
+          status: "bye",
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          id: "match-4",
+          tournament_id: tournamentId,
+          round_id: roundId,
+          match_number: 2,
+          challenge_id: null,
+          player1_id: "user-2",
+          player2_id: "user-3",
+          winner_id: null,
+          status: "completed",
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    const summaries = await service.listRoundSummaries(tournamentId, 1);
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]?.matchCount).toBe(2);
+    expect(summaries[0]?.completedCount).toBe(2);
+    expect(summaries[0]?.byeCount).toBe(1);
+
+    const matches = await service.listRoundMatches(tournamentId, 1);
+    expect(matches).toHaveLength(2);
+    expect(matches[1]?.isDraw).toBe(true);
+  });
 });

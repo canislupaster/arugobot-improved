@@ -4,7 +4,7 @@ Edit this file to document project structure and any features you add or are pur
 
 # TODO
 
-- Extend tournament reporting (per-round summaries, improved tie-breakers, and richer standings).
+- Add tournament history browsing for completed events.
 
 When this TODO list clears up, continue adding ideas!
 
@@ -32,7 +32,7 @@ The following commands are available to you:
 
   Runs multi-round tournaments with Swiss or elimination formats. Use `create` to open a lobby, pick
   format, match length, rating ranges, tags, and (optionally) Swiss round count. Use `advance` to
-  start the next round after all matches finish. `status` shows standings and the current round.
+  start the next round after all matches finish. `status` shows standings, recent rounds, and the current round.
 
 - **/rating** `[user]`
 

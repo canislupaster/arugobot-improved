@@ -32,6 +32,10 @@ function formatTournamentFormat(format: TournamentFormat): string {
   return format === "swiss" ? "Swiss" : "Elimination";
 }
 
+function formatScore(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function buildUsersValue(users: User[]): string {
   if (users.length === 0) {
     return "No participants yet.";
@@ -130,26 +134,43 @@ export const tournamentCommand: Command = {
           return;
         }
 
-        const participants = await context.services.tournaments.listParticipants(tournament.id);
-        const activeCount = participants.filter((participant) => !participant.eliminated).length;
-        const standings = participants
-          .sort((a, b) => {
-            if (b.score !== a.score) {
-              return b.score - a.score;
-            }
-            return a.seed - b.seed;
-          })
+        const standings = await context.services.tournaments.getStandings(
+          tournament.id,
+          tournament.format
+        );
+        const activeCount = standings.filter((participant) => !participant.eliminated).length;
+        const standingsValue = standings
           .slice(0, 10)
-          .map(
-            (participant, index) =>
-              `${index + 1}. <@${participant.userId}> • ${participant.score} pts (${participant.wins}-${participant.losses}-${participant.draws})`
-          )
+          .map((participant, index) => {
+            const tiebreak =
+              tournament.format === "swiss"
+                ? ` • TB ${formatScore(participant.tiebreak)}`
+                : "";
+            const status = participant.eliminated ? " • eliminated" : "";
+            return `${index + 1}. <@${participant.userId}> • ${formatScore(
+              participant.score
+            )} pts (${participant.wins}-${participant.losses}-${participant.draws})${tiebreak}${status}`;
+          })
           .join("\n");
 
         const round = await context.services.tournaments.getCurrentRound(
           tournament.id,
           tournament.currentRound
         );
+        const roundSummaries = await context.services.tournaments.listRoundSummaries(
+          tournament.id,
+          3
+        );
+        const currentSummary = roundSummaries.find(
+          (summary) => summary.roundNumber === tournament.currentRound
+        );
+        const currentMatches =
+          tournament.currentRound > 0
+            ? await context.services.tournaments.listRoundMatches(
+                tournament.id,
+                tournament.currentRound
+              )
+            : [];
         const embed = new EmbedBuilder()
           .setTitle("Active tournament")
           .setColor(0x3498db)
@@ -160,19 +181,65 @@ export const tournamentCommand: Command = {
               value: `${tournament.currentRound}/${tournament.roundCount}`,
               inline: true,
             },
-            { name: "Participants", value: `${activeCount}/${participants.length}`, inline: true }
+            {
+              name: "Participants",
+              value: `${activeCount}/${standings.length}`,
+              inline: true,
+            }
           );
 
         if (round) {
+          const progress =
+            currentSummary && currentSummary.matchCount > 0
+              ? `${currentSummary.completedCount}/${currentSummary.matchCount} complete`
+              : "No matches yet";
           embed.addFields({
             name: "Current round",
-            value: `${round.roundNumber} (${round.status}) • ${round.problem.index}. ${round.problem.name}`,
+            value: `${round.roundNumber} (${round.status}) • ${round.problem.index}. ${round.problem.name} • ${progress}`,
             inline: false,
           });
         }
 
-        if (standings) {
-          embed.addFields({ name: "Standings (top 10)", value: standings, inline: false });
+        if (roundSummaries.length > 0) {
+          const roundsValue = roundSummaries
+            .map((summary) => {
+              const progress =
+                summary.matchCount > 0
+                  ? `${summary.completedCount}/${summary.matchCount} complete`
+                  : "No matches";
+              const byes = summary.byeCount > 0 ? ` • ${summary.byeCount} byes` : "";
+              return `Round ${summary.roundNumber} (${summary.status}) • ${summary.problem.index}. ${summary.problem.name} • ${progress}${byes}`;
+            })
+            .join("\n");
+          embed.addFields({ name: "Recent rounds", value: roundsValue, inline: false });
+        }
+
+        if (currentMatches.length > 0) {
+          const matchValue = currentMatches
+            .slice(0, 10)
+            .map((match) => {
+              if (!match.player2Id) {
+                return `${match.matchNumber}. <@${match.player1Id}> • bye`;
+              }
+              if (match.status === "pending") {
+                return `${match.matchNumber}. <@${match.player1Id}> vs <@${match.player2Id}>`;
+              }
+              if (match.isDraw) {
+                return `${match.matchNumber}. <@${match.player1Id}> drew <@${match.player2Id}>`;
+              }
+              if (!match.winnerId) {
+                return `${match.matchNumber}. <@${match.player1Id}> vs <@${match.player2Id}> • pending`;
+              }
+              const loserId =
+                match.winnerId === match.player1Id ? match.player2Id : match.player1Id;
+              return `${match.matchNumber}. <@${match.winnerId}> def. <@${loserId}>`;
+            })
+            .join("\n");
+          embed.addFields({ name: "Current round matches", value: matchValue, inline: false });
+        }
+
+        if (standingsValue) {
+          embed.addFields({ name: "Standings (top 10)", value: standingsValue, inline: false });
         }
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
