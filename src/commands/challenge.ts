@@ -32,15 +32,18 @@ const MAX_PARTICIPANTS = 10;
 const MIN_PARTICIPANTS = 2;
 const OPEN_LOBBY_TIMEOUT_MS = 5 * 60 * 1000;
 
-function addCommonChallengeOptions(subcommand: SlashCommandSubcommandBuilder) {
+function addLengthOption(subcommand: SlashCommandSubcommandBuilder) {
+  return subcommand.addIntegerOption((option) =>
+    option
+      .setName("length")
+      .setDescription("Challenge length in minutes")
+      .setRequired(true)
+      .addChoices({ name: "40", value: 40 }, { name: "60", value: 60 }, { name: "80", value: 80 })
+  );
+}
+
+function addLobbyOptions(subcommand: SlashCommandSubcommandBuilder) {
   return subcommand
-    .addIntegerOption((option) =>
-      option
-        .setName("length")
-        .setDescription("Challenge length in minutes")
-        .setRequired(true)
-        .addChoices({ name: "40", value: 40 }, { name: "60", value: 60 }, { name: "80", value: 80 })
-    )
     .addBooleanOption((option) =>
       option.setName("open").setDescription("Allow anyone to join before starting")
     )
@@ -87,25 +90,23 @@ export const challengeCommand: Command = {
     .setDescription("Starts a challenge")
     .addSubcommand((subcommand) =>
       addParticipantOptions(
-        addCommonChallengeOptions(
-          subcommand
-            .setName("problem")
-            .setDescription("Challenge a specific Codeforces problem")
-            .addStringOption((option) =>
-              option
-                .setName("problem")
-                .setDescription("Problem id, e.g. 1000A")
-                .setRequired(true)
-            )
+        addLobbyOptions(
+          addLengthOption(
+            subcommand.setName("problem").setDescription("Challenge a specific Codeforces problem")
+          ).addStringOption((option) =>
+            option.setName("problem").setDescription("Problem id, e.g. 1000A").setRequired(true)
+          )
         )
       )
     )
     .addSubcommand((subcommand) =>
       addParticipantOptions(
-        addCommonChallengeOptions(
-          subcommand
-            .setName("random")
-            .setDescription("Challenge a random unsolved problem")
+        addLobbyOptions(
+          addLengthOption(
+            subcommand
+              .setName("random")
+              .setDescription("Challenge a random unsolved problem")
+          )
             .addIntegerOption((option) =>
               option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
             )
