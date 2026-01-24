@@ -68,4 +68,33 @@ describe("handleCommandInteraction", () => {
 
     expect(execute).toHaveBeenCalled();
   });
+
+  it("replies with error when command execution fails", async () => {
+    const interaction = createInteraction();
+    const execute = jest.fn().mockRejectedValue(new Error("boom"));
+    const command: Command = {
+      data: { name: "ping", description: "Ping" } as never,
+      execute,
+    };
+    const context = {
+      client: {} as never,
+      config: {} as never,
+      commandSummaries: [],
+      services: {} as never,
+    };
+    const cooldowns = new CooldownManager(0, 0);
+
+    await handleCommandInteraction(
+      interaction,
+      new Map([["ping", command]]),
+      context,
+      cooldowns,
+      "corr-3"
+    );
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Something went wrong.",
+      ephemeral: true,
+    });
+  });
 });

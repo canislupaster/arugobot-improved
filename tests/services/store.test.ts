@@ -65,4 +65,30 @@ describe("StoreService", () => {
     expect(second.source).toBe("cache");
     expect(mockClient.request).toHaveBeenCalledTimes(1);
   });
+
+  it("returns server roster and stats", async () => {
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.insertUser("guild-1", "user-2", "petr");
+    await store.updateRating("guild-1", "user-1", 1600);
+    await store.addToHistory("guild-1", "user-1", "1000A");
+
+    const roster = await store.getServerRoster("guild-1");
+    expect(roster).toHaveLength(2);
+    expect(roster[0].userId).toBe("user-1");
+    expect(roster[0].rating).toBe(1600);
+
+    const stats = await store.getServerStats("guild-1");
+    expect(stats.userCount).toBe(2);
+    expect(stats.totalChallenges).toBe(1);
+    expect(stats.avgRating).toBe(1550);
+    expect(stats.topRating).toBe(1600);
+  });
+
+  it("returns empty stats when no users are linked", async () => {
+    const stats = await store.getServerStats("missing-guild");
+    expect(stats.userCount).toBe(0);
+    expect(stats.totalChallenges).toBe(0);
+    expect(stats.avgRating).toBeNull();
+    expect(stats.topRating).toBeNull();
+  });
 });

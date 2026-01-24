@@ -35,12 +35,18 @@ The following commands are available to you:
 - **/help**
 
   Prints the help message.
+- **/handles** `[page]`
+
+  Lists linked Codeforces handles for the server.
 - **/health**
 
   Admin-only diagnostics (uptime, memory, DB status, last error).
 - **/ping**
 
   Quick liveness check.
+- **/stats**
+
+  Shows server challenge stats (linked users, total challenges, ratings).
 
 ## Installation
 To invite the instance I am hosting, use this [link](https://discord.com/oauth2/authorize?client_id=1325529003473240124&permissions=277025507392&integration_type=0&scope=bot).
@@ -74,7 +80,7 @@ pnpm run test
 pnpm run build
 ```
 
-To build and run the production build (tsx runtime):
+To typecheck and run the production bot (tsx runtime, no JS build output):
 
 ```bash
 pnpm run build

@@ -19,6 +19,13 @@ type HistoryWithRatings = {
   ratingHistory: number[];
 };
 
+type ServerStats = {
+  userCount: number;
+  totalChallenges: number;
+  avgRating: number | null;
+  topRating: number | null;
+};
+
 const HANDLE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 type HandleResolution = {
@@ -334,6 +341,63 @@ export class StoreService {
     } catch (error) {
       logError(`Database error: ${String(error)}`);
       return null;
+    }
+  }
+
+  async getServerRoster(
+    serverId: string
+  ): Promise<Array<{ userId: string; handle: string; rating: number }>> {
+    try {
+      const rows = await this.db
+        .selectFrom("users")
+        .select(["user_id", "handle", "rating"])
+        .where("server_id", "=", serverId)
+        .orderBy("rating", "desc")
+        .orderBy("handle", "asc")
+        .execute();
+      return rows.map((row) => ({
+        userId: row.user_id,
+        handle: row.handle,
+        rating: row.rating,
+      }));
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return [];
+    }
+  }
+
+  async getServerStats(serverId: string): Promise<ServerStats> {
+    try {
+      const rows = await this.db
+        .selectFrom("users")
+        .select(["rating", "history"])
+        .where("server_id", "=", serverId)
+        .execute();
+
+      if (rows.length === 0) {
+        return { userCount: 0, totalChallenges: 0, avgRating: null, topRating: null };
+      }
+
+      let totalRating = 0;
+      let topRating = Number.NEGATIVE_INFINITY;
+      let totalChallenges = 0;
+
+      for (const row of rows) {
+        totalRating += row.rating;
+        topRating = Math.max(topRating, row.rating);
+        const history = parseJsonArray<string>(row.history, []);
+        totalChallenges += history.length;
+      }
+
+      return {
+        userCount: rows.length,
+        totalChallenges,
+        avgRating: Math.round(totalRating / rows.length),
+        topRating: Number.isFinite(topRating) ? topRating : null,
+      };
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return { userCount: 0, totalChallenges: 0, avgRating: null, topRating: null };
     }
   }
 
