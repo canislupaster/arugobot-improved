@@ -43,6 +43,10 @@ The following commands are available to you:
 
   Shows a linked handle, rating, Codeforces profile info, and recent activity.
 
+- **/compare** `[user1..user4]` `[handles]`
+
+  Compares Codeforces stats for multiple linked users and/or handles.
+
 - **/recent** `[user]` `[handle]` `[limit]`
 
   Shows recent Codeforces submissions for a linked user or a handle.

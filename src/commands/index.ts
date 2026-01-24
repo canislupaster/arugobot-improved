@@ -1,4 +1,5 @@
 import { challengeCommand } from "./challenge.js";
+import { compareCommand } from "./compare.js";
 import { contestsCommand } from "./contests.js";
 import { handlesCommand } from "./handles.js";
 import { healthCommand } from "./health.js";
@@ -16,6 +17,7 @@ import type { Command } from "./types.js";
 
 export const commandList: Command[] = [
   challengeCommand,
+  compareCommand,
   contestsCommand,
   handlesCommand,
   historyCommand,
