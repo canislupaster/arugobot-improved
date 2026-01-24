@@ -150,7 +150,6 @@ export const challengeCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("challenge")
     .setDescription("Starts a challenge")
-    .addStringOption((option) => option.setName("problem").setDescription("Problem id, e.g. 1000A"))
     .addIntegerOption((option) =>
       option
         .setName("length")
@@ -158,6 +157,7 @@ export const challengeCommand: Command = {
         .setRequired(true)
         .addChoices({ name: "40", value: 40 }, { name: "60", value: 60 }, { name: "80", value: 80 })
     )
+    .addStringOption((option) => option.setName("problem").setDescription("Problem id, e.g. 1000A"))
     .addIntegerOption((option) =>
       option.setName("rating").setDescription(`Exact problem rating (${MIN_RATING}-${MAX_RATING})`)
     )
