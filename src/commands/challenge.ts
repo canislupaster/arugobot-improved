@@ -78,6 +78,7 @@ export const challengeCommand: Command = {
       });
       return;
     }
+    const guildId = interaction.guild.id;
     const problemIdRaw = interaction.options.getString("problem");
     const rating = interaction.options.getInteger("rating");
     const minRatingOption = interaction.options.getInteger("min_rating");
@@ -137,7 +138,7 @@ export const challengeCommand: Command = {
     }
 
     for (const user of participantUsers) {
-      if (!(await context.services.store.handleLinked(interaction.guild.id, user.id))) {
+      if (!(await context.services.store.handleLinked(guildId, user.id))) {
         await interaction.reply({
           content: "One or more users have not linked a handle.",
           ephemeral: true,
@@ -181,14 +182,14 @@ export const challengeCommand: Command = {
 
       const excludedIds = new Set<string>();
       for (const user of participantUsers) {
-        const history = await context.services.store.getHistoryList(interaction.guild.id, user.id);
+        const history = await context.services.store.getHistoryList(guildId, user.id);
         for (const problemId of history) {
           excludedIds.add(problemId);
         }
       }
 
       for (const user of participantUsers) {
-        const handle = await context.services.store.getHandle(interaction.guild.id, user.id);
+        const handle = await context.services.store.getHandle(guildId, user.id);
         if (!handle) {
           await interaction.reply({
             content: "Missing handle data. Try again in a bit.",
@@ -229,7 +230,7 @@ export const challengeCommand: Command = {
     }
 
     for (const user of participantUsers) {
-      const history = await context.services.store.getHistoryList(interaction.guild.id, user.id);
+      const history = await context.services.store.getHistoryList(guildId, user.id);
       if (history.includes(problemId)) {
         await interaction.reply({
           content: "One or more users have already done this problem.",
@@ -242,14 +243,14 @@ export const challengeCommand: Command = {
     const logContext: LogContext = {
       correlationId: context.correlationId,
       command: "challenge",
-      guildId: interaction.guild.id,
+      guildId,
       userId: interaction.user.id,
     };
 
     const buildUsersValue = async (users: User[]) => {
       let value = "";
       for (const user of users) {
-        const rating = await context.services.store.getRating(interaction.guild.id, user.id);
+        const rating = await context.services.store.getRating(guildId, user.id);
         const [down, up] = getRatingChanges(rating, problem.rating!, length);
         value += `- ${user} (${rating}) (don't solve: ${down}, solve: ${up})\n`;
       }
@@ -392,17 +393,14 @@ export const challengeCommand: Command = {
             return;
           }
           const linked = await context.services.store.handleLinked(
-            interaction.guild.id,
+            guildId,
             button.user.id
           );
           if (!linked) {
             await button.reply({ content: "Link a handle with /register first.", ephemeral: true });
             return;
           }
-          const history = await context.services.store.getHistoryList(
-            interaction.guild.id,
-            button.user.id
-          );
+          const history = await context.services.store.getHistoryList(guildId, button.user.id);
           if (history.includes(problemId)) {
             await button.reply({
               content: "You have already done this problem in a prior challenge.",
@@ -410,10 +408,7 @@ export const challengeCommand: Command = {
             });
             return;
           }
-          const handle = await context.services.store.getHandle(
-            interaction.guild.id,
-            button.user.id
-          );
+          const handle = await context.services.store.getHandle(guildId, button.user.id);
           if (!handle) {
             await button.reply({
               content: "Missing handle data. Try again in a bit.",
@@ -504,7 +499,7 @@ export const challengeCommand: Command = {
     }));
 
     const challengeEmbed = await context.services.challenges.buildActiveEmbed({
-      serverId: interaction.guild.id,
+      serverId: guildId,
       problem: {
         contestId: problem.contestId,
         index: problem.index,
@@ -523,7 +518,7 @@ export const challengeCommand: Command = {
 
     try {
       await context.services.challenges.createChallenge({
-        serverId: interaction.guild.id,
+        serverId: guildId,
         channelId: interaction.channelId,
         messageId: challengeMessage.id,
         hostUserId: interaction.user.id,
