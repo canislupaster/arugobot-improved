@@ -87,7 +87,7 @@ async function checkAc(
     )
   ) {
     const rating = await context.services.store.getRating(serverId, userId);
-    const [_, up] = getRatingChanges(rating, problemRating, length);
+    const [, up] = getRatingChanges(rating, problemRating, length);
     await context.services.store.updateRating(serverId, userId, rating + up);
     return 1;
   }
