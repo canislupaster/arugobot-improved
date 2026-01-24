@@ -14,11 +14,11 @@ Discord bot with all you need to practice competitive programming and compete ag
 
 The following commands are available to you:
 
-- **/challenge** `problem` `length` `[user1..user9]` `[open]` `[max_participants]`
+- **/challenge problem** `length` `problem` `[user1..user9]` `[open]` `[max_participants]`
 
   Starts a challenge.
 
-- **/challenge** `length` `rating|min_rating|max_rating|ranges` `[tags]` `[user1..user9]` `[open]` `[max_participants]`
+- **/challenge random** `length` `rating|min_rating|max_rating|ranges` `[tags]` `[user1..user9]` `[open]` `[max_participants]`
 
   Starts a challenge by selecting a random unsolved problem in the rating range (defaults to 800-3500).
   Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.

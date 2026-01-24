@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { challengeCommand } from "../../src/commands/challenge.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
+import { ephemeralFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -10,6 +11,7 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     guild: { id: "guild-1" },
     channelId: "channel-1",
     options: {
+      getSubcommand: jest.fn().mockReturnValue("random"),
       getString: jest.fn(),
       getInteger: jest.fn(),
       getBoolean: jest.fn(),
@@ -26,6 +28,7 @@ describe("challengeCommand", () => {
   it("rejects invalid max participants", async () => {
     const interaction = createInteraction({
       options: {
+        getSubcommand: jest.fn().mockReturnValue("random"),
         getString: jest.fn().mockReturnValue(null),
         getInteger: jest.fn((name: string) => {
           if (name === "length") {
@@ -46,7 +49,7 @@ describe("challengeCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Invalid max participants. Choose 2-10.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 
@@ -59,6 +62,7 @@ describe("challengeCommand", () => {
     );
     const interaction = createInteraction({
       options: {
+        getSubcommand: jest.fn().mockReturnValue("problem"),
         getString: jest.fn((name: string) => (name === "problem" ? "1000A" : null)),
         getInteger: jest.fn((name: string) => {
           if (name === "length") {
@@ -74,13 +78,14 @@ describe("challengeCommand", () => {
 
     await challengeCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ...ephemeralFlags });
     expect(interaction.editReply).toHaveBeenCalledWith("Too many users (limit is 5).");
   });
 
   it("blocks manual problems already solved on Codeforces", async () => {
     const interaction = createInteraction({
       options: {
+        getSubcommand: jest.fn().mockReturnValue("problem"),
         getString: jest.fn((name: string) => (name === "problem" ? "1000A" : null)),
         getInteger: jest.fn((name: string) => {
           if (name === "length") {

@@ -5,9 +5,11 @@ import {
   ComponentType,
   EmbedBuilder,
   SlashCommandBuilder,
+  type SlashCommandSubcommandBuilder,
   type User,
 } from "discord.js";
 
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { logError, type LogContext } from "../utils/logger.js";
 import {
   filterProblemsByRatingRanges,
@@ -30,6 +32,40 @@ const MAX_PARTICIPANTS = 10;
 const MIN_PARTICIPANTS = 2;
 const OPEN_LOBBY_TIMEOUT_MS = 5 * 60 * 1000;
 
+function addCommonChallengeOptions(subcommand: SlashCommandSubcommandBuilder) {
+  return subcommand
+    .addIntegerOption((option) =>
+      option
+        .setName("length")
+        .setDescription("Challenge length in minutes")
+        .setRequired(true)
+        .addChoices({ name: "40", value: 40 }, { name: "60", value: 60 }, { name: "80", value: 80 })
+    )
+    .addBooleanOption((option) =>
+      option.setName("open").setDescription("Allow anyone to join before starting")
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("max_participants")
+        .setDescription(`Max participants (${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS})`)
+        .setMinValue(MIN_PARTICIPANTS)
+        .setMaxValue(MAX_PARTICIPANTS)
+    );
+}
+
+function addParticipantOptions(subcommand: SlashCommandSubcommandBuilder) {
+  return subcommand
+    .addUserOption((option) => option.setName("user1").setDescription("Participant 1 (optional)"))
+    .addUserOption((option) => option.setName("user2").setDescription("Participant 2 (optional)"))
+    .addUserOption((option) => option.setName("user3").setDescription("Participant 3 (optional)"))
+    .addUserOption((option) => option.setName("user4").setDescription("Participant 4 (optional)"))
+    .addUserOption((option) => option.setName("user5").setDescription("Participant 5 (optional)"))
+    .addUserOption((option) => option.setName("user6").setDescription("Participant 6 (optional)"))
+    .addUserOption((option) => option.setName("user7").setDescription("Participant 7 (optional)"))
+    .addUserOption((option) => option.setName("user8").setDescription("Participant 8 (optional)"))
+    .addUserOption((option) => option.setName("user9").setDescription("Participant 9 (optional)"));
+}
+
 function buildProblemLink(contestId: number, index: string, name: string) {
   return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
 }
@@ -49,63 +85,69 @@ export const challengeCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("challenge")
     .setDescription("Starts a challenge")
-    .addIntegerOption((option) =>
-      option
-        .setName("length")
-        .setDescription("Challenge length in minutes")
-        .setRequired(true)
-        .addChoices({ name: "40", value: 40 }, { name: "60", value: 60 }, { name: "80", value: 80 })
+    .addSubcommand((subcommand) =>
+      addParticipantOptions(
+        addCommonChallengeOptions(
+          subcommand
+            .setName("problem")
+            .setDescription("Challenge a specific Codeforces problem")
+            .addStringOption((option) =>
+              option
+                .setName("problem")
+                .setDescription("Problem id, e.g. 1000A")
+                .setRequired(true)
+            )
+        )
+      )
     )
-    .addStringOption((option) => option.setName("problem").setDescription("Problem id, e.g. 1000A"))
-    .addIntegerOption((option) =>
-      option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
-    )
-    .addIntegerOption((option) =>
-      option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
-    )
-    .addIntegerOption((option) =>
-      option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
-    )
-    .addStringOption((option) =>
-      option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
-    )
-    .addStringOption((option) =>
-      option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
-    )
-    .addBooleanOption((option) =>
-      option.setName("open").setDescription("Allow anyone to join before starting")
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("max_participants")
-        .setDescription(`Max participants (${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS})`)
-        .setMinValue(MIN_PARTICIPANTS)
-        .setMaxValue(MAX_PARTICIPANTS)
-    )
-    .addUserOption((option) => option.setName("user1").setDescription("Participant 1 (optional)"))
-    .addUserOption((option) => option.setName("user2").setDescription("Participant 2 (optional)"))
-    .addUserOption((option) => option.setName("user3").setDescription("Participant 3 (optional)"))
-    .addUserOption((option) => option.setName("user4").setDescription("Participant 4 (optional)"))
-    .addUserOption((option) => option.setName("user5").setDescription("Participant 5 (optional)"))
-    .addUserOption((option) => option.setName("user6").setDescription("Participant 6 (optional)"))
-    .addUserOption((option) => option.setName("user7").setDescription("Participant 7 (optional)"))
-    .addUserOption((option) => option.setName("user8").setDescription("Participant 8 (optional)"))
-    .addUserOption((option) => option.setName("user9").setDescription("Participant 9 (optional)")),
+    .addSubcommand((subcommand) =>
+      addParticipantOptions(
+        addCommonChallengeOptions(
+          subcommand
+            .setName("random")
+            .setDescription("Challenge a random unsolved problem")
+            .addIntegerOption((option) =>
+              option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
+            )
+            .addIntegerOption((option) =>
+              option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
+            )
+            .addIntegerOption((option) =>
+              option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
+            )
+            .addStringOption((option) =>
+              option
+                .setName("ranges")
+                .setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
+            )
+            .addStringOption((option) =>
+              option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
+            )
+        )
+      )
+    ),
   async execute(interaction, context) {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
+      return;
+    }
+    const subcommand = interaction.options.getSubcommand();
+    const isProblemChallenge = subcommand === "problem";
+    const isRandomChallenge = subcommand === "random";
+    if (!isProblemChallenge && !isRandomChallenge) {
+      await interaction.reply({ content: "Unknown challenge mode.", ...ephemeralFlags });
       return;
     }
     const guildId = interaction.guild.id;
     const problemIdRaw = interaction.options.getString("problem");
-    const rating = interaction.options.getInteger("rating");
-    const minRatingOption = interaction.options.getInteger("min_rating");
-    const maxRatingOption = interaction.options.getInteger("max_rating");
-    const rangesRaw = interaction.options.getString("ranges");
-    const tagsRaw = interaction.options.getString("tags");
+    const rating = isRandomChallenge ? interaction.options.getInteger("rating") : null;
+    const minRatingOption = isRandomChallenge ? interaction.options.getInteger("min_rating") : null;
+    const maxRatingOption = isRandomChallenge ? interaction.options.getInteger("max_rating") : null;
+    const rangesRaw = isRandomChallenge ? interaction.options.getString("ranges") : null;
+    const tagsRaw = isRandomChallenge ? interaction.options.getString("tags") : null;
     const openLobby = interaction.options.getBoolean("open") ?? false;
     const maxParticipantsOption = interaction.options.getInteger("max_participants");
     const maxParticipants = maxParticipantsOption ?? DEFAULT_MAX_PARTICIPANTS;
@@ -114,7 +156,7 @@ export const challengeCommand: Command = {
     if (!VALID_LENGTHS.has(length)) {
       await interaction.reply({
         content: "Invalid length. Valid lengths are 40, 60, and 80 minutes.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -126,40 +168,28 @@ export const challengeCommand: Command = {
     ) {
       await interaction.reply({
         content: `Invalid max participants. Choose ${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS}.`,
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
 
-    if (
-      problemIdRaw &&
-      (rating !== null ||
-        minRatingOption !== null ||
-        maxRatingOption !== null ||
-        rangesRaw !== null ||
-        tagsRaw !== null)
-    ) {
-      await interaction.reply({
-        content: "Provide either a problem id or a rating range, not both.",
-        ephemeral: true,
-      });
+
+    const rangeResult = isRandomChallenge
+      ? resolveRatingRanges({
+          rating,
+          minRating: minRatingOption,
+          maxRating: maxRatingOption,
+          rangesRaw,
+          defaultMin: DEFAULT_MIN_RATING,
+          defaultMax: DEFAULT_MAX_RATING,
+        })
+      : null;
+    if (isRandomChallenge && rangeResult?.error) {
+      await interaction.reply({ content: rangeResult.error, ...ephemeralFlags });
       return;
     }
 
-    const rangeResult = resolveRatingRanges({
-      rating,
-      minRating: minRatingOption,
-      maxRating: maxRatingOption,
-      rangesRaw,
-      defaultMin: DEFAULT_MIN_RATING,
-      defaultMax: DEFAULT_MAX_RATING,
-    });
-    if (!problemIdRaw && rangeResult.error) {
-      await interaction.reply({ content: rangeResult.error, ephemeral: true });
-      return;
-    }
-
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ...ephemeralFlags });
 
     let participantUsers = uniqueUsers(
       [
@@ -217,7 +247,11 @@ export const challengeCommand: Command = {
     let problemId = "";
     let problem: (typeof problems)[number] | null = null;
 
-    if (problemIdRaw) {
+    if (isProblemChallenge) {
+      if (!problemIdRaw) {
+        await interaction.editReply("Problem id is required.");
+        return;
+      }
       problemId = problemIdRaw.toUpperCase();
       const problemDict = context.services.problems.getProblemDict();
       problem = problemDict.get(problemId) ?? null;
@@ -229,7 +263,7 @@ export const challengeCommand: Command = {
       }
     } else {
       const tagFilters = parseTagFilters(tagsRaw);
-      const ratedCandidates = filterProblemsByRatingRanges(problems, rangeResult.ranges);
+      const ratedCandidates = filterProblemsByRatingRanges(problems, rangeResult?.ranges ?? []);
       const candidates = filterProblemsByTags(ratedCandidates, tagFilters);
       if (candidates.length === 0) {
         await interaction.editReply("No problems found for that rating range and tag filter.");
@@ -374,13 +408,13 @@ export const challengeCommand: Command = {
 
       collector.on("collect", async (button) => {
         if (!participantUsers.some((user) => user.id === button.user.id)) {
-          await button.reply({ content: "You are not part of this challenge.", ephemeral: true });
+          await button.reply({ content: "You are not part of this challenge.", ...ephemeralFlags });
           return;
         }
 
         if (button.customId === cancelId) {
           if (button.user.id !== interaction.user.id) {
-            await button.reply({ content: "Only the host can cancel.", ephemeral: true });
+            await button.reply({ content: "Only the host can cancel.", ...ephemeralFlags });
             return;
           }
           confirmEmbed.setDescription("Challenge cancelled.");
@@ -462,13 +496,13 @@ export const challengeCommand: Command = {
       collector.on("collect", async (button) => {
         if (button.customId === joinId) {
           if (participants.has(button.user.id)) {
-            await button.reply({ content: "You already joined.", ephemeral: true });
+            await button.reply({ content: "You already joined.", ...ephemeralFlags });
             return;
           }
           if (participants.size >= maxParticipants) {
             await button.reply({
               content: `Lobby is full (max ${maxParticipants}).`,
-              ephemeral: true,
+              ...ephemeralFlags,
             });
             return;
           }
@@ -481,20 +515,20 @@ export const challengeCommand: Command = {
               content: `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
                 challenge.endsAt
               )}).`,
-              ephemeral: true,
+              ...ephemeralFlags,
             });
             return;
           }
           const linked = await context.services.store.handleLinked(guildId, button.user.id);
           if (!linked) {
-            await button.reply({ content: "Link a handle with /register first.", ephemeral: true });
+            await button.reply({ content: "Link a handle with /register first.", ...ephemeralFlags });
             return;
           }
           const history = await context.services.store.getHistoryList(guildId, button.user.id);
           if (history.includes(problemId)) {
             await button.reply({
               content: "You have already done this problem in a prior challenge.",
-              ephemeral: true,
+              ...ephemeralFlags,
             });
             return;
           }
@@ -502,7 +536,7 @@ export const challengeCommand: Command = {
           if (!handle) {
             await button.reply({
               content: "Missing handle data. Try again in a bit.",
-              ephemeral: true,
+              ...ephemeralFlags,
             });
             return;
           }
@@ -510,14 +544,14 @@ export const challengeCommand: Command = {
           if (!solved) {
             await button.reply({
               content: "Unable to verify solved problems right now. Try again later.",
-              ephemeral: true,
+              ...ephemeralFlags,
             });
             return;
           }
           if (solved.includes(problemId)) {
             await button.reply({
               content: "You have already solved this problem on Codeforces.",
-              ephemeral: true,
+              ...ephemeralFlags,
             });
             return;
           }
@@ -533,13 +567,13 @@ export const challengeCommand: Command = {
 
         if (button.customId === leaveId) {
           if (!participants.has(button.user.id)) {
-            await button.reply({ content: "You are not in this lobby.", ephemeral: true });
+            await button.reply({ content: "You are not in this lobby.", ...ephemeralFlags });
             return;
           }
           if (button.user.id === interaction.user.id) {
             await button.reply({
               content: "The host cannot leave. Use cancel to stop the lobby.",
-              ephemeral: true,
+              ...ephemeralFlags,
             });
             return;
           }
@@ -555,7 +589,7 @@ export const challengeCommand: Command = {
 
         if (button.customId === startId) {
           if (button.user.id !== interaction.user.id) {
-            await button.reply({ content: "Only the host can start.", ephemeral: true });
+            await button.reply({ content: "Only the host can start.", ...ephemeralFlags });
             return;
           }
           lobbyEmbed.setDescription("Challenge starting.");
@@ -566,7 +600,7 @@ export const challengeCommand: Command = {
 
         if (button.customId === cancelId) {
           if (button.user.id !== interaction.user.id) {
-            await button.reply({ content: "Only the host can cancel.", ephemeral: true });
+            await button.reply({ content: "Only the host can cancel.", ...ephemeralFlags });
             return;
           }
           lobbyEmbed.setDescription("Challenge cancelled.");
