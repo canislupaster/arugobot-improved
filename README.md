@@ -36,9 +36,9 @@ The following commands are available to you:
 
   Shows a page of your completed challenge history (result + rating delta).
 
-- **/leaderboard** `[page]`
+- **/leaderboard** `[page]` `[metric]`
 
-  Shows a page of the server leaderboard.
+  Shows a page of the server leaderboard (metric can be `rating` or `solves`).
 
 - **/profile** `[user]` `[handle]`
 

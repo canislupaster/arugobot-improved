@@ -419,6 +419,89 @@ describe("StoreService", () => {
     expect(userSummary.lastCompletedAt).toBe(recentIso);
   });
 
+  it("returns solve leaderboard ordered by solves", async () => {
+    await db
+      .insertInto("challenges")
+      .values([
+        {
+          id: "challenge-1",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-1",
+          host_user_id: "user-1",
+          problem_contest_id: 1000,
+          problem_index: "A",
+          problem_name: "Problem A",
+          problem_rating: 1200,
+          length_minutes: 40,
+          status: "completed",
+          started_at: 1000,
+          ends_at: 2000,
+          check_index: 0,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: "challenge-2",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-2",
+          host_user_id: "user-2",
+          problem_contest_id: 1001,
+          problem_index: "B",
+          problem_name: "Problem B",
+          problem_rating: 1300,
+          length_minutes: 40,
+          status: "completed",
+          started_at: 2000,
+          ends_at: 3000,
+          check_index: 0,
+          updated_at: new Date().toISOString(),
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("challenge_participants")
+      .values([
+        {
+          challenge_id: "challenge-1",
+          user_id: "user-1",
+          position: 0,
+          solved_at: 1500,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          challenge_id: "challenge-1",
+          user_id: "user-2",
+          position: 1,
+          solved_at: 1600,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          challenge_id: "challenge-2",
+          user_id: "user-1",
+          position: 0,
+          solved_at: 2500,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          challenge_id: "challenge-2",
+          user_id: "user-3",
+          position: 1,
+          solved_at: null,
+          updated_at: new Date().toISOString(),
+        },
+      ])
+      .execute();
+
+    const leaderboard = await store.getSolveLeaderboard("guild-1");
+
+    expect(leaderboard).toEqual([
+      { userId: "user-1", solvedCount: 2 },
+      { userId: "user-2", solvedCount: 1 },
+    ]);
+  });
+
   it("tracks and trims recent practice suggestions", async () => {
     const recentCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const oldTimestamp = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();

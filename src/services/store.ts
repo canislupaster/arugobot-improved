@@ -805,6 +805,33 @@ export class StoreService {
     }
   }
 
+  async getSolveLeaderboard(
+    serverId: string
+  ): Promise<Array<{ userId: string; solvedCount: number }> | null> {
+    try {
+      const rows = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select(({ fn, ref }) => [
+          ref("challenge_participants.user_id").as("user_id"),
+          fn.count<number>("challenge_participants.solved_at").as("solved_count"),
+        ])
+        .where("challenges.server_id", "=", serverId)
+        .where("challenges.status", "=", "completed")
+        .where("challenge_participants.solved_at", "is not", null)
+        .groupBy("challenge_participants.user_id")
+        .orderBy("solved_count", "desc")
+        .execute();
+      return rows.map((row) => ({
+        userId: row.user_id,
+        solvedCount: Number(row.solved_count ?? 0),
+      }));
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return null;
+    }
+  }
+
   async getServerRoster(
     serverId: string
   ): Promise<Array<{ userId: string; handle: string; rating: number }>> {
