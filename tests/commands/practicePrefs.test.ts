@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { practicePrefsCommand } from "../../src/commands/practicePrefs.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
+import { ephemeralFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -38,7 +39,7 @@ describe("practicePrefsCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No practice preferences saved yet. Use /practiceprefs set to configure.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 

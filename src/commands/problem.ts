@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Problem } from "../services/problems.js";
 import type { StoreService } from "../services/store.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { parseProblemReference } from "../utils/problemReference.js";
 import { getColor } from "../utils/rating.js";
 
@@ -78,7 +79,7 @@ export const problemCommand: Command = {
     if (!reference) {
       await interaction.reply({
         content: "Invalid problem reference. Use an id like 1000A or a Codeforces URL.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }

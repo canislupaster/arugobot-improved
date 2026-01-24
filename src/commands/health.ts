@@ -11,6 +11,7 @@ import {
   getLastCommandAt,
   getUniqueCommandCount,
 } from "../services/metrics.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { getLastError } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
@@ -25,7 +26,7 @@ export const healthCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -210,6 +211,6 @@ export const healthCommand: Command = {
       });
     }
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], ...ephemeralFlags });
   },
 };

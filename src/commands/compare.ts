@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -32,7 +33,7 @@ export const compareCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -54,12 +55,12 @@ export const compareCommand: Command = {
     if (userOptions.length + handleInputs.length > MAX_TARGETS) {
       await interaction.reply({
         content: `Too many targets. Limit is ${MAX_TARGETS}.`,
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ...ephemeralFlags });
 
     try {
       const targets: Array<{

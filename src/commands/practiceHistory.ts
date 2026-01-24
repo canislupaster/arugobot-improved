@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { parseProblemReference } from "../utils/problemReference.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -73,7 +74,7 @@ export const practiceHistoryCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -81,7 +82,7 @@ export const practiceHistoryCommand: Command = {
     const subcommand = interaction.options.getSubcommand();
     const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ...ephemeralFlags });
 
     try {
       let problemDict = new Map<string, Problem>();

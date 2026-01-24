@@ -6,6 +6,7 @@ import {
   parseKeywordFilters,
   serializeKeywords,
 } from "../utils/contestFilters.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -77,7 +78,7 @@ export const contestRemindersCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -91,7 +92,7 @@ export const contestRemindersCommand: Command = {
         if (!subscription) {
           await interaction.reply({
             content: "No contest reminders configured for this server.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -121,7 +122,7 @@ export const contestRemindersCommand: Command = {
               : [])
           );
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
         return;
       }
 
@@ -131,7 +132,7 @@ export const contestRemindersCommand: Command = {
           content: removed
             ? "Contest reminders disabled for this server."
             : "No contest reminders were configured for this server.",
-          ephemeral: true,
+          ...ephemeralFlags,
         });
         return;
       }
@@ -144,7 +145,7 @@ export const contestRemindersCommand: Command = {
         ) {
           await interaction.reply({
             content: "Pick a text channel for contest reminders.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -172,7 +173,7 @@ export const contestRemindersCommand: Command = {
         const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
         await interaction.reply({
           content: `Contest reminders enabled in <#${channel.id}> (${minutesBefore} minutes before)${roleMention}${filterLabel}.`,
-          ephemeral: true,
+          ...ephemeralFlags,
         });
         return;
       }
@@ -182,7 +183,7 @@ export const contestRemindersCommand: Command = {
         if (!subscription) {
           await interaction.reply({
             content: "No contest reminders configured for this server.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -196,7 +197,7 @@ export const contestRemindersCommand: Command = {
           } else {
             await interaction.reply({
               content: "Unable to reach Codeforces right now. Try again in a few minutes.",
-              ephemeral: true,
+              ...ephemeralFlags,
             });
             return;
           }
@@ -208,7 +209,7 @@ export const contestRemindersCommand: Command = {
           excludeKeywords: subscription.excludeKeywords,
         });
         if (filtered.length === 0) {
-          await interaction.reply({ content: "No upcoming contests found.", ephemeral: true });
+          await interaction.reply({ content: "No upcoming contests found.", ...ephemeralFlags });
           return;
         }
 
@@ -263,13 +264,13 @@ export const contestRemindersCommand: Command = {
           embed.setFooter({ text: "Showing cached contest data due to a temporary error." });
         }
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
         return;
       }
 
       if (subcommand === "post") {
         const force = interaction.options.getBoolean("force") ?? false;
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ...ephemeralFlags });
         const result = await context.services.contestReminders.sendManualReminder(
           guildId,
           context.client,
@@ -319,7 +320,7 @@ export const contestRemindersCommand: Command = {
         interaction,
         context.correlationId
       );
-      await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+      await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
     }
   },
 };

@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Contest } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -97,7 +98,7 @@ export const contestCommand: Command = {
     ),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ...ephemeralFlags });
 
     let stale = false;
     try {

@@ -3,6 +3,7 @@ import { PermissionFlagsBits, type ChatInputCommandInteraction } from "discord.j
 import { recordCommandResult } from "../services/metrics.js";
 import type { CommandContext } from "../types/commandContext.js";
 import type { CooldownManager } from "../utils/cooldown.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
@@ -33,7 +34,7 @@ export async function handleCommandInteraction(
   const command = commands.get(interaction.commandName);
   if (!command) {
     logWarn("Unknown command.", buildLogContext(interaction, correlationId, getLatencyMs()));
-    await interaction.reply({ content: "Unknown command.", ephemeral: true });
+    await interaction.reply({ content: "Unknown command.", ...ephemeralFlags });
     return;
   }
 
@@ -46,7 +47,7 @@ export async function handleCommandInteraction(
       );
       await interaction.reply({
         content: "You do not have permission to use this command.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -60,7 +61,7 @@ export async function handleCommandInteraction(
     });
     await interaction.reply({
       content: `Too many requests. Try again in ${cooldown.retryAfterSeconds}s.`,
-      ephemeral: true,
+      ...ephemeralFlags,
     });
     return;
   }
@@ -78,9 +79,9 @@ export async function handleCommandInteraction(
       error: error instanceof Error ? error.message : String(error),
     });
     if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content: "Something went wrong.", ephemeral: true });
+      await interaction.followUp({ content: "Something went wrong.", ...ephemeralFlags });
     } else {
-      await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+      await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
     }
   } finally {
     recordCommandResult(interaction.commandName, getLatencyMs(), success);

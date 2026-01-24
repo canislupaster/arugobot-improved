@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
@@ -51,7 +52,7 @@ export const practicePrefsCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -66,7 +67,7 @@ export const practicePrefsCommand: Command = {
         if (!preferences) {
           await interaction.reply({
             content: "No practice preferences saved yet. Use /practiceprefs set to configure.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -84,7 +85,7 @@ export const practicePrefsCommand: Command = {
           )
           .setFooter({ text: `Updated ${preferences.updatedAt}` });
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
         return;
       }
 
@@ -94,7 +95,7 @@ export const practicePrefsCommand: Command = {
           content: removed
             ? "Practice preferences cleared."
             : "No saved practice preferences to clear.",
-          ephemeral: true,
+          ...ephemeralFlags,
         });
         return;
       }
@@ -113,7 +114,7 @@ export const practicePrefsCommand: Command = {
         if (!ratingInputProvided && !tagsInputProvided) {
           await interaction.reply({
             content: "Provide rating ranges or tags to update your preferences.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -131,7 +132,7 @@ export const practicePrefsCommand: Command = {
             defaultMax: DEFAULT_MAX_RATING,
           });
           if (rangeResult.error) {
-            await interaction.reply({ content: rangeResult.error, ephemeral: true });
+            await interaction.reply({ content: rangeResult.error, ...ephemeralFlags });
             return;
           }
           ratingRanges = rangeResult.ranges;
@@ -150,7 +151,7 @@ export const practicePrefsCommand: Command = {
           content: `Practice preferences updated. Ranges: ${formatRanges(
             ratingRanges
           )}. Tags: ${tags.trim() ? tags.trim() : "None"}.`,
-          ephemeral: true,
+          ...ephemeralFlags,
         });
         return;
       }
@@ -160,7 +161,7 @@ export const practicePrefsCommand: Command = {
         interaction,
         context.correlationId
       );
-      await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+      await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
     }
   },
 };

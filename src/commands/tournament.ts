@@ -14,6 +14,7 @@ import {
 
 import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatTime } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -265,7 +266,7 @@ export const tournamentCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -277,10 +278,10 @@ export const tournamentCommand: Command = {
       if (subcommand === "history") {
         const page = interaction.options.getInteger("page") ?? 1;
         if (!Number.isInteger(page) || page < 1) {
-          await interaction.reply({ content: "Invalid page.", ephemeral: true });
+          await interaction.reply({ content: "Invalid page.", ...ephemeralFlags });
           return;
         }
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ...ephemeralFlags });
         const history = await context.services.tournaments.getHistoryPage(
           guildId,
           page,
@@ -330,7 +331,7 @@ export const tournamentCommand: Command = {
             if (selection.user.id !== interaction.user.id) {
               await selection.reply({
                 content: "Only the command user can use this menu.",
-                ephemeral: true,
+                ...ephemeralFlags,
               });
               return;
             }
@@ -343,7 +344,7 @@ export const tournamentCommand: Command = {
               HISTORY_DETAIL_STANDINGS_LIMIT
             );
             if (!detail) {
-              await selection.reply({ content: "Tournament not found.", ephemeral: true });
+              await selection.reply({ content: "Tournament not found.", ...ephemeralFlags });
               return;
             }
             const detailEmbed = buildHistoryDetailEmbed(detail);
@@ -356,7 +357,7 @@ export const tournamentCommand: Command = {
               context.correlationId
             );
             if (!selection.replied) {
-              await selection.reply({ content: "Something went wrong.", ephemeral: true });
+              await selection.reply({ content: "Something went wrong.", ...ephemeralFlags });
             }
           }
         });
@@ -371,7 +372,7 @@ export const tournamentCommand: Command = {
             if (button.user.id !== interaction.user.id) {
               await button.reply({
                 content: "Only the command user can use this button.",
-                ephemeral: true,
+                ...ephemeralFlags,
               });
               return;
             }
@@ -383,12 +384,12 @@ export const tournamentCommand: Command = {
             if (!selectedTournamentId) {
               await button.reply({
                 content: "Select a tournament first.",
-                ephemeral: true,
+                ...ephemeralFlags,
               });
               return;
             }
 
-            await button.deferReply({ ephemeral: true });
+            await button.deferReply({ ...ephemeralFlags });
             const recap = await context.services.tournaments.getRecap(
               guildId,
               selectedTournamentId
@@ -412,7 +413,7 @@ export const tournamentCommand: Command = {
               context.correlationId
             );
             if (!button.replied) {
-              await button.reply({ content: "Something went wrong.", ephemeral: true });
+              await button.reply({ content: "Something went wrong.", ...ephemeralFlags });
             }
           }
         });
@@ -432,7 +433,7 @@ export const tournamentCommand: Command = {
         if (!tournament) {
           await interaction.reply({
             content: "No active tournament for this server.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -543,12 +544,12 @@ export const tournamentCommand: Command = {
           embed.addFields({ name: "Standings (top 10)", value: standingsValue, inline: false });
         }
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
         return;
       }
 
       if (subcommand === "advance") {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ...ephemeralFlags });
         const result = await context.services.tournaments.advanceTournament(
           guildId,
           context.client
@@ -601,7 +602,7 @@ export const tournamentCommand: Command = {
       if (subcommand === "cancel") {
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
-          await interaction.reply({ content: "No active tournament to cancel.", ephemeral: true });
+          await interaction.reply({ content: "No active tournament to cancel.", ...ephemeralFlags });
           return;
         }
 
@@ -609,12 +610,12 @@ export const tournamentCommand: Command = {
         if (!isAdmin && tournament.hostUserId !== interaction.user.id) {
           await interaction.reply({
             content: "Only the host or an admin can cancel a tournament.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ...ephemeralFlags });
         const cancelled = await context.services.tournaments.cancelTournament(
           guildId,
           interaction.user.id,
@@ -641,7 +642,7 @@ export const tournamentCommand: Command = {
         if (!VALID_LENGTHS.has(length)) {
           await interaction.reply({
             content: "Invalid length. Valid lengths are 40, 60, and 80 minutes.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -649,7 +650,7 @@ export const tournamentCommand: Command = {
         if (maxParticipants < MIN_PARTICIPANTS || maxParticipants > MAX_PARTICIPANTS) {
           await interaction.reply({
             content: `Invalid max participants. Choose ${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS}.`,
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -663,11 +664,11 @@ export const tournamentCommand: Command = {
           defaultMax: DEFAULT_MAX_RATING,
         });
         if (rangeResult.error) {
-          await interaction.reply({ content: rangeResult.error, ephemeral: true });
+          await interaction.reply({ content: rangeResult.error, ...ephemeralFlags });
           return;
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ...ephemeralFlags });
         const existing = await context.services.tournaments.getActiveTournament(guildId);
         if (existing) {
           await interaction.editReply("An active tournament already exists for this server.");
@@ -717,13 +718,13 @@ export const tournamentCommand: Command = {
         collector.on("collect", async (button) => {
           if (button.customId === joinId) {
             if (participants.has(button.user.id)) {
-              await button.reply({ content: "You already joined.", ephemeral: true });
+              await button.reply({ content: "You already joined.", ...ephemeralFlags });
               return;
             }
             if (participants.size >= maxParticipants) {
               await button.reply({
                 content: `Lobby is full (max ${maxParticipants}).`,
-                ephemeral: true,
+                ...ephemeralFlags,
               });
               return;
             }
@@ -737,7 +738,7 @@ export const tournamentCommand: Command = {
                 content: `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
                   challenge.endsAt
                 )}).`,
-                ephemeral: true,
+                ...ephemeralFlags,
               });
               return;
             }
@@ -745,7 +746,7 @@ export const tournamentCommand: Command = {
             if (!linked) {
               await button.reply({
                 content: "Link a handle with /register first.",
-                ephemeral: true,
+                ...ephemeralFlags,
               });
               return;
             }
@@ -761,13 +762,13 @@ export const tournamentCommand: Command = {
 
           if (button.customId === leaveId) {
             if (!participants.has(button.user.id)) {
-              await button.reply({ content: "You are not in this lobby.", ephemeral: true });
+              await button.reply({ content: "You are not in this lobby.", ...ephemeralFlags });
               return;
             }
             if (button.user.id === interaction.user.id) {
               await button.reply({
                 content: "The host cannot leave. Use cancel to stop the lobby.",
-                ephemeral: true,
+                ...ephemeralFlags,
               });
               return;
             }
@@ -783,13 +784,13 @@ export const tournamentCommand: Command = {
 
           if (button.customId === startId) {
             if (button.user.id !== interaction.user.id) {
-              await button.reply({ content: "Only the host can start.", ephemeral: true });
+              await button.reply({ content: "Only the host can start.", ...ephemeralFlags });
               return;
             }
             if (participants.size < MIN_PARTICIPANTS) {
               await button.reply({
                 content: `Need at least ${MIN_PARTICIPANTS} participants to start.`,
-                ephemeral: true,
+                ...ephemeralFlags,
               });
               return;
             }
@@ -801,7 +802,7 @@ export const tournamentCommand: Command = {
 
           if (button.customId === cancelId) {
             if (button.user.id !== interaction.user.id) {
-              await button.reply({ content: "Only the host can cancel.", ephemeral: true });
+              await button.reply({ content: "Only the host can cancel.", ...ephemeralFlags });
               return;
             }
             lobbyEmbed.setDescription("Tournament cancelled.");
@@ -852,9 +853,9 @@ export const tournamentCommand: Command = {
         error: error instanceof Error ? error.message : String(error),
       });
       if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: "Something went wrong.", ephemeral: true });
+        await interaction.followUp({ content: "Something went wrong.", ...ephemeralFlags });
       } else {
-        await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+        await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
       }
     }
   },

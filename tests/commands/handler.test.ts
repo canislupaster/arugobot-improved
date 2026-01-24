@@ -3,6 +3,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { handleCommandInteraction } from "../../src/commands/handler.js";
 import type { Command } from "../../src/commands/types.js";
 import { CooldownManager } from "../../src/utils/cooldown.js";
+import { ephemeralFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -34,7 +35,7 @@ describe("handleCommandInteraction", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Unknown command.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 
@@ -91,7 +92,7 @@ describe("handleCommandInteraction", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Something went wrong.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 });

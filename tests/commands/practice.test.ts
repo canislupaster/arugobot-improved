@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { practiceCommand } from "../../src/commands/practice.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
+import { ephemeralFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -37,7 +38,7 @@ describe("practiceCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Provide either a handle or a user, not both.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 
@@ -79,7 +80,7 @@ describe("practiceCommand", () => {
 
     await practiceCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ...ephemeralFlags });
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({
         embeds: [expect.any(Object)],

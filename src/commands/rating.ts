@@ -2,6 +2,7 @@ import type { Chart, ChartConfiguration, ChartOptions, Plugin } from "chart.js";
 import { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 
 import type { Command } from "./types.js";
 
@@ -119,7 +120,7 @@ export const ratingCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }

@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { practiceHistoryCommand } from "../../src/commands/practiceHistory.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
+import { ephemeralFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -27,7 +28,7 @@ describe("practiceHistoryCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "This command can only be used in a server.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 
@@ -65,7 +66,7 @@ describe("practiceHistoryCommand", () => {
 
     await practiceHistoryCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ...ephemeralFlags });
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: [expect.any(Object)] })
     );
@@ -105,7 +106,7 @@ describe("practiceHistoryCommand", () => {
 
     await practiceHistoryCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ...ephemeralFlags });
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: [expect.any(Object)] })
     );

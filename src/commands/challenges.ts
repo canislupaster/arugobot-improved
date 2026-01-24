@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatTime } from "../utils/rating.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -68,7 +69,7 @@ export const challengesCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -80,7 +81,7 @@ export const challengesCommand: Command = {
       if (subcommand === "list") {
         const challenges = await context.services.challenges.listActiveChallenges(guildId);
         if (challenges.length === 0) {
-          await interaction.reply({ content: "No active challenges right now.", ephemeral: true });
+          await interaction.reply({ content: "No active challenges right now.", ...ephemeralFlags });
           return;
         }
 
@@ -107,7 +108,7 @@ export const challengesCommand: Command = {
           embed.setFooter({ text: `Showing ${limit} of ${challenges.length} active challenges.` });
         }
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
         return;
       }
 
@@ -119,7 +120,7 @@ export const challengesCommand: Command = {
         if (challenges.length === 0) {
           await interaction.reply({
             content: "You have no active challenges right now.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -142,7 +143,7 @@ export const challengesCommand: Command = {
           .setColor(0x3498db)
           .setDescription(lines.join("\n"));
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
         return;
       }
 
@@ -155,7 +156,7 @@ export const challengesCommand: Command = {
         if (challenges.length === 0) {
           await interaction.reply({
             content: "No completed challenges yet.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -200,13 +201,13 @@ export const challengesCommand: Command = {
           });
         }
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
         return;
       }
 
       const challenges = await context.services.challenges.listActiveChallenges(guildId);
       if (challenges.length === 0) {
-        await interaction.reply({ content: "No active challenges to cancel.", ephemeral: true });
+        await interaction.reply({ content: "No active challenges to cancel.", ...ephemeralFlags });
         return;
       }
 
@@ -237,7 +238,7 @@ export const challengesCommand: Command = {
       const response = await interaction.reply({
         embeds: [embed],
         components: [row],
-        ephemeral: true,
+        ...ephemeralFlags,
         fetchReply: true,
       });
 
@@ -255,7 +256,7 @@ export const challengesCommand: Command = {
         if (!selected) {
           await selection.reply({
             content: "That challenge is no longer active.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -265,7 +266,7 @@ export const challengesCommand: Command = {
         if (!isAdmin && !isHost) {
           await selection.reply({
             content: "Only the host or an admin can cancel this challenge.",
-            ephemeral: true,
+            ...ephemeralFlags,
           });
           return;
         }
@@ -306,9 +307,9 @@ export const challengesCommand: Command = {
     } catch (error) {
       logCommandError(`Error in challenges: ${String(error)}`, interaction, context.correlationId);
       if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: "Something went wrong.", ephemeral: true });
+        await interaction.followUp({ content: "Something went wrong.", ...ephemeralFlags });
       } else {
-        await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+        await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
       }
     }
   },

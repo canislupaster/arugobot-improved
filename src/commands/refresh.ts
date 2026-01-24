@@ -1,6 +1,7 @@
 import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 
 import type { Command } from "./types.js";
 
@@ -34,13 +35,13 @@ export const refreshCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
 
     const scope = resolveScope(interaction.options.getString("scope"));
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ...ephemeralFlags });
 
     const embed = new EmbedBuilder().setTitle("Refresh results").setColor(0x3498db);
     const errors: string[] = [];

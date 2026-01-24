@@ -2,6 +2,7 @@ import { ChannelType, type ChatInputCommandInteraction } from "discord.js";
 
 import { contestRemindersCommand } from "../../src/commands/contestReminders.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
+import { ephemeralFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -44,7 +45,7 @@ describe("contestRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No contest reminders configured for this server.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 
@@ -84,7 +85,7 @@ describe("contestRemindersCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         "Contest reminders enabled in <#channel-1> (30 minutes before) (mentioning <@&role-1>) (include: div. 2, exclude: kotlin).",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 
@@ -109,7 +110,7 @@ describe("contestRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Contest reminders disabled for this server.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 
@@ -155,7 +156,7 @@ describe("contestRemindersCommand", () => {
 
     const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds[0].data.title).toBe("Contest reminder preview");
-    expect(payload.ephemeral).toBe(true);
+    expect(payload.flags).toBe(ephemeralFlags.flags);
   });
 
   it("returns an error when previewing without a subscription", async () => {
@@ -184,7 +185,7 @@ describe("contestRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No contest reminders configured for this server.",
-      ephemeral: true,
+      ...ephemeralFlags,
     });
   });
 
@@ -214,7 +215,7 @@ describe("contestRemindersCommand", () => {
 
     await contestRemindersCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ...ephemeralFlags });
     expect(interaction.editReply).toHaveBeenCalledWith(
       "Posted a reminder for CF Round in <#channel-1>."
     );

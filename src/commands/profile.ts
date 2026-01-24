@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -46,7 +47,7 @@ export const profileCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -57,7 +58,7 @@ export const profileCommand: Command = {
     if (handleInput && userOption) {
       await interaction.reply({
         content: "Provide either a handle or a user, not both.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -67,7 +68,7 @@ export const profileCommand: Command = {
     const targetName = member && "displayName" in member ? member.displayName : user.username;
     const targetMention = member && "toString" in member ? member.toString() : user.toString();
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ...ephemeralFlags });
 
     try {
       const guildId = interaction.guild.id;
