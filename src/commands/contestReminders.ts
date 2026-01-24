@@ -3,8 +3,11 @@ import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } f
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   filterContestsByKeywords,
+  getContestReminderPreset,
+  listContestReminderPresets,
   parseKeywordFilters,
   serializeKeywords,
+  type ContestReminderPreset,
 } from "../utils/contestFilters.js";
 import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
@@ -130,6 +133,38 @@ export const contestRemindersCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("preset")
+        .setDescription("Add a reminder preset (Div 2, Educational)")
+        .addStringOption((option) => {
+          const choice = option
+            .setName("preset")
+            .setDescription("Reminder preset")
+            .setRequired(true);
+          for (const preset of listContestReminderPresets()) {
+            choice.addChoices({ name: preset.name, value: preset.value });
+          }
+          return choice;
+        })
+        .addChannelOption((option) =>
+          option
+            .setName("channel")
+            .setDescription("Channel to post reminders in")
+            .setRequired(true)
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+        )
+        .addRoleOption((option) =>
+          option.setName("role").setDescription("Role to mention for reminders")
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("minutes_before")
+            .setDescription(`Minutes before start to notify (${MIN_MINUTES}-${MAX_MINUTES})`)
+            .setMinValue(MIN_MINUTES)
+            .setMaxValue(MAX_MINUTES)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("remove")
         .setDescription("Remove a reminder subscription")
         .addStringOption((option) =>
@@ -244,6 +279,45 @@ export const contestRemindersCommand: Command = {
         const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
         await interaction.reply({
           content: `Contest reminders enabled in <#${channel.id}> (${minutesBefore} minutes before)${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
+          ...ephemeralFlags,
+        });
+        return;
+      }
+
+      if (subcommand === "preset") {
+        const channel = interaction.options.getChannel("channel", true);
+        if (
+          channel.type !== ChannelType.GuildText &&
+          channel.type !== ChannelType.GuildAnnouncement
+        ) {
+          await interaction.reply({
+            content: "Pick a text channel for contest reminders.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        const presetKey = interaction.options.getString("preset", true) as ContestReminderPreset;
+        const preset = getContestReminderPreset(presetKey);
+        const minutesBefore = interaction.options.getInteger("minutes_before") ?? DEFAULT_MINUTES;
+        const role = interaction.options.getRole("role");
+        const roleId = role?.id ?? null;
+        const subscription = await context.services.contestReminders.createSubscription(
+          guildId,
+          channel.id,
+          minutesBefore,
+          roleId,
+          preset.includeKeywords,
+          preset.excludeKeywords
+        );
+        const filterLabel =
+          preset.includeKeywords.length > 0 || preset.excludeKeywords.length > 0
+            ? ` (include: ${serializeKeywords(preset.includeKeywords) || "none"}, exclude: ${
+                serializeKeywords(preset.excludeKeywords) || "none"
+              })`
+            : "";
+        const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
+        await interaction.reply({
+          content: `Contest reminder preset "${preset.label}" enabled in <#${channel.id}> (${minutesBefore} minutes before)${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
           ...ephemeralFlags,
         });
         return;

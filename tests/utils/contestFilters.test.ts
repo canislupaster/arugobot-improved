@@ -1,4 +1,9 @@
-import { filterContestsByKeywords, parseKeywordFilters } from "../../src/utils/contestFilters.js";
+import {
+  filterContestsByKeywords,
+  getContestReminderPreset,
+  listContestReminderPresets,
+  parseKeywordFilters,
+} from "../../src/utils/contestFilters.js";
 
 describe("contestFilters", () => {
   it("parses keyword filters with normalization", () => {
@@ -22,5 +27,15 @@ describe("contestFilters", () => {
       "Codeforces Round #900 (Div. 2)",
       "Educational Codeforces Round",
     ]);
+  });
+
+  it("exposes contest reminder presets", () => {
+    const presets = listContestReminderPresets();
+    expect(presets).toEqual([
+      { name: "Div 2", value: "div2" },
+      { name: "Educational", value: "educational" },
+    ]);
+    const preset = getContestReminderPreset("div2");
+    expect(preset.includeKeywords).toContain("div. 2");
   });
 });

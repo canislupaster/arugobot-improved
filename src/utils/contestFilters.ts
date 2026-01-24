@@ -3,6 +3,23 @@ export type KeywordFilters = {
   excludeKeywords: string[];
 };
 
+export type ContestReminderPreset = "div2" | "educational";
+
+type ContestReminderPresetConfig = KeywordFilters & { label: string };
+
+const CONTEST_REMINDER_PRESETS: Record<ContestReminderPreset, ContestReminderPresetConfig> = {
+  div2: {
+    label: "Div 2",
+    includeKeywords: ["div. 2", "div.2", "div 2"],
+    excludeKeywords: [],
+  },
+  educational: {
+    label: "Educational",
+    includeKeywords: ["educational"],
+    excludeKeywords: [],
+  },
+};
+
 function normalizeKeywords(raw: string | null | undefined): string[] {
   if (!raw) {
     return [];
@@ -25,6 +42,19 @@ export function parseKeywordFilters(rawInclude?: string | null, rawExclude?: str
     includeKeywords: normalizeKeywords(rawInclude),
     excludeKeywords: normalizeKeywords(rawExclude),
   };
+}
+
+export function getContestReminderPreset(
+  preset: ContestReminderPreset
+): ContestReminderPresetConfig {
+  return CONTEST_REMINDER_PRESETS[preset];
+}
+
+export function listContestReminderPresets(): Array<{ name: string; value: ContestReminderPreset }> {
+  return Object.entries(CONTEST_REMINDER_PRESETS).map(([key, config]) => ({
+    name: config.label,
+    value: key as ContestReminderPreset,
+  }));
 }
 
 export function serializeKeywords(keywords: string[]): string {

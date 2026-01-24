@@ -123,6 +123,54 @@ describe("contestRemindersCommand", () => {
     });
   });
 
+  it("adds reminders using a preset", async () => {
+    const channel = {
+      id: "channel-2",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("preset"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn().mockReturnValue(45),
+        getRole: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockReturnValue("div2"),
+      },
+    });
+    const context = {
+      correlationId: "corr-3a",
+      services: {
+        contestReminders: {
+          createSubscription: jest.fn().mockResolvedValue({
+            id: "sub-10",
+            guildId: "guild-1",
+            channelId: "channel-2",
+            minutesBefore: 45,
+            roleId: null,
+            includeKeywords: ["div. 2", "div.2", "div 2"],
+            excludeKeywords: [],
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRemindersCommand.execute(interaction, context);
+
+    expect(context.services.contestReminders.createSubscription).toHaveBeenCalledWith(
+      "guild-1",
+      "channel-2",
+      45,
+      null,
+      ["div. 2", "div.2", "div 2"],
+      []
+    );
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        'Contest reminder preset "Div 2" enabled in <#channel-2> (45 minutes before) (include: div. 2, div.2, div 2, exclude: none). Subscription id: `sub-10`.',
+      ...publicFlags,
+    });
+  });
+
   it("removes a reminder subscription by id", async () => {
     const interaction = createInteraction({
       options: {
