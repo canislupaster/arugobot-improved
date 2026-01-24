@@ -70,7 +70,7 @@ pnpm run test
 pnpm run build
 ```
 
-To build and run the production build:
+To build and run the production build (tsx runtime):
 
 ```bash
 pnpm run build
