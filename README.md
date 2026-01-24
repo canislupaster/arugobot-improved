@@ -152,6 +152,10 @@ The following commands are available to you:
 
   Shows standings for linked users (or specified handles) in a contest.
 
+- **/contestchanges** `query` `[limit]` `[user1..user4]` `[handles]`
+
+  Shows rating changes for linked users (or specified handles) in a finished contest.
+
 - **/contesthistory** `[user]` `[handle]` `[limit]`
 
   Shows recent Codeforces contest rating changes for a linked user or handle.

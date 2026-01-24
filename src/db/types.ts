@@ -109,6 +109,12 @@ export type ContestStandingsCacheTable = {
   last_fetched: Generated<string>;
 };
 
+export type ContestRatingChangesTable = {
+  contest_id: number;
+  payload: string;
+  last_fetched: Generated<string>;
+};
+
 export type PracticeRemindersTable = {
   guild_id: string;
   channel_id: string;
@@ -223,6 +229,7 @@ export type Database = {
   contest_reminders: ContestRemindersTable;
   contest_notifications: ContestNotificationsTable;
   contest_standings_cache: ContestStandingsCacheTable;
+  contest_rating_changes: ContestRatingChangesTable;
   practice_reminders: PracticeRemindersTable;
   practice_posts: PracticePostsTable;
   practice_suggestions: PracticeSuggestionsTable;

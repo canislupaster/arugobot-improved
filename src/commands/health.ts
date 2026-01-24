@@ -39,6 +39,7 @@ export const healthCommand: Command = {
     const problemLastError = context.services.problems.getLastError();
     const contestRefreshAt = context.services.contests.getLastRefreshAt();
     const contestLastError = context.services.contests.getLastError();
+    const contestRatingChangesLastError = context.services.contestRatingChanges.getLastError();
     const ratingChangesLastError = context.services.ratingChanges.getLastError();
     const reminderCount = await context.services.contestReminders.getSubscriptionCount();
     const reminderLastTick = context.services.contestReminders.getLastTickAt();
@@ -128,6 +129,13 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Contest cache last error",
         value: `${contestLastError.timestamp} - ${contestLastError.message}`,
+        inline: false,
+      });
+    }
+    if (contestRatingChangesLastError) {
+      embed.addFields({
+        name: "Contest rating changes last error",
+        value: `${contestRatingChangesLastError.timestamp} - ${contestRatingChangesLastError.message}`,
         inline: false,
       });
     }

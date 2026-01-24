@@ -35,6 +35,9 @@ describe("healthCommand", () => {
           getLastRefreshAt: jest.fn().mockReturnValue(0),
           getLastError: jest.fn().mockReturnValue(null),
         },
+        contestRatingChanges: {
+          getLastError: jest.fn().mockReturnValue(null),
+        },
         ratingChanges: {
           getLastError: jest.fn().mockReturnValue(null),
         },

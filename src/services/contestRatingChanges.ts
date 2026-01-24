@@ -4,35 +4,20 @@ import type { Database } from "../db/types.js";
 import { logError, logWarn } from "../utils/logger.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
+import type { RatingChange } from "./ratingChanges.js";
 
-export type RatingChange = {
-  handle?: string;
-  contestId: number;
-  contestName: string;
-  rank: number;
-  oldRating: number;
-  newRating: number;
-  ratingUpdateTimeSeconds: number;
-};
-
-type RatingChangesResponse = RatingChange[];
-
-type RatingChangesCacheRow = {
+type ContestRatingChangesRow = {
   payload: string;
   last_fetched: string;
 };
 
-export type RatingChangesResult = {
+export type ContestRatingChangesResult = {
   changes: RatingChange[];
   source: "cache" | "api";
   isStale: boolean;
 };
 
-const DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000;
-
-function normalizeHandle(handle: string): string {
-  return handle.trim().toLowerCase();
-}
+const DEFAULT_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function isCacheFresh(lastFetched: string, ttlMs: number): boolean {
   if (!lastFetched || ttlMs <= 0) {
@@ -65,7 +50,7 @@ function parseChanges(payload: string): RatingChange[] {
   }
 }
 
-export class RatingChangesService {
+export class ContestRatingChangesService {
   private lastError: { message: string; timestamp: string } | null = null;
 
   constructor(
@@ -77,18 +62,16 @@ export class RatingChangesService {
     return this.lastError;
   }
 
-  async getRatingChanges(
-    handle: string,
+  async getContestRatingChanges(
+    contestId: number,
     ttlMs = DEFAULT_CACHE_TTL_MS
-  ): Promise<RatingChangesResult | null> {
-    const key = normalizeHandle(handle);
-    let cached: RatingChangesCacheRow | undefined;
-
+  ): Promise<ContestRatingChangesResult | null> {
+    let cached: ContestRatingChangesRow | undefined;
     try {
       cached = await this.db
-        .selectFrom("cf_rating_changes")
+        .selectFrom("contest_rating_changes")
         .select(["payload", "last_fetched"])
-        .where("handle", "=", key)
+        .where("contest_id", "=", contestId)
         .executeTakeFirst();
     } catch (error) {
       logError(`Database error: ${String(error)}`);
@@ -99,20 +82,20 @@ export class RatingChangesService {
     }
 
     try {
-      const response = await this.client.request<RatingChangesResponse>("user.rating", {
-        handle,
+      const response = await this.client.request<RatingChange[]>("contest.ratingChanges", {
+        contestId,
       });
       const payload = JSON.stringify(response);
       const timestamp = new Date().toISOString();
       await this.db
-        .insertInto("cf_rating_changes")
+        .insertInto("contest_rating_changes")
         .values({
-          handle: key,
+          contest_id: contestId,
           payload,
           last_fetched: timestamp,
         })
         .onConflict((oc) =>
-          oc.column("handle").doUpdateSet({
+          oc.column("contest_id").doUpdateSet({
             payload,
             last_fetched: timestamp,
           })
@@ -123,8 +106,8 @@ export class RatingChangesService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.lastError = { message, timestamp: new Date().toISOString() };
-      logWarn("Rating change request failed; using cached data if available.", {
-        handle: key,
+      logWarn("Contest rating changes request failed; using cached data if available.", {
+        contestId,
         error: message,
       });
       if (cached) {

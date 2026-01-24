@@ -3,6 +3,7 @@ import type { Client } from "discord.js";
 import type { AppConfig } from "../config/env.js";
 import type { ChallengeService } from "../services/challenges.js";
 import type { CodeforcesClient } from "../services/codeforces.js";
+import type { ContestRatingChangesService } from "../services/contestRatingChanges.js";
 import type { ContestReminderService } from "../services/contestReminders.js";
 import type { ContestService } from "../services/contests.js";
 import type { ContestStandingsService } from "../services/contestStandings.js";
@@ -23,6 +24,7 @@ export type CommandContext = {
     challenges: ChallengeService;
     contests: ContestService;
     contestReminders: ContestReminderService;
+    contestRatingChanges: ContestRatingChangesService;
     contestStandings: ContestStandingsService;
     practiceReminders: PracticeReminderService;
     practiceSuggestions: PracticeSuggestionService;

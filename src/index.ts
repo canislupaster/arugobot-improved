@@ -11,6 +11,7 @@ import { migrateToLatest } from "./db/migrator.js";
 import { ChallengeService, challengeUpdateIntervalMs } from "./services/challenges.js";
 import { CodeforcesClient } from "./services/codeforces.js";
 import { CodeforcesCacheService } from "./services/codeforcesCache.js";
+import { ContestRatingChangesService } from "./services/contestRatingChanges.js";
 import { ContestReminderService, contestReminderIntervalMs } from "./services/contestReminders.js";
 import { ContestService } from "./services/contests.js";
 import { ContestStandingsService } from "./services/contestStandings.js";
@@ -49,6 +50,7 @@ async function main() {
   });
   const cache = new CodeforcesCacheService(db);
   const contests = new ContestService(codeforces, cache);
+  const contestRatingChanges = new ContestRatingChangesService(db, codeforces);
   const contestStandings = new ContestStandingsService(db, codeforces);
   const contestReminders = new ContestReminderService(db, contests);
   const problems = new ProblemService(codeforces, cache);
@@ -197,6 +199,7 @@ async function main() {
         challenges,
         contests,
         contestReminders,
+        contestRatingChanges,
         contestStandings,
         practiceReminders,
         practiceSuggestions,
