@@ -434,19 +434,44 @@ describe("StoreService", () => {
       })
       .execute();
 
-    const recent = await store.getRecentPracticeSuggestions(
-      "guild-1",
-      "user-1",
-      recentCutoff
-    );
+    const recent = await store.getRecentPracticeSuggestions("guild-1", "user-1", recentCutoff);
     expect(recent).toContain("1000A");
     expect(recent).not.toContain("1000B");
 
     await store.cleanupPracticeSuggestions(recentCutoff);
-    const rows = await db
-      .selectFrom("practice_suggestions")
-      .select("problem_id")
-      .execute();
+    const rows = await db.selectFrom("practice_suggestions").select("problem_id").execute();
     expect(rows.map((row) => row.problem_id)).toEqual(["1000A"]);
+  });
+
+  it("returns practice suggestion history in descending order", async () => {
+    await db
+      .insertInto("practice_suggestions")
+      .values([
+        {
+          guild_id: "guild-1",
+          user_id: "user-1",
+          problem_id: "1000A",
+          suggested_at: "2024-01-01T00:00:00.000Z",
+        },
+        {
+          guild_id: "guild-1",
+          user_id: "user-1",
+          problem_id: "1000B",
+          suggested_at: "2024-01-03T00:00:00.000Z",
+        },
+        {
+          guild_id: "guild-1",
+          user_id: "user-1",
+          problem_id: "1000C",
+          suggested_at: "2024-01-02T00:00:00.000Z",
+        },
+      ])
+      .execute();
+
+    const history = await store.getPracticeSuggestionHistory("guild-1", "user-1", 2);
+    expect(history).toEqual([
+      { problemId: "1000B", suggestedAt: "2024-01-03T00:00:00.000Z" },
+      { problemId: "1000C", suggestedAt: "2024-01-02T00:00:00.000Z" },
+    ]);
   });
 });

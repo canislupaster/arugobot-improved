@@ -11,6 +11,7 @@ import { historyCommand } from "./history.js";
 import { leaderboardCommand } from "./leaderboard.js";
 import { pingCommand } from "./ping.js";
 import { practiceCommand } from "./practice.js";
+import { practiceHistoryCommand } from "./practiceHistory.js";
 import { practiceRemindersCommand } from "./practiceReminders.js";
 import { problemCommand } from "./problem.js";
 import { profileCommand } from "./profile.js";
@@ -34,6 +35,7 @@ export const commandList: Command[] = [
   leaderboardCommand,
   pingCommand,
   practiceCommand,
+  practiceHistoryCommand,
   practiceRemindersCommand,
   problemCommand,
   profileCommand,

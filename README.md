@@ -78,6 +78,10 @@ The following commands are available to you:
   Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
   Use `tags` to require tags and prefix `-` to exclude tags (e.g. `dp, greedy, -math`).
 
+- **/practicehistory** `suggestions` `[user]` `[limit]` | `reminders` `[limit]`
+
+  Shows recent practice suggestions for a user or recent practice reminder posts for the server.
+
 - **/problem** `id`
 
   Shows details for a Codeforces problem by id or URL, plus which linked users have solved it.

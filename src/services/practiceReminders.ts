@@ -31,6 +31,11 @@ export type PracticeReminder = {
   lastSentAt: string | null;
 };
 
+export type PracticeReminderPost = {
+  problemId: string;
+  sentAt: string;
+};
+
 export type PracticeReminderPreview = {
   subscription: PracticeReminder;
   nextScheduledAt: number;
@@ -200,6 +205,21 @@ export class PracticeReminderService {
       .select(({ fn }) => fn.count<number>("guild_id").as("count"))
       .executeTakeFirst();
     return row?.count ?? 0;
+  }
+
+  async getRecentPosts(guildId: string, limit: number): Promise<PracticeReminderPost[]> {
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 1;
+    const rows = await this.db
+      .selectFrom("practice_posts")
+      .select(["problem_id", "sent_at"])
+      .where("guild_id", "=", guildId)
+      .orderBy("sent_at", "desc")
+      .limit(safeLimit)
+      .execute();
+    return rows.map((row) => ({
+      problemId: row.problem_id,
+      sentAt: row.sent_at,
+    }));
   }
 
   async setSubscription(

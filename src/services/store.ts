@@ -113,6 +113,11 @@ export type UserChallengeActivitySummary = {
   lastCompletedAt: string | null;
 };
 
+export type PracticeSuggestionEntry = {
+  problemId: string;
+  suggestedAt: string;
+};
+
 type HandleResolution = {
   exists: boolean;
   canonicalHandle: string | null;
@@ -552,6 +557,88 @@ export class StoreService {
         .where("user_id", "=", userId)
         .executeTakeFirst();
       return parseJsonArray<string>(row?.history, []);
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return [];
+    }
+  }
+
+  async getRecentPracticeSuggestions(
+    serverId: string,
+    userId: string,
+    cutoffIso: string
+  ): Promise<string[]> {
+    try {
+      const rows = await this.db
+        .selectFrom("practice_suggestions")
+        .select("problem_id")
+        .where("guild_id", "=", serverId)
+        .where("user_id", "=", userId)
+        .where("suggested_at", ">=", cutoffIso)
+        .execute();
+      return rows.map((row) => row.problem_id);
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return [];
+    }
+  }
+
+  async recordPracticeSuggestion(
+    serverId: string,
+    userId: string,
+    problemId: string
+  ): Promise<void> {
+    const timestamp = new Date().toISOString();
+    try {
+      await this.db
+        .insertInto("practice_suggestions")
+        .values({
+          guild_id: serverId,
+          user_id: userId,
+          problem_id: problemId,
+          suggested_at: timestamp,
+        })
+        .onConflict((oc) =>
+          oc.columns(["guild_id", "user_id", "problem_id"]).doUpdateSet({
+            suggested_at: timestamp,
+          })
+        )
+        .execute();
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+    }
+  }
+
+  async cleanupPracticeSuggestions(cutoffIso: string): Promise<void> {
+    try {
+      await this.db
+        .deleteFrom("practice_suggestions")
+        .where("suggested_at", "<", cutoffIso)
+        .execute();
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+    }
+  }
+
+  async getPracticeSuggestionHistory(
+    serverId: string,
+    userId: string,
+    limit: number
+  ): Promise<PracticeSuggestionEntry[]> {
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 1;
+    try {
+      const rows = await this.db
+        .selectFrom("practice_suggestions")
+        .select(["problem_id", "suggested_at"])
+        .where("guild_id", "=", serverId)
+        .where("user_id", "=", userId)
+        .orderBy("suggested_at", "desc")
+        .limit(safeLimit)
+        .execute();
+      return rows.map((row) => ({
+        problemId: row.problem_id,
+        suggestedAt: row.suggested_at,
+      }));
     } catch (error) {
       logError(`Database error: ${String(error)}`);
       return [];

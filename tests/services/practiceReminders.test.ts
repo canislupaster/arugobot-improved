@@ -82,6 +82,47 @@ describe("PracticeReminderService", () => {
     expect(posts[0]?.problem_id).toBe("100A");
   });
 
+  it("returns recent practice posts in descending order", async () => {
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue([]),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await db
+      .insertInto("practice_posts")
+      .values([
+        {
+          guild_id: "guild-1",
+          problem_id: "1000A",
+          sent_at: "2024-01-01T00:00:00.000Z",
+        },
+        {
+          guild_id: "guild-1",
+          problem_id: "1000B",
+          sent_at: "2024-01-03T00:00:00.000Z",
+        },
+        {
+          guild_id: "guild-1",
+          problem_id: "1000C",
+          sent_at: "2024-01-02T00:00:00.000Z",
+        },
+      ])
+      .execute();
+
+    const posts = await service.getRecentPosts("guild-1", 2);
+    expect(posts).toEqual([
+      { problemId: "1000B", sentAt: "2024-01-03T00:00:00.000Z" },
+      { problemId: "1000C", sentAt: "2024-01-02T00:00:00.000Z" },
+    ]);
+  });
+
   it("skips reminders already sent today", async () => {
     const nowMs = Date.UTC(2024, 0, 1, 12, 0, 0);
     jest.useFakeTimers().setSystemTime(new Date(nowMs));
