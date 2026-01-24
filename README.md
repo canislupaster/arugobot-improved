@@ -151,10 +151,12 @@ The following commands are available to you:
 - **/contestresults** `query` `[limit]` `[user1..user4]` `[handles]`
 
   Shows standings for linked users (or specified handles) in a contest.
+  Use `latest` to target the most recent finished contest.
 
 - **/contestchanges** `query` `[limit]` `[user1..user4]` `[handles]`
 
   Shows rating changes for linked users (or specified handles) in a finished contest.
+  Use `latest` to target the most recent finished contest.
 
 - **/contesthistory** `[user]` `[handle]` `[limit]`
 

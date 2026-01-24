@@ -125,4 +125,35 @@ describe("ContestService", () => {
     const matches = service.searchContests("codeforces round", 2);
     expect(matches.map((contest) => contest.id)).toEqual([2, 3]);
   });
+
+  it("returns the most recent finished contest", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: "Codeforces Round #1",
+        phase: "FINISHED",
+        startTimeSeconds: 1_500_000_000,
+        durationSeconds: 7200,
+      },
+      {
+        id: 2,
+        name: "Codeforces Round #2",
+        phase: "FINISHED",
+        startTimeSeconds: 1_600_000_000,
+        durationSeconds: 7200,
+      },
+      {
+        id: 3,
+        name: "Codeforces Round #3",
+        phase: "BEFORE",
+        startTimeSeconds: 1_700_000_000,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestService(mockClient as never, cache);
+    await service.refresh(true);
+
+    expect(service.getLatestFinished()?.id).toBe(2);
+  });
 });

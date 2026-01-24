@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder, type User } from "discord.js";
 
 import type { Contest } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { ephemeralFlags } from "../utils/discordFlags.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -42,6 +43,12 @@ function parseContestId(raw: string): number | null {
     return Number.isFinite(id) ? id : null;
   }
   return null;
+}
+
+const LATEST_CONTEST_QUERIES = new Set(["latest", "last", "recent"]);
+
+function isLatestQuery(raw: string): boolean {
+  return LATEST_CONTEST_QUERIES.has(raw.trim().toLowerCase());
 }
 
 function formatPhase(phase: Contest["phase"]): string {
@@ -146,7 +153,10 @@ export const contestResultsCommand: Command = {
     .setName("contestresults")
     .setDescription("Shows standings for linked users in a contest")
     .addStringOption((option) =>
-      option.setName("query").setDescription("Contest id, URL, or name").setRequired(true)
+      option
+        .setName("query")
+        .setDescription("Contest id, URL, name, or latest")
+        .setRequired(true)
     )
     .addIntegerOption((option) =>
       option
@@ -176,7 +186,7 @@ export const contestResultsCommand: Command = {
     if (!interaction.guild && userOptions.length > 0) {
       await interaction.reply({
         content: "Specify handles directly when using this command outside a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
@@ -184,12 +194,12 @@ export const contestResultsCommand: Command = {
     if (!interaction.guild && handleInputs.length === 0) {
       await interaction.reply({
         content: "Provide at least one handle or run this command in a server.",
-        ephemeral: true,
+        ...ephemeralFlags,
       });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ...ephemeralFlags });
 
     let stale = false;
     try {
@@ -206,9 +216,16 @@ export const contestResultsCommand: Command = {
     }
 
     try {
+      const wantsLatest = isLatestQuery(queryRaw);
       const contestId = parseContestId(queryRaw);
       let contest: Contest | null = null;
-      if (contestId) {
+      if (wantsLatest) {
+        contest = context.services.contests.getLatestFinished();
+        if (!contest) {
+          await interaction.editReply("No finished contests found yet.");
+          return;
+        }
+      } else if (contestId) {
         contest = context.services.contests.getContestById(contestId);
         if (!contest) {
           await interaction.editReply("No contest found with that ID.");

@@ -81,6 +81,19 @@ export class ContestService {
     return match ?? null;
   }
 
+  getLatestFinished(): Contest | null {
+    let latest: Contest | null = null;
+    for (const contest of this.contests) {
+      if (contest.phase !== "FINISHED") {
+        continue;
+      }
+      if (!latest || contest.startTimeSeconds > latest.startTimeSeconds) {
+        latest = contest;
+      }
+    }
+    return latest;
+  }
+
   searchContests(query: string, limit = 5): Contest[] {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {

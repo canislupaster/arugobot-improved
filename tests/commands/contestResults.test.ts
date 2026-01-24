@@ -86,6 +86,56 @@ describe("contestResultsCommand", () => {
     expect(standingsField?.value).toContain("petr");
   });
 
+  it("uses the latest finished contest when requested", async () => {
+    const interaction = createInteraction("latest");
+    const latestContest = {
+      id: 4321,
+      name: "Codeforces Round #4321",
+      phase: "FINISHED",
+      startTimeSeconds: 1_700_100_000,
+      durationSeconds: 7200,
+    };
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getLatestFinished: jest.fn().mockReturnValue(latestContest),
+          getContestById: jest.fn(),
+          searchContests: jest.fn(),
+        },
+        store: {
+          getLinkedUsers: jest.fn().mockResolvedValue([
+            { userId: "user-1", handle: "tourist" },
+          ]),
+          getHandle: jest.fn(),
+          resolveHandle: jest.fn(),
+        },
+        contestStandings: {
+          getStandings: jest.fn().mockResolvedValue({
+            entries: [
+              {
+                handle: "tourist",
+                rank: 1,
+                points: 100,
+                penalty: 0,
+                participantType: "CONTESTANT",
+              },
+            ],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestResultsCommand.execute(interaction, context);
+
+    expect(context.services.contests.getLatestFinished).toHaveBeenCalled();
+    expect(context.services.contests.getContestById).not.toHaveBeenCalled();
+    expect(context.services.contests.searchContests).not.toHaveBeenCalled();
+  });
+
   it("lists contest matches when multiple contests are found", async () => {
     const interaction = createInteraction("Div. 2", "tourist");
     const context = {

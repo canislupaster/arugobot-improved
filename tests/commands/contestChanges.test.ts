@@ -90,6 +90,58 @@ describe("contestChangesCommand", () => {
     expect(changesField?.value).toContain("petr");
   });
 
+  it("uses the latest finished contest when requested", async () => {
+    const interaction = createInteraction("latest");
+    const latestContest = {
+      id: 4321,
+      name: "Codeforces Round #4321",
+      phase: "FINISHED",
+      startTimeSeconds: 1_700_100_000,
+      durationSeconds: 7200,
+    };
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getLatestFinished: jest.fn().mockReturnValue(latestContest),
+          getContestById: jest.fn(),
+          searchContests: jest.fn(),
+        },
+        store: {
+          getLinkedUsers: jest.fn().mockResolvedValue([
+            { userId: "user-1", handle: "tourist" },
+          ]),
+          getHandle: jest.fn(),
+          resolveHandle: jest.fn(),
+        },
+        contestRatingChanges: {
+          getContestRatingChanges: jest.fn().mockResolvedValue({
+            changes: [
+              {
+                contestId: 4321,
+                contestName: "Codeforces Round #4321",
+                handle: "tourist",
+                rank: 1,
+                oldRating: 3500,
+                newRating: 3510,
+                ratingUpdateTimeSeconds: 1_700_100_000,
+              },
+            ],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestChangesCommand.execute(interaction, context);
+
+    expect(context.services.contests.getLatestFinished).toHaveBeenCalled();
+    expect(context.services.contests.getContestById).not.toHaveBeenCalled();
+    expect(context.services.contests.searchContests).not.toHaveBeenCalled();
+  });
+
   it("warns when the contest is not finished", async () => {
     const interaction = createInteraction("1234");
     const context = {
