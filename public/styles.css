@@ -306,6 +306,12 @@ tbody tr:hover {
   font-weight: 600;
 }
 
+.export-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .button {
   display: inline-flex;
   padding: 10px 18px;

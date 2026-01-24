@@ -3,6 +3,7 @@ import { sql, type Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { logError } from "../utils/logger.js";
 
+import type { CacheKey } from "./codeforcesCache.js";
 import type { ContestActivityService } from "./contestActivity.js";
 import type { GuildSettingsService } from "./guildSettings.js";
 import type { StoreService } from "./store.js";
@@ -73,9 +74,41 @@ export type GuildOverview = {
   hasData: boolean;
 };
 
+export type CacheStatusEntry = {
+  key: CacheKey;
+  label: string;
+  lastFetched: string | null;
+  ageSeconds: number | null;
+};
+
+export type GuildLeaderboardExport = {
+  guildId: string;
+  rating: Array<{ userId: string; handle: string; rating: number }>;
+  solves: Array<{ userId: string; handle: string; solvedCount: number }>;
+};
+
 const DEFAULT_ACTIVITY_DAYS = 30;
 const DEFAULT_TOURNAMENT_LIMIT = 3;
 const DEFAULT_CONTEST_ACTIVITY_DAYS = 90;
+const CACHE_STATUS_KEYS: Array<{ key: CacheKey; label: string }> = [
+  { key: "problemset", label: "Problemset cache" },
+  { key: "contest_list", label: "Contest list cache" },
+];
+
+function getAgeSeconds(lastFetched: string | null): number | null {
+  if (!lastFetched) {
+    return null;
+  }
+  const parsed = Date.parse(lastFetched);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  const ageMs = Date.now() - parsed;
+  if (!Number.isFinite(ageMs) || ageMs < 0) {
+    return null;
+  }
+  return Math.floor(ageMs / 1000);
+}
 
 export class WebsiteService {
   constructor(
@@ -366,6 +399,84 @@ export class WebsiteService {
     } catch (error) {
       logError(`Database error (guild overview): ${String(error)}`);
       return null;
+    }
+  }
+
+  async getGuildLeaderboards(guildId: string): Promise<GuildLeaderboardExport | null> {
+    try {
+      const isPublic = await this.settings.isDashboardPublic(guildId);
+      if (!isPublic) {
+        return null;
+      }
+      const stats = await this.store.getServerStats(guildId);
+      const totalChallengesRow = await this.db
+        .selectFrom("challenges")
+        .select(({ fn }) => fn.count<string>("id").as("count"))
+        .where("server_id", "=", guildId)
+        .executeTakeFirst();
+      const totalChallenges = Number(totalChallengesRow?.count ?? 0);
+      const hasData = stats.userCount > 0 || totalChallenges > 0;
+      if (!hasData) {
+        return null;
+      }
+
+      const [ratingLeaderboard, solveLeaderboard, roster] = await Promise.all([
+        this.store.getLeaderboard(guildId),
+        this.store.getSolveLeaderboard(guildId),
+        this.store.getServerRoster(guildId),
+      ]);
+      const rosterMap = new Map(roster.map((entry) => [entry.userId, entry.handle]));
+      const rating = (ratingLeaderboard ?? []).map((entry) => ({
+        userId: entry.userId,
+        handle: rosterMap.get(entry.userId) ?? entry.userId,
+        rating: entry.rating,
+      }));
+      const solves = (solveLeaderboard ?? []).map((entry) => ({
+        userId: entry.userId,
+        handle: rosterMap.get(entry.userId) ?? entry.userId,
+        solvedCount: entry.solvedCount,
+      }));
+
+      return {
+        guildId,
+        rating,
+        solves,
+      };
+    } catch (error) {
+      logError(`Database error (guild exports): ${String(error)}`);
+      return null;
+    }
+  }
+
+  async getCacheStatus(): Promise<CacheStatusEntry[]> {
+    try {
+      const rows = await this.db
+        .selectFrom("cf_cache")
+        .select(["key", "last_fetched"])
+        .where(
+          "key",
+          "in",
+          CACHE_STATUS_KEYS.map((entry) => entry.key)
+        )
+        .execute();
+      const map = new Map(rows.map((row) => [row.key as CacheKey, row.last_fetched]));
+      return CACHE_STATUS_KEYS.map((entry) => {
+        const lastFetched = map.get(entry.key) ?? null;
+        return {
+          key: entry.key,
+          label: entry.label,
+          lastFetched,
+          ageSeconds: getAgeSeconds(lastFetched),
+        };
+      });
+    } catch (error) {
+      logError(`Database error (cache status): ${String(error)}`);
+      return CACHE_STATUS_KEYS.map((entry) => ({
+        key: entry.key,
+        label: entry.label,
+        lastFetched: null,
+        ageSeconds: null,
+      }));
     }
   }
 

@@ -170,13 +170,14 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Shows recent contest participation for the server's linked handles, including top participants and recent contests.
 
-- **/contestreminders** `add|set|list|status|remove|clear|preview|post`
+- **/contestreminders** `add|set|list|status|preset|remove|clear|preview|post`
 
   Configure contest reminders for the server (admin only). Use `add` (or legacy `set`) to create
   multiple subscriptions with distinct channel, lead time, role mention, and keyword filters
   (`include`/`exclude`, comma-separated). Use `list`/`status` to see subscription ids, `remove` to
   delete one, and `clear` to delete all. `preview`/`post` accept an optional subscription id when
   multiple are configured. `post` can `force` a reminder even if one was already posted.
+  `preset` adds a curated subscription (Div 2 or Educational) with sensible keyword filters.
 
 - **/practicereminders** `set|status|clear|preview|post`
 
@@ -218,6 +219,8 @@ The bot serves a Hono-powered dashboard for global stats and per-guild leaderboa
 By default it listens on `http://localhost:8787` (override with `WEB_HOST`/`WEB_PORT`).
 Only guilds that opt in via `/dashboard set public:true` appear on the public pages.
 The overview includes global contest participation cards sourced from cached rating changes.
+Per-guild pages include CSV/Markdown exports for rating/solve leaderboards, and `/status` shows
+cache ages for key Codeforces syncs.
 
 ## Deployment (Supervisor + Caddy)
 

@@ -11,6 +11,7 @@ import {
   renderGuildPage,
   renderHomePage,
   renderNotFoundPage,
+  renderStatusPage,
   type GuildViewModel,
   type HomeViewModel,
 } from "./views.js";
@@ -22,6 +23,12 @@ type WebAppContext = {
 
 type WebVariables = {
   requestId: string;
+};
+
+type LeaderboardRow = {
+  handle: string;
+  userId: string;
+  value: number;
 };
 
 function resolveGuildName(client: Client, guildId: string): string {
@@ -37,6 +44,49 @@ function formatTournamentFormat(value: string): string {
     return "Elimination";
   }
   return value;
+}
+
+function escapeCsv(value: string | number): string {
+  const raw = String(value);
+  if (/[",\n]/.test(raw)) {
+    return `"${raw.replaceAll('"', '""')}"`;
+  }
+  return raw;
+}
+
+function escapeMarkdown(value: string | number): string {
+  return String(value).replaceAll("|", "\\|");
+}
+
+function formatLeaderboardCsv(
+  rows: LeaderboardRow[],
+  valueLabel: string
+): string {
+  const header = ["Rank", "Handle", "User ID", valueLabel].join(",");
+  const body = rows.map((row, index) =>
+    [
+      escapeCsv(index + 1),
+      escapeCsv(row.handle),
+      escapeCsv(row.userId),
+      escapeCsv(row.value),
+    ].join(",")
+  );
+  return [header, ...body].join("\n");
+}
+
+function formatLeaderboardMarkdown(
+  rows: LeaderboardRow[],
+  valueLabel: string
+): string {
+  const header = `| Rank | Handle | User ID | ${valueLabel} |`;
+  const divider = "| --- | --- | --- | --- |";
+  const body = rows.map(
+    (row, index) =>
+      `| ${index + 1} | ${escapeMarkdown(row.handle)} | ${escapeMarkdown(
+        row.userId
+      )} | ${row.value} |`
+  );
+  return [header, divider, ...body].join("\n");
 }
 
 export function createWebApp({ website, client }: WebAppContext) {
@@ -132,6 +182,54 @@ export function createWebApp({ website, client }: WebAppContext) {
       },
     };
     return c.html(renderGuildPage(viewModel));
+  });
+
+  app.get("/guilds/:guildId/exports/:metric/:format", async (c) => {
+    const guildId = c.req.param("guildId");
+    const metric = c.req.param("metric").toLowerCase();
+    const format = c.req.param("format").toLowerCase();
+    if (metric !== "rating" && metric !== "solves") {
+      return c.text("Unknown export metric.", 404);
+    }
+    if (format !== "csv" && format !== "md") {
+      return c.text("Unknown export format.", 404);
+    }
+
+    const leaderboards = await website.getGuildLeaderboards(guildId);
+    if (!leaderboards) {
+      return c.text("Guild not found or no data available.", 404);
+    }
+
+    const rows =
+      metric === "rating"
+        ? leaderboards.rating.map((entry) => ({
+            handle: entry.handle,
+            userId: entry.userId,
+            value: entry.rating,
+          }))
+        : leaderboards.solves.map((entry) => ({
+            handle: entry.handle,
+            userId: entry.userId,
+            value: entry.solvedCount,
+          }));
+    const valueLabel = metric === "rating" ? "Rating" : "Solves";
+    const filename = `guild-${guildId}-${metric}.${format}`;
+
+    if (format === "csv") {
+      c.header("content-type", "text/csv; charset=utf-8");
+      c.header("content-disposition", `attachment; filename="${filename}"`);
+      return c.text(formatLeaderboardCsv(rows, valueLabel));
+    }
+    c.header("content-type", "text/markdown; charset=utf-8");
+    c.header("content-disposition", `attachment; filename="${filename}"`);
+    return c.text(formatLeaderboardMarkdown(rows, valueLabel));
+  });
+
+  app.get("/status", async (c) => {
+    const cacheEntries = await website.getCacheStatus();
+    return c.html(
+      renderStatusPage({ generatedAt: new Date().toISOString(), cacheEntries })
+    );
   });
 
   app.notFound((c) => c.html(renderNotFoundPage("Page not found."), 404));

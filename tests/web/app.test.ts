@@ -83,4 +83,40 @@ describe("web app", () => {
     const response = await app.request("http://localhost/guilds/missing");
     expect(response.status).toBe(404);
   });
+
+  it("renders the status page", async () => {
+    await db
+      .insertInto("cf_cache")
+      .values({
+        key: "problemset",
+        payload: "[]",
+        last_fetched: "2024-01-01T00:00:00.000Z",
+      })
+      .execute();
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/status");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Cache status");
+    expect(body).toContain("Problemset cache");
+  });
+
+  it("exports rating leaderboard as csv", async () => {
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/guilds/guild-1/exports/rating/csv");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Rank,Handle,User ID,Rating");
+    expect(body).toContain("alice");
+  });
 });

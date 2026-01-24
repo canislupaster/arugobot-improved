@@ -70,6 +70,15 @@ export type GuildViewModel = {
   guild: GuildView;
 };
 
+export type StatusViewModel = {
+  generatedAt: string;
+  cacheEntries: Array<{
+    label: string;
+    lastFetched: string | null;
+    ageSeconds: number | null;
+  }>;
+};
+
 type ViewResult = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 const numberFormatter = new Intl.NumberFormat("en-US");
@@ -102,6 +111,25 @@ function formatUnixTimestamp(seconds: number | null | undefined): string {
     return "N/A";
   }
   return formatTimestamp(new Date(seconds * 1000).toISOString());
+}
+
+function formatAgeSeconds(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds)) {
+    return "N/A";
+  }
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) {
+    return `${days}d ${hours % 24}h`;
+  }
+  return `${hours}h ${minutes % 60}m`;
 }
 
 function StatCard(props: { label: string; value: string; hint?: string }): ViewResult {
@@ -144,6 +172,7 @@ function Layout(props: { title: string; children: ViewResult | ViewResult[] }): 
             </div>
             <nav class="nav">
               <a href="/">Overview</a>
+              <a href="/status">Status</a>
               <a href="https://codeforces.com" rel="noreferrer">
                 Codeforces
               </a>
@@ -278,6 +307,24 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
           label="Completed in window"
           value={formatNumber(guild.activity.completedChallenges)}
         />
+      </section>
+
+      <section class="section">
+        <SectionHeader title="Exports" subtitle="Download leaderboards for your server." />
+        <div class="export-grid">
+          <a class="button" href={`/guilds/${guild.id}/exports/rating/csv`}>
+            Rating CSV
+          </a>
+          <a class="button" href={`/guilds/${guild.id}/exports/rating/md`}>
+            Rating Markdown
+          </a>
+          <a class="button" href={`/guilds/${guild.id}/exports/solves/csv`}>
+            Solves CSV
+          </a>
+          <a class="button" href={`/guilds/${guild.id}/exports/solves/md`}>
+            Solves Markdown
+          </a>
+        </div>
       </section>
 
       <section class="section split">
@@ -430,6 +477,49 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
                     <td>{row.handle}</td>
                     <td class="muted">{row.userId}</td>
                     <td>{formatNumber(row.rating)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </Layout>
+  );
+}
+
+export function renderStatusPage(model: StatusViewModel): ViewResult {
+  return (
+    <Layout title="ArugoBot | Status">
+      <section class="hero compact">
+        <div>
+          <h1>Cache status</h1>
+          <p>Last refresh: {formatTimestamp(model.generatedAt)}</p>
+        </div>
+        <div class="hero-glow" aria-hidden="true" />
+      </section>
+
+      <section class="section">
+        <div class="card table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Cache</th>
+                <th>Last fetched</th>
+                <th>Age</th>
+              </tr>
+            </thead>
+            <tbody>
+              {model.cacheEntries.length === 0 ? (
+                <tr>
+                  <td colSpan={3}>No cache data available.</td>
+                </tr>
+              ) : (
+                model.cacheEntries.map((entry) => (
+                  <tr>
+                    <td>{entry.label}</td>
+                    <td>{formatTimestamp(entry.lastFetched)}</td>
+                    <td>{formatAgeSeconds(entry.ageSeconds)}</td>
                   </tr>
                 ))
               )}

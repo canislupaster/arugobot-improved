@@ -241,6 +241,41 @@ describe("WebsiteService", () => {
 
   afterEach(async () => {
     await db.destroy();
+    jest.restoreAllMocks();
+  });
+
+  it("returns cache status entries", async () => {
+    jest.spyOn(Date, "now").mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z"));
+    await db
+      .insertInto("cf_cache")
+      .values([
+        {
+          key: "problemset",
+          payload: "[]",
+          last_fetched: "2024-01-31T00:00:00.000Z",
+        },
+        {
+          key: "contest_list",
+          payload: "[]",
+          last_fetched: "2024-01-30T00:00:00.000Z",
+        },
+      ])
+      .execute();
+
+    const status = await website.getCacheStatus();
+    expect(status).toHaveLength(2);
+    const problemset = status.find((entry) => entry.key === "problemset");
+    expect(problemset?.lastFetched).toBe("2024-01-31T00:00:00.000Z");
+    expect(problemset?.ageSeconds).toBe(24 * 60 * 60);
+  });
+
+  it("returns leaderboard exports for a public guild", async () => {
+    const exportData = await website.getGuildLeaderboards("guild-1");
+    expect(exportData?.rating).toEqual([
+      { userId: "user-1", handle: "alice", rating: 1500 },
+      { userId: "user-2", handle: "bob", rating: 1400 },
+    ]);
+    expect(exportData?.solves[0]?.handle).toBe("alice");
   });
 
   it("returns global overview counts", async () => {
