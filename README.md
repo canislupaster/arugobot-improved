@@ -21,7 +21,7 @@ The following commands are available to you:
   Shows a page of the server leaderboard.
 - **/profile** `[user]`
 
-  Shows a linked handle, rating, and recent activity.
+  Shows a linked handle, rating, Codeforces profile info, and recent activity.
 - **/register** `handle`
 
   Links your CF account.
@@ -47,6 +47,9 @@ The following commands are available to you:
 - **/stats**
 
   Shows server challenge stats (linked users, total challenges, ratings).
+- **/contests** `[limit]`
+
+  Lists ongoing and upcoming Codeforces contests.
 
 ## Installation
 To invite the instance I am hosting, use this [link](https://discord.com/oauth2/authorize?client_id=1325529003473240124&permissions=277025507392&integration_type=0&scope=bot).

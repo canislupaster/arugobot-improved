@@ -32,8 +32,12 @@ export const healthCommand: Command = {
     const cfLastError = context.services.codeforces.getLastError();
     const cfLastSuccessAt = context.services.codeforces.getLastSuccessAt();
     const lastRefreshAt = context.services.problems.getLastRefreshAt();
+    const contestRefreshAt = context.services.contests.getLastRefreshAt();
+    const contestLastError = context.services.contests.getLastError();
     const cacheAgeSeconds =
       lastRefreshAt > 0 ? Math.floor((Date.now() - lastRefreshAt) / 1000) : null;
+    const contestCacheAgeSeconds =
+      contestRefreshAt > 0 ? Math.floor((Date.now() - contestRefreshAt) / 1000) : null;
 
     const embed = new EmbedBuilder()
       .setTitle("ArugoBot Health")
@@ -45,6 +49,11 @@ export const healthCommand: Command = {
         {
           name: "Problem cache age",
           value: cacheAgeSeconds === null ? "Unknown" : `${cacheAgeSeconds}s`,
+          inline: true,
+        },
+        {
+          name: "Contest cache age",
+          value: contestCacheAgeSeconds === null ? "Unknown" : `${contestCacheAgeSeconds}s`,
           inline: true,
         },
         { name: "Commands handled", value: String(getCommandCount()), inline: true },
@@ -64,6 +73,13 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Codeforces last error",
         value: `${cfLastError.timestamp} - ${cfLastError.message}`,
+        inline: false,
+      });
+    }
+    if (contestLastError) {
+      embed.addFields({
+        name: "Contest cache last error",
+        value: `${contestLastError.timestamp} - ${contestLastError.message}`,
         inline: false,
       });
     }

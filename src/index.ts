@@ -9,6 +9,7 @@ import { loadConfig, validateConfig } from "./config/env.js";
 import { initDb, destroyDb } from "./db/database.js";
 import { migrateToLatest } from "./db/migrator.js";
 import { CodeforcesClient } from "./services/codeforces.js";
+import { ContestService } from "./services/contests.js";
 import { ProblemService } from "./services/problems.js";
 import { StoreService } from "./services/store.js";
 import { CooldownManager } from "./utils/cooldown.js";
@@ -34,6 +35,7 @@ async function main() {
     requestDelayMs: config.codeforcesRequestDelayMs,
     timeoutMs: config.codeforcesTimeoutMs,
   });
+  const contests = new ContestService(codeforces);
   const problems = new ProblemService(codeforces);
   const store = new StoreService(db, codeforces);
 
@@ -139,7 +141,7 @@ async function main() {
       client,
       config,
       commandSummaries,
-      services: { codeforces, problems, store },
+      services: { contests, codeforces, problems, store },
     };
     await handleCommandInteraction(interaction, commandMap, context, cooldowns, correlationId);
   });
