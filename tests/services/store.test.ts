@@ -50,6 +50,17 @@ describe("StoreService", () => {
     expect(duplicateLink).toBe("already_linked");
   });
 
+  it("looks up linked user ids by handle", async () => {
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.insertUser("guild-1", "user-2", "petr");
+
+    const userId = await store.getUserIdByHandle("guild-1", "tourist");
+    expect(userId).toBe("user-1");
+
+    const missing = await store.getUserIdByHandle("guild-1", "unknown");
+    expect(missing).toBeNull();
+  });
+
   it("caches handle resolution results", async () => {
     mockClient.request.mockResolvedValueOnce([{ handle: "Tourist" }]);
 

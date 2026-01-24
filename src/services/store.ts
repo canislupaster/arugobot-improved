@@ -464,6 +464,21 @@ export class StoreService {
     }
   }
 
+  async getUserIdByHandle(serverId: string, handle: string): Promise<string | null> {
+    try {
+      const row = await this.db
+        .selectFrom("users")
+        .select("user_id")
+        .where("server_id", "=", serverId)
+        .where("handle", "=", handle)
+        .executeTakeFirst();
+      return row?.user_id ?? null;
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return null;
+    }
+  }
+
   async getHandle(serverId: string, userId: string): Promise<string | null> {
     try {
       const row = await this.db
