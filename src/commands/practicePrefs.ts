@@ -35,9 +35,7 @@ export const practicePrefsCommand: Command = {
           option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
         )
         .addStringOption((option) =>
-          option
-            .setName("ranges")
-            .setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
+          option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
         )
         .addStringOption((option) =>
           option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")

@@ -48,10 +48,7 @@ export const practiceCommand: Command = {
     const maxRatingOption = interaction.options.getInteger("max_rating");
     const rangesRaw = interaction.options.getString("ranges");
     const ratingInputProvided =
-      rating !== null ||
-      minRatingOption !== null ||
-      maxRatingOption !== null ||
-      rangesRaw !== null;
+      rating !== null || minRatingOption !== null || maxRatingOption !== null || rangesRaw !== null;
 
     if (handleInput && userOption) {
       await interaction.reply({
