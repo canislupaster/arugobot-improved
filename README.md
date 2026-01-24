@@ -4,7 +4,7 @@ Edit this file to document project structure and any features you add or are pur
 
 # TODO
 
-- Add per-round tournament recap exports (CSV or markdown) for sharing results.
+- Add optional auto-posting of tournament recaps when a tournament completes.
 
 When this TODO list clears up, continue adding ideas!
 
@@ -33,7 +33,8 @@ The following commands are available to you:
   Runs multi-round tournaments with Swiss or elimination formats. Use `create` to open a lobby, pick
   format, match length, rating ranges, tags, and (optionally) Swiss round count. Use `advance` to
   start the next round after all matches finish. `status` shows standings, recent rounds, and the current round.
-  `history` lists recently completed or cancelled tournaments for the server (select a tournament for a recap).
+  `history` lists recently completed or cancelled tournaments for the server (select a tournament for a recap
+  and export CSV/markdown results).
 
 - **/rating** `[user]`
 

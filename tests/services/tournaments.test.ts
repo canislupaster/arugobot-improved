@@ -574,4 +574,126 @@ describe("TournamentService", () => {
     expect(detail?.standings.length).toBeGreaterThan(0);
     expect(detail?.rounds.length).toBeGreaterThan(0);
   });
+
+  it("builds a recap with rounds, matches, and handles", async () => {
+    const service = new TournamentService(db, {} as never, {} as never, {} as never);
+    const tournamentId = "tournament-3";
+    const roundId = "round-3";
+    const nowIso = new Date().toISOString();
+
+    await db
+      .insertInto("tournaments")
+      .values({
+        id: tournamentId,
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        host_user_id: "host-1",
+        format: "swiss",
+        status: "completed",
+        length_minutes: 40,
+        round_count: 1,
+        current_round: 1,
+        rating_ranges: "[]",
+        tags: "dp",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("users")
+      .values([
+        {
+          server_id: "guild-1",
+          user_id: "user-1",
+          handle: "tourist",
+          rating: 2500,
+          history: "[]",
+          rating_history: "[]",
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          server_id: "guild-1",
+          user_id: "user-2",
+          handle: "petr",
+          rating: 2600,
+          history: "[]",
+          rating_history: "[]",
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("tournament_participants")
+      .values([
+        {
+          tournament_id: tournamentId,
+          user_id: "user-1",
+          seed: 1,
+          score: 1,
+          wins: 1,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-2",
+          seed: 2,
+          score: 0,
+          wins: 0,
+          losses: 1,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("tournament_rounds")
+      .values({
+        id: roundId,
+        tournament_id: tournamentId,
+        round_number: 1,
+        status: "completed",
+        problem_contest_id: 1000,
+        problem_index: "A",
+        problem_name: "Test",
+        problem_rating: 1200,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_matches")
+      .values({
+        id: "match-3",
+        tournament_id: tournamentId,
+        round_id: roundId,
+        match_number: 1,
+        challenge_id: null,
+        player1_id: "user-1",
+        player2_id: "user-2",
+        winner_id: "user-1",
+        status: "completed",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    const recap = await service.getRecap("guild-1", tournamentId);
+
+    expect(recap).not.toBeNull();
+    expect(recap?.entry.participantCount).toBe(2);
+    expect(recap?.participantHandles["user-1"]).toBe("tourist");
+    expect(recap?.rounds[0]?.matches[0]?.winnerId).toBe("user-1");
+  });
 });

@@ -175,6 +175,6 @@ describe("tournamentCommand", () => {
     const fields = (embed.fields ?? []) as Array<{ name: string; value: string }>;
     const historyField = fields.find((field) => field.name === "Recent tournaments");
     expect(historyField?.value).toContain("Winner: <@user-1>");
-    expect(payload.components).toHaveLength(1);
+    expect(payload.components).toHaveLength(2);
   });
 });

@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
@@ -16,6 +17,10 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { formatTime } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
+import {
+  formatTournamentRecapCsv,
+  formatTournamentRecapMarkdown,
+} from "../utils/tournamentRecap.js";
 
 import type { Command } from "./types.js";
 
@@ -106,6 +111,21 @@ function buildHistorySelectOptions(
       .setDescription(description)
       .setValue(entry.id);
   });
+}
+
+function buildHistoryExportRow(customIdSuffix: string, disabled: boolean) {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tournament_recap_csv_${customIdSuffix}`)
+      .setLabel("Export CSV")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId(`tournament_recap_md_${customIdSuffix}`)
+      .setLabel("Export Markdown")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled)
+  );
 }
 
 function formatRoundSummary(summary: TournamentHistoryDetail["rounds"][number]): string {
@@ -282,6 +302,7 @@ export const tournamentCommand: Command = {
           .setColor(0x3498db)
           .addFields({ name: "Recent tournaments", value: lines.join("\n"), inline: false });
         const selectId = `tournament_history_${interaction.id}`;
+        const exportRow = buildHistoryExportRow(interaction.id, true);
         const options = buildHistorySelectOptions(history.entries);
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
           new StringSelectMenuBuilder()
@@ -292,8 +313,9 @@ export const tournamentCommand: Command = {
 
         const response = await interaction.editReply({
           embeds: [embed],
-          components: [row],
+          components: [row, exportRow],
         });
+        let selectedTournamentId: string | null = null;
 
         const collector = response.createMessageComponentCollector({
           componentType: ComponentType.StringSelect,
@@ -313,6 +335,7 @@ export const tournamentCommand: Command = {
               return;
             }
             const selectedId = selection.values[0];
+            selectedTournamentId = selectedId;
             const detail = await context.services.tournaments.getHistoryDetail(
               guildId,
               selectedId,
@@ -324,7 +347,8 @@ export const tournamentCommand: Command = {
               return;
             }
             const detailEmbed = buildHistoryDetailEmbed(detail);
-            await selection.update({ embeds: [detailEmbed], components: [row] });
+            const enabledExportRow = buildHistoryExportRow(interaction.id, false);
+            await selection.update({ embeds: [detailEmbed], components: [row, enabledExportRow] });
           } catch (error) {
             logCommandError(
               `Error in tournament history: ${String(error)}`,
@@ -333,6 +357,62 @@ export const tournamentCommand: Command = {
             );
             if (!selection.replied) {
               await selection.reply({ content: "Something went wrong.", ephemeral: true });
+            }
+          }
+        });
+
+        const buttonCollector = response.createMessageComponentCollector({
+          componentType: ComponentType.Button,
+          time: HISTORY_SELECT_TIMEOUT_MS,
+        });
+
+        buttonCollector.on("collect", async (button) => {
+          try {
+            if (button.user.id !== interaction.user.id) {
+              await button.reply({
+                content: "Only the command user can use this button.",
+                ephemeral: true,
+              });
+              return;
+            }
+            const isCsv = button.customId === `tournament_recap_csv_${interaction.id}`;
+            const isMarkdown = button.customId === `tournament_recap_md_${interaction.id}`;
+            if (!isCsv && !isMarkdown) {
+              return;
+            }
+            if (!selectedTournamentId) {
+              await button.reply({
+                content: "Select a tournament first.",
+                ephemeral: true,
+              });
+              return;
+            }
+
+            await button.deferReply({ ephemeral: true });
+            const recap = await context.services.tournaments.getRecap(
+              guildId,
+              selectedTournamentId
+            );
+            if (!recap) {
+              await button.editReply("Tournament not found.");
+              return;
+            }
+            const payload = isCsv
+              ? formatTournamentRecapCsv(recap)
+              : formatTournamentRecapMarkdown(recap);
+            const extension = isCsv ? "csv" : "md";
+            const shortId = selectedTournamentId.slice(0, 8);
+            const filename = `tournament-recap-${shortId}.${extension}`;
+            const file = new AttachmentBuilder(Buffer.from(payload), { name: filename });
+            await button.editReply({ content: "Tournament recap export:", files: [file] });
+          } catch (error) {
+            logCommandError(
+              `Error exporting tournament recap: ${String(error)}`,
+              interaction,
+              context.correlationId
+            );
+            if (!button.replied) {
+              await button.reply({ content: "Something went wrong.", ephemeral: true });
             }
           }
         });

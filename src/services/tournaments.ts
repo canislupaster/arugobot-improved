@@ -95,6 +95,22 @@ export type TournamentHistoryDetail = {
   rounds: TournamentRoundSummary[];
 };
 
+export type TournamentRecapRound = {
+  roundNumber: number;
+  status: TournamentRoundStatus;
+  problem: Problem;
+  matches: TournamentMatchSummary[];
+};
+
+export type TournamentRecap = {
+  entry: TournamentHistoryEntry;
+  channelId: string;
+  hostUserId: string;
+  standings: TournamentStandingsEntry[];
+  rounds: TournamentRecapRound[];
+  participantHandles: Record<string, string | null>;
+};
+
 export type TournamentStartResult = {
   tournamentId: string;
   round: TournamentRoundSummary;
@@ -492,6 +508,114 @@ export class TournamentService implements ChallengeCompletionNotifier {
       status: match.status as TournamentMatchSummary["status"],
       isDraw: match.status === "completed" && !match.winner_id && Boolean(match.player2_id),
     }));
+  }
+
+  async getRecap(guildId: string, tournamentId: string): Promise<TournamentRecap | null> {
+    const row = await this.db
+      .selectFrom("tournaments")
+      .selectAll()
+      .where("id", "=", tournamentId)
+      .where("guild_id", "=", guildId)
+      .where("status", "in", ["completed", "cancelled"])
+      .executeTakeFirst();
+    if (!row) {
+      return null;
+    }
+
+    const tournament = this.mapTournament(row);
+    const participantRows = await this.db
+      .selectFrom("tournament_participants")
+      .select(["user_id"])
+      .where("tournament_id", "=", tournament.id)
+      .execute();
+    const participantIds = participantRows.map((participant) => participant.user_id);
+    const participantCount = participantIds.length;
+    const winnerId =
+      tournament.status === "completed"
+        ? await this.getTournamentWinnerId(tournament.id, tournament.format)
+        : null;
+
+    const handleRows =
+      participantIds.length === 0
+        ? []
+        : await this.db
+            .selectFrom("users")
+            .select(["user_id", "handle"])
+            .where("server_id", "=", guildId)
+            .where("user_id", "in", participantIds)
+            .execute();
+    const participantHandles: Record<string, string | null> = {};
+    for (const participantId of participantIds) {
+      participantHandles[participantId] = null;
+    }
+    for (const handleRow of handleRows) {
+      participantHandles[handleRow.user_id] = handleRow.handle ?? null;
+    }
+
+    const entry: TournamentHistoryEntry = {
+      id: tournament.id,
+      format: tournament.format,
+      status: tournament.status,
+      lengthMinutes: tournament.lengthMinutes,
+      roundCount: tournament.roundCount,
+      ratingRanges: tournament.ratingRanges,
+      tags: tournament.tags,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      participantCount,
+      winnerId,
+    };
+
+    const standings = await this.getStandings(tournament.id, tournament.format);
+
+    const rounds = await this.db
+      .selectFrom("tournament_rounds")
+      .selectAll()
+      .where("tournament_id", "=", tournament.id)
+      .orderBy("round_number", "asc")
+      .execute();
+    const matches = await this.db
+      .selectFrom("tournament_matches")
+      .select(["round_id", "match_number", "player1_id", "player2_id", "winner_id", "status"])
+      .where("tournament_id", "=", tournament.id)
+      .orderBy("round_id", "asc")
+      .orderBy("match_number", "asc")
+      .execute();
+    const matchMap = new Map<string, TournamentMatchSummary[]>();
+    for (const match of matches) {
+      const entry = matchMap.get(match.round_id) ?? [];
+      entry.push({
+        matchNumber: match.match_number,
+        player1Id: match.player1_id,
+        player2Id: match.player2_id,
+        winnerId: match.winner_id,
+        status: match.status as TournamentMatchSummary["status"],
+        isDraw: match.status === "completed" && !match.winner_id && Boolean(match.player2_id),
+      });
+      matchMap.set(match.round_id, entry);
+    }
+
+    const roundEntries: TournamentRecapRound[] = rounds.map((round) => ({
+      roundNumber: round.round_number,
+      status: round.status as TournamentRoundStatus,
+      problem: {
+        contestId: round.problem_contest_id,
+        index: round.problem_index,
+        name: round.problem_name,
+        rating: round.problem_rating,
+        tags: [],
+      },
+      matches: matchMap.get(round.id) ?? [],
+    }));
+
+    return {
+      entry,
+      channelId: tournament.channelId,
+      hostUserId: tournament.hostUserId,
+      standings,
+      rounds: roundEntries,
+      participantHandles,
+    };
   }
 
   async createTournament({
