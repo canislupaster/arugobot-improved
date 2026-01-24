@@ -77,4 +77,51 @@ describe("challengeCommand", () => {
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(interaction.editReply).toHaveBeenCalledWith("Too many users (limit is 5).");
   });
+
+  it("blocks manual problems already solved on Codeforces", async () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn((name: string) => (name === "problem" ? "1000A" : null)),
+        getInteger: jest.fn((name: string) => {
+          if (name === "length") {
+            return 40;
+          }
+          return null;
+        }),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getUser: jest.fn().mockReturnValue(null),
+      },
+    });
+    const problem = {
+      contestId: 1000,
+      index: "A",
+      name: "Test Problem",
+      rating: 800,
+      tags: [],
+    };
+    const context = {
+      correlationId: "corr-3",
+      services: {
+        store: {
+          handleLinked: jest.fn().mockResolvedValue(true),
+          getHistoryList: jest.fn().mockResolvedValue([]),
+          getHandle: jest.fn().mockResolvedValue("tourist"),
+          getSolvedProblems: jest.fn().mockResolvedValue(["1000A"]),
+        },
+        challenges: {
+          getActiveChallengesForUsers: jest.fn().mockResolvedValue(new Map()),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([problem]),
+          getProblemDict: jest.fn().mockReturnValue(new Map([["1000A", problem]])),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await challengeCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Some participants have already solved this problem on Codeforces: <@user-1>."
+    );
+  });
 });

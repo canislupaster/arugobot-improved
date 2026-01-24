@@ -285,6 +285,35 @@ export const challengeCommand: Command = {
       }
     }
 
+    if (problemIdRaw) {
+      const solvedUsers: User[] = [];
+      for (const user of participantUsers) {
+        const handle = await context.services.store.getHandle(guildId, user.id);
+        if (!handle) {
+          await interaction.editReply("Missing handle data. Try again in a bit.");
+          return;
+        }
+        const solved = await context.services.store.getSolvedProblems(handle);
+        if (!solved) {
+          await interaction.editReply(
+            "Unable to fetch solved problems right now. Try again later."
+          );
+          return;
+        }
+        if (solved.includes(problemId)) {
+          solvedUsers.push(user);
+        }
+      }
+
+      if (solvedUsers.length > 0) {
+        const mentions = solvedUsers.map((user) => `<@${user.id}>`).join(", ");
+        await interaction.editReply(
+          `Some participants have already solved this problem on Codeforces: ${mentions}.`
+        );
+        return;
+      }
+    }
+
     const logContext: LogContext = {
       correlationId: context.correlationId,
       command: "challenge",
