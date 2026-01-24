@@ -95,6 +95,21 @@ describe("StoreService", () => {
     expect(stats.topRating).toBe(1600);
   });
 
+  it("returns linked users for a server", async () => {
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.insertUser("guild-1", "user-2", "petr");
+
+    const linked = await store.getLinkedUsers("guild-1");
+
+    expect(linked).toHaveLength(2);
+    expect(linked).toEqual(
+      expect.arrayContaining([
+        { userId: "user-1", handle: "tourist" },
+        { userId: "user-2", handle: "petr" },
+      ])
+    );
+  });
+
   it("returns empty stats when no users are linked", async () => {
     const stats = await store.getServerStats("missing-guild");
     expect(stats.userCount).toBe(0);

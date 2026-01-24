@@ -99,6 +99,10 @@ The following commands are available to you:
 
   Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time, and optional role mention.
 
+- **/practicereminders** `set|status|clear|preview`
+
+  Configure daily practice problem reminders (admin only). Use `set` to choose a channel, UTC time, rating ranges, and optional tags.
+
 ## Installation
 
 To invite the instance I am hosting, use this [link](https://discord.com/oauth2/authorize?client_id=1325529003473240124&permissions=277025507392&integration_type=0&scope=bot).

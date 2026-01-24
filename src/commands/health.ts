@@ -33,6 +33,12 @@ export const healthCommand: Command = {
     const lastRefreshAt = context.services.problems.getLastRefreshAt();
     const contestRefreshAt = context.services.contests.getLastRefreshAt();
     const contestLastError = context.services.contests.getLastError();
+    const reminderCount = await context.services.contestReminders.getSubscriptionCount();
+    const reminderLastTick = context.services.contestReminders.getLastTickAt();
+    const reminderLastError = context.services.contestReminders.getLastError();
+    const practiceReminderCount = await context.services.practiceReminders.getSubscriptionCount();
+    const practiceReminderLastTick = context.services.practiceReminders.getLastTickAt();
+    const practiceReminderLastError = context.services.practiceReminders.getLastError();
     const activeChallenges = await context.services.challenges.getActiveCount();
     const challengeLastTick = context.services.challenges.getLastTickAt();
     const challengeLastError = context.services.challenges.getLastError();
@@ -58,6 +64,8 @@ export const healthCommand: Command = {
           value: contestCacheAgeSeconds === null ? "Unknown" : `${contestCacheAgeSeconds}s`,
           inline: true,
         },
+        { name: "Contest reminders", value: String(reminderCount), inline: true },
+        { name: "Practice reminders", value: String(practiceReminderCount), inline: true },
         { name: "Active challenges", value: String(activeChallenges), inline: true },
         { name: "Commands handled", value: String(getCommandCount()), inline: true },
         { name: "Node", value: process.version, inline: true },
@@ -86,6 +94,20 @@ export const healthCommand: Command = {
         inline: false,
       });
     }
+    if (reminderLastError) {
+      embed.addFields({
+        name: "Contest reminders last error",
+        value: `${reminderLastError.timestamp} - ${reminderLastError.message}`,
+        inline: false,
+      });
+    }
+    if (practiceReminderLastError) {
+      embed.addFields({
+        name: "Practice reminders last error",
+        value: `${practiceReminderLastError.timestamp} - ${practiceReminderLastError.message}`,
+        inline: false,
+      });
+    }
     if (challengeLastError) {
       embed.addFields({
         name: "Challenge loop last error",
@@ -104,6 +126,20 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Challenge loop last tick",
         value: challengeLastTick,
+        inline: false,
+      });
+    }
+    if (reminderLastTick) {
+      embed.addFields({
+        name: "Contest reminders last tick",
+        value: reminderLastTick,
+        inline: false,
+      });
+    }
+    if (practiceReminderLastTick) {
+      embed.addFields({
+        name: "Practice reminders last tick",
+        value: practiceReminderLastTick,
         inline: false,
       });
     }

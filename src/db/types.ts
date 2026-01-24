@@ -87,6 +87,24 @@ export type ContestNotificationsTable = {
   notified_at: Generated<string>;
 };
 
+export type PracticeRemindersTable = {
+  guild_id: string;
+  channel_id: string;
+  hour_utc: number;
+  minute_utc: number;
+  rating_ranges: string;
+  tags: string;
+  last_sent_at: string | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type PracticePostsTable = {
+  guild_id: string;
+  problem_id: string;
+  sent_at: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
@@ -97,4 +115,6 @@ export type Database = {
   challenge_participants: ChallengeParticipantsTable;
   contest_reminders: ContestRemindersTable;
   contest_notifications: ContestNotificationsTable;
+  practice_reminders: PracticeRemindersTable;
+  practice_posts: PracticePostsTable;
 };

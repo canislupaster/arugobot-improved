@@ -1,5 +1,7 @@
 import { challengeCommand } from "./challenge.js";
+import { challengesCommand } from "./challenges.js";
 import { compareCommand } from "./compare.js";
+import { contestRemindersCommand } from "./contestReminders.js";
 import { contestsCommand } from "./contests.js";
 import { handlesCommand } from "./handles.js";
 import { healthCommand } from "./health.js";
@@ -7,6 +9,7 @@ import { helpCommand } from "./help.js";
 import { historyCommand } from "./history.js";
 import { leaderboardCommand } from "./leaderboard.js";
 import { pingCommand } from "./ping.js";
+import { practiceRemindersCommand } from "./practiceReminders.js";
 import { profileCommand } from "./profile.js";
 import { ratingCommand } from "./rating.js";
 import { recentCommand } from "./recent.js";
@@ -17,12 +20,15 @@ import type { Command } from "./types.js";
 
 export const commandList: Command[] = [
   challengeCommand,
+  challengesCommand,
   compareCommand,
+  contestRemindersCommand,
   contestsCommand,
   handlesCommand,
   historyCommand,
   leaderboardCommand,
   pingCommand,
+  practiceRemindersCommand,
   profileCommand,
   ratingCommand,
   recentCommand,

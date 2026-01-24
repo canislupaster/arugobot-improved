@@ -102,11 +102,23 @@ describe("ContestReminderService", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("skips refresh when there are no subscriptions", async () => {
+    const service = new ContestReminderService(db, contestService);
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(contestService.refresh).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("captures refresh failures", async () => {
     contestService.refresh.mockRejectedValue(new Error("CF down"));
     contestService.getUpcomingContests.mockReturnValue([]);
 
     const service = new ContestReminderService(db, contestService);
+    await service.setSubscription("guild-1", "channel-1", 10, null);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -114,6 +126,31 @@ describe("ContestReminderService", () => {
 
     expect(service.getLastError()?.message).toBe("CF down");
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("uses cached contests when refresh fails", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.refresh.mockRejectedValue(new Error("CF down"));
+    contestService.getUpcomingContests.mockReturnValue([
+      {
+        id: 301,
+        name: "Cached Round",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 10 * 60,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestReminderService(db, contestService);
+    await service.setSubscription("guild-1", "channel-1", 15, null);
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(service.getLastError()?.message).toBe("CF down");
   });
 
   it("avoids overlapping ticks", async () => {
@@ -127,12 +164,14 @@ describe("ContestReminderService", () => {
     contestService.getUpcomingContests.mockReturnValue([]);
 
     const service = new ContestReminderService(db, contestService);
+    await service.setSubscription("guild-1", "channel-1", 10, null);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
     const first = service.runTick(client);
     const second = service.runTick(client);
 
+    await new Promise((resolve) => setImmediate(resolve));
     expect(contestService.refresh).toHaveBeenCalledTimes(1);
 
     resolveRefresh();

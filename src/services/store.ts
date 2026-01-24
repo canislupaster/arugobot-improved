@@ -198,6 +198,20 @@ export class StoreService {
     }
   }
 
+  async getLinkedUsers(serverId: string): Promise<Array<{ userId: string; handle: string }>> {
+    try {
+      const rows = await this.db
+        .selectFrom("users")
+        .select(["user_id", "handle"])
+        .where("server_id", "=", serverId)
+        .execute();
+      return rows.map((row) => ({ userId: row.user_id, handle: row.handle }));
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return [];
+    }
+  }
+
   async updateHandle(oldHandle: string, newHandle: string): Promise<void> {
     try {
       await this.db

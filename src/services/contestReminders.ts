@@ -121,8 +121,6 @@ export class ContestReminderService {
     this.isTicking = true;
     this.lastTickAt = new Date().toISOString();
     try {
-      await this.contests.refresh();
-
       let subscriptions: ContestReminder[] = [];
       try {
         subscriptions = await this.listSubscriptions();
@@ -137,8 +135,21 @@ export class ContestReminderService {
         return;
       }
 
+      let refreshFailed = false;
+      try {
+        await this.contests.refresh();
+      } catch (error) {
+        refreshFailed = true;
+        const message = error instanceof Error ? error.message : String(error);
+        this.lastError = { message, timestamp: new Date().toISOString() };
+        logWarn("Contest reminder refresh failed; using cached contests.", { error: message });
+      }
+
       const upcoming = this.contests.getUpcomingContests();
       if (upcoming.length === 0) {
+        if (refreshFailed) {
+          logWarn("Contest reminders skipped: no cached contests available.");
+        }
         return;
       }
 

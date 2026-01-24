@@ -10,7 +10,12 @@ import { initDb, destroyDb } from "./db/database.js";
 import { migrateToLatest } from "./db/migrator.js";
 import { ChallengeService, challengeUpdateIntervalMs } from "./services/challenges.js";
 import { CodeforcesClient } from "./services/codeforces.js";
+import { ContestReminderService, contestReminderIntervalMs } from "./services/contestReminders.js";
 import { ContestService } from "./services/contests.js";
+import {
+  PracticeReminderService,
+  practiceReminderIntervalMs,
+} from "./services/practiceReminders.js";
 import { ProblemService } from "./services/problems.js";
 import { StoreService } from "./services/store.js";
 import { CooldownManager } from "./utils/cooldown.js";
@@ -37,11 +42,13 @@ async function main() {
     timeoutMs: config.codeforcesTimeoutMs,
   });
   const contests = new ContestService(codeforces);
+  const contestReminders = new ContestReminderService(db, contests);
   const problems = new ProblemService(codeforces);
   const store = new StoreService(db, codeforces, {
     maxSolvedPages: config.codeforcesSolvedMaxPages,
   });
   const challenges = new ChallengeService(db, store, codeforces);
+  const practiceReminders = new PracticeReminderService(db, problems, store);
 
   const commandSummaries = commandList.map((command) => ({
     name: command.data.name,
@@ -55,6 +62,8 @@ async function main() {
   const cooldowns = new CooldownManager(3, 1);
   let parseInterval: NodeJS.Timeout | null = null;
   let challengeInterval: NodeJS.Timeout | null = null;
+  let contestReminderInterval: NodeJS.Timeout | null = null;
+  let practiceReminderInterval: NodeJS.Timeout | null = null;
   let shuttingDown = false;
   let isChallengeTicking = false;
 
@@ -150,6 +159,24 @@ async function main() {
     };
     await tickChallenges();
     challengeInterval = setInterval(tickChallenges, challengeUpdateIntervalMs);
+
+    const tickContestReminders = async () => {
+      if (shuttingDown) {
+        return;
+      }
+      await contestReminders.runTick(client);
+    };
+    await tickContestReminders();
+    contestReminderInterval = setInterval(tickContestReminders, contestReminderIntervalMs);
+
+    const tickPracticeReminders = async () => {
+      if (shuttingDown) {
+        return;
+      }
+      await practiceReminders.runTick(client);
+    };
+    await tickPracticeReminders();
+    practiceReminderInterval = setInterval(tickPracticeReminders, practiceReminderIntervalMs);
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
@@ -162,7 +189,15 @@ async function main() {
       config,
       commandSummaries,
       correlationId,
-      services: { challenges, contests, codeforces, problems, store },
+      services: {
+        challenges,
+        contests,
+        contestReminders,
+        practiceReminders,
+        codeforces,
+        problems,
+        store,
+      },
     };
     await handleCommandInteraction(interaction, commandMap, context, cooldowns, correlationId);
   });
@@ -175,6 +210,12 @@ async function main() {
     }
     if (challengeInterval) {
       clearInterval(challengeInterval);
+    }
+    if (contestReminderInterval) {
+      clearInterval(contestReminderInterval);
+    }
+    if (practiceReminderInterval) {
+      clearInterval(practiceReminderInterval);
     }
     await client.destroy();
     await destroyDb();
