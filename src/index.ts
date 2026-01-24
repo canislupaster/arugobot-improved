@@ -38,7 +38,9 @@ async function main() {
   });
   const contests = new ContestService(codeforces);
   const problems = new ProblemService(codeforces);
-  const store = new StoreService(db, codeforces);
+  const store = new StoreService(db, codeforces, {
+    maxSolvedPages: config.codeforcesSolvedMaxPages,
+  });
   const challenges = new ChallengeService(db, store, codeforces);
 
   const commandSummaries = commandList.map((command) => ({

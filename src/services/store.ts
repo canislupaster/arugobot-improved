@@ -1,7 +1,7 @@
 import { sql, type Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
-import { logError, logInfo } from "../utils/logger.js";
+import { logError, logInfo, logWarn } from "../utils/logger.js";
 
 import { CodeforcesClient } from "./codeforces.js";
 
@@ -40,6 +40,7 @@ const PROFILE_CACHE_TTL_MS = 60 * 60 * 1000;
 const RECENT_SUBMISSIONS_TTL_MS = 5 * 60 * 1000;
 const RECENT_SUBMISSIONS_FETCH_COUNT = 20;
 const SOLVED_CACHE_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_MAX_SOLVED_PAGES = 10;
 
 export type CodeforcesProfile = {
   handle: string;
@@ -105,10 +106,15 @@ function isCacheFresh(lastFetched: string | null | undefined, ttlMs: number): bo
 }
 
 export class StoreService {
+  private maxSolvedPages: number;
+
   constructor(
     private db: Kysely<Database>,
-    private cfClient: CodeforcesClient
-  ) {}
+    private cfClient: CodeforcesClient,
+    options: { maxSolvedPages?: number } = {}
+  ) {
+    this.maxSolvedPages = options.maxSolvedPages ?? DEFAULT_MAX_SOLVED_PAGES;
+  }
 
   private normalizeHandle(handle: string): string {
     return handle.trim().toLowerCase();
@@ -802,7 +808,10 @@ export class StoreService {
     const result: string[] = [];
     let lastSubId: number | null = null;
     let index = 1;
-    while (Math.floor(index / 5000) < 4) {
+    let page = 0;
+    const maxPages =
+      this.maxSolvedPages <= 0 ? Number.POSITIVE_INFINITY : this.maxSolvedPages;
+    while (page < maxPages) {
       const response = await this.cfClient.request<UserStatusResponse>("user.status", {
         handle,
         from: index,
@@ -829,6 +838,13 @@ export class StoreService {
       }
 
       index += 5000;
+      page += 1;
+    }
+    if (page >= maxPages) {
+      logWarn("Solved list fetch reached max pages.", {
+        handle,
+        maxPages,
+      });
     }
     return { solved: result, lastSubId };
   }

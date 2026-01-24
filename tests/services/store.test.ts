@@ -139,4 +139,23 @@ describe("StoreService", () => {
     expect(second?.isStale).toBe(true);
     expect(second?.submissions[0]?.name).toBe("Test Problem");
   });
+
+
+  it("caps solved list fetch pages when configured", async () => {
+    store = new StoreService(db, mockClient as never, { maxSolvedPages: 1 });
+    mockClient.request.mockResolvedValueOnce(
+      Array.from({ length: 5000 }, (_, index) => ({
+        id: index + 1,
+        verdict: "OK",
+        contestId: 1,
+        problem: { contestId: 1, index: "A" },
+        creationTimeSeconds: 100,
+      }))
+    );
+
+    const solved = await store.getSolvedProblems("tourist", 0);
+
+    expect(mockClient.request).toHaveBeenCalledTimes(1);
+    expect(solved).toContain("1A");
+  });
 });

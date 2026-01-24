@@ -10,6 +10,7 @@ export type AppConfig = {
   codeforcesApiBaseUrl: string;
   codeforcesRequestDelayMs: number;
   codeforcesTimeoutMs: number;
+  codeforcesSolvedMaxPages: number;
 };
 
 function parseNumber(value: string, fallback: number): number {
@@ -46,6 +47,9 @@ export function validateConfig(config: AppConfig): string[] {
   if (config.codeforcesTimeoutMs <= 0) {
     errors.push("CODEFORCES_TIMEOUT_MS must be greater than 0.");
   }
+  if (config.codeforcesSolvedMaxPages < 0) {
+    errors.push("CODEFORCES_SOLVED_MAX_PAGES must be 0 or greater.");
+  }
   if (!["development", "production", "test"].includes(config.environment)) {
     errors.push("NODE_ENV must be one of development, production, or test.");
   }
@@ -64,6 +68,10 @@ export function loadConfig(): AppConfig {
     2000
   );
   const codeforcesTimeoutMs = parseNumber(process.env.CODEFORCES_TIMEOUT_MS ?? "10000", 10000);
+  const codeforcesSolvedMaxPages = parseNumber(
+    process.env.CODEFORCES_SOLVED_MAX_PAGES ?? "10",
+    10
+  );
 
   return {
     discordToken,
@@ -73,5 +81,6 @@ export function loadConfig(): AppConfig {
     codeforcesApiBaseUrl,
     codeforcesRequestDelayMs,
     codeforcesTimeoutMs,
+    codeforcesSolvedMaxPages,
   };
 }
