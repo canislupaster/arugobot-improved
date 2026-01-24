@@ -112,6 +112,10 @@ The following commands are available to you:
 
   Shows server challenge stats (linked users, total challenges, ratings).
 
+- **/activity** `[days]` `[user]`
+
+  Shows challenge activity summaries for the server or a specific user over a lookback window.
+
 - **/contests** `[limit]` `[include]` `[exclude]`
 
   Lists ongoing and upcoming Codeforces contests. Use `include`/`exclude` to filter by keywords

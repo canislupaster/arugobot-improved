@@ -1,3 +1,4 @@
+import { activityCommand } from "./activity.js";
 import { challengeCommand } from "./challenge.js";
 import { challengesCommand } from "./challenges.js";
 import { compareCommand } from "./compare.js";
@@ -22,6 +23,7 @@ import { suggestCommand } from "./suggest.js";
 import type { Command } from "./types.js";
 
 export const commandList: Command[] = [
+  activityCommand,
   challengeCommand,
   challengesCommand,
   compareCommand,

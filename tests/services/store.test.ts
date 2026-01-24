@@ -326,4 +326,127 @@ describe("StoreService", () => {
     expect(history.entries[0]?.problemId).toBe("1000A");
     expect(history.entries[0]?.ratingDelta).toBe(25);
   });
+
+  it("summarizes challenge activity windows", async () => {
+    const now = Date.now();
+    const recentIso = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const oldIso = new Date(now - 25 * 24 * 60 * 60 * 1000).toISOString();
+    const sinceIso = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString();
+
+    await db
+      .insertInto("challenges")
+      .values([
+        {
+          id: "challenge-1",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-1",
+          host_user_id: "user-1",
+          problem_contest_id: 1000,
+          problem_index: "A",
+          problem_name: "Recent Problem",
+          problem_rating: 1200,
+          length_minutes: 40,
+          status: "completed",
+          started_at: 1000,
+          ends_at: 2000,
+          check_index: 0,
+          updated_at: recentIso,
+        },
+        {
+          id: "challenge-2",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-2",
+          host_user_id: "user-2",
+          problem_contest_id: 1001,
+          problem_index: "B",
+          problem_name: "Old Problem",
+          problem_rating: 1100,
+          length_minutes: 40,
+          status: "completed",
+          started_at: 1000,
+          ends_at: 2000,
+          check_index: 0,
+          updated_at: oldIso,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("challenge_participants")
+      .values([
+        {
+          challenge_id: "challenge-1",
+          user_id: "user-1",
+          position: 0,
+          solved_at: 1500,
+          rating_before: 1500,
+          rating_delta: 20,
+          updated_at: recentIso,
+        },
+        {
+          challenge_id: "challenge-1",
+          user_id: "user-2",
+          position: 1,
+          solved_at: null,
+          rating_before: 1500,
+          rating_delta: -10,
+          updated_at: recentIso,
+        },
+        {
+          challenge_id: "challenge-2",
+          user_id: "user-1",
+          position: 0,
+          solved_at: 1600,
+          rating_before: 1520,
+          rating_delta: 15,
+          updated_at: oldIso,
+        },
+      ])
+      .execute();
+
+    const summary = await store.getChallengeActivity("guild-1", sinceIso, 3);
+    expect(summary.completedChallenges).toBe(1);
+    expect(summary.participantCount).toBe(2);
+    expect(summary.uniqueParticipants).toBe(2);
+    expect(summary.solvedCount).toBe(1);
+    expect(summary.topSolvers[0]).toEqual({ userId: "user-1", solvedCount: 1 });
+
+    const userSummary = await store.getUserChallengeActivity("guild-1", "user-1", sinceIso);
+    expect(userSummary.participations).toBe(1);
+    expect(userSummary.solvedCount).toBe(1);
+    expect(userSummary.lastCompletedAt).toBe(recentIso);
+  });
+
+  it("tracks and trims recent practice suggestions", async () => {
+    const recentCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const oldTimestamp = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    await store.recordPracticeSuggestion("guild-1", "user-1", "1000A");
+    await db
+      .insertInto("practice_suggestions")
+      .values({
+        guild_id: "guild-1",
+        user_id: "user-1",
+        problem_id: "1000B",
+        suggested_at: oldTimestamp,
+      })
+      .execute();
+
+    const recent = await store.getRecentPracticeSuggestions(
+      "guild-1",
+      "user-1",
+      recentCutoff
+    );
+    expect(recent).toContain("1000A");
+    expect(recent).not.toContain("1000B");
+
+    await store.cleanupPracticeSuggestions(recentCutoff);
+    const rows = await db
+      .selectFrom("practice_suggestions")
+      .select("problem_id")
+      .execute();
+    expect(rows.map((row) => row.problem_id)).toEqual(["1000A"]);
+  });
 });

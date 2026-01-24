@@ -99,6 +99,20 @@ export type ChallengeHistoryPage = {
   entries: ChallengeHistoryEntry[];
 };
 
+export type ChallengeActivitySummary = {
+  completedChallenges: number;
+  participantCount: number;
+  uniqueParticipants: number;
+  solvedCount: number;
+  topSolvers: Array<{ userId: string; solvedCount: number }>;
+};
+
+export type UserChallengeActivitySummary = {
+  participations: number;
+  solvedCount: number;
+  lastCompletedAt: string | null;
+};
+
 type HandleResolution = {
   exists: boolean;
   canonicalHandle: string | null;
@@ -769,6 +783,125 @@ export class StoreService {
     } catch (error) {
       logError(`Database error: ${String(error)}`);
       return { userCount: 0, totalChallenges: 0, avgRating: null, topRating: null };
+    }
+  }
+
+  async getChallengeActivity(
+    serverId: string,
+    sinceIso: string,
+    limit = 5
+  ): Promise<ChallengeActivitySummary> {
+    try {
+      const challengeCountRow = await this.db
+        .selectFrom("challenges")
+        .select(({ fn }) => fn.count<number>("id").as("count"))
+        .where("server_id", "=", serverId)
+        .where("status", "=", "completed")
+        .where("updated_at", ">=", sinceIso)
+        .executeTakeFirst();
+      const completedChallenges = Number(challengeCountRow?.count ?? 0);
+      if (completedChallenges === 0) {
+        return {
+          completedChallenges: 0,
+          participantCount: 0,
+          uniqueParticipants: 0,
+          solvedCount: 0,
+          topSolvers: [],
+        };
+      }
+
+      const participantRow = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select(({ fn }) => [
+          fn.count<number>("challenge_participants.challenge_id").as("participant_count"),
+          fn.count<number>("challenge_participants.solved_at").as("solved_count"),
+        ])
+        .where("challenges.server_id", "=", serverId)
+        .where("challenges.status", "=", "completed")
+        .where("challenges.updated_at", ">=", sinceIso)
+        .executeTakeFirst();
+
+      const participantCount = Number(participantRow?.participant_count ?? 0);
+      const solvedCount = Number(participantRow?.solved_count ?? 0);
+
+      const uniqueRows = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select("challenge_participants.user_id")
+        .distinct()
+        .where("challenges.server_id", "=", serverId)
+        .where("challenges.status", "=", "completed")
+        .where("challenges.updated_at", ">=", sinceIso)
+        .execute();
+      const uniqueParticipants = uniqueRows.length;
+
+      const topSolvers = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select(({ fn, ref }) => [
+          ref("challenge_participants.user_id").as("user_id"),
+          fn.count<number>("challenge_participants.solved_at").as("solved_count"),
+        ])
+        .where("challenges.server_id", "=", serverId)
+        .where("challenges.status", "=", "completed")
+        .where("challenges.updated_at", ">=", sinceIso)
+        .where("challenge_participants.solved_at", "is not", null)
+        .groupBy("challenge_participants.user_id")
+        .orderBy("solved_count", "desc")
+        .limit(Math.max(1, limit))
+        .execute();
+
+      return {
+        completedChallenges,
+        participantCount,
+        uniqueParticipants,
+        solvedCount,
+        topSolvers: topSolvers.map((row) => ({
+          userId: row.user_id,
+          solvedCount: Number(row.solved_count ?? 0),
+        })),
+      };
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return {
+        completedChallenges: 0,
+        participantCount: 0,
+        uniqueParticipants: 0,
+        solvedCount: 0,
+        topSolvers: [],
+      };
+    }
+  }
+
+  async getUserChallengeActivity(
+    serverId: string,
+    userId: string,
+    sinceIso: string
+  ): Promise<UserChallengeActivitySummary> {
+    try {
+      const row = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select(({ fn }) => [
+          fn.count<number>("challenge_participants.challenge_id").as("participant_count"),
+          fn.count<number>("challenge_participants.solved_at").as("solved_count"),
+          fn.max<string>("challenges.updated_at").as("last_completed_at"),
+        ])
+        .where("challenges.server_id", "=", serverId)
+        .where("challenges.status", "=", "completed")
+        .where("challenges.updated_at", ">=", sinceIso)
+        .where("challenge_participants.user_id", "=", userId)
+        .executeTakeFirst();
+
+      return {
+        participations: Number(row?.participant_count ?? 0),
+        solvedCount: Number(row?.solved_count ?? 0),
+        lastCompletedAt: row?.last_completed_at ?? null,
+      };
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return { participations: 0, solvedCount: 0, lastCompletedAt: null };
     }
   }
 
