@@ -4,9 +4,7 @@ Edit this file to document project structure and any features you add or are pur
 
 # TODO
 
-- Allow open challenges in which everyone is invited to accept before the challenge creator starts the challenge.
 - Extend to tournaments with any number of participants and various formats (Swiss, elimination, etc).
-- Update challenges and other state in a central loop using the database instead of during the command invocation, so they seamlessly resume after restarts.
 
 When this TODO list clears up, continue adding ideas!
 
@@ -18,14 +16,15 @@ Discord bot with all you need to practice competitive programming and compete ag
 
 The following commands are available to you:
 
-- **/challenge** `problem` `length` `[user1..user4]`
+- **/challenge** `problem` `length` `[user1..user4]` `[open]`
 
   Starts a challenge.
 
-- **/challenge** `length` `rating|min_rating|max_rating|ranges` `[user1..user4]`
+- **/challenge** `length` `rating|min_rating|max_rating|ranges` `[user1..user4]` `[open]`
 
   Starts a challenge by selecting a random unsolved problem in the rating range (defaults to 800-3500).
   Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
+  Set `open` to allow anyone in the server to join before the host starts.
 
 - **/rating** `[user]`
 
