@@ -104,6 +104,18 @@ describe("StoreService", () => {
     expect(mockClient.request).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back to cached handle data when the API fails", async () => {
+    mockClient.request.mockResolvedValueOnce([{ handle: "Tourist" }]);
+    await store.resolveHandle("tourist");
+
+    mockClient.request.mockRejectedValueOnce(new Error("CF down"));
+    const fallback = await store.resolveHandle("tourist", 0);
+
+    expect(fallback.exists).toBe(true);
+    expect(fallback.canonicalHandle).toBe("Tourist");
+    expect(fallback.source).toBe("cache");
+  });
+
   it("returns server roster and stats", async () => {
     await store.insertUser("guild-1", "user-1", "tourist");
     await store.insertUser("guild-1", "user-2", "petr");
@@ -120,6 +132,65 @@ describe("StoreService", () => {
     expect(stats.totalChallenges).toBe(1);
     expect(stats.avgRating).toBe(1550);
     expect(stats.topRating).toBe(1600);
+  });
+
+  it("counts completed challenges, not participants", async () => {
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.insertUser("guild-1", "user-2", "petr");
+
+    const now = Math.floor(Date.now() / 1000);
+
+    await db
+      .insertInto("challenges")
+      .values([
+        {
+          id: "challenge-1",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-1",
+          host_user_id: "user-1",
+          problem_contest_id: 1000,
+          problem_index: "A",
+          problem_name: "Problem One",
+          problem_rating: 1200,
+          length_minutes: 60,
+          status: "completed",
+          started_at: now,
+          ends_at: now + 3600,
+          check_index: 0,
+        },
+        {
+          id: "challenge-2",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-2",
+          host_user_id: "user-2",
+          problem_contest_id: 1001,
+          problem_index: "B",
+          problem_name: "Problem Two",
+          problem_rating: 1300,
+          length_minutes: 60,
+          status: "completed",
+          started_at: now,
+          ends_at: now + 3600,
+          check_index: 0,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("challenge_participants")
+      .values([
+        { challenge_id: "challenge-1", user_id: "user-1", position: 1 },
+        { challenge_id: "challenge-1", user_id: "user-2", position: 2 },
+        { challenge_id: "challenge-2", user_id: "user-1", position: 1 },
+        { challenge_id: "challenge-2", user_id: "user-2", position: 2 },
+      ])
+      .execute();
+
+    const stats = await store.getServerStats("guild-1");
+
+    expect(stats.totalChallenges).toBe(2);
   });
 
   it("returns linked users for a server", async () => {

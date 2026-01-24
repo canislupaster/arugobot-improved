@@ -279,8 +279,15 @@ export class StoreService {
     }
 
     const key = this.normalizeHandle(handle);
+    let cached:
+      | {
+          canonical_handle: string | null;
+          exists: number;
+          last_checked: string;
+        }
+      | undefined;
     try {
-      const cached = await this.db
+      cached = await this.db
         .selectFrom("cf_handles")
         .select(["canonical_handle", "exists", "last_checked"])
         .where("handle", "=", key)
@@ -344,6 +351,15 @@ export class StoreService {
         } catch (dbError) {
           logError(`Database error: ${String(dbError)}`);
         }
+        return { exists: false, canonicalHandle: null, source: "api" };
+      }
+      if (cached) {
+        logWarn("Handle resolution failed; using cached data.", { handle: key, error: message });
+        return {
+          exists: cached.exists === 1,
+          canonicalHandle: cached.canonical_handle,
+          source: "cache",
+        };
       }
       logError(`Request error: ${message}`);
       return { exists: false, canonicalHandle: null, source: "api" };
@@ -961,11 +977,10 @@ export class StoreService {
       }
 
       const challengeCountRow = await this.db
-        .selectFrom("challenge_participants")
-        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
-        .select(({ fn }) => fn.count<number>("challenge_participants.challenge_id").as("count"))
-        .where("challenges.server_id", "=", serverId)
-        .where("challenges.status", "=", "completed")
+        .selectFrom("challenges")
+        .select(({ fn }) => fn.count<number>("id").as("count"))
+        .where("server_id", "=", serverId)
+        .where("status", "=", "completed")
         .executeTakeFirst();
       const completedCount = Number(challengeCountRow?.count ?? 0);
 
