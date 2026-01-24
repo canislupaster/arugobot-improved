@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { getProblemId } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
 
@@ -8,6 +9,7 @@ import type { Command } from "./types.js";
 
 const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
+const PRACTICE_SUGGESTION_RETENTION_DAYS = 14;
 
 function buildProblemLink(contestId: number, index: string, name: string): string {
   return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
@@ -39,11 +41,17 @@ export const practiceCommand: Command = {
   async execute(interaction, context) {
     const handleInput = interaction.options.getString("handle")?.trim() ?? "";
     const userOption = interaction.options.getUser("user");
-    const tagsRaw = interaction.options.getString("tags") ?? "";
+    const tagsRaw = interaction.options.getString("tags");
+    const tagsInput = tagsRaw?.trim() ?? "";
     const rating = interaction.options.getInteger("rating");
     const minRatingOption = interaction.options.getInteger("min_rating");
     const maxRatingOption = interaction.options.getInteger("max_rating");
     const rangesRaw = interaction.options.getString("ranges");
+    const ratingInputProvided =
+      rating !== null ||
+      minRatingOption !== null ||
+      maxRatingOption !== null ||
+      rangesRaw !== null;
 
     if (handleInput && userOption) {
       await interaction.reply({
@@ -78,6 +86,20 @@ export const practiceCommand: Command = {
 
     try {
       const targetUser = userOption ?? interaction.user;
+      let tags = tagsInput;
+      let ratingRanges = rangeResult.ranges;
+      if (interaction.guild && !handleInput) {
+        const preferences = await context.services.store.getPracticePreferences(
+          interaction.guild.id,
+          targetUser.id
+        );
+        if (!ratingInputProvided && preferences?.ratingRanges.length) {
+          ratingRanges = preferences.ratingRanges;
+        }
+        if (!tags && preferences?.tags) {
+          tags = preferences.tags;
+        }
+      }
       let handle = "";
       let historyUserId: string | null = null;
 
@@ -107,18 +129,29 @@ export const practiceCommand: Command = {
 
       const excludedIds = new Set<string>();
       if (interaction.guild && historyUserId) {
-        const history = await context.services.store.getHistoryList(
-          interaction.guild.id,
-          historyUserId
-        );
+        const guildId = interaction.guild.id;
+        const history = await context.services.store.getHistoryList(guildId, historyUserId);
         for (const problemId of history) {
+          excludedIds.add(problemId);
+        }
+
+        const cutoffIso = new Date(
+          Date.now() - PRACTICE_SUGGESTION_RETENTION_DAYS * 24 * 60 * 60 * 1000
+        ).toISOString();
+        await context.services.store.cleanupPracticeSuggestions(cutoffIso);
+        const recentSuggestions = await context.services.store.getRecentPracticeSuggestions(
+          guildId,
+          historyUserId,
+          cutoffIso
+        );
+        for (const problemId of recentSuggestions) {
           excludedIds.add(problemId);
         }
       }
 
       const suggestion = await context.services.practiceSuggestions.suggestProblem(handle, {
-        ratingRanges: rangeResult.ranges,
-        tags: tagsRaw,
+        ratingRanges,
+        tags,
         excludedIds,
       });
 
@@ -138,6 +171,13 @@ export const practiceCommand: Command = {
       }
 
       const problem = suggestion.problem;
+      if (interaction.guild && historyUserId) {
+        await context.services.store.recordPracticeSuggestion(
+          interaction.guild.id,
+          historyUserId,
+          getProblemId(problem)
+        );
+      }
       const embed = new EmbedBuilder()
         .setTitle(`Practice suggestion for ${handleInput ? handle : targetUser.username}`)
         .setColor(problem.rating ? getColor(problem.rating) : 0x3498db)

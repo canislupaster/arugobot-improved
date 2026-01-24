@@ -122,6 +122,15 @@ export type PracticeSuggestionsTable = {
   suggested_at: Generated<string>;
 };
 
+export type PracticePreferencesTable = {
+  guild_id: string;
+  user_id: string;
+  rating_ranges: string;
+  tags: string;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
@@ -136,4 +145,5 @@ export type Database = {
   practice_reminders: PracticeRemindersTable;
   practice_posts: PracticePostsTable;
   practice_suggestions: PracticeSuggestionsTable;
+  practice_preferences: PracticePreferencesTable;
 };

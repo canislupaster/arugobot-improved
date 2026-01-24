@@ -2,6 +2,7 @@ import { sql, type Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
+import type { RatingRange } from "../utils/ratingRanges.js";
 
 import { CodeforcesClient } from "./codeforces.js";
 
@@ -118,6 +119,12 @@ export type PracticeSuggestionEntry = {
   suggestedAt: string;
 };
 
+export type PracticePreferences = {
+  ratingRanges: RatingRange[];
+  tags: string;
+  updatedAt: string;
+};
+
 type HandleResolution = {
   exists: boolean;
   canonicalHandle: string | null;
@@ -133,6 +140,23 @@ function parseJsonArray<T>(raw: string | null | undefined, fallback: T[]): T[] {
     return Array.isArray(parsed) ? parsed : fallback;
   } catch {
     return fallback;
+  }
+}
+
+function parseRatingRanges(raw: string | null | undefined): RatingRange[] {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as RatingRange[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter(
+      (range) => Number.isFinite(range.min) && Number.isFinite(range.max) && range.min <= range.max
+    );
+  } catch {
+    return [];
   }
 }
 
@@ -642,6 +666,76 @@ export class StoreService {
     } catch (error) {
       logError(`Database error: ${String(error)}`);
       return [];
+    }
+  }
+
+  async getPracticePreferences(
+    guildId: string,
+    userId: string
+  ): Promise<PracticePreferences | null> {
+    try {
+      const row = await this.db
+        .selectFrom("practice_preferences")
+        .select(["rating_ranges", "tags", "updated_at"])
+        .where("guild_id", "=", guildId)
+        .where("user_id", "=", userId)
+        .executeTakeFirst();
+      if (!row) {
+        return null;
+      }
+      return {
+        ratingRanges: parseRatingRanges(row.rating_ranges),
+        tags: row.tags ?? "",
+        updatedAt: row.updated_at,
+      };
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return null;
+    }
+  }
+
+  async setPracticePreferences(
+    guildId: string,
+    userId: string,
+    ratingRanges: RatingRange[],
+    tags: string
+  ): Promise<void> {
+    const timestamp = new Date().toISOString();
+    try {
+      await this.db
+        .insertInto("practice_preferences")
+        .values({
+          guild_id: guildId,
+          user_id: userId,
+          rating_ranges: JSON.stringify(ratingRanges),
+          tags,
+          created_at: timestamp,
+          updated_at: timestamp,
+        })
+        .onConflict((oc) =>
+          oc.columns(["guild_id", "user_id"]).doUpdateSet({
+            rating_ranges: JSON.stringify(ratingRanges),
+            tags,
+            updated_at: timestamp,
+          })
+        )
+        .execute();
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+    }
+  }
+
+  async clearPracticePreferences(guildId: string, userId: string): Promise<boolean> {
+    try {
+      const result = await this.db
+        .deleteFrom("practice_preferences")
+        .where("guild_id", "=", guildId)
+        .where("user_id", "=", userId)
+        .executeTakeFirst();
+      return Number(result.numDeletedRows ?? 0) > 0;
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return false;
     }
   }
 

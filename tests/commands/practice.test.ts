@@ -49,7 +49,11 @@ describe("practiceCommand", () => {
         store: {
           resolveHandle: jest.fn(),
           getHandle: jest.fn().mockResolvedValue("tourist"),
+          getPracticePreferences: jest.fn().mockResolvedValue(null),
           getHistoryList: jest.fn().mockResolvedValue([]),
+          cleanupPracticeSuggestions: jest.fn().mockResolvedValue(undefined),
+          getRecentPracticeSuggestions: jest.fn().mockResolvedValue([]),
+          recordPracticeSuggestion: jest.fn().mockResolvedValue(undefined),
           getUserIdByHandle: jest.fn(),
         },
         practiceSuggestions: {
@@ -81,5 +85,56 @@ describe("practiceCommand", () => {
         embeds: [expect.any(Object)],
       })
     );
+  });
+
+  it("uses saved preferences when no filters are provided", async () => {
+    const interaction = createInteraction();
+    const preferences = {
+      ratingRanges: [{ min: 1200, max: 1600 }],
+      tags: "dp, greedy",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+    };
+    const suggestProblem = jest.fn().mockResolvedValue({
+      status: "ok",
+      handle: "tourist",
+      problem: {
+        contestId: 1200,
+        index: "A",
+        name: "Pref Problem",
+        rating: 1300,
+        tags: ["dp"],
+      },
+      candidateCount: 12,
+      excludedCount: 3,
+      solvedCount: 50,
+      isStale: false,
+      source: "api",
+    });
+    const context = {
+      correlationId: "corr-2",
+      services: {
+        store: {
+          resolveHandle: jest.fn(),
+          getHandle: jest.fn().mockResolvedValue("tourist"),
+          getPracticePreferences: jest.fn().mockResolvedValue(preferences),
+          getHistoryList: jest.fn().mockResolvedValue([]),
+          cleanupPracticeSuggestions: jest.fn().mockResolvedValue(undefined),
+          getRecentPracticeSuggestions: jest.fn().mockResolvedValue([]),
+          recordPracticeSuggestion: jest.fn().mockResolvedValue(undefined),
+          getUserIdByHandle: jest.fn(),
+        },
+        practiceSuggestions: {
+          suggestProblem,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceCommand.execute(interaction, context);
+
+    expect(suggestProblem).toHaveBeenCalledWith("tourist", {
+      ratingRanges: preferences.ratingRanges,
+      tags: preferences.tags,
+      excludedIds: expect.any(Set),
+    });
   });
 });

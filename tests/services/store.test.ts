@@ -557,4 +557,19 @@ describe("StoreService", () => {
       { problemId: "1000C", suggestedAt: "2024-01-02T00:00:00.000Z" },
     ]);
   });
+
+  it("stores and clears practice preferences", async () => {
+    const ranges = [{ min: 900, max: 1200 }];
+    await store.setPracticePreferences("guild-1", "user-1", ranges, "dp");
+
+    const preferences = await store.getPracticePreferences("guild-1", "user-1");
+    expect(preferences?.ratingRanges).toEqual(ranges);
+    expect(preferences?.tags).toBe("dp");
+
+    const cleared = await store.clearPracticePreferences("guild-1", "user-1");
+    expect(cleared).toBe(true);
+
+    const afterClear = await store.getPracticePreferences("guild-1", "user-1");
+    expect(afterClear).toBeNull();
+  });
 });
