@@ -25,6 +25,9 @@ import type { Command } from "./types.js";
 const VALID_LENGTHS = new Set([40, 60, 80]);
 const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
+const DEFAULT_MAX_PARTICIPANTS = 5;
+const MAX_PARTICIPANTS = 10;
+const MIN_PARTICIPANTS = 2;
 const OPEN_LOBBY_TIMEOUT_MS = 5 * 60 * 1000;
 
 function buildProblemLink(contestId: number, index: string, name: string) {
@@ -72,10 +75,22 @@ export const challengeCommand: Command = {
     .addBooleanOption((option) =>
       option.setName("open").setDescription("Allow anyone to join before starting")
     )
+    .addIntegerOption((option) =>
+      option
+        .setName("max_participants")
+        .setDescription(`Max participants (${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS})`)
+        .setMinValue(MIN_PARTICIPANTS)
+        .setMaxValue(MAX_PARTICIPANTS)
+    )
     .addUserOption((option) => option.setName("user1").setDescription("Participant 1 (optional)"))
     .addUserOption((option) => option.setName("user2").setDescription("Participant 2 (optional)"))
     .addUserOption((option) => option.setName("user3").setDescription("Participant 3 (optional)"))
-    .addUserOption((option) => option.setName("user4").setDescription("Participant 4 (optional)")),
+    .addUserOption((option) => option.setName("user4").setDescription("Participant 4 (optional)"))
+    .addUserOption((option) => option.setName("user5").setDescription("Participant 5 (optional)"))
+    .addUserOption((option) => option.setName("user6").setDescription("Participant 6 (optional)"))
+    .addUserOption((option) => option.setName("user7").setDescription("Participant 7 (optional)"))
+    .addUserOption((option) => option.setName("user8").setDescription("Participant 8 (optional)"))
+    .addUserOption((option) => option.setName("user9").setDescription("Participant 9 (optional)")),
   async execute(interaction, context) {
     if (!interaction.guild) {
       await interaction.reply({
@@ -92,11 +107,25 @@ export const challengeCommand: Command = {
     const rangesRaw = interaction.options.getString("ranges");
     const tagsRaw = interaction.options.getString("tags");
     const openLobby = interaction.options.getBoolean("open") ?? false;
+    const maxParticipantsOption = interaction.options.getInteger("max_participants");
+    const maxParticipants = maxParticipantsOption ?? DEFAULT_MAX_PARTICIPANTS;
     const length = interaction.options.getInteger("length", true);
 
     if (!VALID_LENGTHS.has(length)) {
       await interaction.reply({
         content: "Invalid length. Valid lengths are 40, 60, and 80 minutes.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (
+      !Number.isInteger(maxParticipants) ||
+      maxParticipants < MIN_PARTICIPANTS ||
+      maxParticipants > MAX_PARTICIPANTS
+    ) {
+      await interaction.reply({
+        content: `Invalid max participants. Choose ${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS}.`,
         ephemeral: true,
       });
       return;
@@ -139,11 +168,16 @@ export const challengeCommand: Command = {
         interaction.options.getUser("user2"),
         interaction.options.getUser("user3"),
         interaction.options.getUser("user4"),
+        interaction.options.getUser("user5"),
+        interaction.options.getUser("user6"),
+        interaction.options.getUser("user7"),
+        interaction.options.getUser("user8"),
+        interaction.options.getUser("user9"),
       ].filter(Boolean) as User[]
     );
 
-    if (participantUsers.length > 5) {
-      await interaction.editReply("Too many users (limit is 5).");
+    if (participantUsers.length > maxParticipants) {
+      await interaction.editReply(`Too many users (limit is ${maxParticipants}).`);
       return;
     }
 
@@ -370,6 +404,7 @@ export const challengeCommand: Command = {
             value: buildProblemLink(problem.contestId, problem.index, problem.name),
             inline: false,
           },
+          { name: "Capacity", value: String(maxParticipants), inline: true },
           { name: "Users", value: await buildUsersValue([...participants.values()]), inline: false }
         );
 
@@ -401,8 +436,11 @@ export const challengeCommand: Command = {
             await button.reply({ content: "You already joined.", ephemeral: true });
             return;
           }
-          if (participants.size >= 5) {
-            await button.reply({ content: "Lobby is full (max 5).", ephemeral: true });
+          if (participants.size >= maxParticipants) {
+            await button.reply({
+              content: `Lobby is full (max ${maxParticipants}).`,
+              ephemeral: true,
+            });
             return;
           }
           const conflicts = await context.services.challenges.getActiveChallengesForUsers(guildId, [
