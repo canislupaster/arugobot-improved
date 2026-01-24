@@ -75,6 +75,12 @@ export type RecentSubmissionsResult = {
   isStale: boolean;
 };
 
+export type SolvedProblemsResult = {
+  solved: string[];
+  source: "cache" | "api";
+  isStale: boolean;
+};
+
 export type ChallengeHistoryEntry = {
   challengeId: string;
   problemId: string;
@@ -827,10 +833,62 @@ export class StoreService {
     }
   }
 
+  async updateUserHandle(
+    serverId: string,
+    userId: string,
+    handle: string
+  ): Promise<"ok" | "not_linked" | "handle_exists" | "error"> {
+    try {
+      return await this.db.transaction().execute(async (trx) => {
+        const current = await trx
+          .selectFrom("users")
+          .select("handle")
+          .where("server_id", "=", serverId)
+          .where("user_id", "=", userId)
+          .executeTakeFirst();
+        if (!current) {
+          return "not_linked";
+        }
+
+        const existing = await trx
+          .selectFrom("users")
+          .select("user_id")
+          .where("server_id", "=", serverId)
+          .where("handle", "=", handle)
+          .where("user_id", "!=", userId)
+          .executeTakeFirst();
+        if (existing) {
+          return "handle_exists";
+        }
+
+        await trx
+          .updateTable("users")
+          .set({ handle, updated_at: new Date().toISOString() })
+          .where("server_id", "=", serverId)
+          .where("user_id", "=", userId)
+          .execute();
+
+        return "ok";
+      });
+    } catch (error) {
+      logError(`Transaction failed: ${String(error)}`);
+      return "error";
+    }
+  }
+
   async getSolvedProblems(handle: string, ttlMs = SOLVED_CACHE_TTL_MS): Promise<string[] | null> {
+    const result = await this.getSolvedProblemsResult(handle, ttlMs);
+    return result?.solved ?? null;
+  }
+
+  async getSolvedProblemsResult(
+    handle: string,
+    ttlMs = SOLVED_CACHE_TTL_MS
+  ): Promise<SolvedProblemsResult | null> {
     const key = this.normalizeHandle(handle);
     let result: string[] = [];
     let newLast = -1;
+    let cachedList: string[] | null = null;
     let row:
       | {
           handle: string;
@@ -884,12 +942,13 @@ export class StoreService {
       }
 
       if (row) {
+        cachedList = parseJsonArray<string>(row.solved, []);
         if (isCacheFresh(row.updated_at, ttlMs)) {
-          return parseJsonArray<string>(row.solved, []);
+          return { solved: cachedList, source: "cache", isStale: false };
         }
         logInfo("Solved list incremental refresh.", { handle: key });
         const prevLast = row.last_sub;
-        const currentList = parseJsonArray<string>(row.solved, []);
+        const currentList = cachedList.slice();
         try {
           const response = await this.cfClient.request<UserStatusResponse>("user.status", {
             handle,
@@ -925,7 +984,14 @@ export class StoreService {
             }
           }
         } catch (error) {
-          logError(`Error when getting submissions: ${String(error)}`);
+          const message = error instanceof Error ? error.message : String(error);
+          logWarn("Solved list refresh failed; using cached list.", {
+            handle: key,
+            error: message,
+          });
+          if (cachedList) {
+            return { solved: cachedList, source: "cache", isStale: true };
+          }
           return null;
         }
       } else {
@@ -970,7 +1036,7 @@ export class StoreService {
       }
     }
 
-    return result;
+    return { solved: result, source: "api", isStale: false };
   }
 
   async refreshHandles(): Promise<{ checked: number; updated: number }> {

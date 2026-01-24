@@ -50,6 +50,33 @@ describe("StoreService", () => {
     expect(duplicateLink).toBe("already_linked");
   });
 
+  it("updates a linked handle and preserves rating history", async () => {
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.updateRating("guild-1", "user-1", 1650);
+    await store.addToHistory("guild-1", "user-1", "1000A");
+
+    const result = await store.updateUserHandle("guild-1", "user-1", "petr");
+    expect(result).toBe("ok");
+
+    const handle = await store.getHandle("guild-1", "user-1");
+    expect(handle).toBe("petr");
+    const rating = await store.getRating("guild-1", "user-1");
+    expect(rating).toBe(1650);
+    const history = await store.getHistoryList("guild-1", "user-1");
+    expect(history).toContain("1000A");
+  });
+
+  it("rejects handle updates for missing or taken handles", async () => {
+    const missing = await store.updateUserHandle("guild-1", "user-1", "petr");
+    expect(missing).toBe("not_linked");
+
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.insertUser("guild-1", "user-2", "petr");
+
+    const taken = await store.updateUserHandle("guild-1", "user-1", "petr");
+    expect(taken).toBe("handle_exists");
+  });
+
   it("looks up linked user ids by handle", async () => {
     await store.insertUser("guild-1", "user-1", "tourist");
     await store.insertUser("guild-1", "user-2", "petr");
@@ -214,6 +241,28 @@ describe("StoreService", () => {
     const second = await store.getSolvedProblems("tourist");
     expect(second).toEqual(["1A"]);
     expect(mockClient.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("serves cached solved list when refresh fails", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        id: 10,
+        verdict: "OK",
+        contestId: 1,
+        problem: { contestId: 1, index: "A" },
+        creationTimeSeconds: 100,
+      },
+    ]);
+
+    const first = await store.getSolvedProblems("tourist");
+    expect(first).toEqual(["1A"]);
+
+    mockClient.request.mockRejectedValueOnce(new Error("CF down"));
+    const second = await store.getSolvedProblemsResult("tourist", 0);
+
+    expect(second?.source).toBe("cache");
+    expect(second?.isStale).toBe(true);
+    expect(second?.solved).toEqual(["1A"]);
   });
 
   it("caps solved list fetch pages when configured", async () => {
