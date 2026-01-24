@@ -75,6 +75,24 @@ export type RecentSubmissionsResult = {
   isStale: boolean;
 };
 
+export type ChallengeHistoryEntry = {
+  challengeId: string;
+  problemId: string;
+  contestId: number;
+  index: string;
+  name: string;
+  rating: number;
+  startedAt: number;
+  endsAt: number;
+  solvedAt: number | null;
+  ratingDelta: number | null;
+};
+
+export type ChallengeHistoryPage = {
+  total: number;
+  entries: ChallengeHistoryEntry[];
+};
+
 type HandleResolution = {
   exists: boolean;
   canonicalHandle: string | null;
@@ -515,6 +533,73 @@ export class StoreService {
     }
   }
 
+  async getChallengeHistoryPage(
+    serverId: string,
+    userId: string,
+    page: number,
+    pageSize: number
+  ): Promise<ChallengeHistoryPage> {
+    const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+    const limit = Math.max(1, pageSize);
+    const offset = (safePage - 1) * limit;
+
+    try {
+      const countRow = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select(({ fn }) => fn.count<number>("challenge_participants.challenge_id").as("count"))
+        .where("challenges.server_id", "=", serverId)
+        .where("challenge_participants.user_id", "=", userId)
+        .where("challenges.status", "=", "completed")
+        .executeTakeFirst();
+      const total = Number(countRow?.count ?? 0);
+      if (total === 0) {
+        return { total: 0, entries: [] };
+      }
+
+      const rows = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select((eb) => [
+          eb.ref("challenges.id").as("challenge_id"),
+          eb.ref("challenges.problem_contest_id").as("problem_contest_id"),
+          eb.ref("challenges.problem_index").as("problem_index"),
+          eb.ref("challenges.problem_name").as("problem_name"),
+          eb.ref("challenges.problem_rating").as("problem_rating"),
+          eb.ref("challenges.started_at").as("started_at"),
+          eb.ref("challenges.ends_at").as("ends_at"),
+          eb.ref("challenge_participants.solved_at").as("solved_at"),
+          eb.ref("challenge_participants.rating_delta").as("rating_delta"),
+        ])
+        .where("challenges.server_id", "=", serverId)
+        .where("challenge_participants.user_id", "=", userId)
+        .where("challenges.status", "=", "completed")
+        .orderBy("challenges.started_at", "desc")
+        .limit(limit)
+        .offset(offset)
+        .execute();
+
+      return {
+        total,
+        entries: rows.map((row) => ({
+          challengeId: row.challenge_id,
+          problemId: `${row.problem_contest_id}${row.problem_index}`,
+          contestId: row.problem_contest_id,
+          index: row.problem_index,
+          name: row.problem_name,
+          rating: row.problem_rating,
+          startedAt: row.started_at,
+          endsAt: row.ends_at,
+          solvedAt: row.solved_at ?? null,
+          ratingDelta: row.rating_delta ?? null,
+        })),
+      };
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return { total: 0, entries: [] };
+    }
+  }
+
   async addToHistory(serverId: string, userId: string, problem: string): Promise<void> {
     try {
       const row = await this.db
@@ -618,15 +703,26 @@ export class StoreService {
         return { userCount: 0, totalChallenges: 0, avgRating: null, topRating: null };
       }
 
+      const challengeCountRow = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select(({ fn }) => fn.count<number>("challenge_participants.challenge_id").as("count"))
+        .where("challenges.server_id", "=", serverId)
+        .where("challenges.status", "=", "completed")
+        .executeTakeFirst();
+      const completedCount = Number(challengeCountRow?.count ?? 0);
+
       let totalRating = 0;
       let topRating = Number.NEGATIVE_INFINITY;
-      let totalChallenges = 0;
+      let totalChallenges = completedCount;
 
       for (const row of rows) {
         totalRating += row.rating;
         topRating = Math.max(topRating, row.rating);
-        const history = parseJsonArray<string>(row.history, []);
-        totalChallenges += history.length;
+        if (completedCount === 0) {
+          const history = parseJsonArray<string>(row.history, []);
+          totalChallenges += history.length;
+        }
       }
 
       return {
@@ -809,8 +905,7 @@ export class StoreService {
     let lastSubId: number | null = null;
     let index = 1;
     let page = 0;
-    const maxPages =
-      this.maxSolvedPages <= 0 ? Number.POSITIVE_INFINITY : this.maxSolvedPages;
+    const maxPages = this.maxSolvedPages <= 0 ? Number.POSITIVE_INFINITY : this.maxSolvedPages;
     while (page < maxPages) {
       const response = await this.cfClient.request<UserStatusResponse>("user.status", {
         handle,

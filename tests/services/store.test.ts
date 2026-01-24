@@ -140,6 +140,25 @@ describe("StoreService", () => {
     expect(second?.submissions[0]?.name).toBe("Test Problem");
   });
 
+  it("reuses cached solved list when fresh", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        id: 10,
+        verdict: "OK",
+        contestId: 1,
+        problem: { contestId: 1, index: "A" },
+        creationTimeSeconds: 100,
+      },
+    ]);
+
+    const first = await store.getSolvedProblems("tourist");
+    expect(first).toEqual(["1A"]);
+    expect(mockClient.request).toHaveBeenCalledTimes(1);
+
+    const second = await store.getSolvedProblems("tourist");
+    expect(second).toEqual(["1A"]);
+    expect(mockClient.request).toHaveBeenCalledTimes(1);
+  });
 
   it("caps solved list fetch pages when configured", async () => {
     store = new StoreService(db, mockClient as never, { maxSolvedPages: 1 });
@@ -157,5 +176,49 @@ describe("StoreService", () => {
 
     expect(mockClient.request).toHaveBeenCalledTimes(1);
     expect(solved).toContain("1A");
+  });
+
+  it("returns challenge history entries from completed challenges", async () => {
+    await store.insertUser("guild-1", "user-1", "tourist");
+
+    await db
+      .insertInto("challenges")
+      .values({
+        id: "challenge-1",
+        server_id: "guild-1",
+        channel_id: "channel-1",
+        message_id: "message-1",
+        host_user_id: "user-1",
+        problem_contest_id: 1000,
+        problem_index: "A",
+        problem_name: "Test Problem",
+        problem_rating: 1200,
+        length_minutes: 40,
+        status: "completed",
+        started_at: 1000,
+        ends_at: 2000,
+        check_index: 0,
+        updated_at: new Date().toISOString(),
+      })
+      .execute();
+
+    await db
+      .insertInto("challenge_participants")
+      .values({
+        challenge_id: "challenge-1",
+        user_id: "user-1",
+        position: 0,
+        solved_at: 1500,
+        rating_before: 1500,
+        rating_delta: 25,
+        updated_at: new Date().toISOString(),
+      })
+      .execute();
+
+    const history = await store.getChallengeHistoryPage("guild-1", "user-1", 1, 10);
+
+    expect(history.total).toBe(1);
+    expect(history.entries[0]?.problemId).toBe("1000A");
+    expect(history.entries[0]?.ratingDelta).toBe(25);
   });
 });

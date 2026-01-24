@@ -66,8 +66,25 @@ export type ChallengeParticipantsTable = {
   user_id: string;
   position: number;
   solved_at: number | null;
+  rating_before: number | null;
+  rating_delta: number | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;
+};
+
+export type ContestRemindersTable = {
+  guild_id: string;
+  channel_id: string;
+  minutes_before: number;
+  role_id: string | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type ContestNotificationsTable = {
+  guild_id: string;
+  contest_id: number;
+  notified_at: Generated<string>;
 };
 
 export type Database = {
@@ -78,4 +95,6 @@ export type Database = {
   cf_recent_submissions: CfRecentSubmissionsTable;
   challenges: ChallengesTable;
   challenge_participants: ChallengeParticipantsTable;
+  contest_reminders: ContestRemindersTable;
+  contest_notifications: ContestNotificationsTable;
 };

@@ -78,7 +78,7 @@ describe("ChallengeService", () => {
 
     const row = await db
       .selectFrom("challenge_participants")
-      .select("solved_at")
+      .select(["solved_at", "rating_delta"])
       .where(
         "challenge_id",
         "=",
@@ -87,6 +87,7 @@ describe("ChallengeService", () => {
       .where("user_id", "=", "user-1")
       .executeTakeFirst();
     expect(row?.solved_at).not.toBeNull();
+    expect(row?.rating_delta).toBe(up);
     expect(message.edit).toHaveBeenCalled();
     expect(down).toBeLessThan(0);
   });
@@ -120,6 +121,12 @@ describe("ChallengeService", () => {
 
     const statusRow = await db.selectFrom("challenges").select("status").executeTakeFirstOrThrow();
     expect(statusRow.status).toBe("completed");
+
+    const participantRow = await db
+      .selectFrom("challenge_participants")
+      .select("rating_delta")
+      .executeTakeFirst();
+    expect(participantRow?.rating_delta).toBe(down);
   });
 
   it("keeps challenges active when Codeforces requests fail", async () => {
@@ -147,5 +154,69 @@ describe("ChallengeService", () => {
 
     const statusRow = await db.selectFrom("challenges").select("status").executeTakeFirstOrThrow();
     expect(statusRow.status).toBe("active");
+  });
+
+  it("cancels an active challenge without changing ratings", async () => {
+    const store = new StoreService(db, mockCodeforces as never);
+    await store.insertUser("guild-1", "user-1", "tourist");
+
+    const service = new ChallengeService(db, store, mockCodeforces as never);
+    const { client, message } = createClientMock();
+
+    const challengeId = await service.createChallenge({
+      serverId: "guild-1",
+      channelId: "channel-1",
+      messageId: "message-1",
+      hostUserId: "user-1",
+      problem: { contestId: 1000, index: "A", name: "Test", rating: 1200 },
+      lengthMinutes: 40,
+      participants: ["user-1"],
+      startedAt: 1000,
+    });
+
+    const cancelled = await service.cancelChallenge(challengeId, "user-1", client);
+
+    expect(cancelled).toBe(true);
+    const statusRow = await db
+      .selectFrom("challenges")
+      .select("status")
+      .where("id", "=", challengeId)
+      .executeTakeFirstOrThrow();
+    expect(statusRow.status).toBe("cancelled");
+    expect(message.edit).toHaveBeenCalled();
+
+    const rating = await store.getRating("guild-1", "user-1");
+    expect(rating).toBe(1500);
+  });
+
+  it("returns active challenge summaries for users", async () => {
+    const store = new StoreService(db, mockCodeforces as never);
+    await store.insertUser("guild-1", "user-1", "tourist");
+    await store.insertUser("guild-1", "user-2", "petr");
+
+    const service = new ChallengeService(db, store, mockCodeforces as never);
+
+    await service.createChallenge({
+      serverId: "guild-1",
+      channelId: "channel-1",
+      messageId: "message-1",
+      hostUserId: "user-1",
+      problem: { contestId: 1000, index: "A", name: "Test", rating: 1200 },
+      lengthMinutes: 40,
+      participants: ["user-1", "user-2"],
+      startedAt: 1000,
+    });
+
+    const summaries = await service.getActiveChallengesForUsers("guild-1", ["user-1", "user-2"]);
+    expect(summaries.size).toBe(2);
+    expect(summaries.get("user-1")?.channelId).toBe("channel-1");
+  });
+
+  it("returns empty map when users have no active challenges", async () => {
+    const store = new StoreService(db, mockCodeforces as never);
+    const service = new ChallengeService(db, store, mockCodeforces as never);
+
+    const summaries = await service.getActiveChallengesForUsers("guild-1", ["user-1"]);
+    expect(summaries.size).toBe(0);
   });
 });

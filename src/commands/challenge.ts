@@ -18,6 +18,7 @@ import {
 } from "../utils/problemSelection.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
+import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
@@ -66,9 +67,7 @@ export const challengeCommand: Command = {
       option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
     )
     .addStringOption((option) =>
-      option
-        .setName("tags")
-        .setDescription("Problem tags (e.g. dp, greedy, -math)")
+      option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
     )
     .addBooleanOption((option) =>
       option.setName("open").setDescription("Allow anyone to join before starting")
@@ -131,6 +130,8 @@ export const challengeCommand: Command = {
       return;
     }
 
+    await interaction.deferReply({ ephemeral: true });
+
     let participantUsers = uniqueUsers(
       [
         interaction.user,
@@ -142,26 +143,40 @@ export const challengeCommand: Command = {
     );
 
     if (participantUsers.length > 5) {
-      await interaction.reply({ content: "Too many users (limit is 5).", ephemeral: true });
+      await interaction.editReply("Too many users (limit is 5).");
       return;
     }
 
     for (const user of participantUsers) {
       if (!(await context.services.store.handleLinked(guildId, user.id))) {
-        await interaction.reply({
-          content: "One or more users have not linked a handle.",
-          ephemeral: true,
-        });
+        await interaction.editReply("One or more users have not linked a handle.");
         return;
       }
     }
 
+    const activeChallenges = await context.services.challenges.getActiveChallengesForUsers(
+      guildId,
+      participantUsers.map((user) => user.id)
+    );
+    if (activeChallenges.size > 0) {
+      const lines = participantUsers
+        .filter((user) => activeChallenges.has(user.id))
+        .map((user) => {
+          const challenge = activeChallenges.get(user.id)!;
+          return `- ${user} already in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
+            challenge.endsAt
+          )})`;
+        })
+        .join("\n");
+      await interaction.editReply(
+        `Some participants are already in an active challenge:\n${lines}`
+      );
+      return;
+    }
+
     const problems = await context.services.problems.ensureProblemsLoaded();
     if (problems.length === 0) {
-      await interaction.reply({
-        content: "Problem cache not ready yet. Try again in a bit.",
-        ephemeral: true,
-      });
+      await interaction.editReply("Problem cache not ready yet. Try again in a bit.");
       return;
     }
 
@@ -173,10 +188,9 @@ export const challengeCommand: Command = {
       const problemDict = context.services.problems.getProblemDict();
       problem = problemDict.get(problemId) ?? null;
       if (!problem) {
-        await interaction.reply({
-          content: "Invalid problem. Make sure it is in the correct format (e.g., 1000A).",
-          ephemeral: true,
-        });
+        await interaction.editReply(
+          "Invalid problem. Make sure it is in the correct format (e.g., 1000A)."
+        );
         return;
       }
     } else {
@@ -184,10 +198,7 @@ export const challengeCommand: Command = {
       const ratedCandidates = filterProblemsByRatingRanges(problems, rangeResult.ranges);
       const candidates = filterProblemsByTags(ratedCandidates, tagFilters);
       if (candidates.length === 0) {
-        await interaction.reply({
-          content: "No problems found for that rating range and tag filter.",
-          ephemeral: true,
-        });
+        await interaction.editReply("No problems found for that rating range and tag filter.");
         return;
       }
 
@@ -202,18 +213,14 @@ export const challengeCommand: Command = {
       for (const user of participantUsers) {
         const handle = await context.services.store.getHandle(guildId, user.id);
         if (!handle) {
-          await interaction.reply({
-            content: "Missing handle data. Try again in a bit.",
-            ephemeral: true,
-          });
+          await interaction.editReply("Missing handle data. Try again in a bit.");
           return;
         }
         const solved = await context.services.store.getSolvedProblems(handle);
         if (!solved) {
-          await interaction.reply({
-            content: "Unable to fetch solved problems right now. Try again later.",
-            ephemeral: true,
-          });
+          await interaction.editReply(
+            "Unable to fetch solved problems right now. Try again later."
+          );
           return;
         }
         for (const solvedId of solved) {
@@ -223,30 +230,23 @@ export const challengeCommand: Command = {
 
       problem = selectRandomProblem(candidates, excludedIds);
       if (!problem) {
-        await interaction.reply({
-          content: "No unsolved problems found for this group in that rating range.",
-          ephemeral: true,
-        });
+        await interaction.editReply(
+          "No unsolved problems found for this group in that rating range."
+        );
         return;
       }
       problemId = getProblemId(problem);
     }
 
     if (!problem) {
-      await interaction.reply({
-        content: "Problem selection failed. Try again in a moment.",
-        ephemeral: true,
-      });
+      await interaction.editReply("Problem selection failed. Try again in a moment.");
       return;
     }
 
     for (const user of participantUsers) {
       const history = await context.services.store.getHistoryList(guildId, user.id);
       if (history.includes(problemId)) {
-        await interaction.reply({
-          content: "One or more users have already done this problem.",
-          ephemeral: true,
-        });
+        await interaction.editReply("One or more users have already done this problem.");
         return;
       }
     }
@@ -297,7 +297,7 @@ export const challengeCommand: Command = {
         new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary)
       );
 
-      const response = await interaction.reply({
+      const response = await interaction.followUp({
         embeds: [confirmEmbed],
         components: [row],
         fetchReply: true,
@@ -347,13 +347,13 @@ export const challengeCommand: Command = {
       if (status !== "confirmed") {
         if (status !== "cancelled") {
           confirmEmbed.setDescription("Confirmation failed.");
-          await interaction.editReply({ embeds: [confirmEmbed], components: [] });
+          await response.edit({ embeds: [confirmEmbed], components: [] });
         }
         return false;
       }
 
       confirmEmbed.setDescription("Challenge confirmed.");
-      await interaction.editReply({ embeds: [confirmEmbed], components: [] });
+      await response.edit({ embeds: [confirmEmbed], components: [] });
       return true;
     };
 
@@ -382,7 +382,7 @@ export const challengeCommand: Command = {
         new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary)
       );
 
-      const response = await interaction.reply({
+      const response = await interaction.followUp({
         embeds: [lobbyEmbed],
         components: [row],
         fetchReply: true,
@@ -401,6 +401,19 @@ export const challengeCommand: Command = {
           }
           if (participants.size >= 5) {
             await button.reply({ content: "Lobby is full (max 5).", ephemeral: true });
+            return;
+          }
+          const conflicts = await context.services.challenges.getActiveChallengesForUsers(guildId, [
+            button.user.id,
+          ]);
+          if (conflicts.has(button.user.id)) {
+            const challenge = conflicts.get(button.user.id)!;
+            await button.reply({
+              content: `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
+                challenge.endsAt
+              )}).`,
+              ephemeral: true,
+            });
             return;
           }
           const linked = await context.services.store.handleLinked(guildId, button.user.id);
@@ -478,7 +491,7 @@ export const challengeCommand: Command = {
       if (status !== "started") {
         if (status !== "cancelled") {
           lobbyEmbed.setDescription("Lobby timed out.");
-          await interaction.editReply({ embeds: [lobbyEmbed], components: [] });
+          await response.edit({ embeds: [lobbyEmbed], components: [] });
         }
         return null;
       }
@@ -489,21 +502,27 @@ export const challengeCommand: Command = {
     if (openLobby) {
       const lobbyUsers = await runOpenLobby();
       if (!lobbyUsers) {
+        await interaction.editReply("Challenge was not started.");
         return;
       }
       participantUsers = lobbyUsers;
     } else {
       const confirmed = await confirmParticipants();
       if (!confirmed) {
+        await interaction.editReply("Challenge was not started.");
         return;
       }
     }
+
+    await interaction.editReply("Challenge confirmed. Posting details...");
 
     const startTime = Math.floor(Date.now() / 1000);
     const participants = participantUsers.map((user, index) => ({
       userId: user.id,
       position: index,
       solvedAt: null,
+      ratingBefore: null,
+      ratingDelta: null,
     }));
 
     const challengeEmbed = await context.services.challenges.buildActiveEmbed({
@@ -540,12 +559,14 @@ export const challengeCommand: Command = {
         participants: participantUsers.map((user) => user.id),
         startedAt: startTime,
       });
+      await interaction.editReply("Challenge started.");
     } catch (error) {
       logError(`Failed to start challenge: ${String(error)}`, logContext);
       await challengeMessage.edit({
         content: "Failed to start challenge. Please try again.",
         embeds: [],
       });
+      await interaction.editReply("Failed to start the challenge.");
     }
   },
 };

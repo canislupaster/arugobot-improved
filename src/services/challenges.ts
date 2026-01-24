@@ -23,6 +23,8 @@ export type ChallengeParticipant = {
   userId: string;
   position: number;
   solvedAt: number | null;
+  ratingBefore: number | null;
+  ratingDelta: number | null;
 };
 
 export type ActiveChallenge = {
@@ -38,6 +40,13 @@ export type ActiveChallenge = {
   status: ChallengeStatus;
   checkIndex: number;
   participants: ChallengeParticipant[];
+};
+
+export type ActiveChallengeSummary = {
+  id: string;
+  channelId: string;
+  problem: ChallengeProblem;
+  endsAt: number;
 };
 
 type ChallengeClock = {
@@ -123,6 +132,55 @@ export class ChallengeService {
     return row?.count ?? 0;
   }
 
+  async getActiveChallengesForUsers(
+    serverId: string,
+    userIds: string[]
+  ): Promise<Map<string, ActiveChallengeSummary>> {
+    if (userIds.length === 0) {
+      return new Map();
+    }
+    const rows = await this.db
+      .selectFrom("challenge_participants")
+      .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+      .select((eb) => [
+        eb.ref("challenge_participants.user_id").as("user_id"),
+        eb.ref("challenges.id").as("challenge_id"),
+        eb.ref("challenges.channel_id").as("channel_id"),
+        eb.ref("challenges.problem_contest_id").as("problem_contest_id"),
+        eb.ref("challenges.problem_index").as("problem_index"),
+        eb.ref("challenges.problem_name").as("problem_name"),
+        eb.ref("challenges.problem_rating").as("problem_rating"),
+        eb.ref("challenges.ends_at").as("ends_at"),
+      ])
+      .where("challenges.server_id", "=", serverId)
+      .where("challenges.status", "=", "active")
+      .where("challenge_participants.user_id", "in", userIds)
+      .execute();
+
+    const result = new Map<string, ActiveChallengeSummary>();
+    for (const row of rows) {
+      if (result.has(row.user_id)) {
+        continue;
+      }
+      result.set(row.user_id, {
+        id: row.challenge_id,
+        channelId: row.channel_id,
+        problem: {
+          contestId: row.problem_contest_id,
+          index: row.problem_index,
+          name: row.problem_name,
+          rating: row.problem_rating,
+        },
+        endsAt: row.ends_at,
+      });
+    }
+    return result;
+  }
+
+  async listActiveChallenges(serverId: string): Promise<ActiveChallenge[]> {
+    return this.getActiveChallenges(serverId);
+  }
+
   async createChallenge({
     serverId,
     channelId,
@@ -144,6 +202,23 @@ export class ChallengeService {
   }): Promise<string> {
     const id = randomUUID();
     const endsAt = startedAt + lengthMinutes * 60;
+    const participantRatings = await Promise.all(
+      participants.map(async (userId) => ({
+        userId,
+        rating: await this.store.getRating(serverId, userId),
+      }))
+    );
+    for (const entry of participantRatings) {
+      if (entry.rating < 0) {
+        logWarn("Missing rating while creating challenge.", {
+          guildId: serverId,
+          userId: entry.userId,
+        });
+      }
+    }
+    const ratingMap = new Map(participantRatings.map((entry) => [entry.userId, entry.rating]));
+    const nowIso = new Date().toISOString();
+
     await this.db.transaction().execute(async (trx) => {
       await trx
         .insertInto("challenges")
@@ -162,7 +237,7 @@ export class ChallengeService {
           started_at: startedAt,
           ends_at: endsAt,
           check_index: 0,
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso,
         })
         .execute();
 
@@ -171,7 +246,9 @@ export class ChallengeService {
         user_id: userId,
         position,
         solved_at: null,
-        updated_at: new Date().toISOString(),
+        rating_before: ratingMap.get(userId) ?? null,
+        rating_delta: null,
+        updated_at: nowIso,
       }));
       await trx.insertInto("challenge_participants").values(rows).execute();
     });
@@ -264,10 +341,12 @@ export class ChallengeService {
     serverId,
     problem,
     participants,
+    startedAt,
   }: {
     serverId: string;
     problem: ChallengeProblem;
     participants: ChallengeParticipant[];
+    startedAt: number;
   }): Promise<EmbedBuilder> {
     const embed = new EmbedBuilder()
       .setTitle("Challenge results")
@@ -279,10 +358,17 @@ export class ChallengeService {
       .sort((a, b) => a.position - b.position)
       .map((participant) => {
         const rating = ratings.get(participant.userId) ?? 0;
+        const delta =
+          participant.ratingDelta === null || participant.ratingDelta === undefined
+            ? "N/A"
+            : participant.ratingDelta > 0
+              ? `+${participant.ratingDelta}`
+              : String(participant.ratingDelta);
         if (participant.solvedAt !== null) {
-          return `- <@${participant.userId}> (${rating}) :white_check_mark:`;
+          const duration = formatTime(Math.max(0, participant.solvedAt - startedAt));
+          return `- <@${participant.userId}> (${rating}, ${delta}) solved in ${duration} :white_check_mark:`;
         }
-        return `- <@${participant.userId}> (${rating}) :x:`;
+        return `- <@${participant.userId}> (${rating}, ${delta}) not solved :x:`;
       })
       .join("\n");
 
@@ -290,12 +376,47 @@ export class ChallengeService {
     return embed;
   }
 
-  private async getActiveChallenges(): Promise<ActiveChallenge[]> {
-    const rows = await this.db
-      .selectFrom("challenges")
-      .selectAll()
-      .where("status", "=", "active")
+  async cancelChallenge(
+    challengeId: string,
+    cancelledBy: string,
+    client: Client
+  ): Promise<boolean> {
+    const challenge = await this.getActiveChallengeById(challengeId);
+    if (!challenge) {
+      return false;
+    }
+
+    await this.db
+      .updateTable("challenges")
+      .set({ status: "cancelled", updated_at: new Date().toISOString() })
+      .where("id", "=", challenge.id)
       .execute();
+
+    const embed = await this.buildCancelledEmbed({
+      serverId: challenge.serverId,
+      problem: challenge.problem,
+      participants: challenge.participants,
+      cancelledBy,
+    });
+    const message = await fetchMessage(client, challenge.channelId, challenge.messageId);
+    if (!message) {
+      logWarn("Challenge message missing; skipping cancel update.", {
+        challengeId: challenge.id,
+        guildId: challenge.serverId,
+      });
+      return true;
+    }
+    await message.edit({ embeds: [embed] });
+    logInfo("Challenge cancelled.", { challengeId: challenge.id, guildId: challenge.serverId });
+    return true;
+  }
+
+  private async getActiveChallenges(serverId?: string): Promise<ActiveChallenge[]> {
+    let query = this.db.selectFrom("challenges").selectAll().where("status", "=", "active");
+    if (serverId) {
+      query = query.where("server_id", "=", serverId);
+    }
+    const rows = await query.execute();
     if (rows.length === 0) {
       return [];
     }
@@ -316,6 +437,8 @@ export class ChallengeService {
         userId: participant.user_id,
         position: participant.position,
         solvedAt: participant.solved_at ?? null,
+        ratingBefore: participant.rating_before ?? null,
+        ratingDelta: participant.rating_delta ?? null,
       });
       grouped.set(participant.challenge_id, list);
     }
@@ -339,6 +462,11 @@ export class ChallengeService {
       checkIndex: row.check_index,
       participants: (grouped.get(row.id) ?? []).sort((a, b) => a.position - b.position),
     }));
+  }
+
+  private async getActiveChallengeById(challengeId: string): Promise<ActiveChallenge | null> {
+    const challenges = await this.getActiveChallenges();
+    return challenges.find((challenge) => challenge.id === challengeId) ?? null;
   }
 
   private async updateChallengeMessage(
@@ -407,22 +535,45 @@ export class ChallengeService {
       return false;
     }
 
-    await this.markSolved(challenge, participant.userId);
+    await this.markSolved(challenge, participant);
     return true;
   }
 
-  private async markSolved(challenge: ActiveChallenge, userId: string): Promise<void> {
+  private async markSolved(
+    challenge: ActiveChallenge,
+    participant: ChallengeParticipant
+  ): Promise<void> {
     const nowSeconds = this.clock.nowSeconds();
+    const rating = await this.store.getRating(challenge.serverId, participant.userId);
+    if (rating < 0) {
+      logWarn("Missing rating while resolving challenge.", {
+        challengeId: challenge.id,
+        guildId: challenge.serverId,
+        userId: participant.userId,
+      });
+      await this.db
+        .updateTable("challenge_participants")
+        .set({ solved_at: nowSeconds, updated_at: new Date().toISOString() })
+        .where("challenge_id", "=", challenge.id)
+        .where("user_id", "=", participant.userId)
+        .execute();
+      return;
+    }
+
+    const [, up] = getRatingChanges(rating, challenge.problem.rating, challenge.lengthMinutes);
     await this.db
       .updateTable("challenge_participants")
-      .set({ solved_at: nowSeconds, updated_at: new Date().toISOString() })
+      .set({
+        solved_at: nowSeconds,
+        rating_delta: up,
+        updated_at: new Date().toISOString(),
+      })
       .where("challenge_id", "=", challenge.id)
-      .where("user_id", "=", userId)
+      .where("user_id", "=", participant.userId)
       .execute();
 
-    const rating = await this.store.getRating(challenge.serverId, userId);
-    const [, up] = getRatingChanges(rating, challenge.problem.rating, challenge.lengthMinutes);
-    await this.store.updateRating(challenge.serverId, userId, rating + up);
+    participant.ratingDelta = up;
+    await this.store.updateRating(challenge.serverId, participant.userId, rating + up);
   }
 
   private async finalizeChallenge(challenge: ActiveChallenge, client: Client): Promise<void> {
@@ -439,7 +590,22 @@ export class ChallengeService {
         continue;
       }
       const rating = await this.store.getRating(challenge.serverId, participant.userId);
+      if (rating < 0) {
+        logWarn("Missing rating while applying challenge penalty.", {
+          challengeId: challenge.id,
+          guildId: challenge.serverId,
+          userId: participant.userId,
+        });
+        continue;
+      }
       const [down] = getRatingChanges(rating, challenge.problem.rating, challenge.lengthMinutes);
+      await this.db
+        .updateTable("challenge_participants")
+        .set({ rating_delta: down, updated_at: new Date().toISOString() })
+        .where("challenge_id", "=", challenge.id)
+        .where("user_id", "=", participant.userId)
+        .execute();
+      participant.ratingDelta = down;
       await this.store.updateRating(challenge.serverId, participant.userId, rating + down);
     }
 
@@ -453,6 +619,7 @@ export class ChallengeService {
       serverId: challenge.serverId,
       problem: challenge.problem,
       participants,
+      startedAt: challenge.startedAt,
     });
     const message = await fetchMessage(client, challenge.channelId, challenge.messageId);
     if (!message) {
@@ -463,6 +630,41 @@ export class ChallengeService {
       return;
     }
     await message.edit({ embeds: [embed] });
+  }
+
+  private async buildCancelledEmbed({
+    serverId,
+    problem,
+    participants,
+    cancelledBy,
+  }: {
+    serverId: string;
+    problem: ChallengeProblem;
+    participants: ChallengeParticipant[];
+    cancelledBy: string;
+  }): Promise<EmbedBuilder> {
+    const embed = new EmbedBuilder()
+      .setTitle("Challenge cancelled")
+      .setColor(0xe67e22)
+      .addFields(
+        { name: "Problem", value: buildProblemLink(problem), inline: false },
+        { name: "Cancelled by", value: `<@${cancelledBy}>`, inline: true }
+      );
+
+    const ratings = await this.getRatings(serverId, participants);
+    const usersValue = participants
+      .sort((a, b) => a.position - b.position)
+      .map((participant) => {
+        const rating = ratings.get(participant.userId) ?? 0;
+        if (participant.solvedAt !== null) {
+          return `- <@${participant.userId}> (${rating}) :white_check_mark:`;
+        }
+        return `- <@${participant.userId}> (${rating}) :x:`;
+      })
+      .join("\n");
+
+    embed.addFields({ name: "Users", value: usersValue || "No participants.", inline: false });
+    return embed;
   }
 
   private async gotAc(

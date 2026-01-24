@@ -44,25 +44,37 @@ export const profileCommand: Command = {
 
       const rating = await context.services.store.getRating(interaction.guild.id, targetId);
       const cfProfile = await context.services.store.getCodeforcesProfile(handle);
-      const historyData = await context.services.store.getHistoryWithRatings(
+      const recentHistory = await context.services.store.getChallengeHistoryPage(
         interaction.guild.id,
-        targetId
+        targetId,
+        1,
+        5
       );
-      const totalChallenges = historyData?.history.length ?? 0;
-      const problemDict = context.services.problems.getProblemDict();
-      const recent = historyData?.history.slice(-5) ?? [];
-
-      const recentLines = recent
-        .map((problemId) => {
-          const problem = problemDict.get(problemId);
-          return buildProblemLine(
-            problemId,
-            problem?.name ?? null,
-            problem?.contestId,
-            problem?.index
-          );
-        })
+      let totalChallenges = recentHistory.total;
+      let recentLines = recentHistory.entries
+        .map((entry) => buildProblemLine(entry.problemId, entry.name, entry.contestId, entry.index))
         .join("\n");
+
+      if (totalChallenges === 0) {
+        const historyData = await context.services.store.getHistoryWithRatings(
+          interaction.guild.id,
+          targetId
+        );
+        totalChallenges = historyData?.history.length ?? 0;
+        const problemDict = context.services.problems.getProblemDict();
+        const recent = historyData?.history.slice(-5) ?? [];
+        recentLines = recent
+          .map((problemId) => {
+            const problem = problemDict.get(problemId);
+            return buildProblemLine(
+              problemId,
+              problem?.name ?? null,
+              problem?.contestId,
+              problem?.index
+            );
+          })
+          .join("\n");
+      }
 
       const displayHandle = cfProfile?.profile.displayHandle ?? handle;
       const cfRating =

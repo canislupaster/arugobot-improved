@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { formatTime } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
 
@@ -26,6 +27,42 @@ export const historyCommand: Command = {
     }
 
     try {
+      const historyPage = await context.services.store.getChallengeHistoryPage(
+        interaction.guild.id,
+        interaction.user.id,
+        page,
+        10
+      );
+
+      if (historyPage.total > 0) {
+        if (historyPage.entries.length === 0) {
+          await interaction.reply({ content: "Empty page.", ephemeral: true });
+          return;
+        }
+        const lines = historyPage.entries.map((entry) => {
+          const duration =
+            entry.solvedAt === null
+              ? "Not solved"
+              : `Solved in ${formatTime(Math.max(0, entry.solvedAt - entry.startedAt))}`;
+          const delta =
+            entry.ratingDelta === null
+              ? "N/A"
+              : entry.ratingDelta > 0
+                ? `+${entry.ratingDelta}`
+                : String(entry.ratingDelta);
+          return `- [${entry.problemId}. ${entry.name}](https://codeforces.com/problemset/problem/${entry.contestId}/${entry.index}) • ${duration} • ${delta}`;
+        });
+
+        const embed = new EmbedBuilder()
+          .setTitle("History")
+          .setDescription(`Page ${page}`)
+          .setColor(0x3498db)
+          .addFields({ name: "Challenges", value: lines.join("\n"), inline: false });
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
+
       const historyData = await context.services.store.getHistoryWithRatings(
         interaction.guild.id,
         interaction.user.id

@@ -33,7 +33,7 @@ The following commands are available to you:
 
 - **/history** `[page]`
 
-  Shows a page of your challenge history.
+  Shows a page of your completed challenge history (result + rating delta).
 
 - **/leaderboard** `[page]`
 
@@ -41,7 +41,7 @@ The following commands are available to you:
 
 - **/profile** `[user]`
 
-  Shows a linked handle, rating, Codeforces profile info, and recent activity.
+  Shows a linked handle, rating, Codeforces profile info, and recent completed challenges.
 
 - **/compare** `[user1..user4]` `[handles]`
 
@@ -94,7 +94,7 @@ The following commands are available to you:
 
   Lists ongoing and upcoming Codeforces contests.
 
-- **/contestreminders** `set|status|clear`
+- **/contestreminders** `set|status|clear|preview`
 
   Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time, and optional role mention.
 
