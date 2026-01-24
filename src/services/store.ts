@@ -39,6 +39,7 @@ const HANDLE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 60 * 60 * 1000;
 const RECENT_SUBMISSIONS_TTL_MS = 5 * 60 * 1000;
 const RECENT_SUBMISSIONS_FETCH_COUNT = 20;
+const SOLVED_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export type CodeforcesProfile = {
   handle: string;
@@ -89,6 +90,18 @@ function parseJsonArray<T>(raw: string | null | undefined, fallback: T[]): T[] {
   } catch {
     return fallback;
   }
+}
+
+function isCacheFresh(lastFetched: string | null | undefined, ttlMs: number): boolean {
+  if (!lastFetched || ttlMs <= 0) {
+    return false;
+  }
+  const lastFetchedAt = Date.parse(lastFetched);
+  if (!Number.isFinite(lastFetchedAt)) {
+    return false;
+  }
+  const ageMs = Date.now() - lastFetchedAt;
+  return ageMs >= 0 && ageMs <= ttlMs;
 }
 
 export class StoreService {
@@ -186,18 +199,12 @@ export class StoreService {
         .where("handle", "=", key)
         .executeTakeFirst();
 
-      if (cached?.last_checked) {
-        const lastCheckedAt = Date.parse(cached.last_checked);
-        if (Number.isFinite(lastCheckedAt)) {
-          const ageMs = Date.now() - lastCheckedAt;
-          if (ageMs >= 0 && ageMs <= ttlMs) {
-            return {
-              exists: cached.exists === 1,
-              canonicalHandle: cached.canonical_handle,
-              source: "cache",
-            };
-          }
-        }
+      if (cached && isCacheFresh(cached.last_checked, ttlMs)) {
+        return {
+          exists: cached.exists === 1,
+          canonicalHandle: cached.canonical_handle,
+          source: "cache",
+        };
       }
     } catch (error) {
       logError(`Database error: ${String(error)}`);
@@ -293,14 +300,8 @@ export class StoreService {
       logError(`Database error: ${String(error)}`);
     }
 
-    if (cached?.last_fetched) {
-      const lastFetchedAt = Date.parse(cached.last_fetched);
-      if (Number.isFinite(lastFetchedAt)) {
-        const ageMs = Date.now() - lastFetchedAt;
-        if (ageMs >= 0 && ageMs <= ttlMs) {
-          return { profile: this.mapProfileRow(cached), source: "cache", isStale: false };
-        }
-      }
+    if (cached && isCacheFresh(cached.last_fetched, ttlMs)) {
+      return { profile: this.mapProfileRow(cached), source: "cache", isStale: false };
     }
 
     try {
@@ -364,15 +365,9 @@ export class StoreService {
       logError(`Database error: ${String(error)}`);
     }
 
-    if (cached?.last_fetched) {
-      const lastFetchedAt = Date.parse(cached.last_fetched);
-      if (Number.isFinite(lastFetchedAt)) {
-        const ageMs = Date.now() - lastFetchedAt;
-        if (ageMs >= 0 && ageMs <= ttlMs) {
-          const submissions = parseJsonArray<RecentSubmission>(cached.submissions, []);
-          return { submissions: submissions.slice(0, limit), source: "cache", isStale: false };
-        }
-      }
+    if (cached && isCacheFresh(cached.last_fetched, ttlMs)) {
+      const submissions = parseJsonArray<RecentSubmission>(cached.submissions, []);
+      return { submissions: submissions.slice(0, limit), source: "cache", isStale: false };
     }
 
     try {
@@ -701,18 +696,21 @@ export class StoreService {
     }
   }
 
-  async getSolvedProblems(handle: string): Promise<string[] | null> {
+  async getSolvedProblems(handle: string, ttlMs = SOLVED_CACHE_TTL_MS): Promise<string[] | null> {
     let result: string[] = [];
     let newLast = -1;
 
     try {
       const row = await this.db
         .selectFrom("ac")
-        .select(["solved", "last_sub"])
+        .select(["solved", "last_sub", "updated_at"])
         .where("handle", "=", handle)
         .executeTakeFirst();
 
       if (row) {
+        if (isCacheFresh(row.updated_at, ttlMs)) {
+          return parseJsonArray<string>(row.solved, []);
+        }
         logInfo("Small query.");
         const prevLast = row.last_sub;
         const currentList = parseJsonArray<string>(row.solved, []);
