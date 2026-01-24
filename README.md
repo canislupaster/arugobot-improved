@@ -152,6 +152,10 @@ The following commands are available to you:
 
   Shows standings for linked users (or specified handles) in a contest.
 
+- **/contesthistory** `[user]` `[handle]` `[limit]`
+
+  Shows recent Codeforces contest rating changes for a linked user or handle.
+
 - **/contestreminders** `set|status|clear|preview|post`
 
   Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time,

@@ -20,6 +20,7 @@ import {
 } from "./services/practiceReminders.js";
 import { PracticeSuggestionService } from "./services/practiceSuggestions.js";
 import { ProblemService } from "./services/problems.js";
+import { RatingChangesService } from "./services/ratingChanges.js";
 import { StoreService } from "./services/store.js";
 import { TournamentRecapService } from "./services/tournamentRecaps.js";
 import { TournamentService } from "./services/tournaments.js";
@@ -51,6 +52,7 @@ async function main() {
   const contestStandings = new ContestStandingsService(db, codeforces);
   const contestReminders = new ContestReminderService(db, contests);
   const problems = new ProblemService(codeforces, cache);
+  const ratingChanges = new RatingChangesService(db, codeforces);
   const store = new StoreService(db, codeforces, {
     maxSolvedPages: config.codeforcesSolvedMaxPages,
   });
@@ -200,6 +202,7 @@ async function main() {
         practiceSuggestions,
         codeforces,
         problems,
+        ratingChanges,
         store,
         tournamentRecaps,
         tournaments,

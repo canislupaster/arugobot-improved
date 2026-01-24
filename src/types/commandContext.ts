@@ -9,6 +9,7 @@ import type { ContestStandingsService } from "../services/contestStandings.js";
 import type { PracticeReminderService } from "../services/practiceReminders.js";
 import type { PracticeSuggestionService } from "../services/practiceSuggestions.js";
 import type { ProblemService } from "../services/problems.js";
+import type { RatingChangesService } from "../services/ratingChanges.js";
 import type { StoreService } from "../services/store.js";
 import type { TournamentRecapService } from "../services/tournamentRecaps.js";
 import type { TournamentService } from "../services/tournaments.js";
@@ -27,6 +28,7 @@ export type CommandContext = {
     practiceSuggestions: PracticeSuggestionService;
     codeforces: CodeforcesClient;
     problems: ProblemService;
+    ratingChanges: RatingChangesService;
     store: StoreService;
     tournamentRecaps: TournamentRecapService;
     tournaments: TournamentService;

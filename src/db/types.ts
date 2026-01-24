@@ -48,6 +48,12 @@ export type CfCacheTable = {
   last_fetched: Generated<string>;
 };
 
+export type CfRatingChangesTable = {
+  handle: string;
+  payload: string;
+  last_fetched: Generated<string>;
+};
+
 export type ChallengesTable = {
   id: string;
   server_id: string;
@@ -211,6 +217,7 @@ export type Database = {
   cf_profiles: CfProfilesTable;
   cf_recent_submissions: CfRecentSubmissionsTable;
   cf_cache: CfCacheTable;
+  cf_rating_changes: CfRatingChangesTable;
   challenges: ChallengesTable;
   challenge_participants: ChallengeParticipantsTable;
   contest_reminders: ContestRemindersTable;
