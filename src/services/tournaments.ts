@@ -87,6 +87,14 @@ export type TournamentHistoryPage = {
   entries: TournamentHistoryEntry[];
 };
 
+export type TournamentHistoryDetail = {
+  entry: TournamentHistoryEntry;
+  channelId: string;
+  hostUserId: string;
+  standings: TournamentStandingsEntry[];
+  rounds: TournamentRoundSummary[];
+};
+
 export type TournamentStartResult = {
   tournamentId: string;
   round: TournamentRoundSummary;
@@ -226,6 +234,61 @@ export class TournamentService implements ChallengeCompletionNotifier {
     );
 
     return { total, entries };
+  }
+
+  async getHistoryDetail(
+    guildId: string,
+    tournamentId: string,
+    roundLimit = 3,
+    standingsLimit = 5
+  ): Promise<TournamentHistoryDetail | null> {
+    const row = await this.db
+      .selectFrom("tournaments")
+      .selectAll()
+      .where("id", "=", tournamentId)
+      .where("guild_id", "=", guildId)
+      .where("status", "in", ["completed", "cancelled"])
+      .executeTakeFirst();
+    if (!row) {
+      return null;
+    }
+
+    const tournament = this.mapTournament(row);
+    const participantRow = await this.db
+      .selectFrom("tournament_participants")
+      .select(({ fn }) => fn.count<number>("user_id").as("count"))
+      .where("tournament_id", "=", tournament.id)
+      .executeTakeFirst();
+    const participantCount = Number(participantRow?.count ?? 0);
+    const winnerId =
+      tournament.status === "completed"
+        ? await this.getTournamentWinnerId(tournament.id, tournament.format)
+        : null;
+
+    const entry: TournamentHistoryEntry = {
+      id: tournament.id,
+      format: tournament.format,
+      status: tournament.status,
+      lengthMinutes: tournament.lengthMinutes,
+      roundCount: tournament.roundCount,
+      ratingRanges: tournament.ratingRanges,
+      tags: tournament.tags,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      participantCount,
+      winnerId,
+    };
+
+    const standings = await this.getStandings(tournament.id, tournament.format);
+    const rounds = await this.listRoundSummaries(tournament.id, roundLimit);
+
+    return {
+      entry,
+      channelId: tournament.channelId,
+      hostUserId: tournament.hostUserId,
+      standings: standings.slice(0, Math.max(1, standingsLimit)),
+      rounds,
+    };
   }
 
   async listParticipants(tournamentId: string): Promise<TournamentParticipant[]> {

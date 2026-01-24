@@ -475,4 +475,103 @@ describe("TournamentService", () => {
     expect(history.entries[1]?.id).toBe("tournament-2");
     expect(history.entries[1]?.winnerId).toBeNull();
   });
+
+  it("returns tournament history detail with standings and rounds", async () => {
+    const service = new TournamentService(db, {} as never, {} as never, {} as never);
+    const tournamentId = "tournament-history-1";
+    const roundId = "round-history-1";
+    const nowIso = new Date().toISOString();
+
+    await db
+      .insertInto("tournaments")
+      .values({
+        id: tournamentId,
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        host_user_id: "host-1",
+        format: "swiss",
+        status: "completed",
+        length_minutes: 40,
+        round_count: 2,
+        current_round: 2,
+        rating_ranges: JSON.stringify([{ min: 800, max: 1200 }]),
+        tags: "dp,greedy",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_participants")
+      .values([
+        {
+          tournament_id: tournamentId,
+          user_id: "user-1",
+          seed: 1,
+          score: 1,
+          wins: 1,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-2",
+          seed: 2,
+          score: 0,
+          wins: 0,
+          losses: 1,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("tournament_rounds")
+      .values({
+        id: roundId,
+        tournament_id: tournamentId,
+        round_number: 1,
+        status: "completed",
+        problem_contest_id: 1000,
+        problem_index: "A",
+        problem_name: "History Problem",
+        problem_rating: 1200,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_matches")
+      .values({
+        id: "match-history-1",
+        tournament_id: tournamentId,
+        round_id: roundId,
+        match_number: 1,
+        challenge_id: "challenge-history-1",
+        player1_id: "user-1",
+        player2_id: "user-2",
+        winner_id: "user-1",
+        status: "completed",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    const detail = await service.getHistoryDetail("guild-1", tournamentId, 2, 2);
+
+    expect(detail).not.toBeNull();
+    expect(detail?.entry.participantCount).toBe(2);
+    expect(detail?.entry.winnerId).toBe("user-1");
+    expect(detail?.channelId).toBe("channel-1");
+    expect(detail?.hostUserId).toBe("host-1");
+    expect(detail?.standings.length).toBeGreaterThan(0);
+    expect(detail?.rounds.length).toBeGreaterThan(0);
+  });
 });

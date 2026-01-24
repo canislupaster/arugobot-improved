@@ -6,10 +6,15 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   type User,
 } from "discord.js";
 
-import type { TournamentHistoryEntry } from "../services/tournaments.js";
+import type {
+  TournamentHistoryDetail,
+  TournamentHistoryEntry,
+} from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatTime } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
@@ -27,6 +32,9 @@ const OPEN_LOBBY_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_SWISS_MIN_ROUNDS = 3;
 const MAX_SWISS_ROUNDS = 10;
 const HISTORY_PAGE_SIZE = 5;
+const HISTORY_SELECT_TIMEOUT_MS = 30_000;
+const HISTORY_DETAIL_ROUND_LIMIT = 3;
+const HISTORY_DETAIL_STANDINGS_LIMIT = 5;
 
 type TournamentFormat = "swiss" | "elimination";
 
@@ -36,6 +44,13 @@ function formatTournamentFormat(format: TournamentFormat): string {
 
 function formatScore(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function truncateLabel(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
 function buildUsersValue(users: User[]): string {
@@ -58,6 +73,101 @@ function formatHistoryLine(entry: TournamentHistoryEntry): string {
   const winnerLabel = entry.winnerId ? `<@${entry.winnerId}>` : "None";
   const timestamp = formatHistoryTimestamp(entry.updatedAt);
   return `- ${statusLabel} • ${formatTournamentFormat(entry.format)} • ${entry.participantCount} players • ${entry.roundCount} rounds • ${entry.lengthMinutes}m • Winner: ${winnerLabel} • ${timestamp}`;
+}
+
+function formatRatingRanges(ranges: Array<{ min: number; max: number }>): string {
+  if (ranges.length === 0) {
+    return "Any";
+  }
+  return ranges
+    .map((range) => (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`))
+    .join(", ");
+}
+
+function formatTags(tags: string): string {
+  const trimmed = tags.trim();
+  return trimmed.length > 0 ? trimmed : "None";
+}
+
+function buildHistorySelectOptions(
+  entries: TournamentHistoryEntry[]
+): StringSelectMenuOptionBuilder[] {
+  return entries.map((entry, index) => {
+    const label = truncateLabel(
+      `${index + 1}. ${formatTournamentFormat(entry.format)} • ${entry.lengthMinutes}m`,
+      100
+    );
+    const statusLabel = entry.status === "completed" ? "Completed" : "Cancelled";
+    const description = truncateLabel(
+      `${statusLabel} • ${entry.participantCount} players • ${formatHistoryTimestamp(
+        entry.updatedAt
+      )}`,
+      100
+    );
+    return new StringSelectMenuOptionBuilder()
+      .setLabel(label)
+      .setDescription(description)
+      .setValue(entry.id);
+  });
+}
+
+function formatRoundSummary(summary: TournamentHistoryDetail["rounds"][number]): string {
+  const progress =
+    summary.matchCount > 0
+      ? `${summary.completedCount}/${summary.matchCount} complete`
+      : "No matches";
+  const byes = summary.byeCount > 0 ? ` • ${summary.byeCount} byes` : "";
+  return `Round ${summary.roundNumber} (${summary.status}) • ${summary.problem.index}. ${summary.problem.name} • ${progress}${byes}`;
+}
+
+function buildHistoryDetailEmbed(detail: TournamentHistoryDetail): EmbedBuilder {
+  const statusLabel = detail.entry.status === "completed" ? "Completed" : "Cancelled";
+  const winnerLabel = detail.entry.winnerId ? `<@${detail.entry.winnerId}>` : "None";
+  const rangeLabel = formatRatingRanges(detail.entry.ratingRanges);
+  const tagLabel = formatTags(detail.entry.tags);
+  const updatedAt = formatHistoryTimestamp(detail.entry.updatedAt);
+  const embed = new EmbedBuilder()
+    .setTitle("Tournament recap")
+    .setColor(0x3498db)
+    .setDescription(
+      `${statusLabel} • ${formatTournamentFormat(detail.entry.format)} • ${detail.entry.lengthMinutes}m`
+    )
+    .addFields(
+      { name: "Participants", value: String(detail.entry.participantCount), inline: true },
+      { name: "Rounds", value: String(detail.entry.roundCount), inline: true },
+      { name: "Winner", value: winnerLabel, inline: true },
+      { name: "Channel", value: `<#${detail.channelId}>`, inline: true },
+      { name: "Host", value: `<@${detail.hostUserId}>`, inline: true },
+      { name: "Updated", value: updatedAt, inline: true }
+    )
+    .setFooter({ text: `Ranges: ${rangeLabel} • Tags: ${tagLabel}` });
+
+  if (detail.standings.length > 0) {
+    const standingsValue = detail.standings
+      .map((participant, index) => {
+        const tiebreak =
+          detail.entry.format === "swiss"
+            ? ` • TB ${formatScore(participant.tiebreak)}`
+            : "";
+        const status = participant.eliminated ? " • eliminated" : "";
+        return `${index + 1}. <@${participant.userId}> • ${formatScore(
+          participant.score
+        )} pts (${participant.wins}-${participant.losses}-${participant.draws})${tiebreak}${status}`;
+      })
+      .join("\n");
+    embed.addFields({
+      name: `Standings (top ${detail.standings.length})`,
+      value: standingsValue,
+      inline: false,
+    });
+  }
+
+  if (detail.rounds.length > 0) {
+    const roundsValue = detail.rounds.map((summary) => formatRoundSummary(summary)).join("\n");
+    embed.addFields({ name: "Recent rounds", value: roundsValue, inline: false });
+  }
+
+  return embed;
 }
 
 export const tournamentCommand: Command = {
@@ -176,7 +286,69 @@ export const tournamentCommand: Command = {
           .setDescription(`Page ${page} of ${totalPages}`)
           .setColor(0x3498db)
           .addFields({ name: "Recent tournaments", value: lines.join("\n"), inline: false });
-        await interaction.editReply({ embeds: [embed] });
+        const selectId = `tournament_history_${interaction.id}`;
+        const options = buildHistorySelectOptions(history.entries);
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId(selectId)
+            .setPlaceholder("Select a tournament for details")
+            .addOptions(options)
+        );
+
+        const response = await interaction.editReply({
+          embeds: [embed],
+          components: [row],
+        });
+
+        const collector = response.createMessageComponentCollector({
+          componentType: ComponentType.StringSelect,
+          time: HISTORY_SELECT_TIMEOUT_MS,
+        });
+
+        collector.on("collect", async (selection) => {
+          try {
+            if (selection.customId !== selectId) {
+              return;
+            }
+            if (selection.user.id !== interaction.user.id) {
+              await selection.reply({
+                content: "Only the command user can use this menu.",
+                ephemeral: true,
+              });
+              return;
+            }
+            const selectedId = selection.values[0];
+            const detail = await context.services.tournaments.getHistoryDetail(
+              guildId,
+              selectedId,
+              HISTORY_DETAIL_ROUND_LIMIT,
+              HISTORY_DETAIL_STANDINGS_LIMIT
+            );
+            if (!detail) {
+              await selection.reply({ content: "Tournament not found.", ephemeral: true });
+              return;
+            }
+            const detailEmbed = buildHistoryDetailEmbed(detail);
+            await selection.update({ embeds: [detailEmbed], components: [row] });
+          } catch (error) {
+            logCommandError(
+              `Error in tournament history: ${String(error)}`,
+              interaction,
+              context.correlationId
+            );
+            if (!selection.replied) {
+              await selection.reply({ content: "Something went wrong.", ephemeral: true });
+            }
+          }
+        });
+
+        collector.on("end", async () => {
+          try {
+            await interaction.editReply({ components: [] });
+          } catch {
+            return;
+          }
+        });
         return;
       }
 

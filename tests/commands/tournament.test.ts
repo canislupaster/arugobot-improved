@@ -12,8 +12,12 @@ const createInteraction = () =>
     reply: jest.fn().mockResolvedValue(undefined),
   }) as unknown as ChatInputCommandInteraction;
 
-const createHistoryInteraction = () =>
-  ({
+const createHistoryInteraction = () => {
+  const collector = { on: jest.fn() };
+  const response = {
+    createMessageComponentCollector: jest.fn().mockReturnValue(collector),
+  };
+  return {
     options: {
       getSubcommand: jest.fn().mockReturnValue("history"),
       getInteger: jest.fn().mockReturnValue(1),
@@ -21,8 +25,9 @@ const createHistoryInteraction = () =>
     guild: { id: "guild-1" },
     reply: jest.fn().mockResolvedValue(undefined),
     deferReply: jest.fn().mockResolvedValue(undefined),
-    editReply: jest.fn().mockResolvedValue(undefined),
-  }) as unknown as ChatInputCommandInteraction;
+    editReply: jest.fn().mockResolvedValue(response),
+  } as unknown as ChatInputCommandInteraction;
+};
 
 describe("tournamentCommand", () => {
   it("shows round summaries and tiebreak standings", async () => {
@@ -170,5 +175,6 @@ describe("tournamentCommand", () => {
     const fields = (embed.fields ?? []) as Array<{ name: string; value: string }>;
     const historyField = fields.find((field) => field.name === "Recent tournaments");
     expect(historyField?.value).toContain("Winner: <@user-1>");
+    expect(payload.components).toHaveLength(1);
   });
 });
