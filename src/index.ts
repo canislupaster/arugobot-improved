@@ -20,6 +20,7 @@ import {
 import { PracticeSuggestionService } from "./services/practiceSuggestions.js";
 import { ProblemService } from "./services/problems.js";
 import { StoreService } from "./services/store.js";
+import { TournamentRecapService } from "./services/tournamentRecaps.js";
 import { TournamentService } from "./services/tournaments.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo, logWarn } from "./utils/logger.js";
@@ -53,6 +54,7 @@ async function main() {
   });
   const challenges = new ChallengeService(db, store, codeforces);
   const tournaments = new TournamentService(db, problems, store, challenges);
+  const tournamentRecaps = new TournamentRecapService(db, tournaments);
   challenges.setCompletionNotifier(tournaments);
   const practiceReminders = new PracticeReminderService(db, problems, store);
   const practiceSuggestions = new PracticeSuggestionService(problems, store);
@@ -196,6 +198,7 @@ async function main() {
         codeforces,
         problems,
         store,
+        tournamentRecaps,
         tournaments,
       },
     };

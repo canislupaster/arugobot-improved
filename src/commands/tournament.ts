@@ -564,10 +564,25 @@ export const tournamentCommand: Command = {
           return;
         }
         if (result.status === "completed") {
+          const recapResult = await context.services.tournamentRecaps.postRecapForTournament(
+            guildId,
+            result.tournamentId,
+            context.client,
+            true
+          );
+          let recapNote = "";
+          if (recapResult.status === "sent") {
+            recapNote = ` Recap posted in <#${recapResult.channelId}>.`;
+          } else if (recapResult.status === "channel_missing") {
+            recapNote =
+              " Recap channel is missing; use /tournamentrecaps set to update the channel.";
+          } else if (recapResult.status === "error") {
+            recapNote = " Recap failed to post.";
+          }
           await interaction.editReply(
             result.winnerId
-              ? `Tournament complete! Winner: <@${result.winnerId}>.`
-              : "Tournament complete!"
+              ? `Tournament complete! Winner: <@${result.winnerId}>.${recapNote}`
+              : `Tournament complete!${recapNote}`
           );
           return;
         }

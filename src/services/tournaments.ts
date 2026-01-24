@@ -119,7 +119,7 @@ export type TournamentStartResult = {
 export type TournamentAdvanceResult =
   | { status: "no_active" }
   | { status: "round_incomplete"; roundNumber: number }
-  | { status: "completed"; winnerId: string | null }
+  | { status: "completed"; winnerId: string | null; tournamentId: string }
   | { status: "started"; round: TournamentRoundSummary }
   | { status: "error"; message: string };
 
@@ -708,13 +708,21 @@ export class TournamentService implements ChallengeCompletionNotifier {
     const remaining = await this.listActiveParticipants(tournament.id);
     if (tournament.format === "elimination" && remaining.length <= 1) {
       await this.completeTournament(tournament.id);
-      return { status: "completed", winnerId: remaining[0]?.userId ?? null };
+      return {
+        status: "completed",
+        winnerId: remaining[0]?.userId ?? null,
+        tournamentId: tournament.id,
+      };
     }
 
     if (tournament.format === "swiss" && tournament.currentRound >= tournament.roundCount) {
       await this.completeTournament(tournament.id);
       const top = remaining.sort((a, b) => b.score - a.score)[0];
-      return { status: "completed", winnerId: top?.userId ?? null };
+      return {
+        status: "completed",
+        winnerId: top?.userId ?? null,
+        tournamentId: tournament.id,
+      };
     }
 
     try {

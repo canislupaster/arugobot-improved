@@ -25,6 +25,7 @@ import { registerCommand, relinkCommand, unlinkCommand } from "./register.js";
 import { statsCommand } from "./stats.js";
 import { suggestCommand } from "./suggest.js";
 import { tournamentCommand } from "./tournament.js";
+import { tournamentRecapsCommand } from "./tournamentRecaps.js";
 import type { Command } from "./types.js";
 
 export const commandList: Command[] = [
@@ -55,6 +56,7 @@ export const commandList: Command[] = [
   suggestCommand,
   statsCommand,
   tournamentCommand,
+  tournamentRecapsCommand,
   helpCommand,
   healthCommand,
 ];

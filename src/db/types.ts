@@ -188,6 +188,14 @@ export type TournamentMatchesTable = {
   updated_at: Generated<string>;
 };
 
+export type TournamentRecapSettingsTable = {
+  guild_id: string;
+  channel_id: string;
+  role_id: string | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
@@ -207,4 +215,5 @@ export type Database = {
   tournament_participants: TournamentParticipantsTable;
   tournament_rounds: TournamentRoundsTable;
   tournament_matches: TournamentMatchesTable;
+  tournament_recap_settings: TournamentRecapSettingsTable;
 };

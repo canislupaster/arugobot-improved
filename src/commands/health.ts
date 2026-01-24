@@ -45,6 +45,8 @@ export const healthCommand: Command = {
     const challengeLastError = context.services.challenges.getLastError();
     const activeTournaments = await context.services.tournaments.getActiveCount();
     const tournamentLastError = context.services.tournaments.getLastError();
+    const recapCount = await context.services.tournamentRecaps.getSubscriptionCount();
+    const recapLastError = context.services.tournamentRecaps.getLastError();
     const cacheAgeSeconds =
       lastRefreshAt > 0 ? Math.floor((Date.now() - lastRefreshAt) / 1000) : null;
     const contestCacheAgeSeconds =
@@ -71,6 +73,7 @@ export const healthCommand: Command = {
         { name: "Practice reminders", value: String(practiceReminderCount), inline: true },
         { name: "Active challenges", value: String(activeChallenges), inline: true },
         { name: "Active tournaments", value: String(activeTournaments), inline: true },
+        { name: "Tournament recaps", value: String(recapCount), inline: true },
         { name: "Commands handled", value: String(getCommandCount()), inline: true },
         { name: "Node", value: process.version, inline: true },
         { name: "discord.js", value: discordJsVersion, inline: true },
@@ -130,6 +133,13 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Tournament last error",
         value: `${tournamentLastError.timestamp} - ${tournamentLastError.message}`,
+        inline: false,
+      });
+    }
+    if (recapLastError) {
+      embed.addFields({
+        name: "Tournament recaps last error",
+        value: `${recapLastError.timestamp} - ${recapLastError.message}`,
         inline: false,
       });
     }

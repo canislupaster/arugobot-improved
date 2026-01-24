@@ -4,8 +4,6 @@ Edit this file to document project structure and any features you add or are pur
 
 # TODO
 
-- Add optional auto-posting of tournament recaps when a tournament completes.
-
 When this TODO list clears up, continue adding ideas!
 
 # ArugoBot
@@ -35,6 +33,11 @@ The following commands are available to you:
   start the next round after all matches finish. `status` shows standings, recent rounds, and the current round.
   `history` lists recently completed or cancelled tournaments for the server (select a tournament for a recap
   and export CSV/markdown results).
+
+- **/tournamentrecaps** `set|status|clear|post`
+
+  Configure automatic tournament recap posts. Use `set` to choose a channel and optional role mention.
+  `post` sends the latest completed tournament recap immediately.
 
 - **/rating** `[user]`
 
