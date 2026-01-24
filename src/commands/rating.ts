@@ -1,16 +1,27 @@
-import { Chart, registerables, type ChartConfiguration, type ChartOptions, type Plugin } from "chart.js";
-import { ChartJSNodeCanvas } from "chartjs-node-canvas";
+import type { Chart, ChartConfiguration, ChartOptions, Plugin } from "chart.js";
 import { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logError } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
 
-Chart.register(...registerables);
-
 const width = 900;
 const height = 450;
-const chartCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: "white" });
+let chartCanvas: import("chartjs-node-canvas").ChartJSNodeCanvas | null = null;
+let chartRegistered = false;
+
+async function getChartCanvas() {
+  const chartJs = await import("chart.js");
+  const { ChartJSNodeCanvas } = await import("chartjs-node-canvas");
+  if (!chartRegistered) {
+    chartJs.Chart.register(...chartJs.registerables);
+    chartRegistered = true;
+  }
+  if (!chartCanvas) {
+    chartCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: "white" });
+  }
+  return chartCanvas;
+}
 
 const ratingBands = [
   { min: -1000, max: 1200, color: "rgba(128,128,128,0.5)" },
@@ -44,6 +55,7 @@ const bandPlugin: Plugin<"line"> = {
 };
 
 async function renderRatingChart(name: string, ratings: number[]): Promise<Buffer> {
+  const canvas = await getChartCanvas();
   const labels = ratings.map((_, index) => String(index + 1));
   const min = Math.min(...ratings) - 100;
   const max = Math.max(...ratings) + 100;
@@ -95,7 +107,7 @@ async function renderRatingChart(name: string, ratings: number[]): Promise<Buffe
     plugins: [bandPlugin],
   };
 
-  return chartCanvas.renderToBuffer(config);
+  return canvas.renderToBuffer(config);
 }
 
 export const ratingCommand: Command = {
@@ -148,7 +160,9 @@ export const ratingCommand: Command = {
       await interaction.editReply({ files: [attachment], embeds: [embed] });
     } catch (error) {
       logError(`Something went wrong: ${String(error)}`);
-      await interaction.editReply("Something went wrong.");
+      await interaction.editReply(
+        "Something went wrong while rendering the rating graph. Try again later."
+      );
     }
   },
 };
