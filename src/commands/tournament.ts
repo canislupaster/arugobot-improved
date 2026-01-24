@@ -11,10 +11,7 @@ import {
   type User,
 } from "discord.js";
 
-import type {
-  TournamentHistoryDetail,
-  TournamentHistoryEntry,
-} from "../services/tournaments.js";
+import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatTime } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
@@ -146,9 +143,7 @@ function buildHistoryDetailEmbed(detail: TournamentHistoryDetail): EmbedBuilder 
     const standingsValue = detail.standings
       .map((participant, index) => {
         const tiebreak =
-          detail.entry.format === "swiss"
-            ? ` • TB ${formatScore(participant.tiebreak)}`
-            : "";
+          detail.entry.format === "swiss" ? ` • TB ${formatScore(participant.tiebreak)}` : "";
         const status = participant.eliminated ? " • eliminated" : "";
         return `${index + 1}. <@${participant.userId}> • ${formatScore(
           participant.score
