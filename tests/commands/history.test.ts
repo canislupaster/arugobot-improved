@@ -11,6 +11,8 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     options: {
       getInteger: jest.fn().mockReturnValue(1),
     },
+    deferReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(undefined),
     reply: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
@@ -45,8 +47,9 @@ describe("historyCommand", () => {
 
     await historyCommand.execute(interaction, context);
 
-    expect(interaction.reply).toHaveBeenCalledWith(
-      expect.objectContaining({ embeds: expect.any(Array), ephemeral: true })
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ embeds: expect.any(Array) })
     );
   });
 
@@ -79,8 +82,9 @@ describe("historyCommand", () => {
 
     await historyCommand.execute(interaction, context);
 
-    expect(interaction.reply).toHaveBeenCalledWith(
-      expect.objectContaining({ embeds: expect.any(Array), ephemeral: true })
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ embeds: expect.any(Array) })
     );
   });
 });

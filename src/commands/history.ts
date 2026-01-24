@@ -26,6 +26,8 @@ export const historyCommand: Command = {
       return;
     }
 
+    await interaction.deferReply({ ephemeral: true });
+
     try {
       const historyPage = await context.services.store.getChallengeHistoryPage(
         interaction.guild.id,
@@ -36,7 +38,7 @@ export const historyCommand: Command = {
 
       if (historyPage.total > 0) {
         if (historyPage.entries.length === 0) {
-          await interaction.reply({ content: "Empty page.", ephemeral: true });
+          await interaction.editReply("Empty page.");
           return;
         }
         const lines = historyPage.entries.map((entry) => {
@@ -59,7 +61,7 @@ export const historyCommand: Command = {
           .setColor(0x3498db)
           .addFields({ name: "Challenges", value: lines.join("\n"), inline: false });
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.editReply({ embeds: [embed] });
         return;
       }
 
@@ -68,17 +70,17 @@ export const historyCommand: Command = {
         interaction.user.id
       );
       if (!historyData) {
-        await interaction.reply({ content: "No history yet.", ephemeral: true });
+        await interaction.editReply("No history yet.");
         return;
       }
       const problemDict = context.services.problems.getProblemDict();
       if (problemDict.size === 0) {
-        await interaction.reply({ content: "Problem cache not ready yet.", ephemeral: true });
+        await interaction.editReply("Problem cache not ready yet.");
         return;
       }
       const start = (page - 1) * 10;
       if (start >= historyData.history.length) {
-        await interaction.reply({ content: "Empty page.", ephemeral: true });
+        await interaction.editReply("Empty page.");
         return;
       }
 
@@ -106,10 +108,10 @@ export const historyCommand: Command = {
         .setColor(0x3498db)
         .addFields({ name: "Problems", value: content || "No entries.", inline: false });
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       logCommandError(`Error in history: ${String(error)}`, interaction, context.correlationId);
-      await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+      await interaction.editReply("Something went wrong.");
     }
   },
 };

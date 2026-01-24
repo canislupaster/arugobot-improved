@@ -15,10 +15,12 @@ export const statsCommand: Command = {
       return;
     }
 
+    await interaction.deferReply();
+
     try {
       const stats = await context.services.store.getServerStats(interaction.guild.id);
       if (stats.userCount === 0) {
-        await interaction.reply({ content: "No linked users yet.", ephemeral: true });
+        await interaction.editReply("No linked users yet.");
         return;
       }
 
@@ -40,10 +42,10 @@ export const statsCommand: Command = {
           }
         );
 
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       logCommandError(`Error in stats: ${String(error)}`, interaction, context.correlationId);
-      await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+      await interaction.editReply("Something went wrong.");
     }
   },
 };

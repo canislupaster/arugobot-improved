@@ -27,16 +27,18 @@ export const handlesCommand: Command = {
       return;
     }
 
+    await interaction.deferReply();
+
     try {
       const roster = await context.services.store.getServerRoster(interaction.guild.id);
       if (roster.length === 0) {
-        await interaction.reply({ content: "No linked handles yet.", ephemeral: true });
+        await interaction.editReply("No linked handles yet.");
         return;
       }
 
       const start = (page - 1) * PAGE_SIZE;
       if (start >= roster.length) {
-        await interaction.reply({ content: "Empty page.", ephemeral: true });
+        await interaction.editReply("Empty page.");
         return;
       }
 
@@ -54,10 +56,10 @@ export const handlesCommand: Command = {
         .setColor(0x3498db)
         .addFields({ name: "Users", value: lines || "No entries.", inline: false });
 
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       logCommandError(`Error in handles: ${String(error)}`, interaction, context.correlationId);
-      await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+      await interaction.editReply("Something went wrong.");
     }
   },
 };

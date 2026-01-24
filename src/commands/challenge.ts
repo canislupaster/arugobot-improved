@@ -374,10 +374,12 @@ export const challengeCommand: Command = {
         );
 
       const joinId = `challenge_join_${interaction.id}`;
+      const leaveId = `challenge_leave_${interaction.id}`;
       const startId = `challenge_start_${interaction.id}`;
       const cancelId = `challenge_cancel_${interaction.id}`;
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId(joinId).setLabel("Join").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(leaveId).setLabel("Leave").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(startId).setLabel("Start").setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary)
       );
@@ -453,6 +455,28 @@ export const challengeCommand: Command = {
             return;
           }
           participants.set(button.user.id, button.user);
+          lobbyEmbed.spliceFields(2, 1, {
+            name: "Users",
+            value: await buildUsersValue([...participants.values()]),
+            inline: false,
+          });
+          await button.update({ embeds: [lobbyEmbed], components: [row] });
+          return;
+        }
+
+        if (button.customId === leaveId) {
+          if (!participants.has(button.user.id)) {
+            await button.reply({ content: "You are not in this lobby.", ephemeral: true });
+            return;
+          }
+          if (button.user.id === interaction.user.id) {
+            await button.reply({
+              content: "The host cannot leave. Use cancel to stop the lobby.",
+              ephemeral: true,
+            });
+            return;
+          }
+          participants.delete(button.user.id);
           lobbyEmbed.spliceFields(2, 1, {
             name: "Users",
             value: await buildUsersValue([...participants.values()]),
