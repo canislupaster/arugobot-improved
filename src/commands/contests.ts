@@ -1,5 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
+import { filterContestsByKeywords, parseKeywordFilters } from "../utils/contestFilters.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -24,9 +25,23 @@ export const contestsCommand: Command = {
         .setDescription(`Number of upcoming contests to show (1-${MAX_CONTESTS})`)
         .setMinValue(1)
         .setMaxValue(MAX_CONTESTS)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("include")
+        .setDescription("Only show contests matching keywords (comma-separated)")
+    )
+    .addStringOption((option) =>
+      option
+        .setName("exclude")
+        .setDescription("Hide contests matching keywords (comma-separated)")
     ),
   async execute(interaction, context) {
     const limit = interaction.options.getInteger("limit") ?? MAX_CONTESTS;
+    const filters = parseKeywordFilters(
+      interaction.options.getString("include"),
+      interaction.options.getString("exclude")
+    );
     await interaction.deferReply();
 
     let stale = false;
@@ -43,8 +58,11 @@ export const contestsCommand: Command = {
       }
     }
 
-    const ongoing = context.services.contests.getOngoing();
-    const upcoming = context.services.contests.getUpcoming(limit);
+    const ongoing = filterContestsByKeywords(context.services.contests.getOngoing(), filters);
+    const upcoming = filterContestsByKeywords(
+      context.services.contests.getUpcoming(limit),
+      filters
+    );
 
     if (ongoing.length === 0 && upcoming.length === 0) {
       await interaction.editReply("No Codeforces contests found.");
@@ -77,8 +95,22 @@ export const contestsCommand: Command = {
       embed.addFields({ name: "Upcoming", value: upcomingLines, inline: false });
     }
 
+    const filterParts: string[] = [];
+    if (filters.includeKeywords.length > 0) {
+      filterParts.push(`include: ${filters.includeKeywords.join(", ")}`);
+    }
+    if (filters.excludeKeywords.length > 0) {
+      filterParts.push(`exclude: ${filters.excludeKeywords.join(", ")}`);
+    }
+    const footerParts = [];
     if (stale) {
-      embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+      footerParts.push("Showing cached data due to a temporary Codeforces error.");
+    }
+    if (filterParts.length > 0) {
+      footerParts.push(`Filters: ${filterParts.join(" • ")}`);
+    }
+    if (footerParts.length > 0) {
+      embed.setFooter({ text: footerParts.join(" ") });
     }
 
     await interaction.editReply({ embeds: [embed] });

@@ -2,6 +2,11 @@ import { ChannelType, EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import {
+  filterContestsByKeywords,
+  parseKeywordFilters,
+  serializeKeywords,
+} from "../utils/contestFilters.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import {
   formatDiscordRelativeTime,
@@ -18,6 +23,8 @@ export type ContestReminder = {
   channelId: string;
   minutesBefore: number;
   roleId: string | null;
+  includeKeywords: string[];
+  excludeKeywords: string[];
 };
 
 type ContestProvider = Pick<ContestService, "refresh" | "getUpcomingContests">;
@@ -43,30 +50,48 @@ export class ContestReminderService {
   async getSubscription(guildId: string): Promise<ContestReminder | null> {
     const row = await this.db
       .selectFrom("contest_reminders")
-      .select(["guild_id", "channel_id", "minutes_before", "role_id"])
+      .select([
+        "guild_id",
+        "channel_id",
+        "minutes_before",
+        "role_id",
+        "include_keywords",
+        "exclude_keywords",
+      ])
       .where("guild_id", "=", guildId)
       .executeTakeFirst();
     if (!row) {
       return null;
     }
+    const filters = parseKeywordFilters(row.include_keywords, row.exclude_keywords);
     return {
       guildId: row.guild_id,
       channelId: row.channel_id,
       minutesBefore: row.minutes_before,
       roleId: row.role_id ?? null,
+      includeKeywords: filters.includeKeywords,
+      excludeKeywords: filters.excludeKeywords,
     };
   }
 
   async listSubscriptions(): Promise<ContestReminder[]> {
     const rows = await this.db
       .selectFrom("contest_reminders")
-      .select(["guild_id", "channel_id", "minutes_before", "role_id"])
+      .select([
+        "guild_id",
+        "channel_id",
+        "minutes_before",
+        "role_id",
+        "include_keywords",
+        "exclude_keywords",
+      ])
       .execute();
     return rows.map((row) => ({
       guildId: row.guild_id,
       channelId: row.channel_id,
       minutesBefore: row.minutes_before,
       roleId: row.role_id ?? null,
+      ...parseKeywordFilters(row.include_keywords, row.exclude_keywords),
     }));
   }
 
@@ -82,7 +107,9 @@ export class ContestReminderService {
     guildId: string,
     channelId: string,
     minutesBefore: number,
-    roleId: string | null
+    roleId: string | null,
+    includeKeywords: string[],
+    excludeKeywords: string[]
   ): Promise<void> {
     const timestamp = new Date().toISOString();
     await this.db
@@ -92,6 +119,8 @@ export class ContestReminderService {
         channel_id: channelId,
         minutes_before: minutesBefore,
         role_id: roleId,
+        include_keywords: serializeKeywords(includeKeywords),
+        exclude_keywords: serializeKeywords(excludeKeywords),
         created_at: timestamp,
         updated_at: timestamp,
       })
@@ -100,6 +129,8 @@ export class ContestReminderService {
           channel_id: channelId,
           minutes_before: minutesBefore,
           role_id: roleId,
+          include_keywords: serializeKeywords(includeKeywords),
+          exclude_keywords: serializeKeywords(excludeKeywords),
           updated_at: timestamp,
         })
       )
@@ -178,7 +209,11 @@ export class ContestReminderService {
         }
 
         const textChannel = channel;
-        const contests = getUpcomingWithinWindow(upcoming, nowSeconds, subscription.minutesBefore);
+        const filtered = filterContestsByKeywords(upcoming, {
+          includeKeywords: subscription.includeKeywords,
+          excludeKeywords: subscription.excludeKeywords,
+        });
+        const contests = getUpcomingWithinWindow(filtered, nowSeconds, subscription.minutesBefore);
         for (const contest of contests) {
           const alreadyNotified = await this.wasNotified(subscription.guildId, contest.id);
           if (alreadyNotified) {

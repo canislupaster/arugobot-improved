@@ -56,7 +56,7 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 15, "role-1");
+    await service.setSubscription("guild-1", "channel-1", 15, "role-1", [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -93,13 +93,46 @@ describe("ContestReminderService", () => {
       .execute();
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 10, null);
+    await service.setSubscription("guild-1", "channel-1", 10, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
     await service.runTick(client);
 
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("filters contests using include/exclude keywords", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.getUpcomingContests.mockReturnValue([
+      {
+        id: 401,
+        name: "Codeforces Round #900 (Div. 2)",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 5 * 60,
+        durationSeconds: 7200,
+      },
+      {
+        id: 402,
+        name: "Kotlin Heroes: Practice",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 5 * 60,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestReminderService(db, contestService);
+    await service.setSubscription("guild-1", "channel-1", 10, null, ["div. 2"], ["kotlin"]);
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const notifications = await db.selectFrom("contest_notifications").selectAll().execute();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.contest_id).toBe(401);
   });
 
   it("skips refresh when there are no subscriptions", async () => {
@@ -118,7 +151,7 @@ describe("ContestReminderService", () => {
     contestService.getUpcomingContests.mockReturnValue([]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 10, null);
+    await service.setSubscription("guild-1", "channel-1", 10, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -143,7 +176,7 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 15, null);
+    await service.setSubscription("guild-1", "channel-1", 15, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -164,7 +197,7 @@ describe("ContestReminderService", () => {
     contestService.getUpcomingContests.mockReturnValue([]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 10, null);
+    await service.setSubscription("guild-1", "channel-1", 10, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 

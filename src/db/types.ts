@@ -77,6 +77,8 @@ export type ContestRemindersTable = {
   channel_id: string;
   minutes_before: number;
   role_id: string | null;
+  include_keywords: string | null;
+  exclude_keywords: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;
 };

@@ -111,13 +111,15 @@ The following commands are available to you:
 
   Shows server challenge stats (linked users, total challenges, ratings).
 
-- **/contests** `[limit]`
+- **/contests** `[limit]` `[include]` `[exclude]`
 
-  Lists ongoing and upcoming Codeforces contests.
+  Lists ongoing and upcoming Codeforces contests. Use `include`/`exclude` to filter by keywords
+  (comma-separated, matched against the contest name).
 
 - **/contestreminders** `set|status|clear|preview`
 
-  Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time, and optional role mention.
+  Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time,
+  optional role mention, and optional keyword filters (`include`/`exclude`, comma-separated).
 
 - **/practicereminders** `set|status|clear|preview|post`
 
