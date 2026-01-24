@@ -170,11 +170,13 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Shows recent contest participation for the server's linked handles, including top participants and recent contests.
 
-- **/contestreminders** `set|status|clear|preview|post`
+- **/contestreminders** `add|set|list|status|remove|clear|preview|post`
 
-  Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time,
-  optional role mention, and optional keyword filters (`include`/`exclude`, comma-separated).
-  Use `post` to send a reminder immediately (optionally `force` to send even if one was already posted).
+  Configure contest reminders for the server (admin only). Use `add` (or legacy `set`) to create
+  multiple subscriptions with distinct channel, lead time, role mention, and keyword filters
+  (`include`/`exclude`, comma-separated). Use `list`/`status` to see subscription ids, `remove` to
+  delete one, and `clear` to delete all. `preview`/`post` accept an optional subscription id when
+  multiple are configured. `post` can `force` a reminder even if one was already posted.
 
 - **/practicereminders** `set|status|clear|preview|post`
 

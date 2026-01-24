@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { ChannelType, EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
@@ -19,6 +21,7 @@ import type { Contest, ContestService } from "./contests.js";
 const NOTIFICATION_RETENTION_DAYS = 14;
 
 export type ContestReminder = {
+  id: string;
   guildId: string;
   channelId: string;
   minutesBefore: number;
@@ -28,7 +31,6 @@ export type ContestReminder = {
 };
 
 export type ManualContestReminderResult =
-  | { status: "no_subscription" }
   | { status: "channel_missing"; channelId: string }
   | { status: "no_contest" }
   | { status: "already_notified"; contestId: number; contestName: string; notifiedAt: string }
@@ -62,10 +64,14 @@ export class ContestReminderService {
     return this.lastError;
   }
 
-  async getSubscription(guildId: string): Promise<ContestReminder | null> {
+  async getSubscriptionById(
+    guildId: string,
+    subscriptionId: string
+  ): Promise<ContestReminder | null> {
     const row = await this.db
       .selectFrom("contest_reminders")
       .select([
+        "id",
         "guild_id",
         "channel_id",
         "minutes_before",
@@ -74,12 +80,14 @@ export class ContestReminderService {
         "exclude_keywords",
       ])
       .where("guild_id", "=", guildId)
+      .where("id", "=", subscriptionId)
       .executeTakeFirst();
     if (!row) {
       return null;
     }
     const filters = parseKeywordFilters(row.include_keywords, row.exclude_keywords);
     return {
+      id: row.id,
       guildId: row.guild_id,
       channelId: row.channel_id,
       minutesBefore: row.minutes_before,
@@ -89,10 +97,11 @@ export class ContestReminderService {
     };
   }
 
-  async listSubscriptions(): Promise<ContestReminder[]> {
-    const rows = await this.db
+  async listSubscriptions(guildId?: string): Promise<ContestReminder[]> {
+    let query = this.db
       .selectFrom("contest_reminders")
       .select([
+        "id",
         "guild_id",
         "channel_id",
         "minutes_before",
@@ -100,8 +109,13 @@ export class ContestReminderService {
         "include_keywords",
         "exclude_keywords",
       ])
-      .execute();
+      .orderBy("created_at");
+    if (guildId) {
+      query = query.where("guild_id", "=", guildId);
+    }
+    const rows = await query.execute();
     return rows.map((row) => ({
+      id: row.id,
       guildId: row.guild_id,
       channelId: row.channel_id,
       minutesBefore: row.minutes_before,
@@ -113,23 +127,25 @@ export class ContestReminderService {
   async getSubscriptionCount(): Promise<number> {
     const row = await this.db
       .selectFrom("contest_reminders")
-      .select(({ fn }) => fn.count<number>("guild_id").as("count"))
+      .select(({ fn }) => fn.count<number>("id").as("count"))
       .executeTakeFirst();
     return row?.count ?? 0;
   }
 
-  async setSubscription(
+  async createSubscription(
     guildId: string,
     channelId: string,
     minutesBefore: number,
     roleId: string | null,
     includeKeywords: string[],
     excludeKeywords: string[]
-  ): Promise<void> {
+  ): Promise<ContestReminder> {
+    const id = randomUUID();
     const timestamp = new Date().toISOString();
     await this.db
       .insertInto("contest_reminders")
       .values({
+        id,
         guild_id: guildId,
         channel_id: channelId,
         minutes_before: minutesBefore,
@@ -139,37 +155,61 @@ export class ContestReminderService {
         created_at: timestamp,
         updated_at: timestamp,
       })
-      .onConflict((oc) =>
-        oc.column("guild_id").doUpdateSet({
-          channel_id: channelId,
-          minutes_before: minutesBefore,
-          role_id: roleId,
-          include_keywords: serializeKeywords(includeKeywords),
-          exclude_keywords: serializeKeywords(excludeKeywords),
-          updated_at: timestamp,
-        })
-      )
       .execute();
+    return {
+      id,
+      guildId,
+      channelId,
+      minutesBefore,
+      roleId,
+      includeKeywords,
+      excludeKeywords,
+    };
   }
 
-  async clearSubscription(guildId: string): Promise<boolean> {
-    const result = await this.db
-      .deleteFrom("contest_reminders")
-      .where("guild_id", "=", guildId)
-      .executeTakeFirst();
-    return Number(result.numDeletedRows ?? 0) > 0;
+  async removeSubscription(guildId: string, subscriptionId: string): Promise<boolean> {
+    return this.db.transaction().execute(async (trx) => {
+      const result = await trx
+        .deleteFrom("contest_reminders")
+        .where("guild_id", "=", guildId)
+        .where("id", "=", subscriptionId)
+        .executeTakeFirst();
+      const removed = Number(result.numDeletedRows ?? 0) > 0;
+      if (removed) {
+        await trx
+          .deleteFrom("contest_notifications")
+          .where("subscription_id", "=", subscriptionId)
+          .execute();
+      }
+      return removed;
+    });
+  }
+
+  async clearSubscriptions(guildId: string): Promise<number> {
+    return this.db.transaction().execute(async (trx) => {
+      const subscriptions = await trx
+        .selectFrom("contest_reminders")
+        .select("id")
+        .where("guild_id", "=", guildId)
+        .execute();
+      if (subscriptions.length === 0) {
+        return 0;
+      }
+      const ids = subscriptions.map((subscription) => subscription.id);
+      await trx.deleteFrom("contest_notifications").where("subscription_id", "in", ids).execute();
+      const result = await trx
+        .deleteFrom("contest_reminders")
+        .where("guild_id", "=", guildId)
+        .executeTakeFirst();
+      return Number(result.numDeletedRows ?? 0);
+    });
   }
 
   async sendManualReminder(
-    guildId: string,
+    subscription: ContestReminder,
     client: Client,
     force = false
   ): Promise<ManualContestReminderResult> {
-    const subscription = await this.getSubscription(guildId);
-    if (!subscription) {
-      return { status: "no_subscription" };
-    }
-
     const channel = await client.channels.fetch(subscription.channelId).catch(() => null);
     if (
       !channel ||
@@ -200,7 +240,7 @@ export class ContestReminderService {
 
     const contest = filtered[0]!;
     if (!force) {
-      const notification = await this.getNotification(subscription.guildId, contest.id);
+      const notification = await this.getNotification(subscription.id, contest.id);
       if (notification) {
         return {
           status: "already_notified",
@@ -221,9 +261,10 @@ export class ContestReminderService {
         allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
         embeds: [embed],
       });
-      await this.markNotified(subscription.guildId, contest.id);
+      await this.markNotified(subscription.id, contest.id);
       logInfo("Contest reminder sent (manual).", {
         guildId: subscription.guildId,
+        subscriptionId: subscription.id,
         channelId: subscription.channelId,
         contestId: contest.id,
         minutesBefore: subscription.minutesBefore,
@@ -242,6 +283,7 @@ export class ContestReminderService {
       this.lastError = { message, timestamp: new Date().toISOString() };
       logWarn("Contest reminder send failed (manual).", {
         guildId: subscription.guildId,
+        subscriptionId: subscription.id,
         channelId: subscription.channelId,
         contestId: contest.id,
         error: message,
@@ -320,7 +362,7 @@ export class ContestReminderService {
         });
         const contests = getUpcomingWithinWindow(filtered, nowSeconds, subscription.minutesBefore);
         for (const contest of contests) {
-          const alreadyNotified = await this.wasNotified(subscription.guildId, contest.id);
+          const alreadyNotified = await this.wasNotified(subscription.id, contest.id);
           if (alreadyNotified) {
             continue;
           }
@@ -333,9 +375,10 @@ export class ContestReminderService {
               allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
               embeds: [embed],
             });
-            await this.markNotified(subscription.guildId, contest.id);
+            await this.markNotified(subscription.id, contest.id);
             logInfo("Contest reminder sent.", {
               guildId: subscription.guildId,
+              subscriptionId: subscription.id,
               channelId: subscription.channelId,
               contestId: contest.id,
               minutesBefore: subscription.minutesBefore,
@@ -360,33 +403,33 @@ export class ContestReminderService {
     }
   }
 
-  private async wasNotified(guildId: string, contestId: number): Promise<boolean> {
-    const notification = await this.getNotification(guildId, contestId);
+  private async wasNotified(subscriptionId: string, contestId: number): Promise<boolean> {
+    const notification = await this.getNotification(subscriptionId, contestId);
     return Boolean(notification);
   }
 
   private async getNotification(
-    guildId: string,
+    subscriptionId: string,
     contestId: number
   ): Promise<{ notified_at: string } | null> {
     const row = await this.db
       .selectFrom("contest_notifications")
       .select("notified_at")
-      .where("guild_id", "=", guildId)
+      .where("subscription_id", "=", subscriptionId)
       .where("contest_id", "=", contestId)
       .executeTakeFirst();
     return row ?? null;
   }
 
-  private async markNotified(guildId: string, contestId: number): Promise<void> {
+  private async markNotified(subscriptionId: string, contestId: number): Promise<void> {
     await this.db
       .insertInto("contest_notifications")
       .values({
-        guild_id: guildId,
+        subscription_id: subscriptionId,
         contest_id: contestId,
         notified_at: new Date().toISOString(),
       })
-      .onConflict((oc) => oc.columns(["guild_id", "contest_id"]).doNothing())
+      .onConflict((oc) => oc.columns(["subscription_id", "contest_id"]).doNothing())
       .execute();
   }
 

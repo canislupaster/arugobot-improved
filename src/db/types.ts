@@ -85,6 +85,7 @@ export type ChallengeParticipantsTable = {
 };
 
 export type ContestRemindersTable = {
+  id: string;
   guild_id: string;
   channel_id: string;
   minutes_before: number;
@@ -96,7 +97,7 @@ export type ContestRemindersTable = {
 };
 
 export type ContestNotificationsTable = {
-  guild_id: string;
+  subscription_id: string;
   contest_id: number;
   notified_at: Generated<string>;
 };

@@ -56,7 +56,14 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 15, "role-1", [], []);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      15,
+      "role-1",
+      [],
+      []
+    );
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -72,6 +79,7 @@ describe("ContestReminderService", () => {
     const notifications = await db.selectFrom("contest_notifications").selectAll().execute();
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.contest_id).toBe(101);
+    expect(notifications[0]?.subscription_id).toBe(subscription.id);
   });
 
   it("skips contests already notified", async () => {
@@ -87,13 +95,17 @@ describe("ContestReminderService", () => {
       },
     ]);
 
+    const service = new ContestReminderService(db, contestService);
+    const subscription = await service.createSubscription("guild-1", "channel-1", 10, null, [], []);
+
     await db
       .insertInto("contest_notifications")
-      .values({ guild_id: "guild-1", contest_id: 201, notified_at: new Date().toISOString() })
+      .values({
+        subscription_id: subscription.id,
+        contest_id: 201,
+        notified_at: new Date().toISOString(),
+      })
       .execute();
-
-    const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 10, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -123,7 +135,14 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 10, null, ["div. 2"], ["kotlin"]);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      10,
+      null,
+      ["div. 2"],
+      ["kotlin"]
+    );
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -133,6 +152,7 @@ describe("ContestReminderService", () => {
     const notifications = await db.selectFrom("contest_notifications").selectAll().execute();
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.contest_id).toBe(401);
+    expect(notifications[0]?.subscription_id).toBe(subscription.id);
   });
 
   it("skips refresh when there are no subscriptions", async () => {
@@ -151,7 +171,7 @@ describe("ContestReminderService", () => {
     contestService.getUpcomingContests.mockReturnValue([]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 10, null, [], []);
+    await service.createSubscription("guild-1", "channel-1", 10, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -176,7 +196,7 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 15, null, [], []);
+    await service.createSubscription("guild-1", "channel-1", 15, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -197,7 +217,7 @@ describe("ContestReminderService", () => {
     contestService.getUpcomingContests.mockReturnValue([]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 10, null, [], []);
+    await service.createSubscription("guild-1", "channel-1", 10, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -225,17 +245,18 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 30, null, [], []);
+    const subscription = await service.createSubscription("guild-1", "channel-1", 30, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
-    const result = await service.sendManualReminder("guild-1", client, false);
+    const result = await service.sendManualReminder(subscription, client, false);
 
     expect(result.status).toBe("sent");
     expect(send).toHaveBeenCalledTimes(1);
     const notifications = await db.selectFrom("contest_notifications").selectAll().execute();
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.contest_id).toBe(501);
+    expect(notifications[0]?.subscription_id).toBe(subscription.id);
   });
 
   it("reports already-notified contests when posting manually", async () => {
@@ -251,17 +272,21 @@ describe("ContestReminderService", () => {
       },
     ]);
 
+    const service = new ContestReminderService(db, contestService);
+    const subscription = await service.createSubscription("guild-1", "channel-1", 30, null, [], []);
+
     await db
       .insertInto("contest_notifications")
-      .values({ guild_id: "guild-1", contest_id: 601, notified_at: new Date().toISOString() })
+      .values({
+        subscription_id: subscription.id,
+        contest_id: 601,
+        notified_at: new Date().toISOString(),
+      })
       .execute();
-
-    const service = new ContestReminderService(db, contestService);
-    await service.setSubscription("guild-1", "channel-1", 30, null, [], []);
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
-    const result = await service.sendManualReminder("guild-1", client, false);
+    const result = await service.sendManualReminder(subscription, client, false);
 
     expect(result.status).toBe("already_notified");
     expect(send).not.toHaveBeenCalled();

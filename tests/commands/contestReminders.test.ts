@@ -30,13 +30,14 @@ describe("contestRemindersCommand", () => {
         getSubcommand: jest.fn().mockReturnValue("status"),
         getChannel: jest.fn(),
         getInteger: jest.fn(),
+        getString: jest.fn(),
       },
     });
     const context = {
       correlationId: "corr-1",
       services: {
         contestReminders: {
-          getSubscription: jest.fn().mockResolvedValue(null),
+          listSubscriptions: jest.fn().mockResolvedValue([]),
         },
       },
     } as unknown as CommandContext;
@@ -49,14 +50,14 @@ describe("contestRemindersCommand", () => {
     });
   });
 
-  it("sets reminders for the specified channel", async () => {
+  it("adds reminders for the specified channel", async () => {
     const channel = {
       id: "channel-1",
       type: ChannelType.GuildText,
     };
     const interaction = createInteraction({
       options: {
-        getSubcommand: jest.fn().mockReturnValue("set"),
+        getSubcommand: jest.fn().mockReturnValue("add"),
         getChannel: jest.fn().mockReturnValue(channel),
         getInteger: jest.fn().mockReturnValue(null),
         getRole: jest.fn().mockReturnValue({ id: "role-1" }),
@@ -67,14 +68,22 @@ describe("contestRemindersCommand", () => {
       correlationId: "corr-2",
       services: {
         contestReminders: {
-          setSubscription: jest.fn().mockResolvedValue(undefined),
+          createSubscription: jest.fn().mockResolvedValue({
+            id: "sub-1",
+            guildId: "guild-1",
+            channelId: "channel-1",
+            minutesBefore: 30,
+            roleId: "role-1",
+            includeKeywords: ["div. 2"],
+            excludeKeywords: ["kotlin"],
+          }),
         },
       },
     } as unknown as CommandContext;
 
     await contestRemindersCommand.execute(interaction, context);
 
-    expect(context.services.contestReminders.setSubscription).toHaveBeenCalledWith(
+    expect(context.services.contestReminders.createSubscription).toHaveBeenCalledWith(
       "guild-1",
       "channel-1",
       30,
@@ -84,7 +93,7 @@ describe("contestRemindersCommand", () => {
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
-        "Contest reminders enabled in <#channel-1> (30 minutes before) (mentioning <@&role-1>) (include: div. 2, exclude: kotlin).",
+        "Contest reminders enabled in <#channel-1> (30 minutes before) (mentioning <@&role-1>) (include: div. 2, exclude: kotlin). Subscription id: `sub-1`.",
       ...publicFlags,
     });
   });
@@ -101,7 +110,7 @@ describe("contestRemindersCommand", () => {
       correlationId: "corr-3",
       services: {
         contestReminders: {
-          clearSubscription: jest.fn().mockResolvedValue(true),
+          clearSubscriptions: jest.fn().mockResolvedValue(2),
         },
       },
     } as unknown as CommandContext;
@@ -109,7 +118,42 @@ describe("contestRemindersCommand", () => {
     await contestRemindersCommand.execute(interaction, context);
 
     expect(interaction.reply).toHaveBeenCalledWith({
-      content: "Contest reminders disabled for this server.",
+      content: "Removed 2 contest reminder subscriptions.",
+      ...publicFlags,
+    });
+  });
+
+  it("removes a reminder subscription by id", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("remove"),
+        getString: jest.fn().mockReturnValue("sub-1"),
+      },
+    });
+    const context = {
+      correlationId: "corr-3b",
+      services: {
+        contestReminders: {
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-1",
+              guildId: "guild-1",
+              channelId: "channel-1",
+              minutesBefore: 30,
+              roleId: null,
+              includeKeywords: [],
+              excludeKeywords: [],
+            },
+          ]),
+          removeSubscription: jest.fn().mockResolvedValue(true),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRemindersCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Removed contest reminder subscription `sub-1`.",
       ...publicFlags,
     });
   });
@@ -120,21 +164,24 @@ describe("contestRemindersCommand", () => {
         getSubcommand: jest.fn().mockReturnValue("preview"),
         getChannel: jest.fn(),
         getInteger: jest.fn(),
-        getString: jest.fn(),
+        getString: jest.fn().mockReturnValue(null),
       },
     });
     const context = {
       correlationId: "corr-4",
       services: {
         contestReminders: {
-          getSubscription: jest.fn().mockResolvedValue({
-            guildId: "guild-1",
-            channelId: "channel-1",
-            minutesBefore: 30,
-            roleId: null,
-            includeKeywords: [],
-            excludeKeywords: [],
-          }),
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-1",
+              guildId: "guild-1",
+              channelId: "channel-1",
+              minutesBefore: 30,
+              roleId: null,
+              includeKeywords: [],
+              excludeKeywords: [],
+            },
+          ]),
         },
         contests: {
           refresh: jest.fn().mockResolvedValue(undefined),
@@ -165,13 +212,14 @@ describe("contestRemindersCommand", () => {
         getSubcommand: jest.fn().mockReturnValue("preview"),
         getChannel: jest.fn(),
         getInteger: jest.fn(),
+        getString: jest.fn(),
       },
     });
     const context = {
       correlationId: "corr-5",
       services: {
         contestReminders: {
-          getSubscription: jest.fn().mockResolvedValue(null),
+          listSubscriptions: jest.fn().mockResolvedValue([]),
         },
         contests: {
           refresh: jest.fn(),
@@ -194,6 +242,7 @@ describe("contestRemindersCommand", () => {
       options: {
         getSubcommand: jest.fn().mockReturnValue("post"),
         getBoolean: jest.fn().mockReturnValue(false),
+        getString: jest.fn().mockReturnValue(null),
       },
     });
     const context = {
@@ -201,6 +250,17 @@ describe("contestRemindersCommand", () => {
       client: {} as never,
       services: {
         contestReminders: {
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-1",
+              guildId: "guild-1",
+              channelId: "channel-1",
+              minutesBefore: 30,
+              roleId: null,
+              includeKeywords: [],
+              excludeKeywords: [],
+            },
+          ]),
           sendManualReminder: jest.fn().mockResolvedValue({
             status: "sent",
             contestId: 123,
