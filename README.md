@@ -129,6 +129,10 @@ The following commands are available to you:
   Lists ongoing and upcoming Codeforces contests. Use `include`/`exclude` to filter by keywords
   (comma-separated, matched against the contest name).
 
+- **/contest** `query`
+
+  Shows details for a contest by id, URL, or name.
+
 - **/contestreminders** `set|status|clear|preview`
 
   Configure contest reminders for the server (admin only). Use `set` to choose a channel, lead time,

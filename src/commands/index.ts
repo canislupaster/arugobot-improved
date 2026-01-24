@@ -2,6 +2,7 @@ import { activityCommand } from "./activity.js";
 import { challengeCommand } from "./challenge.js";
 import { challengesCommand } from "./challenges.js";
 import { compareCommand } from "./compare.js";
+import { contestCommand } from "./contest.js";
 import { contestRemindersCommand } from "./contestReminders.js";
 import { contestsCommand } from "./contests.js";
 import { handlesCommand } from "./handles.js";
@@ -30,6 +31,7 @@ export const commandList: Command[] = [
   challengesCommand,
   compareCommand,
   contestRemindersCommand,
+  contestCommand,
   contestsCommand,
   handlesCommand,
   historyCommand,

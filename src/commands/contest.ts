@@ -1,0 +1,158 @@
+import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+
+import type { Contest } from "../services/contests.js";
+import { logCommandError } from "../utils/commandLogging.js";
+import {
+  formatDiscordRelativeTime,
+  formatDiscordTimestamp,
+  formatDuration,
+} from "../utils/time.js";
+
+import type { Command } from "./types.js";
+
+const MAX_MATCHES = 5;
+
+function parseContestId(raw: string): number | null {
+  const trimmed = raw.trim();
+  const urlMatch = trimmed.match(/\bcontests?\/(\d+)/i);
+  if (urlMatch) {
+    const id = Number(urlMatch[1]);
+    return Number.isFinite(id) ? id : null;
+  }
+  if (/^\d+$/.test(trimmed)) {
+    const id = Number(trimmed);
+    return Number.isFinite(id) ? id : null;
+  }
+  return null;
+}
+
+function formatPhase(phase: Contest["phase"]): string {
+  switch (phase) {
+    case "BEFORE":
+      return "Upcoming";
+    case "CODING":
+      return "Ongoing";
+    case "FINISHED":
+      return "Finished";
+    case "PENDING_SYSTEM_TEST":
+      return "Pending system test";
+    case "SYSTEM_TEST":
+      return "System test";
+    default:
+      return phase;
+  }
+}
+
+function buildContestEmbed(contest: Contest): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle(contest.name)
+    .setColor(0x3498db)
+    .setDescription(`[Open contest](https://codeforces.com/contest/${contest.id})`)
+    .addFields(
+      { name: "Contest ID", value: String(contest.id), inline: true },
+      { name: "Status", value: formatPhase(contest.phase), inline: true },
+      {
+        name: "Starts",
+        value: `${formatDiscordTimestamp(contest.startTimeSeconds)} (${formatDiscordRelativeTime(
+          contest.startTimeSeconds
+        )})`,
+        inline: false,
+      },
+      { name: "Duration", value: formatDuration(contest.durationSeconds), inline: true }
+    );
+
+  if (contest.phase === "CODING") {
+    const endsAt = contest.startTimeSeconds + contest.durationSeconds;
+    embed.addFields({
+      name: "Ends",
+      value: `${formatDiscordTimestamp(endsAt)} (${formatDiscordRelativeTime(endsAt)})`,
+      inline: true,
+    });
+  }
+
+  return embed;
+}
+
+function buildMatchEmbed(query: string, matches: Contest[]): EmbedBuilder {
+  const lines = matches
+    .map((contest) => {
+      const when = formatDiscordRelativeTime(contest.startTimeSeconds);
+      return `- ${contest.name} (ID ${contest.id}, ${when})`;
+    })
+    .join("\n");
+
+  return new EmbedBuilder()
+    .setTitle("Contest matches")
+    .setColor(0x3498db)
+    .setDescription(`Results for "${query}":\n${lines}`)
+    .setFooter({ text: "Use /contest with the contest ID for details." });
+}
+
+export const contestCommand: Command = {
+  data: new SlashCommandBuilder()
+    .setName("contest")
+    .setDescription("Shows details for a Codeforces contest")
+    .addStringOption((option) =>
+      option.setName("query").setDescription("Contest id, URL, or name").setRequired(true)
+    ),
+  async execute(interaction, context) {
+    const queryRaw = interaction.options.getString("query", true).trim();
+    await interaction.deferReply({ ephemeral: true });
+
+    let stale = false;
+    try {
+      await context.services.contests.refresh();
+    } catch {
+      if (context.services.contests.getLastRefreshAt() > 0) {
+        stale = true;
+      } else {
+        await interaction.editReply(
+          "Unable to reach Codeforces right now. Try again in a few minutes."
+        );
+        return;
+      }
+    }
+
+    try {
+      const contestId = parseContestId(queryRaw);
+      if (contestId) {
+        const contest = context.services.contests.getContestById(contestId);
+        if (!contest) {
+          await interaction.editReply("No contest found with that ID.");
+          return;
+        }
+
+        const embed = buildContestEmbed(contest);
+        if (stale) {
+          embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+        }
+        await interaction.editReply({ embeds: [embed] });
+        return;
+      }
+
+      const matches = context.services.contests.searchContests(queryRaw, MAX_MATCHES);
+      if (matches.length === 0) {
+        await interaction.editReply("No contests found matching that name.");
+        return;
+      }
+
+      if (matches.length === 1) {
+        const embed = buildContestEmbed(matches[0]!);
+        if (stale) {
+          embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+        }
+        await interaction.editReply({ embeds: [embed] });
+        return;
+      }
+
+      const embed = buildMatchEmbed(queryRaw, matches);
+      if (stale) {
+        embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+      }
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      logCommandError(`Error in contest: ${String(error)}`, interaction, context.correlationId);
+      await interaction.editReply("Something went wrong.");
+    }
+  },
+};
