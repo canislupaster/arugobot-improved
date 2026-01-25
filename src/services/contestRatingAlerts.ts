@@ -10,6 +10,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
+import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { ContestRatingChangesService } from "./contestRatingChanges.js";
@@ -98,10 +99,6 @@ function serializeHandleFilter(handles: string[]): string | null {
   return Array.from(new Set(handles.map((handle) => normalizeHandleKey(handle)))).join(",");
 }
 
-function formatDelta(delta: number): string {
-  return delta >= 0 ? `+${delta}` : String(delta);
-}
-
 function formatEntryLabel(entry: ContestRatingAlertEntry): string {
   if (entry.userId) {
     return `<@${entry.userId}> (${entry.handle})`;
@@ -120,7 +117,7 @@ export function buildContestRatingAlertEmbed(preview: ContestRatingAlertPreview)
     const rank = entry.change.rank > 0 ? `#${entry.change.rank}` : "Unranked";
     return `${rank} ${formatEntryLabel(entry)} • ${entry.change.oldRating} → ${
       entry.change.newRating
-    } (${formatDelta(delta)})`;
+    } (${formatRatingDelta(delta)})`;
   });
 
   const embed = new EmbedBuilder()

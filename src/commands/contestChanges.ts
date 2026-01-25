@@ -19,6 +19,7 @@ import { parseContestScope, refreshContestData } from "../utils/contestScope.js"
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { formatRatingDelta } from "../utils/ratingChanges.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -41,10 +42,6 @@ function parseHandleList(raw: string): string[] {
     .split(/[\s,]+/u)
     .map((value) => value.trim())
     .filter(Boolean);
-}
-
-function formatDelta(delta: number): string {
-  return delta >= 0 ? `+${delta}` : String(delta);
 }
 
 function buildContestEmbed(contest: Contest): EmbedBuilder {
@@ -359,7 +356,7 @@ export const contestChangesCommand: Command = {
             : entry.label;
           const delta = entry.newRating - entry.oldRating;
           const rank = entry.rank > 0 ? `#${entry.rank}` : "Unranked";
-          return `${rank} ${display} • ${entry.oldRating} → ${entry.newRating} (${formatDelta(
+          return `${rank} ${display} • ${entry.oldRating} → ${entry.newRating} (${formatRatingDelta(
             delta
           )})`;
         });

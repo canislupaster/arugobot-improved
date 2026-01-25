@@ -7,6 +7,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getErrorMessage } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
+import { formatRatingDelta } from "../utils/ratingChanges.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -117,14 +118,6 @@ export function getNextWeeklyScheduledUtcMs(
 
 function formatUserLine(userId: string, count: number, label: string): string {
   return `${label} <@${userId}> • ${count}`;
-}
-
-function formatDelta(delta: number): string {
-  if (!Number.isFinite(delta)) {
-    return "0";
-  }
-  const rounded = Math.round(delta);
-  return rounded > 0 ? `+${rounded}` : String(rounded);
 }
 
 export class WeeklyDigestService {
@@ -462,13 +455,19 @@ export class WeeklyDigestService {
     const ratingLines = [
       `Rated contests: ${ratingSummary.contestCount}`,
       `Participants: ${ratingSummary.participantCount}`,
-      `Net delta: ${formatDelta(ratingSummary.totalDelta)}`,
+      `Net delta: ${formatRatingDelta(ratingSummary.totalDelta, {
+        round: true,
+        includeZeroSign: false,
+      })}`,
     ];
     if (ratingSummary.topGainers.length > 0) {
       const lines = ratingSummary.topGainers
         .map(
           (entry, index) =>
-            `${index + 1}. <@${entry.userId}> (${entry.handle}) • ${formatDelta(entry.delta)}`
+            `${index + 1}. <@${entry.userId}> (${entry.handle}) • ${formatRatingDelta(
+              entry.delta,
+              { round: true, includeZeroSign: false }
+            )}`
         )
         .join("\n");
       ratingLines.push(`Top gainers:\n${lines}`);
@@ -479,7 +478,10 @@ export class WeeklyDigestService {
       const lines = ratingSummary.topLosers
         .map(
           (entry, index) =>
-            `${index + 1}. <@${entry.userId}> (${entry.handle}) • ${formatDelta(entry.delta)}`
+            `${index + 1}. <@${entry.userId}> (${entry.handle}) • ${formatRatingDelta(
+              entry.delta,
+              { round: true, includeZeroSign: false }
+            )}`
         )
         .join("\n");
       ratingLines.push(`Top losses:\n${lines}`);

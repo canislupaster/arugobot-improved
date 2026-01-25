@@ -2,16 +2,13 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
-
-function formatDelta(delta: number): string {
-  return delta >= 0 ? `+${delta}` : String(delta);
-}
 
 function clampLimit(limit: number): number {
   return Math.min(Math.max(limit, 1), MAX_LIMIT);
@@ -113,9 +110,9 @@ export const contestHistoryCommand: Command = {
       const lines = entries.map((entry) => {
         const delta = entry.newRating - entry.oldRating;
         const when = formatDiscordRelativeTime(entry.ratingUpdateTimeSeconds);
-        return `- **${entry.contestName}** • ${entry.oldRating} → ${entry.newRating} (${formatDelta(
-          delta
-        )}) • rank ${entry.rank} • ${when}`;
+        return `- **${entry.contestName}** • ${entry.oldRating} → ${
+          entry.newRating
+        } (${formatRatingDelta(delta)}) • rank ${entry.rank} • ${when}`;
       });
 
       const embed = new EmbedBuilder()

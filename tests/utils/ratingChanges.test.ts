@@ -1,4 +1,4 @@
-import { parseRatingChangesPayload } from "../../src/utils/ratingChanges.js";
+import { formatRatingDelta, parseRatingChangesPayload } from "../../src/utils/ratingChanges.js";
 
 describe("parseRatingChangesPayload", () => {
   it("filters out invalid rating change entries", () => {
@@ -30,5 +30,25 @@ describe("parseRatingChangesPayload", () => {
 
   it("returns an empty array for malformed payloads", () => {
     expect(parseRatingChangesPayload("not-json")).toEqual([]);
+  });
+});
+
+describe("formatRatingDelta", () => {
+  it("formats positive and negative deltas", () => {
+    expect(formatRatingDelta(42)).toBe("+42");
+    expect(formatRatingDelta(-18)).toBe("-18");
+  });
+
+  it("rounds deltas when requested", () => {
+    expect(formatRatingDelta(12.6, { round: true })).toBe("+13");
+    expect(formatRatingDelta(-12.4, { round: true })).toBe("-12");
+  });
+
+  it("omits plus sign for zero when configured", () => {
+    expect(formatRatingDelta(0, { includeZeroSign: false })).toBe("0");
+  });
+
+  it("handles non-finite deltas", () => {
+    expect(formatRatingDelta(Number.NaN)).toBe("0");
   });
 });

@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -12,11 +13,6 @@ const MIN_DAYS = 1;
 const MAX_DAYS = 365;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
-
-function formatDelta(value: number): string {
-  const rounded = Math.round(value);
-  return rounded >= 0 ? `+${rounded}` : String(rounded);
-}
 
 function formatParticipantLine(entry: {
   userId: string;
@@ -29,7 +25,9 @@ function formatParticipantLine(entry: {
     entry.lastContestAt && entry.lastContestAt > 0
       ? ` • last ${formatDiscordRelativeTime(entry.lastContestAt)}`
       : "";
-  return `<@${entry.userId}> (${entry.handle}) • ${formatDelta(entry.delta)} • ${
+  return `<@${entry.userId}> (${entry.handle}) • ${formatRatingDelta(entry.delta, {
+    round: true,
+  })} • ${
     entry.contestCount
   } contests${lastContest}`;
 }
@@ -116,7 +114,11 @@ export const contestDeltasCommand: Command = {
         .addFields(
           { name: "Contests", value: String(summary.contestCount), inline: true },
           { name: "Participants", value: String(summary.participantCount), inline: true },
-          { name: "Total delta", value: formatDelta(summary.totalDelta), inline: true }
+          {
+            name: "Total delta",
+            value: formatRatingDelta(summary.totalDelta, { round: true }),
+            inline: true,
+          }
         );
 
       if (summary.lastContestAt) {
