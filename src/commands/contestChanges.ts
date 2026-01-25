@@ -4,6 +4,7 @@ import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -340,17 +341,25 @@ export const contestChangesCommand: Command = {
       } else {
         const guildId = interaction.guild?.id ?? "";
         const linkedUsers = await context.services.store.getLinkedUsers(guildId);
-        if (linkedUsers.length === 0) {
+        const filteredLinkedUsers = interaction.guild
+          ? await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
+              correlationId: context.correlationId,
+              command: interaction.commandName,
+              guildId: interaction.guild.id,
+              userId: interaction.user.id,
+            })
+          : linkedUsers;
+        if (filteredLinkedUsers.length === 0) {
           await interaction.editReply("No linked handles found in this server yet.");
           return;
         }
-        if (linkedUsers.length > MAX_HANDLES) {
+        if (filteredLinkedUsers.length > MAX_HANDLES) {
           await interaction.editReply(
-            `Too many linked handles (${linkedUsers.length}). Provide specific handles or users.`
+            `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`
           );
           return;
         }
-        for (const linked of linkedUsers) {
+        for (const linked of filteredLinkedUsers) {
           buildTargetHandles(targets, linked.handle, `<@${linked.userId}>`);
         }
       }

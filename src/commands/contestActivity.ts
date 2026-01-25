@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -111,8 +112,15 @@ export const contestActivityCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const activity = await context.services.contestActivity.getGuildContestActivity(
-        interaction.guild.id,
+      const roster = await context.services.store.getServerRoster(interaction.guild.id);
+      const filteredRoster = await filterEntriesByGuildMembers(interaction.guild, roster, {
+        correlationId: context.correlationId,
+        command: interaction.commandName,
+        guildId: interaction.guild.id,
+        userId: interaction.user.id,
+      });
+      const activity = await context.services.contestActivity.getContestActivityForRoster(
+        filteredRoster,
         { lookbackDays: days, participantLimit: limit }
       );
       const scopeSummary =

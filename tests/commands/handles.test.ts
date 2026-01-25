@@ -8,7 +8,15 @@ const createInteraction = () => {
     createMessageComponentCollector: jest.fn().mockReturnValue({ on: jest.fn() }),
   };
   return {
-    guild: { id: "guild-1" },
+    guild: {
+      id: "guild-1",
+      members: {
+        fetch: jest.fn().mockResolvedValue(
+          new Map([["user-1", { user: { id: "user-1" } }]])
+        ),
+        cache: new Map([["user-1", { user: { id: "user-1" } }]]),
+      },
+    },
     user: { id: "user-1" },
     options: {
       getInteger: jest.fn().mockReturnValue(1),
@@ -27,7 +35,10 @@ describe("handlesCommand", () => {
         store: {
           getServerRoster: jest
             .fn()
-            .mockResolvedValue([{ userId: "user-1", handle: "tourist", rating: 3500 }]),
+            .mockResolvedValue([
+              { userId: "user-1", handle: "tourist", rating: 3500 },
+              { userId: "user-2", handle: "petr", rating: 3400 },
+            ]),
         },
       },
     } as unknown as CommandContext;
@@ -36,6 +47,8 @@ describe("handlesCommand", () => {
 
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds[0].data.title).toBe("Linked handles");
+    expect(payload.embeds[0].data.fields?.[0]?.value ?? "").toContain("tourist");
+    expect(payload.embeds[0].data.fields?.[0]?.value ?? "").not.toContain("petr");
     expect(payload.components).toHaveLength(1);
   });
 });

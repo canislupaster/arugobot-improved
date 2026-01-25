@@ -9,6 +9,7 @@ import {
 } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
+import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 
 import type { Command } from "./types.js";
 
@@ -81,7 +82,14 @@ export const suggestCommand: Command = {
 
     let handles = parseHandles(rawHandles);
     if (handles.length === 0 && interaction.guild) {
-      handles = await context.services.store.getHandlesForServer(interaction.guild.id);
+      const linkedUsers = await context.services.store.getLinkedUsers(interaction.guild.id);
+      const filtered = await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
+        correlationId: context.correlationId,
+        command: interaction.commandName,
+        guildId: interaction.guild.id,
+        userId: interaction.user.id,
+      });
+      handles = filtered.map((entry) => entry.handle);
     }
     if (handles.length === 0) {
       await interaction.reply({

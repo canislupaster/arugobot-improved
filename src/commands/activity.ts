@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -127,10 +128,18 @@ export const activityCommand: Command = {
         );
 
       if (summary.topSolvers.length > 0) {
-        const lines = summary.topSolvers
-          .map((entry, index) => `${index + 1}. <@${entry.userId}> - ${entry.solvedCount}`)
-          .join("\n");
-        embed.addFields({ name: "Top solvers", value: lines, inline: false });
+        const filtered = await filterEntriesByGuildMembers(interaction.guild, summary.topSolvers, {
+          correlationId: context.correlationId,
+          command: interaction.commandName,
+          guildId: interaction.guild.id,
+          userId: interaction.user.id,
+        });
+        if (filtered.length > 0) {
+          const lines = filtered
+            .map((entry, index) => `${index + 1}. <@${entry.userId}> - ${entry.solvedCount}`)
+            .join("\n");
+          embed.addFields({ name: "Top solvers", value: lines, inline: false });
+        }
       }
 
       await interaction.editReply({ embeds: [embed] });

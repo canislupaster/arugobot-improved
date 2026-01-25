@@ -1,6 +1,7 @@
 import { ComponentType, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   buildPaginationIds,
   buildPaginationRow,
@@ -35,12 +36,18 @@ export const handlesCommand: Command = {
 
     try {
       const roster = await context.services.store.getServerRoster(interaction.guild.id);
-      if (roster.length === 0) {
-        await interaction.editReply("No linked handles yet.");
+      const filteredRoster = await filterEntriesByGuildMembers(interaction.guild, roster, {
+        correlationId: context.correlationId,
+        command: interaction.commandName,
+        guildId: interaction.guild.id,
+        userId: interaction.user.id,
+      });
+      if (filteredRoster.length === 0) {
+        await interaction.editReply("No linked handles for current members.");
         return;
       }
 
-      const totalPages = Math.max(1, Math.ceil(roster.length / PAGE_SIZE));
+      const totalPages = Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE));
       if (page > totalPages) {
         await interaction.editReply("Empty page.");
         return;
@@ -49,11 +56,11 @@ export const handlesCommand: Command = {
       const paginationIds = buildPaginationIds("handles", interaction.id);
       const renderPage = (pageNumber: number) => {
         const start = (pageNumber - 1) * PAGE_SIZE;
-        if (start >= roster.length) {
+        if (start >= filteredRoster.length) {
           return null;
         }
 
-        const lines = roster
+        const lines = filteredRoster
           .slice(start, start + PAGE_SIZE)
           .map(
             (entry, index) =>

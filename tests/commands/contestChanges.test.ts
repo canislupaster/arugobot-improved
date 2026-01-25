@@ -21,7 +21,22 @@ const createInteraction = (query: string, handles?: string, scope?: string) =>
       getInteger: jest.fn().mockReturnValue(null),
       getUser: jest.fn().mockReturnValue(null),
     },
-    guild: { id: "guild-1" },
+    user: { id: "user-1" },
+    guild: {
+      id: "guild-1",
+      members: {
+        fetch: jest.fn().mockResolvedValue(
+          new Map([
+            ["user-1", { user: { id: "user-1" } }],
+            ["user-2", { user: { id: "user-2" } }],
+          ])
+        ),
+        cache: new Map([
+          ["user-1", { user: { id: "user-1" } }],
+          ["user-2", { user: { id: "user-2" } }],
+        ]),
+      },
+    },
     reply: jest.fn().mockResolvedValue(undefined),
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),

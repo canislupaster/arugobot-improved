@@ -8,10 +8,19 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     options: {
       getString: jest.fn().mockReturnValue("1000A"),
     },
+    user: { id: "user-1" },
     reply: jest.fn().mockResolvedValue(undefined),
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),
-    guild: { id: "guild-1" },
+    guild: {
+      id: "guild-1",
+      members: {
+        fetch: jest.fn().mockResolvedValue(
+          new Map([["user-1", { user: { id: "user-1" } }]])
+        ),
+        cache: new Map([["user-1", { user: { id: "user-1" } }]]),
+      },
+    },
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
 

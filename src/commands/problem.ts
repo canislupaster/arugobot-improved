@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Problem } from "../services/problems.js";
 import type { StoreService } from "../services/store.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { parseProblemReference } from "../utils/problemReference.js";
 import { getColor } from "../utils/rating.js";
 
@@ -30,11 +31,10 @@ function normalizeHandle(handle: string): string {
 
 async function getSolvedSummary(
   store: StoreService,
-  guildId: string,
+  linkedUsers: Array<{ userId: string; handle: string }>,
   problem: Problem
 ): Promise<SolvedSummary> {
   const problemId = `${problem.contestId}${problem.index}`;
-  const linkedUsers = await store.getLinkedUsers(guildId);
   const solvedBy = new Set<string>();
   let staleHandles = 0;
   let unavailableHandles = 0;
@@ -149,11 +149,14 @@ export const problemCommand: Command = {
         );
 
       if (interaction.guild) {
-        const summary = await getSolvedSummary(
-          context.services.store,
-          interaction.guild.id,
-          problem
-        );
+      const linkedUsers = await context.services.store.getLinkedUsers(interaction.guild.id);
+      const filteredUsers = await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
+        correlationId: context.correlationId,
+        command: interaction.commandName,
+        guildId: interaction.guild.id,
+        userId: interaction.user.id,
+      });
+      const summary = await getSolvedSummary(context.services.store, filteredUsers, problem);
         if (summary.totalLinked > 0) {
           let solvedValue = "No linked users have solved this yet.";
           if (summary.checkedHandles === 0) {

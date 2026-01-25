@@ -5,7 +5,22 @@ import type { CommandContext } from "../../src/types/commandContext.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
-    guild: { id: "guild-1" },
+    guild: {
+      id: "guild-1",
+      members: {
+        fetch: jest.fn().mockResolvedValue(
+          new Map([
+            ["user-1", { user: { id: "user-1" } }],
+            ["user-2", { user: { id: "user-2" } }],
+          ])
+        ),
+        cache: new Map([
+          ["user-1", { user: { id: "user-1" } }],
+          ["user-2", { user: { id: "user-2" } }],
+        ]),
+      },
+    },
+    user: { id: "user-1" },
     options: {
       getInteger: jest.fn().mockReturnValue(null),
       getString: jest.fn().mockReturnValue(null),
@@ -21,8 +36,16 @@ describe("contestActivityCommand", () => {
     const interaction = createInteraction();
     const context = {
       services: {
+        store: {
+          getServerRoster: jest
+            .fn()
+            .mockResolvedValue([
+              { userId: "user-1", handle: "Alice" },
+              { userId: "user-2", handle: "Bob" },
+            ]),
+        },
         contestActivity: {
-          getGuildContestActivity: jest.fn().mockResolvedValue({
+          getContestActivityForRoster: jest.fn().mockResolvedValue({
             lookbackDays: 90,
             contestCount: 2,
             participantCount: 2,
@@ -81,8 +104,13 @@ describe("contestActivityCommand", () => {
     });
     const context = {
       services: {
+        store: {
+          getServerRoster: jest
+            .fn()
+            .mockResolvedValue([{ userId: "user-1", handle: "Alice" }]),
+        },
         contestActivity: {
-          getGuildContestActivity: jest.fn().mockResolvedValue({
+          getContestActivityForRoster: jest.fn().mockResolvedValue({
             lookbackDays: 90,
             contestCount: 2,
             participantCount: 2,
@@ -133,8 +161,11 @@ describe("contestActivityCommand", () => {
     const interaction = createInteraction();
     const context = {
       services: {
+        store: {
+          getServerRoster: jest.fn().mockResolvedValue([]),
+        },
         contestActivity: {
-          getGuildContestActivity: jest.fn().mockResolvedValue({
+          getContestActivityForRoster: jest.fn().mockResolvedValue({
             lookbackDays: 90,
             contestCount: 0,
             participantCount: 0,

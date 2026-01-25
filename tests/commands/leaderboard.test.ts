@@ -12,10 +12,20 @@ const createInteraction = (overrides: Record<string, unknown> = {}) => {
       getInteger: jest.fn().mockReturnValue(1),
       getString: jest.fn().mockReturnValue("solves"),
     },
+    user: { id: "user-1" },
     guild: {
       id: "guild-1",
       members: {
-        fetch: jest.fn().mockResolvedValue(null),
+        fetch: jest.fn().mockResolvedValue(
+          new Map([
+            ["user-1", { user: { id: "user-1" } }],
+            ["user-2", { user: { id: "user-2" } }],
+          ])
+        ),
+        cache: new Map([
+          ["user-1", { user: { id: "user-1" } }],
+          ["user-2", { user: { id: "user-2" } }],
+        ]),
       },
     },
     reply: jest.fn().mockResolvedValue(undefined),

@@ -1,6 +1,7 @@
 import { ComponentType, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   buildPaginationIds,
   buildPaginationRow,
@@ -44,6 +45,14 @@ export const leaderboardCommand: Command = {
     }
 
     await interaction.deferReply();
+
+    const filterRows = async (rows: Array<{ userId: string; value: number }>) =>
+      filterEntriesByGuildMembers(guild, rows, {
+        correlationId: context.correlationId,
+        command: interaction.commandName,
+        guildId: guild.id,
+        userId: interaction.user.id,
+      });
 
     const renderLeaderboard = async (
       rows: Array<{ userId: string; value: number }>,
@@ -142,8 +151,15 @@ export const leaderboardCommand: Command = {
           await interaction.editReply("No solves recorded yet.");
           return;
         }
+        const rows = await filterRows(
+          leaderboard.map((entry) => ({ userId: entry.userId, value: entry.solvedCount }))
+        );
+        if (rows.length === 0) {
+          await interaction.editReply("No solves recorded for current members.");
+          return;
+        }
         await renderLeaderboard(
-          leaderboard.map((entry) => ({ userId: entry.userId, value: entry.solvedCount })),
+          rows,
           "Solve leaderboard",
           "Solves"
         );
@@ -160,12 +176,17 @@ export const leaderboardCommand: Command = {
           userId: entry.userId,
           value: metric === "streak" ? entry.currentStreak : entry.longestStreak,
         }));
+        const filtered = await filterRows(entries);
+        if (filtered.length === 0) {
+          await interaction.editReply("No streaks recorded for current members.");
+          return;
+        }
         const formatValue = (value: number) => {
           const emojis = formatStreakEmojis(value);
           return emojis ? `${value} ${emojis}` : String(value);
         };
         await renderLeaderboard(
-          entries,
+          filtered,
           metric === "streak" ? "Current streak leaderboard" : "Longest streak leaderboard",
           metric === "streak" ? "Current streak (days)" : "Longest streak (days)",
           formatValue
@@ -178,8 +199,15 @@ export const leaderboardCommand: Command = {
         await interaction.editReply("No leaderboard entries yet.");
         return;
       }
+      const filtered = await filterRows(
+        leaderboard.map((entry) => ({ userId: entry.userId, value: entry.rating }))
+      );
+      if (filtered.length === 0) {
+        await interaction.editReply("No leaderboard entries for current members.");
+        return;
+      }
       await renderLeaderboard(
-        leaderboard.map((entry) => ({ userId: entry.userId, value: entry.rating })),
+        filtered,
         "Leaderboard",
         "Users"
       );

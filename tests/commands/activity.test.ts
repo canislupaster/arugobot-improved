@@ -5,7 +5,22 @@ import type { CommandContext } from "../../src/types/commandContext.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
-    guild: { id: "guild-1" },
+    guild: {
+      id: "guild-1",
+      members: {
+        fetch: jest.fn().mockResolvedValue(
+          new Map([
+            ["user-1", { user: { id: "user-1" } }],
+            ["user-2", { user: { id: "user-2" } }],
+          ])
+        ),
+        cache: new Map([
+          ["user-1", { user: { id: "user-1" } }],
+          ["user-2", { user: { id: "user-2" } }],
+        ]),
+      },
+    },
+    user: { id: "user-1" },
     options: {
       getInteger: jest.fn().mockReturnValue(7),
       getUser: jest.fn().mockReturnValue(null),
