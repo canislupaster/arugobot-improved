@@ -4,45 +4,31 @@ import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveTargetLabels } from "../utils/interaction.js";
+import { resolveHandleTarget } from "../utils/handles.js";
 import { formatSubmissionLine } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
 const MAX_RECENT = 5;
+const MAX_RECENT_CHALLENGES = 5;
 
-function buildProblemLine(
-  problemId: string,
-  name: string | null,
-  contestId?: number,
-  index?: string
-) {
-  if (name && contestId && index) {
-    return `- [${problemId}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
+type ChallengeProblemEntry = {
+  problemId: string;
+  name?: string | null;
+  contestId?: number;
+  index?: string;
+};
+
+function buildProblemLine(entry: ChallengeProblemEntry) {
+  if (entry.name && entry.contestId && entry.index) {
+    return `- [${entry.problemId}. ${entry.name}](https://codeforces.com/problemset/problem/${entry.contestId}/${entry.index})`;
   }
-  return `- ${problemId}`;
+  return `- ${entry.problemId}`;
 }
 
-async function resolveProfileTarget(
-  handleInput: string,
-  guildId: string,
-  targetId: string,
-  store: CommandContext["services"]["store"]
-): Promise<{ handle: string; linkedUserId: string | null } | { error: string }> {
-  if (handleInput) {
-    const handleInfo = await store.resolveHandle(handleInput);
-    if (!handleInfo.exists) {
-      return { error: "Invalid handle." } as const;
-    }
-    const handle = handleInfo.canonicalHandle ?? handleInput;
-    const linkedUserId = await store.getUserIdByHandle(guildId, handle);
-    return { handle, linkedUserId } as const;
-  }
-  const linkedHandle = await store.getHandle(guildId, targetId);
-  if (!linkedHandle) {
-    return { error: "Handle not linked." } as const;
-  }
-  return { handle: linkedHandle, linkedUserId: targetId } as const;
+function formatProblemLines(entries: ChallengeProblemEntry[]): string {
+  return entries.map(buildProblemLine).join("\n");
 }
 
 async function loadChallengeSummary(
@@ -51,30 +37,37 @@ async function loadChallengeSummary(
   services: CommandContext["services"]
 ) {
   const botRating = await services.store.getRating(guildId, linkedUserId);
-  const recentHistory = await services.store.getChallengeHistoryPage(guildId, linkedUserId, 1, 5);
+  const recentHistory = await services.store.getChallengeHistoryPage(
+    guildId,
+    linkedUserId,
+    1,
+    MAX_RECENT_CHALLENGES
+  );
   let totalChallenges = recentHistory.total;
-  let recentLines = recentHistory.entries
-    .map((entry) => buildProblemLine(entry.problemId, entry.name, entry.contestId, entry.index))
-    .join("\n");
+  let recentEntries: ChallengeProblemEntry[] = recentHistory.entries.map((entry) => ({
+    problemId: entry.problemId,
+    name: entry.name,
+    contestId: entry.contestId,
+    index: entry.index,
+  }));
 
   if (totalChallenges === 0) {
     const historyData = await services.store.getHistoryWithRatings(guildId, linkedUserId);
     totalChallenges = historyData?.history.length ?? 0;
     const problemDict = services.problems.getProblemDict();
-    const recent = historyData?.history.slice(-5) ?? [];
-    recentLines = recent
-      .map((problemId) => {
-        const problem = problemDict.get(problemId);
-        return buildProblemLine(
-          problemId,
-          problem?.name ?? null,
-          problem?.contestId,
-          problem?.index
-        );
-      })
-      .join("\n");
+    const recent = historyData?.history.slice(-MAX_RECENT_CHALLENGES) ?? [];
+    recentEntries = recent.map((problemId) => {
+      const problem = problemDict.get(problemId);
+      return {
+        problemId,
+        name: problem?.name ?? null,
+        contestId: problem?.contestId,
+        index: problem?.index,
+      };
+    });
   }
 
+  const recentLines = formatProblemLines(recentEntries);
   return { botRating, totalChallenges, recentLines };
 }
 
@@ -153,12 +146,12 @@ export const profileCommand: Command = {
 
     try {
       const guildId = interaction.guild.id;
-      const targetResolution = await resolveProfileTarget(
-        handleInput,
+      const targetResolution = await resolveHandleTarget(context.services.store, {
         guildId,
         targetId,
-        context.services.store
-      );
+        handleInput,
+        includeLinkedUserId: true,
+      });
       if ("error" in targetResolution) {
         await interaction.editReply(targetResolution.error);
         return;
