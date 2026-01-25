@@ -48,6 +48,11 @@ describe("healthCommand", () => {
         ratingChanges: {
           getLastError: jest.fn().mockReturnValue(null),
         },
+        databaseBackups: {
+          getBackupDir: jest.fn().mockReturnValue(null),
+          getLastBackupAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
         contestReminders: {
           getSubscriptionCount: jest.fn().mockResolvedValue(0),
           getLastTickAt: jest.fn().mockReturnValue(null),

@@ -13,6 +13,8 @@ export type AppConfig = {
   codeforcesSolvedMaxPages: number;
   proxyFetchUrl?: string;
   logRetentionDays: number;
+  databaseBackupDir?: string;
+  databaseBackupRetentionDays: number;
   webHost: string;
   webPort: number;
   webPublicUrl?: string;
@@ -61,6 +63,12 @@ export function validateConfig(config: AppConfig): string[] {
   if (!Number.isFinite(config.logRetentionDays) || config.logRetentionDays < 0) {
     errors.push("LOG_RETENTION_DAYS must be 0 or greater.");
   }
+  if (
+    !Number.isFinite(config.databaseBackupRetentionDays) ||
+    config.databaseBackupRetentionDays < 0
+  ) {
+    errors.push("DATABASE_BACKUP_RETENTION_DAYS must be 0 or greater.");
+  }
   if (!["development", "production", "test"].includes(config.environment)) {
     errors.push("NODE_ENV must be one of development, production, or test.");
   }
@@ -91,6 +99,11 @@ export function loadConfig(): AppConfig {
   const codeforcesSolvedMaxPages = parseNumber(process.env.CODEFORCES_SOLVED_MAX_PAGES ?? "10", 10);
   const proxyFetchUrl = process.env.PROXY_FETCH_URL?.trim() || undefined;
   const logRetentionDays = parseNumber(process.env.LOG_RETENTION_DAYS ?? "30", 30);
+  const databaseBackupDir = process.env.DATABASE_BACKUP?.trim() || undefined;
+  const databaseBackupRetentionDays = parseNumber(
+    process.env.DATABASE_BACKUP_RETENTION_DAYS ?? "7",
+    7
+  );
   const webHost = process.env.WEB_HOST?.trim() || "0.0.0.0";
   const webPort = parseNumber(process.env.WEB_PORT ?? "8787", 8787);
   const webPublicUrlRaw = process.env.WEB_PUBLIC_URL?.trim();
@@ -107,6 +120,8 @@ export function loadConfig(): AppConfig {
     codeforcesSolvedMaxPages,
     proxyFetchUrl,
     logRetentionDays,
+    databaseBackupDir,
+    databaseBackupRetentionDays,
     webHost,
     webPort,
     webPublicUrl,

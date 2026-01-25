@@ -12,6 +12,7 @@ describe("validateConfig", () => {
       codeforcesSolvedMaxPages: -1,
       proxyFetchUrl: "not-a-url",
       logRetentionDays: -1,
+      databaseBackupRetentionDays: -1,
       webHost: "",
       webPort: 0,
       webPublicUrl: "not-a-url",
@@ -24,6 +25,7 @@ describe("validateConfig", () => {
     expect(errors).toContain("CODEFORCES_SOLVED_MAX_PAGES must be 0 or greater.");
     expect(errors).toContain("PROXY_FETCH_URL must be a valid http(s) URL.");
     expect(errors).toContain("LOG_RETENTION_DAYS must be 0 or greater.");
+    expect(errors).toContain("DATABASE_BACKUP_RETENTION_DAYS must be 0 or greater.");
     expect(errors).toContain("WEB_HOST is missing.");
     expect(errors).toContain("WEB_PORT must be a valid port number (1-65535).");
     expect(errors).toContain("WEB_PUBLIC_URL must be a valid http(s) URL.");
@@ -40,6 +42,7 @@ describe("validateConfig", () => {
       codeforcesSolvedMaxPages: 10,
       proxyFetchUrl: "https://example.com/proxies.txt",
       logRetentionDays: 30,
+      databaseBackupRetentionDays: 7,
       webHost: "0.0.0.0",
       webPort: 8787,
       webPublicUrl: "https://example.com",

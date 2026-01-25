@@ -230,6 +230,8 @@ Optional environment variables:
 - `CODEFORCES_SOLVED_MAX_PAGES` (default `10`, set `0` for unlimited)
 - `PROXY_FETCH_URL` (optional proxy list URL; one proxy per line as `host:port` or `host:port:user:pass`)
 - `LOG_RETENTION_DAYS` (default `30`, set `0` to disable log cleanup)
+- `DATABASE_BACKUP` (directory for automated backups, disabled if unset)
+- `DATABASE_BACKUP_RETENTION_DAYS` (default `7`, set `0` to keep all backups)
 - `WEB_HOST` (default `0.0.0.0`)
 - `WEB_PORT` (default `8787`)
 - `WEB_PUBLIC_URL` (optional, e.g. `https://bot.example.com`, used for `/dashboard` links)
@@ -244,6 +246,8 @@ The bot runs database migrations on startup.
 Problem and contest caches are persisted in the database to keep basic functionality available during Codeforces outages.
 Structured logs are appended to the database (`log_entries`) and cleaned up automatically based on
 `LOG_RETENTION_DAYS`.
+If `DATABASE_BACKUP` is set, the bot copies the sqlite file into that directory on a schedule and
+removes backups older than `DATABASE_BACKUP_RETENTION_DAYS`.
 
 ## Web dashboard
 

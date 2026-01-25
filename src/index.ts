@@ -21,6 +21,7 @@ import { ContestRatingChangesService } from "./services/contestRatingChanges.js"
 import { ContestReminderService, contestReminderIntervalMs } from "./services/contestReminders.js";
 import { ContestService } from "./services/contests.js";
 import { ContestStandingsService } from "./services/contestStandings.js";
+import { DatabaseBackupService, databaseBackupIntervalMs } from "./services/databaseBackups.js";
 import { GuildSettingsService } from "./services/guildSettings.js";
 import { LogsService, logCleanupIntervalMs } from "./services/logs.js";
 import { MetricsService } from "./services/metrics.js";
@@ -73,6 +74,11 @@ async function main() {
   const contests = new ContestService(codeforces, cache);
   const contestRatingChanges = new ContestRatingChangesService(db, codeforces);
   const contestStandings = new ContestStandingsService(db, codeforces);
+  const databaseBackups = new DatabaseBackupService(
+    config.databaseUrl,
+    config.databaseBackupDir ?? null,
+    config.databaseBackupRetentionDays
+  );
   const metrics = new MetricsService(db);
   const contestReminders = new ContestReminderService(db, contests);
   const problems = new ProblemService(codeforces, cache);
@@ -114,9 +120,11 @@ async function main() {
   let tournamentArenaInterval: NodeJS.Timeout | null = null;
   let logCleanupInterval: NodeJS.Timeout | null = null;
   let weeklyDigestInterval: NodeJS.Timeout | null = null;
+  let databaseBackupInterval: NodeJS.Timeout | null = null;
   let webServer: ServerType | null = null;
   let shuttingDown = false;
   let isChallengeTicking = false;
+  let isBackingUp = false;
 
   async function validateConnectivity() {
     try {
@@ -175,6 +183,22 @@ async function main() {
       logWarn("Log cleanup failed.", {
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+  };
+
+  const runDatabaseBackup = async () => {
+    if (shuttingDown || isBackingUp) {
+      return;
+    }
+    isBackingUp = true;
+    try {
+      await databaseBackups.runBackup();
+    } catch (error) {
+      logWarn("Database backup failed.", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      isBackingUp = false;
     }
   };
 
@@ -304,6 +328,7 @@ async function main() {
         contestStandings,
         contestActivity,
         guildSettings,
+        databaseBackups,
         logs,
         metrics,
         practiceReminders,
@@ -350,6 +375,9 @@ async function main() {
     if (logCleanupInterval) {
       clearInterval(logCleanupInterval);
     }
+    if (databaseBackupInterval) {
+      clearInterval(databaseBackupInterval);
+    }
     if (webServer) {
       await new Promise<void>((resolve) => {
         webServer?.close(() => resolve());
@@ -382,6 +410,10 @@ async function main() {
   if (config.logRetentionDays > 0) {
     await runLogCleanup();
     logCleanupInterval = setInterval(runLogCleanup, logCleanupIntervalMs);
+  }
+  if (config.databaseBackupDir) {
+    await runDatabaseBackup();
+    databaseBackupInterval = setInterval(runDatabaseBackup, databaseBackupIntervalMs);
   }
 
   await validateConnectivity();

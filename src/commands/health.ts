@@ -26,6 +26,9 @@ export const healthCommand: Command = {
     const uptimeSeconds = Math.floor(process.uptime());
     const memory = process.memoryUsage();
     const dbOk = await context.services.store.checkDb();
+    const backupDir = context.services.databaseBackups.getBackupDir();
+    const backupLastAt = context.services.databaseBackups.getLastBackupAt();
+    const backupLastError = context.services.databaseBackups.getLastError();
     const lastError = getLastError();
     const cfLastError = context.services.codeforces.getLastError();
     const cfLastSuccessAt = context.services.codeforces.getLastSuccessAt();
@@ -85,6 +88,11 @@ export const healthCommand: Command = {
         { name: "Uptime", value: `${uptimeSeconds}s`, inline: true },
         { name: "Memory", value: `${Math.round(memory.rss / 1024 / 1024)} MB`, inline: true },
         { name: "DB", value: dbOk ? "OK" : "Failed", inline: true },
+        {
+          name: "DB backups",
+          value: backupDir ? backupLastAt ?? "Pending" : "Disabled",
+          inline: true,
+        },
         {
           name: "Problem cache age",
           value: cacheAgeSeconds === null ? "Unknown" : `${cacheAgeSeconds}s`,
@@ -211,6 +219,13 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Tournament recaps last error",
         value: `${recapLastError.timestamp} - ${recapLastError.message}`,
+        inline: false,
+      });
+    }
+    if (backupLastError) {
+      embed.addFields({
+        name: "DB backups last error",
+        value: `${backupLastError.timestamp} - ${backupLastError.message}`,
         inline: false,
       });
     }
