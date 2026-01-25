@@ -114,10 +114,11 @@ describe("compareCommand", () => {
     await compareCommand.execute(interaction, context);
 
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
-    const fieldValues = payload.embeds[0].data.fields.map(
-      (field: { value: string }) => field.value
-    );
+    const fields = payload.embeds[0].data.fields as Array<{ name: string; value: string }>;
+    const fieldValues = fields.map((field) => field.value);
+    const fieldNames = fields.map((field) => field.name);
     expect(fieldValues.join("\n")).toContain("Handle: tourist");
     expect(fieldValues.join("\n")).toContain("Handle: Petr");
+    expect(fieldNames.join("\n")).not.toContain("<@");
   });
 });

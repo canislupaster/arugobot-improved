@@ -186,9 +186,14 @@ export const challengesCommand: Command = {
             challenge.problem.index,
             truncateLabel(challenge.problem.name, 80)
           );
+          const problemLabel = truncateLabel(
+            `${challenge.problem.index}. ${challenge.problem.name}`,
+            80
+          );
           embed.addFields({
-            name: link,
+            name: problemLabel,
             value: [
+              `Problem: ${link}`,
               `Channel: <#${challenge.channelId}>`,
               `Host: <@${challenge.hostUserId}>`,
               `Solved: ${solved.length}/${total}`,

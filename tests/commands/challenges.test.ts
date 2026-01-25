@@ -150,8 +150,9 @@ describe("challengesCommand", () => {
 
     await challengesCommand.execute(interaction, context);
 
-    expect(interaction.reply).toHaveBeenCalledWith(
-      expect.objectContaining({ embeds: expect.any(Array) })
-    );
+    const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
+    const fields = payload.embeds[0].data.fields as Array<{ name: string; value: string }>;
+    expect(fields[0].name).not.toContain("](");
+    expect(fields[0].value).toContain("Problem:");
   });
 });

@@ -61,7 +61,7 @@ export const compareCommand: Command = {
 
     try {
       const targets: Array<{
-        label: string;
+        userId?: string;
         handle: string;
         botRating: number | null;
       }> = [];
@@ -80,7 +80,7 @@ export const compareCommand: Command = {
         seenHandles.add(normalized);
         const rating = await context.services.store.getRating(interaction.guild.id, user!.id);
         targets.push({
-          label: `<@${user!.id}>`,
+          userId: user!.id,
           handle,
           botRating: Number.isFinite(rating) && rating >= 0 ? rating : null,
         });
@@ -98,7 +98,7 @@ export const compareCommand: Command = {
           continue;
         }
         seenHandles.add(normalized);
-        targets.push({ label: handle, handle, botRating: null });
+        targets.push({ handle, botRating: null });
       }
 
       if (targets.length === 0) {
@@ -127,15 +127,18 @@ export const compareCommand: Command = {
           : "Unknown";
         const botRating = target.botRating ?? "N/A";
 
+        const lines = [
+          target.userId ? `User: <@${target.userId}>` : null,
+          `Handle: ${target.handle}`,
+          `Bot rating: ${botRating}`,
+          `CF rating: ${cfRating}`,
+          `CF max: ${cfMax}`,
+          `Last online: ${cfLastOnline}`,
+        ].filter((line): line is string => Boolean(line));
+
         embed.addFields({
-          name: target.label,
-          value: [
-            `Handle: ${target.handle}`,
-            `Bot rating: ${botRating}`,
-            `CF rating: ${cfRating}`,
-            `CF max: ${cfMax}`,
-            `Last online: ${cfLastOnline}`,
-          ].join("\n"),
+          name: target.handle,
+          value: lines.join("\n"),
           inline: false,
         });
       }
