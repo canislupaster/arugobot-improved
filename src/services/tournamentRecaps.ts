@@ -2,13 +2,13 @@ import { AttachmentBuilder, ChannelType, EmbedBuilder, type Client } from "disco
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { formatTime } from "../utils/rating.js";
 import { capitalize } from "../utils/text.js";
 import { formatTournamentRecapMarkdown } from "../utils/tournamentRecap.js";
 
 import type { TournamentRecap, TournamentService } from "./tournaments.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const STANDINGS_PREVIEW_LIMIT = 5;
 

@@ -3,12 +3,12 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Problem } from "../services/problems.js";
 import type { StoreService } from "../services/store.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { parseProblemReference } from "../utils/problemReference.js";
 import { getColor } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_HANDLES_CHECK = 10;
 const MAX_SOLVED_DISPLAY = 10;

@@ -1,11 +1,11 @@
 import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import type { LogLevel } from "../utils/logger.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_LIMIT = 20;
 const DEFAULT_LIMIT = 6;

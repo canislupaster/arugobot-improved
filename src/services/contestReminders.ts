@@ -10,6 +10,7 @@ import {
   serializeKeywords,
 } from "../utils/contestFilters.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import {
   formatDiscordRelativeTime,
@@ -18,7 +19,6 @@ import {
 } from "../utils/time.js";
 
 import type { Contest, ContestScope, ContestScopeFilter, ContestService } from "./contests.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const NOTIFICATION_RETENTION_DAYS = 14;
 

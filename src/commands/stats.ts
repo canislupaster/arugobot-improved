@@ -1,9 +1,9 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export const statsCommand: Command = {
   data: new SlashCommandBuilder().setName("stats").setDescription("Shows server challenge stats"),

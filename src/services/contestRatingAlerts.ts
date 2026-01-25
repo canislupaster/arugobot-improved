@@ -5,6 +5,7 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -12,7 +13,6 @@ import type { ContestRatingChangesService } from "./contestRatingChanges.js";
 import type { Contest, ContestService } from "./contests.js";
 import type { RatingChange } from "./ratingChanges.js";
 import type { StoreService } from "./store.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const ALERT_LOOKBACK_DAYS = 14;
 const ALERT_RETENTION_DAYS = 90;

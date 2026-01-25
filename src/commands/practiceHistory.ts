@@ -7,11 +7,11 @@ import {
 import type { Problem } from "../services/problems.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseProblemReference } from "../utils/problemReference.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;

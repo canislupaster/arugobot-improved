@@ -1,6 +1,7 @@
 import { ComponentType, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   buildPaginationIds,
@@ -10,7 +11,6 @@ import {
 import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export const leaderboardCommand: Command = {
   data: new SlashCommandBuilder()

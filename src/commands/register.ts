@@ -10,10 +10,10 @@ import {
 } from "discord.js";
 
 import { waitForCompilationError } from "../services/verification.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, type LogContext } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const VERIFICATION_TIMEOUT_MS = 60000;
 const VERIFICATION_POLL_MS = 5000;

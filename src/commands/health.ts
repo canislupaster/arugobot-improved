@@ -5,10 +5,10 @@ import {
   version as discordJsVersion,
 } from "discord.js";
 
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getLastError } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export const healthCommand: Command = {
   data: new SlashCommandBuilder()

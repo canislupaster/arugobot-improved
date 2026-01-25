@@ -1,6 +1,7 @@
 import { ComponentType, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   buildPaginationIds,
   buildPaginationRow,
@@ -9,7 +10,6 @@ import {
 import { formatTime } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const PAGE_SIZE = 10;
 

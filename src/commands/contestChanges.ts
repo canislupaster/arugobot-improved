@@ -10,6 +10,7 @@ import type { RatingChange } from "../services/ratingChanges.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   formatDiscordRelativeTime,
@@ -18,7 +19,6 @@ import {
 } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_MATCHES = 5;
 const MAX_HANDLES = 50;

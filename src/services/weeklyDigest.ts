@@ -2,12 +2,12 @@ import { ChannelType, EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { ContestActivityService } from "./contestActivity.js";
 import type { StoreService } from "./store.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export type WeeklyDigestSubscription = {
   guildId: string;

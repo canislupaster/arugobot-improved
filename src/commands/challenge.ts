@@ -9,6 +9,7 @@ import {
   type User,
 } from "discord.js";
 
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, type LogContext } from "../utils/logger.js";
 import {
   filterProblemsByRatingRanges,
@@ -22,7 +23,6 @@ import { resolveRatingRanges } from "../utils/ratingRanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const VALID_LENGTHS = new Set([40, 60, 80]);
 const DEFAULT_MIN_RATING = 800;

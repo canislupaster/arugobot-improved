@@ -4,13 +4,13 @@ import { EmbedBuilder, type Client, type Message } from "discord.js";
 import { type Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
 import type { StoreService } from "./store.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export type ChallengeStatus = "active" | "completed" | "cancelled";
 

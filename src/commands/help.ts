@@ -1,7 +1,8 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import type { Command } from "./types.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+
+import type { Command } from "./types.js";
 
 export const helpCommand: Command = {
   data: new SlashCommandBuilder()

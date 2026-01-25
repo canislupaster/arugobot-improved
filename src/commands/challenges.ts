@@ -9,11 +9,11 @@ import {
 } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatTime } from "../utils/rating.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_LIMIT = 5;
 const DEFAULT_RECENT_LIMIT = 5;

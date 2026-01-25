@@ -5,9 +5,9 @@ import {
   type ContestRatingAlertSubscription,
 } from "../services/contestRatingAlerts.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 function parseHandleFilter(value: string | null): string[] {
   if (!value) {

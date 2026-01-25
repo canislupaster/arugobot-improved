@@ -13,6 +13,7 @@ import {
 
 import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   buildPaginationIds,
   buildPaginationRow,
@@ -28,7 +29,6 @@ import {
 } from "../utils/tournamentRecap.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const VALID_LENGTHS = new Set([40, 60, 80]);
 const DEFAULT_MIN_RATING = 800;

@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -10,7 +11,6 @@ import {
 } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_MATCHES = 5;
 const DEFAULT_SCOPE: ContestScopeFilter = "official";

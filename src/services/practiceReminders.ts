@@ -2,6 +2,7 @@ import { ChannelType, EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import {
   filterProblemsByRatingRanges,
@@ -14,7 +15,6 @@ import type { RatingRange } from "../utils/ratingRanges.js";
 
 import type { Problem, ProblemService } from "./problems.js";
 import type { StoreService } from "./store.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_RATING_RANGES: RatingRange[] = [{ min: 800, max: 3500 }];
 const MAX_HANDLES_FOR_SOLVED = 10;

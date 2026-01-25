@@ -11,10 +11,10 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_MINUTES = 30;
 const MIN_MINUTES = 5;

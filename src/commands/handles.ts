@@ -1,6 +1,7 @@
 import { ComponentType, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   buildPaginationIds,
@@ -9,7 +10,6 @@ import {
 } from "../utils/pagination.js";
 
 import type { Command } from "./types.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const PAGE_SIZE = 10;
 
