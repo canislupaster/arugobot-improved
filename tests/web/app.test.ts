@@ -63,6 +63,7 @@ describe("web app", () => {
     expect(body).toContain("Global snapshot");
     expect(body).toContain("Guild One");
     expect(body).toContain("og:image");
+    expect(body).toContain("/static/local-time.js");
   });
 
   it("renders a guild page", async () => {
