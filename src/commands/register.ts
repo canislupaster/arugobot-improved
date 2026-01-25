@@ -18,6 +18,7 @@ import type { Command } from "./types.js";
 const VERIFICATION_TIMEOUT_MS = 60000;
 const VERIFICATION_POLL_MS = 5000;
 const VERIFICATION_CANCEL_LABEL = "Cancel verification";
+const GENERIC_ERROR_MESSAGE = "Some error (maybe Codeforces is down).";
 
 type HandleVerificationResult = "ok" | "verification_failed" | "cancelled" | "error";
 
@@ -25,6 +26,125 @@ type CancelCollector = {
   waitForCancel: Promise<boolean>;
   stop: () => void;
 };
+
+type ResolvedHandle =
+  | {
+      status: "ok";
+      handle: string;
+    }
+  | {
+      status: "invalid";
+    };
+
+type InsertResult = "ok" | "handle_exists" | "already_linked" | "error";
+type UpdateResult = "ok" | "handle_exists" | "not_linked" | "error";
+
+async function requireGuild(
+  interaction: ChatInputCommandInteraction
+): Promise<{ guildId: string } | null> {
+  if (!interaction.guild) {
+    await interaction.reply({
+      content: "This command can only be used in a server.",
+      ephemeral: true,
+    });
+    return null;
+  }
+  return { guildId: interaction.guild.id };
+}
+
+async function resolveCanonicalHandle(
+  handle: string,
+  context: Parameters<Command["execute"]>[1]
+): Promise<ResolvedHandle> {
+  const handleInfo = await context.services.store.resolveHandle(handle);
+  if (!handleInfo.exists) {
+    return { status: "invalid" };
+  }
+  return { status: "ok", handle: handleInfo.canonicalHandle ?? handle };
+}
+
+async function resolveHandleOrReply(
+  interaction: ChatInputCommandInteraction,
+  handle: string,
+  context: Parameters<Command["execute"]>[1]
+): Promise<string | null> {
+  const resolved = await resolveCanonicalHandle(handle, context);
+  if (resolved.status === "invalid") {
+    await interaction.editReply("Invalid handle.");
+    return null;
+  }
+  return resolved.handle;
+}
+
+function getVerificationFailureMessage(result: HandleVerificationResult): string | null {
+  if (result === "verification_failed") {
+    return "Verification failed.";
+  }
+  if (result === "error") {
+    return GENERIC_ERROR_MESSAGE;
+  }
+  return null;
+}
+
+function getInsertResultMessage(result: InsertResult, handle: string): string {
+  if (result === "ok") {
+    return `Handle set to ${handle}.`;
+  }
+  if (result === "handle_exists") {
+    return "Handle has been taken.";
+  }
+  if (result === "already_linked") {
+    return "You already linked a handle.";
+  }
+  return GENERIC_ERROR_MESSAGE;
+}
+
+function getUpdateResultMessage(result: UpdateResult, handle: string): string {
+  if (result === "ok") {
+    return `Handle updated to ${handle}.`;
+  }
+  if (result === "handle_exists") {
+    return "Handle taken in this server.";
+  }
+  if (result === "not_linked") {
+    return "You do not have a linked handle yet.";
+  }
+  return GENERIC_ERROR_MESSAGE;
+}
+
+async function runVerificationAndReport(
+  interaction: ChatInputCommandInteraction,
+  handle: string,
+  context: Parameters<Command["execute"]>[1],
+  logContext: LogContext
+): Promise<"ok" | "cancelled" | "failed"> {
+  const verification = await verifyHandleOwnership(interaction, handle, context, logContext);
+  if (verification === "cancelled") {
+    return "cancelled";
+  }
+  if (verification !== "ok") {
+    const failureMessage = getVerificationFailureMessage(verification);
+    if (failureMessage) {
+      await interaction.editReply(failureMessage);
+    }
+    return "failed";
+  }
+  return "ok";
+}
+
+function createLogContext(
+  command: string,
+  guildId: string,
+  userId: string,
+  correlationId: string
+): LogContext {
+  return {
+    correlationId,
+    command,
+    guildId,
+    userId,
+  };
+}
 
 async function verifyHandleOwnership(
   interaction: ChatInputCommandInteraction,
@@ -48,6 +168,7 @@ async function verifyHandleOwnership(
   const startTime = Math.floor(Date.now() / 1000);
   const abortController = new AbortController();
   const cancelId = `cancel_verification:${context.correlationId}`;
+  const timeoutSeconds = Math.floor(VERIFICATION_TIMEOUT_MS / 1000);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(cancelId)
@@ -56,7 +177,7 @@ async function verifyHandleOwnership(
   );
 
   const promptMessage = await interaction.editReply({
-    content: `Submit a compilation error to the following problem in the next 60 seconds:\nhttps://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}\nI will confirm as soon as I see it.`,
+    content: `Submit a compilation error to the following problem in the next ${timeoutSeconds} seconds:\nhttps://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}\nI will confirm as soon as I see it.`,
     components: [row],
   });
 
@@ -150,30 +271,25 @@ export const registerCommand: Command = {
       option.setName("handle").setDescription("Your Codeforces handle").setRequired(true)
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        ephemeral: true,
-      });
+    const guild = await requireGuild(interaction);
+    if (!guild) {
       return;
     }
-    const guildId = interaction.guild.id;
+    const { guildId } = guild;
     const handle = interaction.options.getString("handle", true);
-    const logContext: LogContext = {
-      correlationId: context.correlationId,
-      command: "register",
+    const logContext = createLogContext(
+      "register",
       guildId,
-      userId: interaction.user.id,
-    };
+      interaction.user.id,
+      context.correlationId
+    );
 
     await interaction.deferReply({ ephemeral: true });
 
-    const handleInfo = await context.services.store.resolveHandle(handle);
-    if (!handleInfo.exists) {
-      await interaction.editReply("Invalid handle.");
+    const resolvedHandle = await resolveHandleOrReply(interaction, handle, context);
+    if (!resolvedHandle) {
       return;
     }
-    const resolvedHandle = handleInfo.canonicalHandle ?? handle;
 
     if (await context.services.store.handleExists(guildId, resolvedHandle)) {
       await interaction.editReply("Handle taken in this server.");
@@ -187,45 +303,22 @@ export const registerCommand: Command = {
       return;
     }
 
-    const verification = await verifyHandleOwnership(
+    const verificationResult = await runVerificationAndReport(
       interaction,
       resolvedHandle,
       context,
       logContext
     );
-
-    if (verification === "ok") {
-      const insertResult = await context.services.store.insertUser(
-        guildId,
-        interaction.user.id,
-        resolvedHandle
-      );
-      if (insertResult === "ok") {
-        await interaction.editReply(`Handle set to ${resolvedHandle}.`);
-        return;
-      }
-      if (insertResult === "handle_exists") {
-        await interaction.editReply("Handle has been taken.");
-        return;
-      }
-      if (insertResult === "already_linked") {
-        await interaction.editReply("You already linked a handle.");
-        return;
-      }
-      await interaction.editReply("Some error (maybe Codeforces is down).");
+    if (verificationResult !== "ok") {
       return;
     }
 
-    if (verification === "cancelled") {
-      return;
-    }
-
-    if (verification === "verification_failed") {
-      await interaction.editReply("Verification failed.");
-      return;
-    }
-
-    await interaction.editReply("Some error (maybe Codeforces is down).");
+    const insertResult = await context.services.store.insertUser(
+      guildId,
+      interaction.user.id,
+      resolvedHandle
+    );
+    await interaction.editReply(getInsertResultMessage(insertResult, resolvedHandle));
   },
 };
 
@@ -237,21 +330,18 @@ export const relinkCommand: Command = {
       option.setName("handle").setDescription("New Codeforces handle").setRequired(true)
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        ephemeral: true,
-      });
+    const guild = await requireGuild(interaction);
+    if (!guild) {
       return;
     }
-    const guildId = interaction.guild.id;
+    const { guildId } = guild;
     const newHandle = interaction.options.getString("handle", true);
-    const logContext: LogContext = {
-      correlationId: context.correlationId,
-      command: "relink",
+    const logContext = createLogContext(
+      "relink",
       guildId,
-      userId: interaction.user.id,
-    };
+      interaction.user.id,
+      context.correlationId
+    );
 
     const currentHandle = await context.services.store.getHandle(guildId, interaction.user.id);
     if (!currentHandle) {
@@ -264,12 +354,10 @@ export const relinkCommand: Command = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const handleInfo = await context.services.store.resolveHandle(newHandle);
-    if (!handleInfo.exists) {
-      await interaction.editReply("Invalid handle.");
+    const resolvedHandle = await resolveHandleOrReply(interaction, newHandle, context);
+    if (!resolvedHandle) {
       return;
     }
-    const resolvedHandle = handleInfo.canonicalHandle ?? newHandle;
     if (currentHandle.toLowerCase() === resolvedHandle.toLowerCase()) {
       await interaction.editReply("That handle is already linked to your account.");
       return;
@@ -279,21 +367,13 @@ export const relinkCommand: Command = {
       return;
     }
 
-    const verification = await verifyHandleOwnership(
+    const verificationResult = await runVerificationAndReport(
       interaction,
       resolvedHandle,
       context,
       logContext
     );
-    if (verification === "cancelled") {
-      return;
-    }
-    if (verification !== "ok") {
-      await interaction.editReply(
-        verification === "verification_failed"
-          ? "Verification failed."
-          : "Some error (maybe Codeforces is down)."
-      );
+    if (verificationResult !== "ok") {
       return;
     }
 
@@ -302,19 +382,7 @@ export const relinkCommand: Command = {
       interaction.user.id,
       resolvedHandle
     );
-    if (updateResult === "ok") {
-      await interaction.editReply(`Handle updated to ${resolvedHandle}.`);
-      return;
-    }
-    if (updateResult === "handle_exists") {
-      await interaction.editReply("Handle taken in this server.");
-      return;
-    }
-    if (updateResult === "not_linked") {
-      await interaction.editReply("You do not have a linked handle yet.");
-      return;
-    }
-    await interaction.editReply("Some error (maybe Codeforces is down).");
+    await interaction.editReply(getUpdateResultMessage(updateResult, resolvedHandle));
   },
 };
 
@@ -323,14 +391,11 @@ export const unlinkCommand: Command = {
     .setName("unlink")
     .setDescription("Unlinks your Codeforces handle and erases progress"),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        ephemeral: true,
-      });
+    const guild = await requireGuild(interaction);
+    if (!guild) {
       return;
     }
-    const guildId = interaction.guild.id;
+    const { guildId } = guild;
     if (!(await context.services.store.handleLinked(guildId, interaction.user.id))) {
       await interaction.reply({ content: "You have not linked a handle.", ephemeral: true });
       return;
