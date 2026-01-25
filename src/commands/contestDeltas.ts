@@ -1,16 +1,14 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
+import type {
+  GuildRatingChangeSummary,
+  RatingChangeParticipantSummary,
+} from "../services/contestActivity.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
-
-import type {
-  GuildRatingChangeSummary,
-  RatingChangeParticipantSummary,
-} from "../services/contestActivity.js";
-
 import type { Command } from "./types.js";
 
 const DEFAULT_DAYS = 90;
