@@ -1,30 +1,14 @@
-import {
-  ComponentType,
-  EmbedBuilder,
-  MessageFlags,
-  SlashCommandBuilder,
-  type ChatInputCommandInteraction,
-} from "discord.js";
+import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import {
-  buildPaginationIds,
-  buildPaginationRow,
-  paginationTimeoutMs,
-  type PaginationIds,
-} from "../utils/pagination.js";
+import { buildPaginationIds, runPaginatedInteraction } from "../utils/pagination.js";
 import { formatTime } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
 
 const PAGE_SIZE = 10;
-
-type PaginatedRender = {
-  embed: EmbedBuilder;
-  row: ReturnType<typeof buildPaginationRow>;
-};
 
 type ChallengeHistoryEntry = {
   problemId: string;
@@ -105,62 +89,6 @@ const renderLegacyHistoryLines = (
   return lines;
 };
 
-async function runPagination(options: {
-  interaction: ChatInputCommandInteraction;
-  paginationIds: PaginationIds;
-  initialPage: number;
-  totalPages: number;
-  renderPage: (pageNumber: number) => Promise<PaginatedRender | null>;
-}): Promise<void> {
-  const { interaction, paginationIds, initialPage, totalPages, renderPage } = options;
-  let currentPage = initialPage;
-  const initial = await renderPage(currentPage);
-  if (!initial) {
-    await interaction.editReply("Empty page.");
-    return;
-  }
-  const response = await interaction.editReply({
-    embeds: [initial.embed],
-    components: [initial.row],
-  });
-
-  const collector = response.createMessageComponentCollector({
-    componentType: ComponentType.Button,
-    time: paginationTimeoutMs,
-  });
-
-  collector.on("collect", async (button) => {
-    if (button.customId !== paginationIds.prev && button.customId !== paginationIds.next) {
-      return;
-    }
-    if (button.user.id !== interaction.user.id) {
-      await button.reply({
-        content: "Only the command user can use these buttons.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-    await button.deferUpdate();
-    currentPage =
-      button.customId === paginationIds.prev
-        ? Math.max(1, currentPage - 1)
-        : Math.min(totalPages, currentPage + 1);
-    const updated = await renderPage(currentPage);
-    if (!updated) {
-      return;
-    }
-    await interaction.editReply({ embeds: [updated.embed], components: [updated.row] });
-  });
-
-  collector.on("end", async () => {
-    try {
-      const disabledRow = buildPaginationRow(paginationIds, currentPage, totalPages, true);
-      await interaction.editReply({ components: [disabledRow] });
-    } catch {
-      return;
-    }
-  });
-}
 
 export const historyCommand: Command = {
   data: new SlashCommandBuilder()
@@ -220,11 +148,10 @@ export const historyCommand: Command = {
             "Challenges",
             lines.join("\n")
           );
-          const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
-          return { embed, row };
+          return { embed };
         };
 
-        await runPagination({
+        await runPaginatedInteraction({
           interaction,
           paginationIds,
           initialPage: page,
@@ -266,10 +193,9 @@ export const historyCommand: Command = {
           "Problems",
           lines.length > 0 ? lines.join("\n") : "No entries."
         );
-        const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
-        return { embed, row };
+        return { embed };
       };
-      await runPagination({
+      await runPaginatedInteraction({
         interaction,
         paginationIds,
         initialPage: page,

@@ -1,12 +1,11 @@
-import { ComponentType, EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
+import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   buildPaginationIds,
-  buildPaginationRow,
-  paginationTimeoutMs,
+  runPaginatedInteraction,
 } from "../utils/pagination.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 
@@ -81,7 +80,6 @@ export const leaderboardCommand: Command = {
       const totalPages = Math.max(1, Math.ceil(rows.length / 10));
       const paginationIds = buildPaginationIds("leaderboard", interaction.id);
       const medals = [":first_place:", ":second_place:", ":third_place:"];
-      let currentPage = page;
 
       const renderPage = async (pageNumber: number) => {
         let content = "";
@@ -106,52 +104,15 @@ export const leaderboardCommand: Command = {
           .setDescription(`Page ${pageNumber} of ${totalPages}`)
           .setColor(EMBED_COLORS.info)
           .addFields({ name: fieldName, value: content || "No entries.", inline: false });
-        const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
-        return { embed, row };
+        return { embed };
       };
 
-      const initial = await renderPage(currentPage);
-      if (!initial) {
-        await interaction.editReply("Empty page.");
-        return;
-      }
-      const response = await interaction.editReply({
-        embeds: [initial.embed],
-        components: [initial.row],
-      });
-
-      const collector = response.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: paginationTimeoutMs,
-      });
-
-      collector.on("collect", async (button) => {
-        if (button.customId !== paginationIds.prev && button.customId !== paginationIds.next) {
-          return;
-        }
-        if (button.user.id !== interaction.user.id) {
-          await button.reply({
-            content: "Only the command user can use these buttons.",
-            flags: MessageFlags.Ephemeral,
-          });
-          return;
-        }
-        await button.deferUpdate();
-        currentPage = button.customId === paginationIds.prev ? currentPage - 1 : currentPage + 1;
-        const updated = await renderPage(currentPage);
-        if (!updated) {
-          return;
-        }
-        await interaction.editReply({ embeds: [updated.embed], components: [updated.row] });
-      });
-
-      collector.on("end", async () => {
-        try {
-          const disabledRow = buildPaginationRow(paginationIds, currentPage, totalPages, true);
-          await interaction.editReply({ components: [disabledRow] });
-        } catch {
-          return;
-        }
+      await runPaginatedInteraction({
+        interaction,
+        paginationIds,
+        initialPage: page,
+        totalPages,
+        renderPage,
       });
     };
 

@@ -2,6 +2,10 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ComponentType,
+  EmbedBuilder,
+  MessageFlags,
+  type ChatInputCommandInteraction,
   type MessageActionRowComponentBuilder,
 } from "discord.js";
 
@@ -39,4 +43,76 @@ export function buildPaginationRow(
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disableNext)
   );
+}
+
+export type PaginatedRender = {
+  embed: EmbedBuilder;
+};
+
+export async function runPaginatedInteraction(options: {
+  interaction: ChatInputCommandInteraction;
+  paginationIds: PaginationIds;
+  initialPage: number;
+  totalPages: number;
+  renderPage: (pageNumber: number) => Promise<PaginatedRender | null>;
+  emptyMessage?: string;
+}): Promise<void> {
+  const {
+    interaction,
+    paginationIds,
+    initialPage,
+    totalPages,
+    renderPage,
+    emptyMessage = "Empty page.",
+  } = options;
+  let currentPage = initialPage;
+  const initial = await renderPage(currentPage);
+  if (!initial) {
+    await interaction.editReply(emptyMessage);
+    return;
+  }
+  const response = await interaction.editReply({
+    embeds: [initial.embed],
+    components: [buildPaginationRow(paginationIds, currentPage, totalPages)],
+  });
+
+  const collector = response.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: paginationTimeoutMs,
+  });
+
+  collector.on("collect", async (button) => {
+    if (button.customId !== paginationIds.prev && button.customId !== paginationIds.next) {
+      return;
+    }
+    if (button.user.id !== interaction.user.id) {
+      await button.reply({
+        content: "Only the command user can use these buttons.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    await button.deferUpdate();
+    currentPage =
+      button.customId === paginationIds.prev
+        ? Math.max(1, currentPage - 1)
+        : Math.min(totalPages, currentPage + 1);
+    const updated = await renderPage(currentPage);
+    if (!updated) {
+      return;
+    }
+    await interaction.editReply({
+      embeds: [updated.embed],
+      components: [buildPaginationRow(paginationIds, currentPage, totalPages)],
+    });
+  });
+
+  collector.on("end", async () => {
+    try {
+      const disabledRow = buildPaginationRow(paginationIds, currentPage, totalPages, true);
+      await interaction.editReply({ components: [disabledRow] });
+    } catch {
+      return;
+    }
+  });
 }
