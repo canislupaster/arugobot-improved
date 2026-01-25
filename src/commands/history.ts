@@ -6,6 +6,7 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 
+import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
@@ -23,6 +24,85 @@ const PAGE_SIZE = 10;
 type PaginatedRender = {
   embed: EmbedBuilder;
   row: ReturnType<typeof buildPaginationRow>;
+};
+
+type ChallengeHistoryEntry = {
+  problemId: string;
+  contestId: number;
+  index: string;
+  name: string;
+  startedAt: number;
+  solvedAt: number | null;
+  ratingDelta: number | null;
+};
+
+type LegacyHistoryData = {
+  history: string[];
+  ratingHistory: number[];
+};
+
+const buildProblemLink = (
+  problemId: string,
+  contestId: number,
+  index: string,
+  name: string
+) => `[${problemId}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
+
+const buildHistoryEmbed = (
+  pageNumber: number,
+  totalPages: number,
+  fieldName: string,
+  fieldValue: string
+) =>
+  new EmbedBuilder()
+    .setTitle("History")
+    .setDescription(`Page ${pageNumber} of ${totalPages}`)
+    .setColor(EMBED_COLORS.info)
+    .addFields({ name: fieldName, value: fieldValue, inline: false });
+
+const formatChallengeDelta = (ratingDelta: number | null) => {
+  if (ratingDelta === null) {
+    return "N/A";
+  }
+  return ratingDelta > 0 ? `+${ratingDelta}` : String(ratingDelta);
+};
+
+const renderChallengeHistoryLines = (entries: ChallengeHistoryEntry[]) =>
+  entries.map((entry) => {
+    const duration =
+      entry.solvedAt === null
+        ? "Not solved"
+        : `Solved in ${formatTime(Math.max(0, entry.solvedAt - entry.startedAt))}`;
+    const delta = formatChallengeDelta(entry.ratingDelta);
+    const link = buildProblemLink(entry.problemId, entry.contestId, entry.index, entry.name);
+    return `- ${link} • ${duration} • ${delta}`;
+  });
+
+const renderLegacyHistoryLines = (
+  historyData: LegacyHistoryData,
+  problemDict: Map<string, Problem>,
+  start: number,
+  pageSize: number
+) => {
+  const lines: string[] = [];
+  for (let i = 0; i < pageSize; i += 1) {
+    const index = start + i;
+    if (index >= historyData.history.length) {
+      break;
+    }
+    const problemId = historyData.history[index];
+    const problem = problemDict.get(problemId);
+    if (!problem) {
+      continue;
+    }
+    const previous = historyData.ratingHistory[index];
+    const next = historyData.ratingHistory[index + 1];
+    const delta = Number.isFinite(previous) && Number.isFinite(next) ? next - previous : null;
+    const deltaLabel = delta === null ? "N/A" : String(delta);
+    const link = buildProblemLink(problemId, problem.contestId, problem.index, problem.name);
+    lines.push(`- ${link} (rating change: ${deltaLabel})`);
+  }
+  return lines;
 };
 
 async function runPagination(options: {
@@ -133,26 +213,13 @@ export const historyCommand: Command = {
           if (pageData.entries.length === 0) {
             return null;
           }
-          const lines = pageData.entries.map((entry) => {
-            const duration =
-              entry.solvedAt === null
-                ? "Not solved"
-                : `Solved in ${formatTime(Math.max(0, entry.solvedAt - entry.startedAt))}`;
-            const delta =
-              entry.ratingDelta === null
-                ? "N/A"
-                : entry.ratingDelta > 0
-                  ? `+${entry.ratingDelta}`
-                  : String(entry.ratingDelta);
-            return `- [${entry.problemId}. ${entry.name}](https://codeforces.com/problemset/problem/${entry.contestId}/${entry.index}) • ${duration} • ${delta}`;
-          });
-
-          const embed = new EmbedBuilder()
-            .setTitle("History")
-            .setDescription(`Page ${pageNumber} of ${totalPages}`)
-            .setColor(EMBED_COLORS.info)
-            .addFields({ name: "Challenges", value: lines.join("\n"), inline: false });
-
+          const lines = renderChallengeHistoryLines(pageData.entries);
+          const embed = buildHistoryEmbed(
+            pageNumber,
+            totalPages,
+            "Challenges",
+            lines.join("\n")
+          );
           const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
           return { embed, row };
         };
@@ -192,29 +259,13 @@ export const historyCommand: Command = {
           return null;
         }
 
-        let content = "";
-        for (let i = 0; i < PAGE_SIZE; i += 1) {
-          const index = start + i;
-          if (index >= historyData.history.length) {
-            break;
-          }
-          const problemId = historyData.history[index];
-          const problem = problemDict.get(problemId);
-          if (!problem) {
-            continue;
-          }
-          const previous = historyData.ratingHistory[index];
-          const next = historyData.ratingHistory[index + 1];
-          const delta = Number.isFinite(previous) && Number.isFinite(next) ? next - previous : null;
-          const deltaLabel = delta === null ? "N/A" : String(delta);
-          content += `- [${problemId}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}) (rating change: ${deltaLabel})\n`;
-        }
-
-        const embed = new EmbedBuilder()
-          .setTitle("History")
-          .setDescription(`Page ${pageNumber} of ${totalPages}`)
-          .setColor(EMBED_COLORS.info)
-          .addFields({ name: "Problems", value: content || "No entries.", inline: false });
+        const lines = renderLegacyHistoryLines(historyData, problemDict, start, PAGE_SIZE);
+        const embed = buildHistoryEmbed(
+          pageNumber,
+          totalPages,
+          "Problems",
+          lines.length > 0 ? lines.join("\n") : "No entries."
+        );
         const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
         return { embed, row };
       };
