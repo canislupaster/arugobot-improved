@@ -307,6 +307,44 @@ describe("PracticeReminderService", () => {
     expect(second.status).toBe("already_sent");
   });
 
+  it("returns channel_missing when manual reminder channel is invalid", async () => {
+    const nowMs = Date.UTC(2024, 0, 1, 10, 0, 0);
+    jest.useFakeTimers().setSystemTime(new Date(nowMs));
+
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue([]),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await service.setSubscription(
+      "guild-1",
+      "missing-channel",
+      9,
+      0,
+      0,
+      ALL_DAYS,
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
+
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(null),
+      },
+    } as unknown as Client;
+
+    const result = await service.sendManualReminder("guild-1", client, false);
+    expect(result).toEqual({ status: "channel_missing", channelId: "missing-channel" });
+  });
+
   it("builds a preview when configured", async () => {
     const nowMs = Date.UTC(2024, 0, 1, 8, 0, 0);
     jest.useFakeTimers().setSystemTime(new Date(nowMs));

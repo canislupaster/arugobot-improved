@@ -1,7 +1,14 @@
-import { ChannelType, EmbedBuilder, type Client } from "discord.js";
+import {
+  ChannelType,
+  type Channel,
+  EmbedBuilder,
+  type Client,
+  type NewsChannel,
+  type TextChannel,
+} from "discord.js";
 import type { Kysely } from "kysely";
 
-import type { Database } from "../db/types.js";
+import type { Database, PracticeRemindersTable } from "../db/types.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
@@ -21,6 +28,20 @@ const DEFAULT_RATING_RANGES: RatingRange[] = [{ min: 800, max: 3500 }];
 const MAX_HANDLES_FOR_SOLVED = 10;
 const POST_RETENTION_DAYS = 120;
 const DEFAULT_DAYS_OF_WEEK = [0, 1, 2, 3, 4, 5, 6];
+const PRACTICE_REMINDER_COLUMNS = [
+  "guild_id",
+  "channel_id",
+  "hour_utc",
+  "minute_utc",
+  "utc_offset_minutes",
+  "days_of_week",
+  "rating_ranges",
+  "tags",
+  "role_id",
+  "last_sent_at",
+] as const;
+
+type SendableChannel = TextChannel | NewsChannel;
 
 export type PracticeReminder = {
   guildId: string;
@@ -64,6 +85,27 @@ type PracticeSelectionResult = {
   candidateCount: number;
 };
 
+type PracticeReminderRow = Pick<
+  PracticeRemindersTable,
+  | "guild_id"
+  | "channel_id"
+  | "hour_utc"
+  | "minute_utc"
+  | "utc_offset_minutes"
+  | "days_of_week"
+  | "rating_ranges"
+  | "tags"
+  | "role_id"
+  | "last_sent_at"
+>;
+
+function isSendableChannel(channel: Channel | null): channel is SendableChannel {
+  return (
+    !!channel &&
+    (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)
+  );
+}
+
 function parseRatingRanges(raw: string | null | undefined): RatingRange[] {
   if (!raw) {
     return DEFAULT_RATING_RANGES.slice();
@@ -106,6 +148,21 @@ function parseDaysOfWeek(raw: string | null | undefined): number[] {
   } catch {
     return DEFAULT_DAYS_OF_WEEK.slice();
   }
+}
+
+function mapPracticeReminderRow(row: PracticeReminderRow): PracticeReminder {
+  return {
+    guildId: row.guild_id,
+    channelId: row.channel_id,
+    hourUtc: row.hour_utc,
+    minuteUtc: row.minute_utc,
+    utcOffsetMinutes: row.utc_offset_minutes ?? 0,
+    daysOfWeek: parseDaysOfWeek(row.days_of_week),
+    ratingRanges: parseRatingRanges(row.rating_ranges),
+    tags: row.tags ?? "",
+    roleId: row.role_id ?? null,
+    lastSentAt: row.last_sent_at ?? null,
+  };
 }
 
 function getLocalDayForUtcMs(utcMs: number, offsetMinutes: number): number {
@@ -197,65 +254,21 @@ export class PracticeReminderService {
   async getSubscription(guildId: string): Promise<PracticeReminder | null> {
     const row = await this.db
       .selectFrom("practice_reminders")
-      .select([
-        "guild_id",
-        "channel_id",
-        "hour_utc",
-        "minute_utc",
-        "utc_offset_minutes",
-        "days_of_week",
-        "rating_ranges",
-        "tags",
-        "role_id",
-        "last_sent_at",
-      ])
+      .select(PRACTICE_REMINDER_COLUMNS)
       .where("guild_id", "=", guildId)
       .executeTakeFirst();
     if (!row) {
       return null;
     }
-    return {
-      guildId: row.guild_id,
-      channelId: row.channel_id,
-      hourUtc: row.hour_utc,
-      minuteUtc: row.minute_utc,
-      utcOffsetMinutes: row.utc_offset_minutes ?? 0,
-      daysOfWeek: parseDaysOfWeek(row.days_of_week),
-      ratingRanges: parseRatingRanges(row.rating_ranges),
-      tags: row.tags ?? "",
-      roleId: row.role_id ?? null,
-      lastSentAt: row.last_sent_at ?? null,
-    };
+    return mapPracticeReminderRow(row);
   }
 
   async listSubscriptions(): Promise<PracticeReminder[]> {
     const rows = await this.db
       .selectFrom("practice_reminders")
-      .select([
-        "guild_id",
-        "channel_id",
-        "hour_utc",
-        "minute_utc",
-        "utc_offset_minutes",
-        "days_of_week",
-        "rating_ranges",
-        "tags",
-        "role_id",
-        "last_sent_at",
-      ])
+      .select(PRACTICE_REMINDER_COLUMNS)
       .execute();
-    return rows.map((row) => ({
-      guildId: row.guild_id,
-      channelId: row.channel_id,
-      hourUtc: row.hour_utc,
-      minuteUtc: row.minute_utc,
-      utcOffsetMinutes: row.utc_offset_minutes ?? 0,
-      daysOfWeek: parseDaysOfWeek(row.days_of_week),
-      ratingRanges: parseRatingRanges(row.rating_ranges),
-      tags: row.tags ?? "",
-      roleId: row.role_id ?? null,
-      lastSentAt: row.last_sent_at ?? null,
-    }));
+    return rows.map(mapPracticeReminderRow);
   }
 
   async getSubscriptionCount(): Promise<number> {
@@ -377,11 +390,8 @@ export class PracticeReminderService {
       };
     }
 
-    const channel = await client.channels.fetch(subscription.channelId).catch(() => null);
-    if (
-      !channel ||
-      (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
-    ) {
+    const channel = await this.resolveSendableChannel(subscription.channelId, client);
+    if (!channel) {
       return { status: "channel_missing", channelId: subscription.channelId };
     }
 
@@ -392,21 +402,7 @@ export class PracticeReminderService {
         return { status: "no_problem", candidateCount: selection.candidateCount };
       }
 
-      const embed = this.buildPracticeEmbed(subscription, selection.problem, selection);
-      const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
-      await channel.send({
-        content: mention,
-        allowedMentions,
-        embeds: [embed],
-      });
-      await this.markPosted(subscription.guildId, selection.problem);
-      await this.updateLastSent(subscription.guildId);
-      const problemId = getProblemId(selection.problem);
-      logInfo("Practice reminder sent (manual).", {
-        guildId: subscription.guildId,
-        channelId: subscription.channelId,
-        problemId,
-      });
+      const problemId = await this.sendReminderMessage(subscription, selection, channel, "manual");
       return { status: "sent", problemId, channelId: subscription.channelId };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -470,11 +466,8 @@ export class PracticeReminderService {
           continue;
         }
 
-        const channel = await client.channels.fetch(subscription.channelId).catch(() => null);
-        if (
-          !channel ||
-          (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
-        ) {
+        const channel = await this.resolveSendableChannel(subscription.channelId, client);
+        if (!channel) {
           logWarn("Practice reminder channel missing or invalid.", {
             guildId: subscription.guildId,
             channelId: subscription.channelId,
@@ -491,21 +484,8 @@ export class PracticeReminderService {
           continue;
         }
 
-        const embed = this.buildPracticeEmbed(subscription, selection.problem, selection);
         try {
-          const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
-          await channel.send({
-            content: mention,
-            allowedMentions,
-            embeds: [embed],
-          });
-          await this.markPosted(subscription.guildId, selection.problem);
-          await this.updateLastSent(subscription.guildId);
-          logInfo("Practice reminder sent.", {
-            guildId: subscription.guildId,
-            channelId: subscription.channelId,
-            problemId: getProblemId(selection.problem),
-          });
+          await this.sendReminderMessage(subscription, selection, channel, "scheduled");
         } catch (error) {
           logWarn("Practice reminder send failed.", {
             guildId: subscription.guildId,
@@ -611,6 +591,41 @@ export class PracticeReminderService {
       })
       .onConflict((oc) => oc.columns(["guild_id", "problem_id"]).doNothing())
       .execute();
+  }
+
+  private async resolveSendableChannel(
+    channelId: string,
+    client: Client
+  ): Promise<SendableChannel | null> {
+    const channel = await client.channels.fetch(channelId).catch(() => null);
+    return isSendableChannel(channel) ? channel : null;
+  }
+
+  private async sendReminderMessage(
+    subscription: PracticeReminder,
+    selection: PracticeSelectionResult,
+    channel: SendableChannel,
+    source: "manual" | "scheduled"
+  ): Promise<string> {
+    if (!selection.problem) {
+      throw new Error("No practice problem selected.");
+    }
+    const embed = this.buildPracticeEmbed(subscription, selection.problem, selection);
+    const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
+    await channel.send({
+      content: mention,
+      allowedMentions,
+      embeds: [embed],
+    });
+    await this.markPosted(subscription.guildId, selection.problem);
+    await this.updateLastSent(subscription.guildId);
+    const problemId = getProblemId(selection.problem);
+    logInfo(source === "manual" ? "Practice reminder sent (manual)." : "Practice reminder sent.", {
+      guildId: subscription.guildId,
+      channelId: subscription.channelId,
+      problemId,
+    });
+    return problemId;
   }
 
   private buildPracticeEmbed(
