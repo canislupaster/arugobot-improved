@@ -1,4 +1,9 @@
-import { buildServiceError, getErrorMessage } from "../../src/utils/errors.js";
+import {
+  buildServiceError,
+  buildServiceErrorFromException,
+  getErrorMessage,
+  getErrorMessageForLog,
+} from "../../src/utils/errors.js";
 
 describe("getErrorMessage", () => {
   it("returns message from Error", () => {
@@ -35,6 +40,26 @@ describe("buildServiceError", () => {
     expect(buildServiceError("boom")).toEqual({
       message: "boom",
       timestamp: "2024-02-01T00:00:00.000Z",
+    });
+  });
+});
+
+describe("getErrorMessageForLog", () => {
+  it("falls back to String when no message is found", () => {
+    expect(getErrorMessageForLog({})).toBe("[object Object]");
+  });
+});
+
+describe("buildServiceErrorFromException", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("returns a timestamped message", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-03-01T00:00:00.000Z"));
+    expect(buildServiceErrorFromException("boom")).toEqual({
+      message: "boom",
+      timestamp: "2024-03-01T00:00:00.000Z",
     });
   });
 });

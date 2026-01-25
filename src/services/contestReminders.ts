@@ -12,6 +12,7 @@ import {
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { resolveSendableChannel } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
@@ -256,14 +257,16 @@ export class ContestReminderService {
           this.contests.refresh(false, "official"),
           this.contests.refresh(false, "gym"),
         ]);
-      } else {
+    } else {
         await this.contests.refresh(false, subscription.scope);
       }
     } catch (error) {
       isStale = true;
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logWarn("Contest reminder refresh failed; using cached contests.", { error: message });
+      const serviceError = buildServiceErrorFromException(error);
+      this.lastError = serviceError;
+      logWarn("Contest reminder refresh failed; using cached contests.", {
+        error: serviceError.message,
+      });
     }
 
     const upcoming = this.contests.getUpcomingContests(subscription.scope);
@@ -318,17 +321,17 @@ export class ContestReminderService {
         isStale,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
+      const serviceError = buildServiceErrorFromException(error);
+      this.lastError = serviceError;
       logWarn("Contest reminder send failed (manual).", {
         guildId: subscription.guildId,
         subscriptionId: subscription.id,
         channelId: subscription.channelId,
         contestId: contest.id,
         scope: subscription.scope,
-        error: message,
+        error: serviceError.message,
       });
-      return { status: "error", message };
+      return { status: "error", message: serviceError.message };
     }
   }
 
@@ -343,9 +346,11 @@ export class ContestReminderService {
       try {
         subscriptions = await this.listSubscriptions();
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.lastError = { message, timestamp: new Date().toISOString() };
-        logError("Contest reminder subscription load failed.", { error: message });
+        const serviceError = buildServiceErrorFromException(error);
+        this.lastError = serviceError;
+        logError("Contest reminder subscription load failed.", {
+          error: serviceError.message,
+        });
         return;
       }
 
@@ -365,16 +370,20 @@ export class ContestReminderService {
         if (rejected.length > 0) {
           refreshFailed = true;
           const reason = rejected[0]?.reason;
-          const message = reason instanceof Error ? reason.message : String(reason);
-          this.lastError = { message, timestamp: new Date().toISOString() };
-          logWarn("Contest reminder refresh failed; using cached contests.", { error: message });
-        }
-      } catch (error) {
-        refreshFailed = true;
-        const message = error instanceof Error ? error.message : String(error);
-        this.lastError = { message, timestamp: new Date().toISOString() };
-        logWarn("Contest reminder refresh failed; using cached contests.", { error: message });
+        const serviceError = buildServiceErrorFromException(reason);
+        this.lastError = serviceError;
+        logWarn("Contest reminder refresh failed; using cached contests.", {
+          error: serviceError.message,
+        });
       }
+    } catch (error) {
+      refreshFailed = true;
+      const serviceError = buildServiceErrorFromException(error);
+      this.lastError = serviceError;
+      logWarn("Contest reminder refresh failed; using cached contests.", {
+        error: serviceError.message,
+      });
+    }
 
       const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
       const requestedScopes = new Set(subscriptions.map((subscription) => subscription.scope));
@@ -406,8 +415,9 @@ export class ContestReminderService {
       try {
         await this.cleanupNotifications(cutoff);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logWarn("Contest reminder cleanup failed.", { error: message });
+        logWarn("Contest reminder cleanup failed.", {
+          error: buildServiceErrorFromException(error).message,
+        });
       }
 
       for (const subscription of subscriptions) {

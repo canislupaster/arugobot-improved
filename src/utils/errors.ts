@@ -19,3 +19,14 @@ export function buildServiceError(message?: string | null): ServiceError | null 
   }
   return { message, timestamp: new Date().toISOString() };
 }
+
+export function getErrorMessageForLog(error: unknown): string {
+  return getErrorMessage(error) || String(error);
+}
+
+export function buildServiceErrorFromException(error: unknown): ServiceError {
+  return {
+    message: getErrorMessageForLog(error),
+    timestamp: new Date().toISOString(),
+  };
+}

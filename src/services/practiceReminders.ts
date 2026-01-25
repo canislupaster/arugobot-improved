@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database, PracticeRemindersTable } from "../db/types.js";
 import { resolveSendableChannel, type SendableChannel } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
@@ -385,14 +386,14 @@ export class PracticeReminderService {
       const problemId = await this.sendReminderMessage(subscription, selection, channel, "manual");
       return { status: "sent", problemId, channelId: subscription.channelId };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
+      const serviceError = buildServiceErrorFromException(error);
+      this.lastError = serviceError;
       logWarn("Manual practice reminder failed.", {
         guildId: subscription.guildId,
         channelId: subscription.channelId,
-        error: message,
+        error: serviceError.message,
       });
-      return { status: "error", message };
+      return { status: "error", message: serviceError.message };
     }
   }
 
@@ -412,7 +413,9 @@ export class PracticeReminderService {
       try {
         await this.cleanupPosts();
       } catch (error) {
-        logWarn("Practice reminder cleanup failed.", { error: String(error) });
+        logWarn("Practice reminder cleanup failed.", {
+          error: buildServiceErrorFromException(error).message,
+        });
       }
 
       const problems = await this.problems.ensureProblemsLoaded();
