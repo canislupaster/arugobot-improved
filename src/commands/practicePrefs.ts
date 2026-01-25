@@ -2,21 +2,12 @@ import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
+import { formatRatingRanges, resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
 
 const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
-
-function formatRanges(ranges: RatingRange[]): string {
-  if (ranges.length === 0) {
-    return `${DEFAULT_MIN_RATING}-${DEFAULT_MAX_RATING}`;
-  }
-  return ranges
-    .map((range) => (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`))
-    .join(", ");
-}
 
 export const practicePrefsCommand: Command = {
   data: new SlashCommandBuilder()
@@ -76,7 +67,14 @@ export const practicePrefsCommand: Command = {
           .setTitle("Practice preferences")
           .setColor(EMBED_COLORS.success)
           .addFields(
-            { name: "Ranges", value: formatRanges(preferences.ratingRanges), inline: false },
+            {
+              name: "Ranges",
+              value: formatRatingRanges(preferences.ratingRanges, {
+                min: DEFAULT_MIN_RATING,
+                max: DEFAULT_MAX_RATING,
+              }),
+              inline: false,
+            },
             {
               name: "Tags",
               value: preferences.tags.trim() ? preferences.tags.trim() : "None",
@@ -148,8 +146,12 @@ export const practicePrefsCommand: Command = {
 
         await context.services.store.setPracticePreferences(guildId, userId, ratingRanges, tags);
         await interaction.reply({
-          content: `Practice preferences updated. Ranges: ${formatRanges(
-            ratingRanges
+          content: `Practice preferences updated. Ranges: ${formatRatingRanges(
+            ratingRanges,
+            {
+              min: DEFAULT_MIN_RATING,
+              max: DEFAULT_MAX_RATING,
+            }
           )}. Tags: ${tags.trim() ? tags.trim() : "None"}.`,
           flags: MessageFlags.Ephemeral,
         });

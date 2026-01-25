@@ -3,7 +3,7 @@ import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } f
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
+import { formatRatingRanges, resolveRatingRanges } from "../utils/ratingRanges.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -24,12 +24,6 @@ const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKENDS = [0, 6];
-
-function formatRanges(ranges: RatingRange[]): string {
-  return ranges
-    .map((range) => (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`))
-    .join(", ");
-}
 
 function formatDaysLabel(days: number[]): string {
   const normalized = Array.from(new Set(days)).sort((a, b) => a - b);
@@ -264,7 +258,11 @@ export const practiceRemindersCommand: Command = {
                   },
                 ]
               : []),
-            { name: "Ranges", value: formatRanges(subscription.ratingRanges), inline: false },
+            {
+              name: "Ranges",
+              value: formatRatingRanges(subscription.ratingRanges),
+              inline: false,
+            },
             {
               name: "Tags",
               value: subscription.tags.trim() ? subscription.tags.trim() : "None",
@@ -434,7 +432,7 @@ export const practiceRemindersCommand: Command = {
               : []),
             {
               name: "Ranges",
-              value: formatRanges(preview.subscription.ratingRanges),
+              value: formatRatingRanges(preview.subscription.ratingRanges),
               inline: false,
             },
             {

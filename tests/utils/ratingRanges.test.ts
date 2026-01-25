@@ -1,4 +1,8 @@
-import { parseRatingRanges, resolveRatingRanges } from "../../src/utils/ratingRanges.js";
+import {
+  formatRatingRanges,
+  parseRatingRanges,
+  resolveRatingRanges,
+} from "../../src/utils/ratingRanges.js";
 
 describe("parseRatingRanges", () => {
   it("parses single and range tokens", () => {
@@ -42,5 +46,22 @@ describe("resolveRatingRanges", () => {
       defaultMax: 3500,
     });
     expect(result.error).toBe("Use rating, min/max, or ranges, not a mix.");
+  });
+});
+
+describe("formatRatingRanges", () => {
+  it("formats single and multiple ranges", () => {
+    expect(formatRatingRanges([{ min: 800, max: 1200 }])).toBe("800-1200");
+    expect(
+      formatRatingRanges([
+        { min: 800, max: 800 },
+        { min: 1200, max: 1400 },
+      ])
+    ).toBe("800, 1200-1400");
+  });
+
+  it("uses fallback when no ranges provided", () => {
+    expect(formatRatingRanges([], { min: 800, max: 3500 })).toBe("800-3500");
+    expect(formatRatingRanges([])).toBe("");
   });
 });

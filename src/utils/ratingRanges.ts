@@ -8,6 +8,13 @@ export type RatingRangeResolution = {
   error?: string;
 };
 
+export function formatRatingRanges(ranges: RatingRange[], fallback?: RatingRange): string {
+  const resolved = ranges.length === 0 && fallback ? [fallback] : ranges;
+  return resolved
+    .map((range) => (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`))
+    .join(", ");
+}
+
 type RatingRangeInput = {
   rating: number | null;
   minRating: number | null;
