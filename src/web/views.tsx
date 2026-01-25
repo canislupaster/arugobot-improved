@@ -18,6 +18,8 @@ type LeaderboardRow = {
   value: number;
 };
 
+type LeaderboardFormatter = (value: number) => string;
+
 type RosterRow = {
   userId: string;
   handle: string;
@@ -104,6 +106,27 @@ function formatNumber(value: number | null): string {
 function formatStreakValue(value: number): string {
   const emojis = formatStreakEmojis(value);
   return emojis ? `${formatNumber(value)} ${emojis}` : formatNumber(value);
+}
+
+function renderLeaderboard(
+  rows: LeaderboardRow[],
+  emptyLabel: string,
+  formatValue: LeaderboardFormatter = formatNumber
+) {
+  return (
+    <ol class="leaderboard">
+      {rows.length === 0 ? (
+        <li>{emptyLabel}</li>
+      ) : (
+        rows.map((row) => (
+          <li>
+            <span>{row.label}</span>
+            <span class="pill">{formatValue(row.value)}</span>
+          </li>
+        ))
+      )}
+    </ol>
+  );
 }
 
 function formatTimestamp(iso: string | null): string {
@@ -534,66 +557,22 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
       <section class="section split">
         <div class="card">
           <SectionHeader title="Rating leaderboard" subtitle="Top ratings in this guild." />
-          <ol class="leaderboard">
-            {guild.ratingLeaderboard.length === 0 ? (
-              <li>No entries yet.</li>
-            ) : (
-              guild.ratingLeaderboard.map((row) => (
-                <li>
-                  <span>{row.label}</span>
-                  <span class="pill">{formatNumber(row.value)}</span>
-                </li>
-              ))
-            )}
-          </ol>
+          {renderLeaderboard(guild.ratingLeaderboard, "No entries yet.")}
         </div>
         <div class="card">
           <SectionHeader title="Solve leaderboard" subtitle="Completed challenges in window." />
-          <ol class="leaderboard">
-            {guild.solveLeaderboard.length === 0 ? (
-              <li>No solves yet.</li>
-            ) : (
-              guild.solveLeaderboard.map((row) => (
-                <li>
-                  <span>{row.label}</span>
-                  <span class="pill">{formatNumber(row.value)}</span>
-                </li>
-              ))
-            )}
-          </ol>
+          {renderLeaderboard(guild.solveLeaderboard, "No solves yet.")}
         </div>
       </section>
 
       <section class="section split">
         <div class="card">
           <SectionHeader title="Current streaks" subtitle="Challenge streaks ending today." />
-          <ol class="leaderboard">
-            {guild.currentStreakLeaderboard.length === 0 ? (
-              <li>No streaks yet.</li>
-            ) : (
-              guild.currentStreakLeaderboard.map((row) => (
-                <li>
-                  <span>{row.label}</span>
-                  <span class="pill">{formatStreakValue(row.value)}</span>
-                </li>
-              ))
-            )}
-          </ol>
+          {renderLeaderboard(guild.currentStreakLeaderboard, "No streaks yet.", formatStreakValue)}
         </div>
         <div class="card">
           <SectionHeader title="Longest streaks" subtitle="Best challenge streaks on record." />
-          <ol class="leaderboard">
-            {guild.longestStreakLeaderboard.length === 0 ? (
-              <li>No streaks yet.</li>
-            ) : (
-              guild.longestStreakLeaderboard.map((row) => (
-                <li>
-                  <span>{row.label}</span>
-                  <span class="pill">{formatStreakValue(row.value)}</span>
-                </li>
-              ))
-            )}
-          </ol>
+          {renderLeaderboard(guild.longestStreakLeaderboard, "No streaks yet.", formatStreakValue)}
         </div>
       </section>
 
@@ -615,18 +594,7 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
             </div>
           </div>
           <div class="subheader">Top solvers</div>
-          <ol class="leaderboard">
-            {guild.activity.topSolvers.length === 0 ? (
-              <li>No solves recorded.</li>
-            ) : (
-              guild.activity.topSolvers.map((row) => (
-                <li>
-                  <span>{row.label}</span>
-                  <span class="pill">{formatNumber(row.value)}</span>
-                </li>
-              ))
-            )}
-          </ol>
+          {renderLeaderboard(guild.activity.topSolvers, "No solves recorded.")}
         </div>
         <div class="card">
           <SectionHeader title="Recent tournaments" subtitle="Latest scheduled rounds." />
