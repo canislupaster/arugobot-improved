@@ -1,10 +1,9 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
+import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
-
-import type { CommandContext } from "../types/commandContext.js";
 
 import type { Command } from "./types.js";
 
