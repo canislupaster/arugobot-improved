@@ -125,6 +125,35 @@ function getAgeSeconds(lastFetched: string | null): number | null {
   return Math.floor(ageMs / 1000);
 }
 
+function buildEmptyContestActivity(lookbackDays: number): GlobalOverview["contestActivity"] {
+  return {
+    lookbackDays,
+    contestCount: 0,
+    participantCount: 0,
+    lastContestAt: null,
+    byScope: {
+      official: { contestCount: 0, participantCount: 0, lastContestAt: null },
+      gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
+    },
+  };
+}
+
+function buildEmptyGlobalOverview(): GlobalOverview {
+  return {
+    guildCount: 0,
+    linkedUsers: 0,
+    activeChallenges: 0,
+    completedChallenges: 0,
+    totalChallenges: 0,
+    activeTournaments: 0,
+    completedTournaments: 0,
+    totalTournaments: 0,
+    lastChallengeAt: null,
+    lastTournamentAt: null,
+    contestActivity: buildEmptyContestActivity(DEFAULT_CONTEST_ACTIVITY_DAYS),
+  };
+}
+
 export class WebsiteService {
   constructor(
     private readonly db: Kysely<Database>,
@@ -134,32 +163,29 @@ export class WebsiteService {
     private readonly codeforces: CodeforcesClient | null = null
   ) {}
 
+  private async getPublicGuildStatus(
+    guildId: string
+  ): Promise<{ stats: ServerStats; hasData: boolean } | null> {
+    const isPublic = await this.settings.isDashboardPublic(guildId);
+    if (!isPublic) {
+      return null;
+    }
+    const stats = await this.store.getServerStats(guildId);
+    const totalChallengesRow = await this.db
+      .selectFrom("challenges")
+      .select(({ fn }) => fn.count<string>("id").as("count"))
+      .where("server_id", "=", guildId)
+      .executeTakeFirst();
+    const totalChallenges = Number(totalChallengesRow?.count ?? 0);
+    const hasData = stats.userCount > 0 || totalChallenges > 0;
+    return { stats, hasData };
+  }
+
   async getGlobalOverview(): Promise<GlobalOverview> {
     try {
       const publicGuildIds = await this.settings.listPublicGuildIds();
       if (publicGuildIds.length === 0) {
-        return {
-          guildCount: 0,
-          linkedUsers: 0,
-          activeChallenges: 0,
-          completedChallenges: 0,
-          totalChallenges: 0,
-          activeTournaments: 0,
-          completedTournaments: 0,
-          totalTournaments: 0,
-          lastChallengeAt: null,
-          lastTournamentAt: null,
-          contestActivity: {
-            lookbackDays: DEFAULT_CONTEST_ACTIVITY_DAYS,
-            contestCount: 0,
-            participantCount: 0,
-            lastContestAt: null,
-            byScope: {
-              official: { contestCount: 0, participantCount: 0, lastContestAt: null },
-              gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
-            },
-          },
-        };
+        return buildEmptyGlobalOverview();
       }
 
       const guildCountRow = await this.db
@@ -238,28 +264,7 @@ export class WebsiteService {
       };
     } catch (error) {
       logError(`Database error (global overview): ${String(error)}`);
-      return {
-        guildCount: 0,
-        linkedUsers: 0,
-        activeChallenges: 0,
-        completedChallenges: 0,
-        totalChallenges: 0,
-        activeTournaments: 0,
-        completedTournaments: 0,
-        totalTournaments: 0,
-        lastChallengeAt: null,
-        lastTournamentAt: null,
-        contestActivity: {
-          lookbackDays: DEFAULT_CONTEST_ACTIVITY_DAYS,
-          contestCount: 0,
-          participantCount: 0,
-          lastContestAt: null,
-          byScope: {
-            official: { contestCount: 0, participantCount: 0, lastContestAt: null },
-            gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
-          },
-        },
-      };
+      return buildEmptyGlobalOverview();
     }
   }
 
@@ -345,22 +350,11 @@ export class WebsiteService {
 
   async getGuildOverview(guildId: string): Promise<GuildOverview | null> {
     try {
-      const isPublic = await this.settings.isDashboardPublic(guildId);
-      if (!isPublic) {
+      const status = await this.getPublicGuildStatus(guildId);
+      if (!status || !status.hasData) {
         return null;
       }
-
-      const stats = await this.store.getServerStats(guildId);
-      const totalChallengesRow = await this.db
-        .selectFrom("challenges")
-        .select(({ fn }) => fn.count<string>("id").as("count"))
-        .where("server_id", "=", guildId)
-        .executeTakeFirst();
-      const totalChallenges = Number(totalChallengesRow?.count ?? 0);
-      const hasData = stats.userCount > 0 || totalChallenges > 0;
-      if (!hasData) {
-        return null;
-      }
+      const stats = status.stats;
 
       const ratingLeaderboard = (await this.store.getLeaderboard(guildId)) ?? [];
       const solveLeaderboard = (await this.store.getSolveLeaderboard(guildId)) ?? [];
@@ -457,19 +451,8 @@ export class WebsiteService {
 
   async getGuildLeaderboards(guildId: string): Promise<GuildLeaderboardExport | null> {
     try {
-      const isPublic = await this.settings.isDashboardPublic(guildId);
-      if (!isPublic) {
-        return null;
-      }
-      const stats = await this.store.getServerStats(guildId);
-      const totalChallengesRow = await this.db
-        .selectFrom("challenges")
-        .select(({ fn }) => fn.count<string>("id").as("count"))
-        .where("server_id", "=", guildId)
-        .executeTakeFirst();
-      const totalChallenges = Number(totalChallengesRow?.count ?? 0);
-      const hasData = stats.userCount > 0 || totalChallenges > 0;
-      if (!hasData) {
+      const status = await this.getPublicGuildStatus(guildId);
+      if (!status || !status.hasData) {
         return null;
       }
 
