@@ -12,17 +12,25 @@ const createInteraction = () =>
     reply: jest.fn().mockResolvedValue(undefined),
   }) as unknown as ChatInputCommandInteraction;
 
-const createHistoryInteraction = () => {
+const createHistoryInteraction = (collectors?: {
+  select?: { on: jest.Mock };
+  button?: { on: jest.Mock };
+}) => {
   const collector = { on: jest.fn() };
   const response = {
-    createMessageComponentCollector: jest.fn().mockReturnValue(collector),
+    createMessageComponentCollector: jest
+      .fn()
+      .mockReturnValueOnce(collectors?.select ?? collector)
+      .mockReturnValueOnce(collectors?.button ?? collector),
   };
   return {
+    id: "interaction-1",
     options: {
       getSubcommand: jest.fn().mockReturnValue("history"),
       getInteger: jest.fn().mockReturnValue(1),
     },
     guild: { id: "guild-1" },
+    user: { id: "user-1" },
     reply: jest.fn().mockResolvedValue(undefined),
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(response),
@@ -176,6 +184,87 @@ describe("tournamentCommand", () => {
     const historyField = fields.find((field) => field.name === "Recent tournaments");
     expect(historyField?.value).toContain("Winner: <@user-1>");
     expect(payload.components).toHaveLength(2);
+  });
+
+  it("updates history details on selection", async () => {
+    const selectCollector = { on: jest.fn() };
+    const buttonCollector = { on: jest.fn() };
+    const handlers: Record<string, (arg: unknown) => Promise<void>> = {};
+    selectCollector.on.mockImplementation(
+      (event: string, handler: (arg: unknown) => Promise<void>) => {
+        if (event === "collect") {
+          handlers.collect = handler;
+        }
+      }
+    );
+
+    const interaction = createHistoryInteraction({
+      select: selectCollector,
+      button: buttonCollector,
+    });
+    const context = {
+      services: {
+        tournaments: {
+          getHistoryPage: jest.fn().mockResolvedValue({
+            total: 1,
+            entries: [
+              {
+                id: "tournament-1",
+                format: "swiss",
+                status: "completed",
+                lengthMinutes: 40,
+                roundCount: 3,
+                ratingRanges: [],
+                tags: "",
+                createdAt: "2026-01-24T10:00:00.000Z",
+                updatedAt: "2026-01-24T12:00:00.000Z",
+                participantCount: 8,
+                winnerId: "user-1",
+              },
+            ],
+          }),
+          getHistoryDetail: jest.fn().mockResolvedValue({
+            entry: {
+              id: "tournament-1",
+              format: "swiss",
+              status: "completed",
+              lengthMinutes: 40,
+              roundCount: 3,
+              ratingRanges: [],
+              tags: "",
+              createdAt: "2026-01-24T10:00:00.000Z",
+              updatedAt: "2026-01-24T12:00:00.000Z",
+              participantCount: 8,
+              winnerId: "user-1",
+            },
+            channelId: "channel-1",
+            hostUserId: "user-1",
+            standings: [],
+            rounds: [],
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await tournamentCommand.execute(interaction, context);
+
+    const selection = {
+      customId: "tournament_history_interaction-1",
+      user: { id: "user-1" },
+      values: ["tournament-1"],
+      deferred: false,
+      replied: false,
+      deferUpdate: jest.fn().mockResolvedValue(undefined),
+      editReply: jest.fn().mockResolvedValue(undefined),
+      reply: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await handlers.collect(selection);
+
+    expect(selection.deferUpdate).toHaveBeenCalled();
+    expect(selection.editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ embeds: expect.any(Array) })
+    );
   });
 
   it("shows lobby status when no tournament is active", async () => {
