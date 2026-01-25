@@ -511,11 +511,12 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "status") {
+        await interaction.deferReply();
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
           const lobby = await context.services.tournaments.getLobby(guildId);
           if (!lobby) {
-            await interaction.reply({
+            await interaction.editReply({
               content: "No active tournament or lobby for this server.",
             });
             return;
@@ -555,14 +556,14 @@ export const tournamentCommand: Command = {
               inline: true,
             });
           }
-          await interaction.reply({ embeds: [lobbyEmbed] });
+          await interaction.editReply({ embeds: [lobbyEmbed] });
           return;
         }
 
         if (tournament.format === "arena") {
           const arena = await context.services.tournaments.getArenaStatus(tournament.id);
           if (!arena) {
-            await interaction.reply({
+            await interaction.editReply({
               content: "Arena tournament details are unavailable.",
             });
             return;
@@ -601,7 +602,7 @@ export const tournamentCommand: Command = {
             embed.addFields({ name: "Standings (top 10)", value: standingsValue, inline: false });
           }
 
-          await interaction.reply({ embeds: [embed] });
+          await interaction.editReply({ embeds: [embed] });
           return;
         }
 
@@ -711,7 +712,7 @@ export const tournamentCommand: Command = {
           embed.addFields({ name: "Standings (top 10)", value: standingsValue, inline: false });
         }
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
         return;
       }
 

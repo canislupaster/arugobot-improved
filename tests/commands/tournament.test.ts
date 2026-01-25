@@ -9,7 +9,8 @@ const createInteraction = () =>
       getSubcommand: jest.fn().mockReturnValue("status"),
     },
     guild: { id: "guild-1" },
-    reply: jest.fn().mockResolvedValue(undefined),
+    deferReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(undefined),
   }) as unknown as ChatInputCommandInteraction;
 
 const createHistoryInteraction = (collectors?: {
@@ -138,7 +139,7 @@ describe("tournamentCommand", () => {
 
     await tournamentCommand.execute(interaction, context);
 
-    const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     const embed = payload.embeds[0].data;
     const fields = (embed.fields ?? []) as Array<{ name: string; value: string }>;
     const standingsField = fields.find((field) => field.name === "Standings (top 10)");
@@ -295,7 +296,7 @@ describe("tournamentCommand", () => {
 
     await tournamentCommand.execute(interaction, context);
 
-    const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     const embed = payload.embeds[0].data;
     expect(embed.title).toBe("Tournament lobby");
     const fields = (embed.fields ?? []) as Array<{ name: string; value: string }>;
