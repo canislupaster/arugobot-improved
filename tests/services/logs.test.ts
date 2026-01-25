@@ -59,4 +59,40 @@ describe("LogsService", () => {
 
     await db.destroy();
   });
+
+  it("returns recent entries with filters", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const logs = new LogsService(db, 30);
+
+    await logs.write({
+      timestamp: "2024-01-01T00:00:00.000Z",
+      level: "info",
+      message: "Info entry.",
+      context: { guildId: "guild-1", command: "ping" },
+    });
+    await logs.write({
+      timestamp: "2024-01-02T00:00:00.000Z",
+      level: "error",
+      message: "Error entry.",
+      context: { guildId: "guild-1", command: "health" },
+    });
+    await logs.write({
+      timestamp: "2024-01-03T00:00:00.000Z",
+      level: "error",
+      message: "Other guild.",
+      context: { guildId: "guild-2", command: "health" },
+    });
+
+    const entries = await logs.getRecentEntries({
+      guildId: "guild-1",
+      level: "error",
+      limit: 5,
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.message).toBe("Error entry.");
+
+    await db.destroy();
+  });
 });

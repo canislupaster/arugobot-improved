@@ -130,6 +130,10 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Admin-only diagnostics (uptime, memory, DB status, last error, command usage/latency).
 
+- **/logs** `[limit]` `[level]` `[command]` `[user]`
+
+  Admin-only log viewer for recent bot activity in the server.
+
 - **/refresh** `[scope]`
 
   Admin-only refresh of cached Codeforces data (problems, contests, and handle canonicalization).

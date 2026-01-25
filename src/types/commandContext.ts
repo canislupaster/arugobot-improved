@@ -10,6 +10,7 @@ import type { ContestReminderService } from "../services/contestReminders.js";
 import type { ContestService } from "../services/contests.js";
 import type { ContestStandingsService } from "../services/contestStandings.js";
 import type { GuildSettingsService } from "../services/guildSettings.js";
+import type { LogsService } from "../services/logs.js";
 import type { MetricsService } from "../services/metrics.js";
 import type { PracticeReminderService } from "../services/practiceReminders.js";
 import type { PracticeSuggestionService } from "../services/practiceSuggestions.js";
@@ -34,6 +35,7 @@ export type CommandContext = {
     contestRatingAlerts: ContestRatingAlertService;
     contestStandings: ContestStandingsService;
     guildSettings: GuildSettingsService;
+    logs: LogsService;
     metrics: MetricsService;
     practiceReminders: PracticeReminderService;
     practiceSuggestions: PracticeSuggestionService;

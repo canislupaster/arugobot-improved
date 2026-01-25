@@ -298,6 +298,7 @@ async function main() {
         contestStandings,
         contestActivity,
         guildSettings,
+        logs,
         metrics,
         practiceReminders,
         practiceSuggestions,
