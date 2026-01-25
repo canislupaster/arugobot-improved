@@ -104,6 +104,16 @@ describe("StoreService", () => {
     expect(mockClient.request).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts profile URLs for handle resolution", async () => {
+    mockClient.request.mockResolvedValueOnce([{ handle: "Tourist" }]);
+
+    const result = await store.resolveHandle("https://codeforces.com/profile/tourist");
+
+    expect(result.exists).toBe(true);
+    expect(result.canonicalHandle).toBe("Tourist");
+    expect(mockClient.request).toHaveBeenCalledWith("user.info", { handles: "tourist" });
+  });
+
   it("falls back to cached handle data when the API fails", async () => {
     mockClient.request.mockResolvedValueOnce([{ handle: "Tourist" }]);
     await store.resolveHandle("tourist");

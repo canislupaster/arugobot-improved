@@ -2,6 +2,7 @@ import { sql, type Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { isCacheFresh } from "../utils/cache.js";
+import { normalizeHandleInput } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
 
@@ -394,11 +395,12 @@ export class StoreService {
   }
 
   async resolveHandle(handle: string, ttlMs = HANDLE_CACHE_TTL_MS): Promise<HandleResolution> {
-    if (!this.isHandleValid(handle)) {
+    const normalizedInput = normalizeHandleInput(handle);
+    if (!this.isHandleValid(normalizedInput)) {
       return { exists: false, canonicalHandle: null, source: "cache" };
     }
 
-    const key = this.normalizeHandle(handle);
+    const key = this.normalizeHandle(normalizedInput);
     let cached:
       | {
           canonical_handle: string | null;
@@ -426,7 +428,7 @@ export class StoreService {
 
     try {
       const response = await this.cfClient.request<UserInfoResponse>("user.info", {
-        handles: handle,
+        handles: normalizedInput,
       });
       const canonicalHandle = response[0]?.handle ?? null;
       const exists = Boolean(canonicalHandle);
