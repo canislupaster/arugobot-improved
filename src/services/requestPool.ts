@@ -48,8 +48,32 @@ type ProxyDefinition = {
   password?: string;
 };
 
+function parseProxyUrl(input: string): ProxyDefinition | null {
+  try {
+    const url = new URL(input);
+    if (!url.hostname || !url.port) {
+      return null;
+    }
+    const username = url.username ? decodeURIComponent(url.username) : undefined;
+    const password = url.password ? decodeURIComponent(url.password) : undefined;
+    return { host: url.hostname, port: url.port, username, password };
+  } catch {
+    return null;
+  }
+}
+
 function parseProxyLine(line: string): ProxyDefinition | null {
-  const parts = line.split(":").map((part) => part.trim());
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return parseProxyUrl(trimmed);
+  }
+  if (trimmed.includes("@")) {
+    return parseProxyUrl(`http://${trimmed}`);
+  }
+  const parts = trimmed.split(":").map((part) => part.trim());
   if (parts.length !== 2 && parts.length !== 4) {
     return null;
   }
@@ -98,6 +122,9 @@ export async function createRequestPool(options: CreateRequestPoolOptions): Prom
       .filter(Boolean);
     let added = 0;
     for (const line of lines) {
+      if (line.startsWith("#")) {
+        continue;
+      }
       const proxy = parseProxyLine(line);
       if (!proxy) {
         logWarn("Skipping invalid proxy entry.", { entry: line });

@@ -13,7 +13,15 @@ describe("createRequestPool", () => {
   it("adds proxies from fetch response", async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
-      text: async () => ["127.0.0.1:8080", "10.0.0.2:3128:user:pass", "bad:format:line"].join("\n"),
+      text: async () =>
+        [
+          "# comment line",
+          "127.0.0.1:8080",
+          "http://10.0.0.1:8081",
+          "10.0.0.2:3128:user:pass",
+          "user:pass@10.0.0.3:3129",
+          "bad:format:line",
+        ].join("\n"),
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -22,7 +30,7 @@ describe("createRequestPool", () => {
       requestDelayMs: 0,
     });
 
-    expect(pool.size()).toBe(3);
+    expect(pool.size()).toBe(5);
   });
 
   it("falls back to direct slot when proxy fetch fails", async () => {
