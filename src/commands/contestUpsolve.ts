@@ -2,15 +2,15 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import {
-  compareProblemIndex,
-  formatContestProblemLine,
-  summarizeContestSolves,
-} from "../utils/contestProblems.js";
-import {
   buildContestEmbed,
   buildContestMatchEmbed,
   resolveContestLookup,
 } from "../utils/contestLookup.js";
+import {
+  compareProblemIndex,
+  formatContestProblemLine,
+  summarizeContestSolves,
+} from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
