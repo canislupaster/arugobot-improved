@@ -89,6 +89,29 @@ function buildContestEmbed(contest: Contest): EmbedBuilder {
   return embed;
 }
 
+function applyScopeAndStale(
+  embed: EmbedBuilder,
+  contest: Contest,
+  scope: ContestScopeFilter,
+  stale: boolean
+): EmbedBuilder {
+  const scopeLabel = formatContestTag(contest, scope);
+  if (scopeLabel) {
+    embed.addFields({ name: "Section", value: scopeLabel, inline: true });
+  }
+  if (stale) {
+    embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+  }
+  return embed;
+}
+
+function applyStaleFooter(embed: EmbedBuilder, stale: boolean): EmbedBuilder {
+  if (stale) {
+    embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+  }
+  return embed;
+}
+
 function buildMatchEmbed(
   query: string,
   matches: Contest[],
@@ -172,14 +195,7 @@ export const contestCommand: Command = {
           return;
         }
 
-        const embed = buildContestEmbed(contest);
-        const scopeLabel = formatContestTag(contest, scope);
-        if (scopeLabel) {
-          embed.addFields({ name: "Section", value: scopeLabel, inline: true });
-        }
-        if (stale) {
-          embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
-        }
+        const embed = applyScopeAndStale(buildContestEmbed(contest), contest, scope, stale);
         await interaction.editReply({ embeds: [embed] });
         return;
       }
@@ -191,22 +207,13 @@ export const contestCommand: Command = {
       }
 
       if (matches.length === 1) {
-        const embed = buildContestEmbed(matches[0]!);
-        const scopeLabel = formatContestTag(matches[0]!, scope);
-        if (scopeLabel) {
-          embed.addFields({ name: "Section", value: scopeLabel, inline: true });
-        }
-        if (stale) {
-          embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
-        }
+        const contest = matches[0]!;
+        const embed = applyScopeAndStale(buildContestEmbed(contest), contest, scope, stale);
         await interaction.editReply({ embeds: [embed] });
         return;
       }
 
-      const embed = buildMatchEmbed(queryRaw, matches, scope);
-      if (stale) {
-        embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
-      }
+      const embed = applyStaleFooter(buildMatchEmbed(queryRaw, matches, scope), stale);
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       logCommandError(`Error in contest: ${String(error)}`, interaction, context.correlationId);
