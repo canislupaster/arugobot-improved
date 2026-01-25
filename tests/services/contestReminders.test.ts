@@ -90,6 +90,31 @@ describe("ContestReminderService", () => {
     expect(notifications[0]?.subscription_id).toBe(subscription.id);
   });
 
+  it("falls back to cached contests when refresh fails", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.refresh.mockRejectedValue(new Error("refresh failed"));
+    contestService.getUpcomingContests.mockReturnValue([
+      {
+        id: 301,
+        name: "Cached Round",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 10 * 60,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestReminderService(db, contestService);
+    await service.createSubscription("guild-1", "channel-1", 15, null, [], [], "official");
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(contestService.refresh).toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it("skips contests already notified", async () => {
     const nowSeconds = 1_700_000_000;
     jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);

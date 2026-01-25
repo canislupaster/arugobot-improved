@@ -359,6 +359,14 @@ export class ContestReminderService {
       }
 
       let refreshFailed = false;
+      const recordRefreshFailure = (error: unknown) => {
+        refreshFailed = true;
+        const serviceError = buildServiceErrorFromException(error);
+        this.lastError = serviceError;
+        logWarn("Contest reminder refresh failed; using cached contests.", {
+          error: serviceError.message,
+        });
+      };
       try {
         const refreshScopes = getRefreshScopes(subscriptions);
         const results = await Promise.allSettled(
@@ -368,22 +376,11 @@ export class ContestReminderService {
           (result): result is PromiseRejectedResult => result.status === "rejected"
         );
         if (rejected.length > 0) {
-          refreshFailed = true;
-          const reason = rejected[0]?.reason;
-        const serviceError = buildServiceErrorFromException(reason);
-        this.lastError = serviceError;
-        logWarn("Contest reminder refresh failed; using cached contests.", {
-          error: serviceError.message,
-        });
+          recordRefreshFailure(rejected[0]?.reason);
+        }
+      } catch (error) {
+        recordRefreshFailure(error);
       }
-    } catch (error) {
-      refreshFailed = true;
-      const serviceError = buildServiceErrorFromException(error);
-      this.lastError = serviceError;
-      logWarn("Contest reminder refresh failed; using cached contests.", {
-        error: serviceError.message,
-      });
-    }
 
       const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
       const requestedScopes = new Set(subscriptions.map((subscription) => subscription.scope));
