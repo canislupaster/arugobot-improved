@@ -2,9 +2,9 @@ import { createAdaptorServer, type ServerType } from "@hono/node-server";
 import type { Client } from "discord.js";
 
 import type { WebsiteService } from "../services/website.js";
-import { sleep } from "../utils/sleep.js";
-import { logError, logInfo, logWarn } from "../utils/logger.js";
 import type { WebServerStatus } from "../types/webStatus.js";
+import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { sleep } from "../utils/sleep.js";
 
 import { createWebApp } from "./app.js";
 
@@ -42,7 +42,7 @@ export async function startWebServer(
 
   const updateFailure = (port: number, err: NodeJS.ErrnoException) => {
     const message = formatWebServerErrorMessage(config.host, port, err);
-    status &&
+    if (status) {
       Object.assign(status, {
         status: "failed",
         actualPort: null,
@@ -52,6 +52,7 @@ export async function startWebServer(
           timestamp: new Date().toISOString(),
         },
       });
+    }
   };
 
   const tryListen = async (port: number, attempts: number): Promise<ListenResult> => {

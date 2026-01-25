@@ -38,9 +38,9 @@ import { TournamentRecapService } from "./services/tournamentRecaps.js";
 import { TournamentService, tournamentArenaIntervalMs } from "./services/tournaments.js";
 import { WebsiteService } from "./services/website.js";
 import { WeeklyDigestService, weeklyDigestIntervalMs } from "./services/weeklyDigest.js";
+import type { WebServerStatus } from "./types/webStatus.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo, logWarn, setLogSink } from "./utils/logger.js";
-import type { WebServerStatus } from "./types/webStatus.js";
 import { startWebServer } from "./web/server.js";
 
 type ContestListResponse = Array<{ id: number }>;
