@@ -394,6 +394,24 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
           label="Last gym contest update"
           value={renderLocalTimeFromUnix(model.global.contestActivity.byScope.gym.lastContestAt)}
         />
+        <StatCard
+          label="Rating alert guilds"
+          value={<span>{formatNumber(model.global.contestRatingAlerts.guildCount)}</span>}
+          hint={`Subscriptions: ${formatNumber(
+            model.global.contestRatingAlerts.subscriptionCount
+          )}`}
+        />
+        <StatCard
+          label="Last rating alert"
+          value={renderLocalTime(model.global.contestRatingAlerts.lastNotifiedAt)}
+        />
+        <StatCard
+          label="Rating change cache age"
+          value={<span>{formatAgeSeconds(model.global.contestRatingAlerts.cacheAgeSeconds)}</span>}
+          hint={`Last fetched: ${formatTimestamp(
+            model.global.contestRatingAlerts.cacheLastFetched
+          )}`}
+        />
       </section>
 
       <section class="section">

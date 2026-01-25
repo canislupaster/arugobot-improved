@@ -357,6 +357,11 @@ describe("WebsiteService", () => {
     expect(overview.contestActivity.lastContestAt).toBeNull();
     expect(overview.contestActivity.byScope.official.contestCount).toBe(0);
     expect(overview.contestActivity.byScope.gym.contestCount).toBe(0);
+    expect(overview.contestRatingAlerts.guildCount).toBe(0);
+    expect(overview.contestRatingAlerts.subscriptionCount).toBe(0);
+    expect(overview.contestRatingAlerts.lastNotifiedAt).toBeNull();
+    expect(overview.contestRatingAlerts.cacheLastFetched).toBeNull();
+    expect(overview.contestRatingAlerts.cacheAgeSeconds).toBeNull();
   });
 
   it("lists guild summaries", async () => {
@@ -492,6 +497,65 @@ describe("WebsiteService", () => {
     expect(overview.contestActivity.lastContestAt).toBe(nowSeconds - 200);
     expect(overview.contestActivity.byScope.official.contestCount).toBe(1);
     expect(overview.contestActivity.byScope.gym.contestCount).toBe(1);
+  });
+
+  it("summarizes contest rating alert coverage and cache freshness", async () => {
+    jest.spyOn(Date, "now").mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z"));
+    await db
+      .insertInto("contest_rating_alert_subscriptions")
+      .values([
+        {
+          id: "alert-1",
+          guild_id: "guild-1",
+          channel_id: "channel-1",
+          role_id: null,
+          min_delta: 0,
+          include_handles: null,
+          created_at: "2024-01-01T00:00:00.000Z",
+          updated_at: "2024-01-01T00:00:00.000Z",
+        },
+        {
+          id: "alert-2",
+          guild_id: "guild-2",
+          channel_id: "channel-2",
+          role_id: null,
+          min_delta: 10,
+          include_handles: "alice",
+          created_at: "2024-01-02T00:00:00.000Z",
+          updated_at: "2024-01-02T00:00:00.000Z",
+        },
+      ])
+      .execute();
+    await db
+      .insertInto("contest_rating_alert_notifications")
+      .values([
+        {
+          subscription_id: "alert-1",
+          contest_id: 123,
+          notified_at: "2024-01-30T12:00:00.000Z",
+        },
+        {
+          subscription_id: "alert-2",
+          contest_id: 124,
+          notified_at: "2024-01-31T12:00:00.000Z",
+        },
+      ])
+      .execute();
+    await db
+      .insertInto("contest_rating_changes")
+      .values({
+        contest_id: 123,
+        payload: "[]",
+        last_fetched: "2024-01-31T00:00:00.000Z",
+      })
+      .execute();
+
+    const overview = await website.getGlobalOverview();
+    expect(overview.contestRatingAlerts.guildCount).toBe(2);
+    expect(overview.contestRatingAlerts.subscriptionCount).toBe(2);
+    expect(overview.contestRatingAlerts.lastNotifiedAt).toBe("2024-01-31T12:00:00.000Z");
+    expect(overview.contestRatingAlerts.cacheLastFetched).toBe("2024-01-31T00:00:00.000Z");
+    expect(overview.contestRatingAlerts.cacheAgeSeconds).toBe(24 * 60 * 60);
   });
 
   it("returns null for unknown guilds", async () => {

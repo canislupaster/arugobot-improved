@@ -7,7 +7,11 @@ import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatTime } from "../utils/rating.js";
 import { capitalize } from "../utils/text.js";
-import { formatTournamentRecapMarkdown } from "../utils/tournamentRecap.js";
+import {
+  formatRatingRanges,
+  formatTags,
+  formatTournamentRecapMarkdown,
+} from "../utils/tournamentRecap.js";
 
 import type { TournamentRecap, TournamentService } from "./tournaments.js";
 
@@ -28,20 +32,6 @@ export type TournamentRecapPostResult =
   | { status: "error"; message: string };
 
 type TournamentRecapProvider = Pick<TournamentService, "getRecap">;
-
-function formatRatingRanges(ranges: Array<{ min: number; max: number }>): string {
-  if (ranges.length === 0) {
-    return "Any";
-  }
-  return ranges
-    .map((range) => (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`))
-    .join(", ");
-}
-
-function formatTags(tags: string): string {
-  const trimmed = tags.trim();
-  return trimmed.length > 0 ? trimmed : "None";
-}
 
 function buildRecapEmbed(recap: TournamentRecap): EmbedBuilder {
   const winnerLabel = recap.entry.winnerId ? `<@${recap.entry.winnerId}>` : "None";

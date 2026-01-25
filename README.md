@@ -259,9 +259,9 @@ By default it listens on `http://localhost:8787` (override with `WEB_HOST`/`WEB_
 Only guilds that opt in via `/dashboard set public:true` appear on the public pages.
 If `WEB_PUBLIC_URL` is set, `/dashboard` responses include direct links to your guild page.
 The overview highlights core bot features alongside global contest participation cards sourced from
-cached rating changes, split by official vs gym activity. Per-guild pages include CSV/Markdown
-exports for rating/solve leaderboards, and `/status` shows cache ages for key Codeforces syncs
-including the gym contest list.
+cached rating changes, split by official vs gym activity, plus contest rating alert coverage and
+rating-change cache freshness. Per-guild pages include CSV/Markdown exports for rating/solve
+leaderboards, and `/status` shows cache ages for key Codeforces syncs including the gym contest list.
 `/status.json` returns the same cache status in JSON for external monitoring.
 `/healthz` returns JSON with a quick DB + Codeforces check plus cache status (useful for uptime monitors).
 
@@ -335,4 +335,3 @@ pnpm start
 ## Future TODOs
 
 - Expand the weekly digest with richer contest analytics (per-contest highlights, streaks).
-- Add a dashboard card for contest rating alerts coverage and cache freshness.

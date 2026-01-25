@@ -27,6 +27,13 @@ export type GlobalOverview = {
   totalTournaments: number;
   lastChallengeAt: string | null;
   lastTournamentAt: string | null;
+  contestRatingAlerts: {
+    guildCount: number;
+    subscriptionCount: number;
+    lastNotifiedAt: string | null;
+    cacheLastFetched: string | null;
+    cacheAgeSeconds: number | null;
+  };
   contestActivity: {
     lookbackDays: number;
     contestCount: number;
@@ -139,6 +146,16 @@ function buildEmptyContestActivity(lookbackDays: number): GlobalOverview["contes
   };
 }
 
+function buildEmptyContestRatingAlerts(): GlobalOverview["contestRatingAlerts"] {
+  return {
+    guildCount: 0,
+    subscriptionCount: 0,
+    lastNotifiedAt: null,
+    cacheLastFetched: null,
+    cacheAgeSeconds: null,
+  };
+}
+
 function buildEmptyGlobalOverview(): GlobalOverview {
   return {
     guildCount: 0,
@@ -151,6 +168,7 @@ function buildEmptyGlobalOverview(): GlobalOverview {
     totalTournaments: 0,
     lastChallengeAt: null,
     lastTournamentAt: null,
+    contestRatingAlerts: buildEmptyContestRatingAlerts(),
     contestActivity: buildEmptyContestActivity(DEFAULT_CONTEST_ACTIVITY_DAYS),
   };
 }
@@ -249,6 +267,7 @@ export class WebsiteService {
         publicGuildIds,
         DEFAULT_CONTEST_ACTIVITY_DAYS
       );
+      const contestRatingAlerts = await this.getContestRatingAlertOverview(publicGuildIds);
 
       return {
         guildCount: Number(guildCountRow?.count ?? 0),
@@ -261,11 +280,59 @@ export class WebsiteService {
         totalTournaments: Number(totalTournamentsRow?.count ?? 0),
         lastChallengeAt: lastChallengeRow?.last ?? null,
         lastTournamentAt: lastTournamentRow?.last ?? null,
+        contestRatingAlerts,
         contestActivity,
       };
     } catch (error) {
       logError(`Database error (global overview): ${String(error)}`);
       return buildEmptyGlobalOverview();
+    }
+  }
+
+  private async getContestRatingAlertOverview(
+    publicGuildIds: string[]
+  ): Promise<GlobalOverview["contestRatingAlerts"]> {
+    try {
+      const [subscriptionCountRow, guildCountRow, lastNotifiedRow, cacheRow] = await Promise.all([
+        this.db
+          .selectFrom("contest_rating_alert_subscriptions")
+          .select(({ fn }) => fn.count<string>("id").as("count"))
+          .where("guild_id", "in", publicGuildIds)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom("contest_rating_alert_subscriptions")
+          .select(sql<number>`count(distinct guild_id)`.as("count"))
+          .where("guild_id", "in", publicGuildIds)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom("contest_rating_alert_notifications")
+          .innerJoin(
+            "contest_rating_alert_subscriptions",
+            "contest_rating_alert_subscriptions.id",
+            "contest_rating_alert_notifications.subscription_id"
+          )
+          .select(({ fn }) =>
+            fn.max<string>("contest_rating_alert_notifications.notified_at").as("last")
+          )
+          .where("contest_rating_alert_subscriptions.guild_id", "in", publicGuildIds)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom("contest_rating_changes")
+          .select(({ fn }) => fn.max<string>("last_fetched").as("last"))
+          .executeTakeFirst(),
+      ]);
+
+      const cacheLastFetched = cacheRow?.last ?? null;
+      return {
+        guildCount: Number(guildCountRow?.count ?? 0),
+        subscriptionCount: Number(subscriptionCountRow?.count ?? 0),
+        lastNotifiedAt: lastNotifiedRow?.last ?? null,
+        cacheLastFetched,
+        cacheAgeSeconds: getAgeSeconds(cacheLastFetched),
+      };
+    } catch (error) {
+      logError(`Database error (contest rating alerts): ${String(error)}`);
+      return buildEmptyContestRatingAlerts();
     }
   }
 

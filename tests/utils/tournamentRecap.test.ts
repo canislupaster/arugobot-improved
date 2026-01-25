@@ -1,5 +1,7 @@
 import type { TournamentRecap } from "../../src/services/tournaments.js";
 import {
+  formatRatingRanges,
+  formatTags,
   formatTournamentRecapCsv,
   formatTournamentRecapMarkdown,
 } from "../../src/utils/tournamentRecap.js";
@@ -88,5 +90,12 @@ describe("tournament recap formatting", () => {
     expect(lines[0]).toContain("section,round,match");
     expect(csv).toContain("match,1,1");
     expect(csv).toContain("standings");
+  });
+
+  it("formats tags and rating ranges for recap footers", () => {
+    expect(formatTags("dp")).toBe("dp");
+    expect(formatTags("")).toBe("None");
+    expect(formatRatingRanges([])).toBe("Any");
+    expect(formatRatingRanges([{ min: 800, max: 1200 }])).toBe("800-1200");
   });
 });

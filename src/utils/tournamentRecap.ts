@@ -2,7 +2,7 @@ import type { TournamentRecap, TournamentStandingsEntry } from "../services/tour
 
 import { formatTime } from "./rating.js";
 
-function formatRatingRanges(ranges: Array<{ min: number; max: number }>): string {
+export function formatRatingRanges(ranges: Array<{ min: number; max: number }>): string {
   if (ranges.length === 0) {
     return "Any";
   }
@@ -11,7 +11,7 @@ function formatRatingRanges(ranges: Array<{ min: number; max: number }>): string
     .join(", ");
 }
 
-function formatTags(tags: string): string {
+export function formatTags(tags: string): string {
   const trimmed = tags.trim();
   return trimmed.length > 0 ? trimmed : "None";
 }
