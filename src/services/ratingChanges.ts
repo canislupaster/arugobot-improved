@@ -1,11 +1,12 @@
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
-import { isCacheFresh } from "../utils/cache.js";
-import { logError, logWarn } from "../utils/logger.js";
 import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
+import {
+  resolveRatingChangesWithCache,
+} from "./ratingChangesCache.js";
 
 export type RatingChange = {
   handle?: string;
@@ -18,11 +19,6 @@ export type RatingChange = {
 };
 
 type RatingChangesResponse = RatingChange[];
-
-type RatingChangesCacheRow = {
-  payload: string;
-  last_fetched: string;
-};
 
 export type RatingChangesResult = {
   changes: RatingChange[];
@@ -53,63 +49,22 @@ export class RatingChangesService {
     ttlMs = DEFAULT_CACHE_TTL_MS
   ): Promise<RatingChangesResult | null> {
     const key = normalizeHandle(handle);
-    let cached: RatingChangesCacheRow | undefined;
+    const { result, errorMessage } = await resolveRatingChangesWithCache(
+      this.db,
+      { type: "handle", handle: key },
+      ttlMs,
+      () => this.client.request<RatingChangesResponse>("user.rating", { handle }),
+      parseRatingChangesPayload,
+      "Rating change request failed; using cached data if available.",
+      { handle: key }
+    );
 
-    try {
-      cached = await this.db
-        .selectFrom("cf_rating_changes")
-        .select(["payload", "last_fetched"])
-        .where("handle", "=", key)
-        .executeTakeFirst();
-    } catch (error) {
-      logError(`Database error: ${String(error)}`);
-    }
-
-    if (cached && isCacheFresh(cached.last_fetched, ttlMs)) {
-      return {
-        changes: parseRatingChangesPayload(cached.payload),
-        source: "cache",
-        isStale: false,
-      };
-    }
-
-    try {
-      const response = await this.client.request<RatingChangesResponse>("user.rating", {
-        handle,
-      });
-      const payload = JSON.stringify(response);
-      const timestamp = new Date().toISOString();
-      await this.db
-        .insertInto("cf_rating_changes")
-        .values({
-          handle: key,
-          payload,
-          last_fetched: timestamp,
-        })
-        .onConflict((oc) =>
-          oc.column("handle").doUpdateSet({
-            payload,
-            last_fetched: timestamp,
-          })
-        )
-        .execute();
+    if (errorMessage) {
+      this.lastError = { message: errorMessage, timestamp: new Date().toISOString() };
+    } else {
       this.lastError = null;
-      return { changes: response, source: "api", isStale: false };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logWarn("Rating change request failed; using cached data if available.", {
-        handle: key,
-        error: message,
-      });
-      if (cached) {
-        return {
-          changes: parseRatingChangesPayload(cached.payload),
-          source: "cache",
-          isStale: true,
-        };
-      }
-      return null;
     }
+
+    return result;
   }
 }
