@@ -1,6 +1,11 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import {
+  type ChatInputCommandInteraction,
+  EmbedBuilder,
+  SlashCommandBuilder,
+} from "discord.js";
 
 import type { Problem } from "../services/problems.js";
+import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { parseProblemReference } from "../utils/problemReference.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -38,6 +43,31 @@ function formatProblemLine(
   const problem = problemDict.get(problemId);
   const link = problem ? buildProblemLink(problem) : buildProblemLinkFromId(problemId);
   return `- ${link} • ${formatWhen(suggestedAt)}`;
+}
+
+async function loadProblemDict(
+  context: CommandContext,
+  interaction: ChatInputCommandInteraction
+): Promise<{ problemDict: Map<string, Problem>; cacheLoaded: boolean }> {
+  let cacheLoaded = true;
+  let problemDict = new Map<string, Problem>();
+
+  try {
+    await context.services.problems.ensureProblemsLoaded();
+    problemDict = context.services.problems.getProblemDict();
+    if (problemDict.size === 0) {
+      cacheLoaded = false;
+    }
+  } catch (error) {
+    cacheLoaded = false;
+    logCommandError(
+      `Problem cache unavailable for practice history: ${String(error)}`,
+      interaction,
+      context.correlationId
+    );
+  }
+
+  return { problemDict, cacheLoaded };
 }
 
 export const practiceHistoryCommand: Command = {
@@ -83,23 +113,7 @@ export const practiceHistoryCommand: Command = {
     await interaction.deferReply();
 
     try {
-      let problemDict = new Map<string, Problem>();
-      let cacheLoaded = true;
-
-      try {
-        await context.services.problems.ensureProblemsLoaded();
-        problemDict = context.services.problems.getProblemDict();
-        if (problemDict.size === 0) {
-          cacheLoaded = false;
-        }
-      } catch (error) {
-        cacheLoaded = false;
-        logCommandError(
-          `Problem cache unavailable for practice history: ${String(error)}`,
-          interaction,
-          context.correlationId
-        );
-      }
+      const { problemDict, cacheLoaded } = await loadProblemDict(context, interaction);
 
       if (subcommand === "suggestions") {
         const user = interaction.options.getUser("user") ?? interaction.user;
