@@ -1,4 +1,9 @@
-import { EmbedBuilder, SlashCommandBuilder, type User } from "discord.js";
+import {
+  EmbedBuilder,
+  SlashCommandBuilder,
+  type ChatInputCommandInteraction,
+  type User,
+} from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
@@ -10,6 +15,7 @@ import {
   formatDiscordTimestamp,
   formatDuration,
 } from "../utils/time.js";
+import type { CommandContext } from "../types/commandContext.js";
 
 import type { Command } from "./types.js";
 
@@ -25,9 +31,6 @@ type TargetHandle = {
 };
 
 function parseHandleList(raw: string): string[] {
-  if (!raw.trim()) {
-    return [];
-  }
   return raw
     .split(/[\s,]+/u)
     .map((value) => value.trim())
@@ -122,6 +125,28 @@ function buildContestEmbed(contest: Contest): EmbedBuilder {
     );
 }
 
+function applyContestSection(
+  embed: EmbedBuilder,
+  contest: Contest,
+  scope: ContestScopeFilter
+): EmbedBuilder {
+  const scopeLabel = formatContestTag(contest, scope);
+  if (scopeLabel) {
+    embed.addFields({ name: "Section", value: scopeLabel, inline: true });
+  }
+  return embed;
+}
+
+function buildContestStatusEmbed(
+  contest: Contest,
+  scope: ContestScopeFilter,
+  message: string
+): EmbedBuilder {
+  const embed = applyContestSection(buildContestEmbed(contest), contest, scope);
+  embed.addFields({ name: "Rating changes", value: message, inline: false });
+  return embed;
+}
+
 function parseScope(raw: string | null): ContestScopeFilter {
   if (raw === "gym" || raw === "all" || raw === "official") {
     return raw;
@@ -129,7 +154,7 @@ function parseScope(raw: string | null): ContestScopeFilter {
   return DEFAULT_SCOPE;
 }
 
-function buildTargetHandles(existing: Map<string, TargetHandle>, handle: string, label: string) {
+function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, label: string) {
   const key = handle.toLowerCase();
   if (existing.has(key)) {
     return;
@@ -150,6 +175,70 @@ function mapChangesByHandle(changes: RatingChange[]): Map<string, RatingChange> 
     map.set(change.handle.toLowerCase(), change);
   }
   return map;
+}
+
+type TargetResolution =
+  | { status: "ok"; targets: TargetHandle[] }
+  | { status: "error"; message: string };
+
+async function resolveTargets(params: {
+  interaction: ChatInputCommandInteraction;
+  context: CommandContext;
+  handleInputs: string[];
+  userOptions: User[];
+}): Promise<TargetResolution> {
+  const { interaction, context, handleInputs, userOptions } = params;
+  const targets = new Map<string, TargetHandle>();
+
+  if (userOptions.length > 0 || handleInputs.length > 0) {
+    if (interaction.guild) {
+      for (const user of userOptions) {
+        const handle = await context.services.store.getHandle(interaction.guild.id, user.id);
+        if (!handle) {
+          return { status: "error", message: `User <@${user.id}> does not have a linked handle.` };
+        }
+        addTargetHandle(targets, handle, `<@${user.id}>`);
+      }
+    }
+
+    for (const handleInput of handleInputs) {
+      const resolved = await context.services.store.resolveHandle(handleInput);
+      if (!resolved.exists) {
+        return { status: "error", message: `Invalid handle: ${handleInput}` };
+      }
+      const handle = resolved.canonicalHandle ?? handleInput;
+      addTargetHandle(targets, handle, handle);
+    }
+  } else {
+    const guildId = interaction.guild?.id ?? "";
+    const linkedUsers = await context.services.store.getLinkedUsers(guildId);
+    const filteredLinkedUsers = interaction.guild
+      ? await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
+          correlationId: context.correlationId,
+          command: interaction.commandName,
+          guildId: interaction.guild.id,
+          userId: interaction.user.id,
+        })
+      : linkedUsers;
+    if (filteredLinkedUsers.length === 0) {
+      return { status: "error", message: "No linked handles found in this server yet." };
+    }
+    if (filteredLinkedUsers.length > MAX_HANDLES) {
+      return {
+        status: "error",
+        message: `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`,
+      };
+    }
+    for (const linked of filteredLinkedUsers) {
+      addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
+    }
+  }
+
+  const targetList = Array.from(targets.values());
+  if (targetList.length === 0) {
+    return { status: "error", message: "No handles found to check." };
+  }
+  return { status: "ok", targets: targetList };
 }
 
 export const contestChangesCommand: Command = {
@@ -280,16 +369,11 @@ export const contestChangesCommand: Command = {
       }
 
       if (contest.isGym) {
-        const embed = buildContestEmbed(contest);
-        const scopeLabel = formatContestTag(contest, scope);
-        if (scopeLabel) {
-          embed.addFields({ name: "Section", value: scopeLabel, inline: true });
-        }
-        embed.addFields({
-          name: "Rating changes",
-          value: "Rating changes are not available for gym contests.",
-          inline: false,
-        });
+        const embed = buildContestStatusEmbed(
+          contest,
+          scope,
+          "Rating changes are not available for gym contests."
+        );
         if (stale) {
           embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
         }
@@ -298,16 +382,11 @@ export const contestChangesCommand: Command = {
       }
 
       if (contest.phase !== "FINISHED") {
-        const embed = buildContestEmbed(contest);
-        const scopeLabel = formatContestTag(contest, scope);
-        if (scopeLabel) {
-          embed.addFields({ name: "Section", value: scopeLabel, inline: true });
-        }
-        embed.addFields({
-          name: "Rating changes",
-          value: "Rating changes are only available once the contest is finished.",
-          inline: false,
-        });
+        const embed = buildContestStatusEmbed(
+          contest,
+          scope,
+          "Rating changes are only available once the contest is finished."
+        );
         if (stale) {
           embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
         }
@@ -315,60 +394,17 @@ export const contestChangesCommand: Command = {
         return;
       }
 
-      const targets = new Map<string, TargetHandle>();
-
-      if (userOptions.length > 0 || handleInputs.length > 0) {
-        if (interaction.guild) {
-          for (const user of userOptions) {
-            const handle = await context.services.store.getHandle(interaction.guild.id, user.id);
-            if (!handle) {
-              await interaction.editReply(`User <@${user.id}> does not have a linked handle.`);
-              return;
-            }
-            buildTargetHandles(targets, handle, `<@${user.id}>`);
-          }
-        }
-
-        for (const handleInput of handleInputs) {
-          const resolved = await context.services.store.resolveHandle(handleInput);
-          if (!resolved.exists) {
-            await interaction.editReply(`Invalid handle: ${handleInput}`);
-            return;
-          }
-          const handle = resolved.canonicalHandle ?? handleInput;
-          buildTargetHandles(targets, handle, handle);
-        }
-      } else {
-        const guildId = interaction.guild?.id ?? "";
-        const linkedUsers = await context.services.store.getLinkedUsers(guildId);
-        const filteredLinkedUsers = interaction.guild
-          ? await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
-              correlationId: context.correlationId,
-              command: interaction.commandName,
-              guildId: interaction.guild.id,
-              userId: interaction.user.id,
-            })
-          : linkedUsers;
-        if (filteredLinkedUsers.length === 0) {
-          await interaction.editReply("No linked handles found in this server yet.");
-          return;
-        }
-        if (filteredLinkedUsers.length > MAX_HANDLES) {
-          await interaction.editReply(
-            `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`
-          );
-          return;
-        }
-        for (const linked of filteredLinkedUsers) {
-          buildTargetHandles(targets, linked.handle, `<@${linked.userId}>`);
-        }
-      }
-
-      const targetList = Array.from(targets.values());
-      if (targetList.length === 0) {
-        await interaction.editReply("No handles found to check.");
+      const targetResult = await resolveTargets({
+        interaction,
+        context,
+        handleInputs,
+        userOptions,
+      });
+      if (targetResult.status === "error") {
+        await interaction.editReply(targetResult.message);
         return;
       }
+      const targetList = targetResult.targets;
 
       const changes = await context.services.contestRatingChanges.getContestRatingChanges(
         contest.id
@@ -396,11 +432,7 @@ export const contestChangesCommand: Command = {
         found.push({ ...target, ...entry });
       }
 
-      const embed = buildContestEmbed(contest);
-      const scopeLabel = formatContestTag(contest, scope);
-      if (scopeLabel) {
-        embed.addFields({ name: "Section", value: scopeLabel, inline: true });
-      }
+      const embed = applyContestSection(buildContestEmbed(contest), contest, scope);
       const footerNotes: string[] = [];
 
       if (found.length === 0) {
