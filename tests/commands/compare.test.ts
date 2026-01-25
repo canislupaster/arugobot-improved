@@ -121,4 +121,51 @@ describe("compareCommand", () => {
     expect(fieldValues.join("\n")).toContain("Handle: Petr");
     expect(fieldNames.join("\n")).not.toContain("<@");
   });
+
+  it("dedupes handles across users and handle inputs", async () => {
+    const interaction = createInteraction({
+      options: {
+        getUser: jest
+          .fn()
+          .mockImplementation((name: string) =>
+            name === "user1" ? { id: "user-2", username: "Other" } : null
+          ),
+        getString: jest.fn().mockReturnValue("tourist"),
+      },
+    });
+    const context = {
+      correlationId: "corr-4",
+      services: {
+        store: {
+          getHandle: jest.fn().mockResolvedValue("Tourist"),
+          getRating: jest.fn().mockResolvedValue(1600),
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: true,
+            canonicalHandle: "tourist",
+            source: "api",
+          }),
+          getCodeforcesProfile: jest.fn().mockResolvedValue({
+            profile: {
+              handle: "tourist",
+              displayHandle: "tourist",
+              rating: 3000,
+              rank: "legendary grandmaster",
+              maxRating: 3100,
+              maxRank: "legendary grandmaster",
+              lastOnlineTimeSeconds: 123,
+              lastFetched: new Date().toISOString(),
+            },
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await compareCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const fields = payload.embeds[0].data.fields as Array<{ name: string }>;
+    expect(fields).toHaveLength(1);
+  });
 });

@@ -8,6 +8,17 @@ import type { Command } from "./types.js";
 
 const MAX_TARGETS = 5;
 
+type CompareTarget = {
+  userId?: string;
+  handle: string;
+  botRating: number | null;
+};
+
+type TargetResolution = {
+  targets: CompareTarget[];
+  error?: string;
+};
+
 function parseHandleList(raw: string): string[] {
   if (!raw.trim()) {
     return [];
@@ -16,6 +27,85 @@ function parseHandleList(raw: string): string[] {
     .split(/[\s,]+/u)
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function normalizeHandleKey(handle: string): string {
+  return handle.trim().toLowerCase();
+}
+
+function addTarget(targets: CompareTarget[], seenHandles: Set<string>, target: CompareTarget) {
+  const normalized = normalizeHandleKey(target.handle);
+  if (seenHandles.has(normalized)) {
+    return;
+  }
+  seenHandles.add(normalized);
+  targets.push(target);
+}
+
+async function resolveUserTargets(
+  users: Array<{ id: string }>,
+  guildId: string,
+  store: Parameters<Command["execute"]>[1]["services"]["store"],
+  seenHandles: Set<string>
+): Promise<TargetResolution> {
+  const targets: CompareTarget[] = [];
+  for (const user of users) {
+    const handle = await store.getHandle(guildId, user.id);
+    if (!handle) {
+      return { targets: [], error: `User <@${user.id}> does not have a linked handle.` };
+    }
+    const rating = await store.getRating(guildId, user.id);
+    addTarget(targets, seenHandles, {
+      userId: user.id,
+      handle,
+      botRating: Number.isFinite(rating) && rating >= 0 ? rating : null,
+    });
+  }
+  return { targets };
+}
+
+async function resolveHandleTargets(
+  handleInputs: string[],
+  store: Parameters<Command["execute"]>[1]["services"]["store"],
+  seenHandles: Set<string>
+): Promise<TargetResolution> {
+  const targets: CompareTarget[] = [];
+  for (const handleInput of handleInputs) {
+    const resolved = await store.resolveHandle(handleInput);
+    if (!resolved.exists) {
+      return { targets: [], error: `Invalid handle: ${handleInput}` };
+    }
+    const handle = resolved.canonicalHandle ?? handleInput;
+    addTarget(targets, seenHandles, { handle, botRating: null });
+  }
+  return { targets };
+}
+
+function buildProfileLines(
+  target: CompareTarget,
+  profile: Awaited<ReturnType<Parameters<Command["execute"]>[1]["services"]["store"]["getCodeforcesProfile"]>>
+) {
+  const cfRating =
+    profile?.profile.rating !== null && profile?.profile.rating !== undefined
+      ? `${profile.profile.rating} (${profile.profile.rank ?? "unrated"})`
+      : "Unrated";
+  const cfMax =
+    profile?.profile.maxRating !== null && profile?.profile.maxRating !== undefined
+      ? `${profile.profile.maxRating} (${profile.profile.maxRank ?? "unknown"})`
+      : "N/A";
+  const cfLastOnline = profile?.profile.lastOnlineTimeSeconds
+    ? formatDiscordRelativeTime(profile.profile.lastOnlineTimeSeconds)
+    : "Unknown";
+  const botRating = target.botRating ?? "N/A";
+
+  return [
+    target.userId ? `User: <@${target.userId}>` : null,
+    `Handle: ${target.handle}`,
+    `Bot rating: ${botRating}`,
+    `CF rating: ${cfRating}`,
+    `CF max: ${cfMax}`,
+    `Last online: ${cfLastOnline}`,
+  ].filter((line): line is string => Boolean(line));
 }
 
 export const compareCommand: Command = {
@@ -61,46 +151,31 @@ export const compareCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const targets: Array<{
-        userId?: string;
-        handle: string;
-        botRating: number | null;
-      }> = [];
+      const targets: CompareTarget[] = [];
       const seenHandles = new Set<string>();
 
-      for (const user of userOptions) {
-        const handle = await context.services.store.getHandle(interaction.guild.id, user!.id);
-        if (!handle) {
-          await interaction.editReply(`User <@${user!.id}> does not have a linked handle.`);
-          return;
-        }
-        const normalized = handle.toLowerCase();
-        if (seenHandles.has(normalized)) {
-          continue;
-        }
-        seenHandles.add(normalized);
-        const rating = await context.services.store.getRating(interaction.guild.id, user!.id);
-        targets.push({
-          userId: user!.id,
-          handle,
-          botRating: Number.isFinite(rating) && rating >= 0 ? rating : null,
-        });
+      const userTargetResolution = await resolveUserTargets(
+        userOptions as Array<{ id: string }>,
+        interaction.guild.id,
+        context.services.store,
+        seenHandles
+      );
+      if (userTargetResolution.error) {
+        await interaction.editReply(userTargetResolution.error);
+        return;
       }
+      targets.push(...userTargetResolution.targets);
 
-      for (const handleInput of handleInputs) {
-        const resolved = await context.services.store.resolveHandle(handleInput);
-        if (!resolved.exists) {
-          await interaction.editReply(`Invalid handle: ${handleInput}`);
-          return;
-        }
-        const handle = resolved.canonicalHandle ?? handleInput;
-        const normalized = handle.toLowerCase();
-        if (seenHandles.has(normalized)) {
-          continue;
-        }
-        seenHandles.add(normalized);
-        targets.push({ handle, botRating: null });
+      const handleTargetResolution = await resolveHandleTargets(
+        handleInputs,
+        context.services.store,
+        seenHandles
+      );
+      if (handleTargetResolution.error) {
+        await interaction.editReply(handleTargetResolution.error);
+        return;
       }
+      targets.push(...handleTargetResolution.targets);
 
       if (targets.length === 0) {
         await interaction.editReply("No valid handles found to compare.");
@@ -115,27 +190,7 @@ export const compareCommand: Command = {
         if (profile?.isStale) {
           stale = true;
         }
-        const cfRating =
-          profile?.profile.rating !== null && profile?.profile.rating !== undefined
-            ? `${profile.profile.rating} (${profile.profile.rank ?? "unrated"})`
-            : "Unrated";
-        const cfMax =
-          profile?.profile.maxRating !== null && profile?.profile.maxRating !== undefined
-            ? `${profile.profile.maxRating} (${profile.profile.maxRank ?? "unknown"})`
-            : "N/A";
-        const cfLastOnline = profile?.profile.lastOnlineTimeSeconds
-          ? formatDiscordRelativeTime(profile.profile.lastOnlineTimeSeconds)
-          : "Unknown";
-        const botRating = target.botRating ?? "N/A";
-
-        const lines = [
-          target.userId ? `User: <@${target.userId}>` : null,
-          `Handle: ${target.handle}`,
-          `Bot rating: ${botRating}`,
-          `CF rating: ${cfRating}`,
-          `CF max: ${cfMax}`,
-          `Last online: ${cfLastOnline}`,
-        ].filter((line): line is string => Boolean(line));
+        const lines = buildProfileLines(target, profile);
 
         embed.addFields({
           name: target.handle,
