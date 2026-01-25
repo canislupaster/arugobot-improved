@@ -3,7 +3,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { contestChangesCommand } from "../../src/commands/contestChanges.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (query: string, handles?: string) =>
+const createInteraction = (query: string, handles?: string, scope?: string) =>
   ({
     options: {
       getString: jest.fn((name: string) => {
@@ -12,6 +12,9 @@ const createInteraction = (query: string, handles?: string) =>
         }
         if (name === "handles") {
           return handles ?? null;
+        }
+        if (name === "scope") {
+          return scope ?? null;
         }
         return null;
       }),
@@ -138,6 +141,43 @@ describe("contestChangesCommand", () => {
     expect(context.services.contests.getLatestFinished).toHaveBeenCalled();
     expect(context.services.contests.getContestById).not.toHaveBeenCalled();
     expect(context.services.contests.searchContests).not.toHaveBeenCalled();
+  });
+
+  it("warns when the contest is a gym contest", async () => {
+    const interaction = createInteraction("1234", "tourist", "gym");
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Gym Contest",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+            isGym: true,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({ exists: true, canonicalHandle: "tourist" }),
+        },
+        contestRatingChanges: {
+          getContestRatingChanges: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestChangesCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0].data;
+    const changesField = embed.fields?.find(
+      (field: { name: string; value: string }) => field.name === "Rating changes"
+    );
+    expect(changesField?.value).toContain("not available for gym contests");
+    expect(context.services.contestRatingChanges.getContestRatingChanges).not.toHaveBeenCalled();
   });
 
   it("warns when the contest is not finished", async () => {

@@ -1,6 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder, type User } from "discord.js";
 
-import type { Contest } from "../services/contests.js";
+import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
@@ -15,6 +15,7 @@ const MAX_MATCHES = 5;
 const MAX_HANDLES = 50;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
+const DEFAULT_SCOPE: ContestScopeFilter = "official";
 
 type TargetHandle = {
   handle: string;
@@ -91,11 +92,24 @@ function formatPoints(points: number): string {
   return points.toFixed(2);
 }
 
-function buildMatchEmbed(query: string, matches: Contest[]): EmbedBuilder {
+function formatContestTag(contest: Contest, scope: ContestScopeFilter): string {
+  if (scope === "official") {
+    return "";
+  }
+  return contest.isGym ? "Gym" : "Official";
+}
+
+function buildMatchEmbed(
+  query: string,
+  matches: Contest[],
+  scope: ContestScopeFilter
+): EmbedBuilder {
   const lines = matches
     .map((contest) => {
       const when = formatDiscordRelativeTime(contest.startTimeSeconds);
-      return `- ${contest.name} (ID ${contest.id}, ${when})`;
+      const scopeLabel = formatContestTag(contest, scope);
+      const scopeSuffix = scopeLabel ? `, ${scopeLabel}` : "";
+      return `- ${contest.name} (ID ${contest.id}, ${when}${scopeSuffix})`;
     })
     .join("\n");
 
@@ -136,6 +150,13 @@ function buildContestEmbed(contest: Contest): EmbedBuilder {
   return embed;
 }
 
+function parseScope(raw: string | null): ContestScopeFilter {
+  if (raw === "gym" || raw === "all" || raw === "official") {
+    return raw;
+  }
+  return DEFAULT_SCOPE;
+}
+
 function buildTargetHandles(existing: Map<string, TargetHandle>, handle: string, label: string) {
   const key = handle.toLowerCase();
   if (existing.has(key)) {
@@ -168,10 +189,21 @@ export const contestResultsCommand: Command = {
     .addUserOption((option) => option.setName("user4").setDescription("User to include"))
     .addStringOption((option) =>
       option.setName("handles").setDescription("Comma or space separated handles to include")
+    )
+    .addStringOption((option) =>
+      option
+        .setName("scope")
+        .setDescription("Which contests to search")
+        .addChoices(
+          { name: "Official", value: "official" },
+          { name: "Gym", value: "gym" },
+          { name: "All", value: "all" }
+        )
     ),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
+    const scope = parseScope(interaction.options.getString("scope"));
     const handleInputs = parseHandleList(handlesRaw);
     const userOptions = getUserOptions([
       interaction.options.getUser("user1"),
@@ -197,16 +229,32 @@ export const contestResultsCommand: Command = {
     await interaction.deferReply();
 
     let stale = false;
-    try {
-      await context.services.contests.refresh();
-    } catch {
-      if (context.services.contests.getLastRefreshAt() > 0) {
+    if (scope === "all") {
+      const results = await Promise.allSettled([
+        context.services.contests.refresh(false, "official"),
+        context.services.contests.refresh(false, "gym"),
+      ]);
+      if (results.some((result) => result.status === "rejected")) {
         stale = true;
-      } else {
+      }
+      if (context.services.contests.getLastRefreshAt("all") <= 0) {
         await interaction.editReply(
           "Unable to reach Codeforces right now. Try again in a few minutes."
         );
         return;
+      }
+    } else {
+      try {
+        await context.services.contests.refresh(false, scope);
+      } catch {
+        if (context.services.contests.getLastRefreshAt(scope) > 0) {
+          stale = true;
+        } else {
+          await interaction.editReply(
+            "Unable to reach Codeforces right now. Try again in a few minutes."
+          );
+          return;
+        }
       }
     }
 
@@ -215,25 +263,25 @@ export const contestResultsCommand: Command = {
       const contestId = parseContestId(queryRaw);
       let contest: Contest | null = null;
       if (wantsLatest) {
-        contest = context.services.contests.getLatestFinished();
+        contest = context.services.contests.getLatestFinished(scope);
         if (!contest) {
           await interaction.editReply("No finished contests found yet.");
           return;
         }
       } else if (contestId) {
-        contest = context.services.contests.getContestById(contestId);
+        contest = context.services.contests.getContestById(contestId, scope);
         if (!contest) {
           await interaction.editReply("No contest found with that ID.");
           return;
         }
       } else {
-        const matches = context.services.contests.searchContests(queryRaw, MAX_MATCHES);
+        const matches = context.services.contests.searchContests(queryRaw, MAX_MATCHES, scope);
         if (matches.length === 0) {
           await interaction.editReply("No contests found matching that name.");
           return;
         }
         if (matches.length > 1) {
-          const embed = buildMatchEmbed(queryRaw, matches);
+          const embed = buildMatchEmbed(queryRaw, matches, scope);
           if (stale) {
             embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
           }
@@ -325,6 +373,10 @@ export const contestResultsCommand: Command = {
       }
 
       const embed = buildContestEmbed(contest);
+      const scopeLabel = formatContestTag(contest, scope);
+      if (scopeLabel) {
+        embed.addFields({ name: "Section", value: scopeLabel, inline: true });
+      }
       const footerNotes: string[] = [];
 
       if (found.length === 0) {

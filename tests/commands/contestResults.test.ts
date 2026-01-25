@@ -3,7 +3,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { contestResultsCommand } from "../../src/commands/contestResults.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (query: string, handles?: string) =>
+const createInteraction = (query: string, handles?: string, scope?: string) =>
   ({
     options: {
       getString: jest.fn((name: string) => {
@@ -12,6 +12,9 @@ const createInteraction = (query: string, handles?: string) =>
         }
         if (name === "handles") {
           return handles ?? null;
+        }
+        if (name === "scope") {
+          return scope ?? null;
         }
         return null;
       }),
@@ -132,6 +135,53 @@ describe("contestResultsCommand", () => {
     expect(context.services.contests.getLatestFinished).toHaveBeenCalled();
     expect(context.services.contests.getContestById).not.toHaveBeenCalled();
     expect(context.services.contests.searchContests).not.toHaveBeenCalled();
+  });
+
+  it("supports gym scope", async () => {
+    const interaction = createInteraction("1234", "tourist", "gym");
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Gym Contest",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+            isGym: true,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({ exists: true, canonicalHandle: "tourist" }),
+        },
+        contestStandings: {
+          getStandings: jest.fn().mockResolvedValue({
+            entries: [
+              {
+                handle: "tourist",
+                rank: 1,
+                points: 100,
+                penalty: 0,
+                participantType: "CONTESTANT",
+              },
+            ],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestResultsCommand.execute(interaction, context);
+
+    expect(context.services.contests.refresh).toHaveBeenCalledWith(false, "gym");
+    expect(context.services.contests.getContestById).toHaveBeenCalledWith(1234, "gym");
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0].data;
+    expect(embed.fields?.some((field: { name: string }) => field.name === "Section")).toBe(true);
   });
 
   it("lists contest matches when multiple contests are found", async () => {

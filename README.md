@@ -157,15 +157,16 @@ Most command responses are public; handle-linking and admin diagnostics remain e
   Shows details for a contest by id, URL, or name. Use `scope` to search `official`, `gym`,
   or `all` contests.
 
-- **/contestresults** `query` `[limit]` `[user1..user4]` `[handles]`
+- **/contestresults** `query` `[limit]` `[user1..user4]` `[handles]` `[scope]`
 
   Shows standings for linked users (or specified handles) in a contest.
   Use `latest` to target the most recent finished contest.
 
-- **/contestchanges** `query` `[limit]` `[user1..user4]` `[handles]`
+- **/contestchanges** `query` `[limit]` `[user1..user4]` `[handles]` `[scope]`
 
   Shows rating changes for linked users (or specified handles) in a finished contest.
   Use `latest` to target the most recent finished contest.
+  Rating changes are only available for official contests; gym contests show a warning.
 
 - **/contesthistory** `[user]` `[handle]` `[limit]`
 
