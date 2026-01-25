@@ -1,10 +1,10 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
+import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
-import type { CommandContext } from "../types/commandContext.js";
 
 type StoreService = CommandContext["services"]["store"];
 type HandleInsertResult = "ok" | "handle_exists" | "already_linked" | "error";
