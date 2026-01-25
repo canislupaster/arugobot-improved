@@ -15,6 +15,14 @@ export function formatRatingRanges(ranges: RatingRange[], fallback?: RatingRange
     .join(", ");
 }
 
+export function formatRatingRangesWithDefaults(
+  ranges: RatingRange[],
+  defaultMin: number,
+  defaultMax: number
+): string {
+  return formatRatingRanges(ranges, { min: defaultMin, max: defaultMax });
+}
+
 type RatingRangeInput = {
   rating: number | null;
   minRating: number | null;

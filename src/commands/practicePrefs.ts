@@ -2,7 +2,11 @@ import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { formatRatingRanges, resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
+import {
+  formatRatingRangesWithDefaults,
+  resolveRatingRanges,
+  type RatingRange,
+} from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
 
@@ -69,10 +73,11 @@ export const practicePrefsCommand: Command = {
           .addFields(
             {
               name: "Ranges",
-              value: formatRatingRanges(preferences.ratingRanges, {
-                min: DEFAULT_MIN_RATING,
-                max: DEFAULT_MAX_RATING,
-              }),
+              value: formatRatingRangesWithDefaults(
+                preferences.ratingRanges,
+                DEFAULT_MIN_RATING,
+                DEFAULT_MAX_RATING
+              ),
               inline: false,
             },
             {
@@ -146,12 +151,10 @@ export const practicePrefsCommand: Command = {
 
         await context.services.store.setPracticePreferences(guildId, userId, ratingRanges, tags);
         await interaction.reply({
-          content: `Practice preferences updated. Ranges: ${formatRatingRanges(
+          content: `Practice preferences updated. Ranges: ${formatRatingRangesWithDefaults(
             ratingRanges,
-            {
-              min: DEFAULT_MIN_RATING,
-              max: DEFAULT_MAX_RATING,
-            }
+            DEFAULT_MIN_RATING,
+            DEFAULT_MAX_RATING
           )}. Tags: ${tags.trim() ? tags.trim() : "None"}.`,
           flags: MessageFlags.Ephemeral,
         });

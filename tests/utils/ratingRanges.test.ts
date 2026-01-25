@@ -1,5 +1,6 @@
 import {
   formatRatingRanges,
+  formatRatingRangesWithDefaults,
   parseRatingRanges,
   resolveRatingRanges,
 } from "../../src/utils/ratingRanges.js";
@@ -63,5 +64,15 @@ describe("formatRatingRanges", () => {
   it("uses fallback when no ranges provided", () => {
     expect(formatRatingRanges([], { min: 800, max: 3500 })).toBe("800-3500");
     expect(formatRatingRanges([])).toBe("");
+  });
+});
+
+describe("formatRatingRangesWithDefaults", () => {
+  it("uses defaults when ranges are empty", () => {
+    expect(formatRatingRangesWithDefaults([], 800, 3500)).toBe("800-3500");
+  });
+
+  it("formats provided ranges without overriding", () => {
+    expect(formatRatingRangesWithDefaults([{ min: 1000, max: 1200 }], 800, 3500)).toBe("1000-1200");
   });
 });

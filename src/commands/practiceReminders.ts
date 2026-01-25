@@ -3,7 +3,7 @@ import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } f
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { formatRatingRanges, resolveRatingRanges } from "../utils/ratingRanges.js";
+import { formatRatingRangesWithDefaults, resolveRatingRanges } from "../utils/ratingRanges.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -260,7 +260,11 @@ export const practiceRemindersCommand: Command = {
               : []),
             {
               name: "Ranges",
-              value: formatRatingRanges(subscription.ratingRanges),
+              value: formatRatingRangesWithDefaults(
+                subscription.ratingRanges,
+                DEFAULT_MIN_RATING,
+                DEFAULT_MAX_RATING
+              ),
               inline: false,
             },
             {
@@ -432,7 +436,11 @@ export const practiceRemindersCommand: Command = {
               : []),
             {
               name: "Ranges",
-              value: formatRatingRanges(preview.subscription.ratingRanges),
+              value: formatRatingRangesWithDefaults(
+                preview.subscription.ratingRanges,
+                DEFAULT_MIN_RATING,
+                DEFAULT_MAX_RATING
+              ),
               inline: false,
             },
             {
