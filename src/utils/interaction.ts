@@ -1,4 +1,5 @@
 import type {
+  ChatInputCommandInteraction,
   InteractionEditReplyOptions,
   InteractionReplyOptions,
   RepliableInteraction,
@@ -99,4 +100,33 @@ export function resolveTargetLabels(user: User, member: unknown) {
       ? memberToString.call(member)
       : user.toString();
   return { displayName, mention };
+}
+
+type HandleUserOptionResult = {
+  handleInput: string;
+  userOption: User | null;
+  member: unknown;
+  error?: string;
+};
+
+export function resolveHandleUserOptions(
+  interaction: ChatInputCommandInteraction,
+  options: { handleOptionName?: string; userOptionName?: string } = {}
+): HandleUserOptionResult {
+  const handleOptionName = options.handleOptionName ?? "handle";
+  const userOptionName = options.userOptionName ?? "user";
+  const handleInput = interaction.options.getString(handleOptionName)?.trim() ?? "";
+  const userOption = interaction.options.getUser(userOptionName);
+  const member = interaction.options.getMember(userOptionName);
+
+  if (handleInput && userOption) {
+    return {
+      handleInput,
+      userOption,
+      member,
+      error: "Provide either a handle or a user, not both.",
+    };
+  }
+
+  return { handleInput, userOption, member };
 }

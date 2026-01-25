@@ -4,7 +4,7 @@ import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTarget } from "../utils/handles.js";
-import { resolveTargetLabels } from "../utils/interaction.js";
+import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
 import { formatSubmissionLine } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -112,16 +112,12 @@ export const profileCommand: Command = {
       });
       return;
     }
-    const handleInput = interaction.options.getString("handle")?.trim() ?? "";
-    const userOption = interaction.options.getUser("user");
-    const member = interaction.options.getMember("user");
-
-    if (handleInput && userOption) {
-      await interaction.reply({
-        content: "Provide either a handle or a user, not both.",
-      });
+    const handleResolution = resolveHandleUserOptions(interaction);
+    if (handleResolution.error) {
+      await interaction.reply({ content: handleResolution.error });
       return;
     }
+    const { handleInput, userOption, member } = handleResolution;
 
     const user = userOption ?? interaction.user;
     const targetId = user.id;

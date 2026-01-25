@@ -1,4 +1,5 @@
 import {
+  resolveHandleUserOptions,
   resolveTargetLabels,
   safeInteractionEdit,
   safeInteractionReply,
@@ -87,5 +88,46 @@ describe("safe interaction helpers", () => {
     await expect(safeInteractionEdit(interaction as never, "Nope")).resolves.toBe(false);
 
     expect(interaction.editReply).toHaveBeenCalledWith("Nope");
+  });
+});
+
+describe("resolveHandleUserOptions", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      options: {
+        getString: jest.fn().mockReturnValue(null),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+      ...overrides,
+    }) as never;
+
+  it("returns an error when both handle and user are provided", () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn().mockReturnValue("tourist"),
+        getUser: jest.fn().mockReturnValue({ id: "user-2" }),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+
+    const result = resolveHandleUserOptions(interaction);
+
+    expect(result.error).toBe("Provide either a handle or a user, not both.");
+  });
+
+  it("trims handle input and returns user option when present", () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn().mockReturnValue("  tourist "),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+
+    const result = resolveHandleUserOptions(interaction);
+
+    expect(result.handleInput).toBe("tourist");
+    expect(result.userOption).toBeNull();
   });
 });

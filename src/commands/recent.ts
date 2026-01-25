@@ -1,49 +1,14 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { resolveHandleTarget } from "../utils/handles.js";
+import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
 import { formatSubmissionLine } from "../utils/submissions.js";
 
 import type { Command } from "./types.js";
 
 const MAX_RECENT = 10;
-
-type HandleResolution = { handle: string } | { error: string };
-
-function resolveTargetName(handleInput: string, user: { username: string }, member: unknown): string {
-  if (handleInput) {
-    return handleInput;
-  }
-  if (member && typeof member === "object" && "displayName" in member) {
-    const displayName = (member as { displayName?: string }).displayName;
-    if (displayName) {
-      return displayName;
-    }
-  }
-  return user.username;
-}
-
-async function resolveHandle(
-  context: CommandContext,
-  guildId: string,
-  targetId: string,
-  handleInput: string
-): Promise<HandleResolution> {
-  if (handleInput) {
-    const handleInfo = await context.services.store.resolveHandle(handleInput);
-    if (!handleInfo.exists) {
-      return { error: "Invalid handle." };
-    }
-    return { handle: handleInfo.canonicalHandle ?? handleInput };
-  }
-
-  const linkedHandle = await context.services.store.getHandle(guildId, targetId);
-  if (!linkedHandle) {
-    return { error: "Handle not linked." };
-  }
-  return { handle: linkedHandle };
-}
 
 export const recentCommand: Command = {
   data: new SlashCommandBuilder()
@@ -67,31 +32,27 @@ export const recentCommand: Command = {
       });
       return;
     }
-    const handleInput = interaction.options.getString("handle")?.trim() ?? "";
-    const userOption = interaction.options.getUser("user");
-    const member = interaction.options.getMember("user");
-
-    if (handleInput && userOption) {
-      await interaction.reply({
-        content: "Provide either a handle or a user, not both.",
-      });
+    const handleResolution = resolveHandleUserOptions(interaction);
+    if (handleResolution.error) {
+      await interaction.reply({ content: handleResolution.error });
       return;
     }
+    const { handleInput, userOption, member } = handleResolution;
 
     const user = userOption ?? interaction.user;
     const targetId = user.id;
-    const targetName = resolveTargetName(handleInput, user, member);
+    const { displayName } = resolveTargetLabels(user, member);
+    const targetName = handleInput || displayName;
     const limit = interaction.options.getInteger("limit") ?? MAX_RECENT;
 
     await interaction.deferReply();
 
     try {
-      const resolution = await resolveHandle(
-        context,
-        interaction.guild.id,
+      const resolution = await resolveHandleTarget(context.services.store, {
+        guildId: interaction.guild.id,
         targetId,
-        handleInput
-      );
+        handleInput,
+      });
       if ("error" in resolution) {
         await interaction.editReply(resolution.error);
         return;
