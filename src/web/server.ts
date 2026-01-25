@@ -80,15 +80,18 @@ export async function startWebServer(
           resolve(value);
         };
 
-        server.on("error", (error) => {
-          const err = error as NodeJS.ErrnoException;
+        const handleListenError = (error: NodeJS.ErrnoException) => {
           logError("Web server error.", {
             host: config.host,
             port,
-            code: err.code ?? "unknown",
-            message: formatWebServerErrorMessage(config.host, port, err),
+            code: error.code ?? "unknown",
+            message: formatWebServerErrorMessage(config.host, port, error),
           });
-          finalize({ server: null, actualPort: null, error: err });
+          finalize({ server: null, actualPort: null, error });
+        };
+
+        server.on("error", (error) => {
+          handleListenError(error as NodeJS.ErrnoException);
         });
 
         try {
@@ -100,14 +103,7 @@ export async function startWebServer(
             finalize({ server, actualPort, error: null });
           });
         } catch (error) {
-          const err = error as NodeJS.ErrnoException;
-          logError("Web server error.", {
-            host: config.host,
-            port,
-            code: err.code ?? "unknown",
-            message: formatWebServerErrorMessage(config.host, port, err),
-          });
-          finalize({ server: null, actualPort: null, error: err });
+          handleListenError(error as NodeJS.ErrnoException);
         }
       });
 
