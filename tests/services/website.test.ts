@@ -378,6 +378,12 @@ describe("WebsiteService", () => {
     expect(arena?.arenaEndsAt).toBe(1700005400);
   });
 
+  it("returns null when dashboard is private", async () => {
+    await settings.setDashboardPublic("guild-1", false);
+    const overview = await website.getGuildOverview("guild-1");
+    expect(overview).toBeNull();
+  });
+
   it("summarizes recent contest activity from cached rating changes", async () => {
     const nowSeconds = Math.floor(Date.now() / 1000);
     await db

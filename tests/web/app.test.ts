@@ -74,6 +74,22 @@ describe("web app", () => {
     expect(body).toContain("Guild One");
   });
 
+  it("returns 404 for private guilds", async () => {
+    await db
+      .updateTable("guild_settings")
+      .set({ dashboard_public: 0 })
+      .where("guild_id", "=", "guild-1")
+      .execute();
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/guilds/guild-1");
+    expect(response.status).toBe(404);
+  });
+
   it("renders arena tournament details", async () => {
     await db
       .insertInto("tournaments")
