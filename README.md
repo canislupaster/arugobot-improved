@@ -232,8 +232,6 @@ Optional environment variables:
 - `CODEFORCES_SOLVED_MAX_PAGES` (default `10`, set `0` for unlimited)
 - `PROXY_FETCH_URL` (optional proxy list URL; one proxy per line as `host:port` or `host:port:user:pass`)
 - `LOG_RETENTION_DAYS` (default `30`, set `0` to disable log cleanup)
-- `INSTANCE_LOCK_TTL_SECONDS` (default `120`, lock expiry window for multi-instance safety)
-- `INSTANCE_LOCK_HEARTBEAT_SECONDS` (default `30`, heartbeat interval for instance locks)
 - `DATABASE_BACKUP` (directory for automated backups, disabled if unset)
 - `DATABASE_BACKUP_RETENTION_DAYS` (default `7`, set `0` to keep all backups)
 - `WEB_HOST` (default `0.0.0.0`)
@@ -249,11 +247,8 @@ pnpm run dev
 The bot runs database migrations on startup.
 Problem and contest caches are persisted in the database to keep basic functionality available during Codeforces outages.
 Structured logs are appended to the database (`log_entries`) and cleaned up automatically based on
-`LOG_RETENTION_DAYS`.
-The bot also uses a database-backed instance lock to prevent multiple schedulers from running at
-once; tune `INSTANCE_LOCK_TTL_SECONDS`/`INSTANCE_LOCK_HEARTBEAT_SECONDS` if you run multiple hosts.
-If `DATABASE_BACKUP` is set, the bot copies the sqlite file into that directory on a schedule and
-removes backups older than `DATABASE_BACKUP_RETENTION_DAYS`.
+`LOG_RETENTION_DAYS`. If `DATABASE_BACKUP` is set, the bot copies the sqlite file into that directory
+on a schedule and removes backups older than `DATABASE_BACKUP_RETENTION_DAYS`.
 
 ## Web dashboard
 
