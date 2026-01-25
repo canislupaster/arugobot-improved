@@ -1,7 +1,7 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
-import type { ContestScopeFilter } from "../services/contests.js";
 import type { ContestReminder } from "../services/contestReminders.js";
+import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   filterContestsByKeywords,
