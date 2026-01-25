@@ -193,6 +193,31 @@ describe("web app", () => {
     expect(body).toContain("Problemset cache");
   });
 
+  it("returns cache status as json", async () => {
+    await db
+      .insertInto("cf_cache")
+      .values({
+        key: "problemset",
+        payload: "[]",
+        last_fetched: "2024-01-01T00:00:00.000Z",
+      })
+      .execute();
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/status.json");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      generatedAt: string;
+      cacheEntries: Array<{ label: string }>;
+    };
+    expect(body.generatedAt).toBeTruthy();
+    expect(body.cacheEntries.some((entry) => entry.label === "Problemset cache")).toBe(true);
+  });
+
   it("exports rating leaderboard as csv", async () => {
     const app = createWebApp({
       website,

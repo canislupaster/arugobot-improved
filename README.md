@@ -253,6 +253,7 @@ If `WEB_PUBLIC_URL` is set, `/dashboard` responses include direct links to your 
 The overview highlights core bot features alongside global contest participation cards sourced from
 cached rating changes, split by official vs gym activity. Per-guild pages include CSV/Markdown
 exports for rating/solve leaderboards, and `/status` shows cache ages for key Codeforces syncs.
+`/status.json` returns the same cache status in JSON for external monitoring.
 
 ## Deployment (Supervisor + Caddy)
 

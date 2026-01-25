@@ -229,6 +229,11 @@ export function createWebApp({ website, client }: WebAppContext) {
     return c.html(renderStatusPage({ generatedAt: new Date().toISOString(), cacheEntries }));
   });
 
+  app.get("/status.json", async (c) => {
+    const cacheEntries = await website.getCacheStatus();
+    return c.json({ generatedAt: new Date().toISOString(), cacheEntries });
+  });
+
   app.notFound((c) => c.html(renderNotFoundPage("Page not found."), 404));
 
   app.onError((error, c) => {
