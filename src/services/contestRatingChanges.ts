@@ -1,12 +1,11 @@
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
-import { buildServiceError } from "../utils/errors.js";
 import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
 import type { RatingChange } from "./ratingChanges.js";
-import { resolveRatingChangesWithCache } from "./ratingChangesCache.js";
+import { fetchRatingChangesWithTracking } from "./ratingChangesHelpers.js";
 
 export type ContestRatingChangesResult = {
   changes: RatingChange[];
@@ -32,7 +31,7 @@ export class ContestRatingChangesService {
     contestId: number,
     ttlMs = DEFAULT_CACHE_TTL_MS
   ): Promise<ContestRatingChangesResult | null> {
-    const { result, errorMessage } = await resolveRatingChangesWithCache(
+    const { result, lastError } = await fetchRatingChangesWithTracking(
       this.db,
       { type: "contest", contestId },
       ttlMs,
@@ -42,7 +41,7 @@ export class ContestRatingChangesService {
       { contestId }
     );
 
-    this.lastError = buildServiceError(errorMessage);
+    this.lastError = lastError;
 
     return result;
   }
