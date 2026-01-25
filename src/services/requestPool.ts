@@ -71,9 +71,7 @@ function buildProxyAgent(proxy: ProxyDefinition): ProxyAgent {
   });
 }
 
-export async function createRequestPool(
-  options: CreateRequestPoolOptions
-): Promise<RequestPool> {
+export async function createRequestPool(options: CreateRequestPoolOptions): Promise<RequestPool> {
   const slots: RequestSlot[] = [
     {
       label: "direct",
