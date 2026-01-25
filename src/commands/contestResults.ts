@@ -1,6 +1,6 @@
-import { EmbedBuilder, SlashCommandBuilder, type User } from "discord.js";
+import { EmbedBuilder, SlashCommandBuilder, type Guild, type User } from "discord.js";
 
-import type { Contest, ContestScopeFilter } from "../services/contests.js";
+import type { Contest, ContestScope, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
@@ -22,6 +22,11 @@ type TargetHandle = {
   handle: string;
   label: string;
 };
+
+type ContestLookup =
+  | { status: "ok"; contest: Contest }
+  | { status: "ambiguous"; matches: Contest[] }
+  | { status: "missing_latest" | "missing_id" | "missing_name" };
 
 function parseHandleList(raw: string): string[] {
   if (!raw.trim()) {
@@ -158,7 +163,7 @@ function parseScope(raw: string | null): ContestScopeFilter {
   return DEFAULT_SCOPE;
 }
 
-function buildTargetHandles(existing: Map<string, TargetHandle>, handle: string, label: string) {
+function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, label: string) {
   const key = handle.toLowerCase();
   if (existing.has(key)) {
     return;
@@ -168,6 +173,137 @@ function buildTargetHandles(existing: Map<string, TargetHandle>, handle: string,
 
 function getUserOptions(users: Array<User | null | undefined>): User[] {
   return users.filter((user): user is User => Boolean(user));
+}
+
+function lookupContest(
+  queryRaw: string,
+  scope: ContestScopeFilter,
+  contests: {
+    getLatestFinished: (scopeFilter: ContestScopeFilter) => Contest | null;
+    getContestById: (contestId: number, scopeFilter: ContestScopeFilter) => Contest | null;
+    searchContests: (query: string, limit: number, scopeFilter: ContestScopeFilter) => Contest[];
+  }
+): ContestLookup {
+  const wantsLatest = isLatestQuery(queryRaw);
+  const contestId = parseContestId(queryRaw);
+  if (wantsLatest) {
+    const contest = contests.getLatestFinished(scope);
+    if (!contest) {
+      return { status: "missing_latest" };
+    }
+    return { status: "ok", contest };
+  }
+  if (contestId) {
+    const contest = contests.getContestById(contestId, scope);
+    if (!contest) {
+      return { status: "missing_id" };
+    }
+    return { status: "ok", contest };
+  }
+  const matches = contests.searchContests(queryRaw, MAX_MATCHES, scope);
+  if (matches.length === 0) {
+    return { status: "missing_name" };
+  }
+  if (matches.length > 1) {
+    return { status: "ambiguous", matches };
+  }
+  return { status: "ok", contest: matches[0] };
+}
+
+async function refreshContestData(
+  scope: ContestScopeFilter,
+  contests: {
+    refresh: (force?: boolean, scopeFilter?: ContestScope) => Promise<void>;
+    getLastRefreshAt: (scopeFilter: ContestScopeFilter) => number;
+  }
+): Promise<{ stale: boolean } | { error: string }> {
+  if (scope === "all") {
+    const results = await Promise.allSettled([
+      contests.refresh(false, "official"),
+      contests.refresh(false, "gym"),
+    ]);
+    const stale = results.some((result) => result.status === "rejected");
+    if (contests.getLastRefreshAt("all") <= 0) {
+      return { error: "Unable to reach Codeforces right now. Try again in a few minutes." };
+    }
+    return { stale };
+  }
+
+  try {
+    await contests.refresh(false, scope);
+    return { stale: false };
+  } catch {
+    if (contests.getLastRefreshAt(scope) > 0) {
+      return { stale: true };
+    }
+    return { error: "Unable to reach Codeforces right now. Try again in a few minutes." };
+  }
+}
+
+async function buildTargets(
+  context: {
+    services: {
+      store: {
+        getHandle: (guildId: string, userId: string) => Promise<string | null>;
+        resolveHandle: (handle: string) => Promise<{
+          exists: boolean;
+          canonicalHandle: string | null;
+        }>;
+        getLinkedUsers: (guildId: string) => Promise<Array<{ userId: string; handle: string }>>;
+      };
+    };
+    correlationId: string;
+  },
+  interaction: { guildId: string | null; commandName: string; user: User; guild: Guild | null },
+  userOptions: User[],
+  handleInputs: string[]
+): Promise<{ targets: TargetHandle[] } | { error: string }> {
+  const targets = new Map<string, TargetHandle>();
+
+  if (userOptions.length > 0 || handleInputs.length > 0) {
+    if (interaction.guildId) {
+      for (const user of userOptions) {
+        const handle = await context.services.store.getHandle(interaction.guildId, user.id);
+        if (!handle) {
+          return { error: `User <@${user.id}> does not have a linked handle.` };
+        }
+        addTargetHandle(targets, handle, `<@${user.id}>`);
+      }
+    }
+
+    for (const handleInput of handleInputs) {
+      const resolved = await context.services.store.resolveHandle(handleInput);
+      if (!resolved.exists) {
+        return { error: `Invalid handle: ${handleInput}` };
+      }
+      const handle = resolved.canonicalHandle ?? handleInput;
+      addTargetHandle(targets, handle, handle);
+    }
+  } else {
+    const guildId = interaction.guildId ?? "";
+    const linkedUsers = await context.services.store.getLinkedUsers(guildId);
+    const filteredLinkedUsers = interaction.guild
+      ? await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
+          correlationId: context.correlationId,
+          command: interaction.commandName,
+          guildId: interaction.guildId ?? undefined,
+          userId: interaction.user.id,
+        })
+      : linkedUsers;
+    if (filteredLinkedUsers.length === 0) {
+      return { error: "No linked handles found in this server yet." };
+    }
+    if (filteredLinkedUsers.length > MAX_HANDLES) {
+      return {
+        error: `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`,
+      };
+    }
+    for (const linked of filteredLinkedUsers) {
+      addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
+    }
+  }
+
+  return { targets: Array.from(targets.values()) };
 }
 
 export const contestResultsCommand: Command = {
@@ -229,124 +365,55 @@ export const contestResultsCommand: Command = {
 
     await interaction.deferReply();
 
-    let stale = false;
-    if (scope === "all") {
-      const results = await Promise.allSettled([
-        context.services.contests.refresh(false, "official"),
-        context.services.contests.refresh(false, "gym"),
-      ]);
-      if (results.some((result) => result.status === "rejected")) {
-        stale = true;
-      }
-      if (context.services.contests.getLastRefreshAt("all") <= 0) {
-        await interaction.editReply(
-          "Unable to reach Codeforces right now. Try again in a few minutes."
-        );
-        return;
-      }
-    } else {
-      try {
-        await context.services.contests.refresh(false, scope);
-      } catch {
-        if (context.services.contests.getLastRefreshAt(scope) > 0) {
-          stale = true;
-        } else {
-          await interaction.editReply(
-            "Unable to reach Codeforces right now. Try again in a few minutes."
-          );
-          return;
-        }
-      }
+    const refreshResult = await refreshContestData(scope, context.services.contests);
+    if ("error" in refreshResult) {
+      await interaction.editReply(refreshResult.error);
+      return;
     }
+    const stale = refreshResult.stale;
 
     try {
-      const wantsLatest = isLatestQuery(queryRaw);
-      const contestId = parseContestId(queryRaw);
-      let contest: Contest | null = null;
-      if (wantsLatest) {
-        contest = context.services.contests.getLatestFinished(scope);
-        if (!contest) {
+      const lookup = lookupContest(queryRaw, scope, context.services.contests);
+      switch (lookup.status) {
+        case "missing_latest":
           await interaction.editReply("No finished contests found yet.");
           return;
-        }
-      } else if (contestId) {
-        contest = context.services.contests.getContestById(contestId, scope);
-        if (!contest) {
+        case "missing_id":
           await interaction.editReply("No contest found with that ID.");
           return;
-        }
-      } else {
-        const matches = context.services.contests.searchContests(queryRaw, MAX_MATCHES, scope);
-        if (matches.length === 0) {
+        case "missing_name":
           await interaction.editReply("No contests found matching that name.");
           return;
-        }
-        if (matches.length > 1) {
-          const embed = buildMatchEmbed(queryRaw, matches, scope);
+        case "ambiguous": {
+          const embed = buildMatchEmbed(queryRaw, lookup.matches, scope);
           if (stale) {
             embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
           }
           await interaction.editReply({ embeds: [embed] });
           return;
         }
-        contest = matches[0] ?? null;
+        case "ok":
+          break;
       }
 
-      if (!contest) {
-        await interaction.editReply("No contest found for that query.");
+      const contest = lookup.contest;
+
+      const targetResult = await buildTargets(
+        context,
+        {
+          guildId: interaction.guildId,
+          commandName: interaction.commandName,
+          user: interaction.user,
+          guild: interaction.guild,
+        },
+        userOptions,
+        handleInputs
+      );
+      if ("error" in targetResult) {
+        await interaction.editReply(targetResult.error);
         return;
       }
-
-      const targets = new Map<string, TargetHandle>();
-
-      if (userOptions.length > 0 || handleInputs.length > 0) {
-        if (interaction.guild) {
-          for (const user of userOptions) {
-            const handle = await context.services.store.getHandle(interaction.guild.id, user.id);
-            if (!handle) {
-              await interaction.editReply(`User <@${user.id}> does not have a linked handle.`);
-              return;
-            }
-            buildTargetHandles(targets, handle, `<@${user.id}>`);
-          }
-        }
-
-        for (const handleInput of handleInputs) {
-          const resolved = await context.services.store.resolveHandle(handleInput);
-          if (!resolved.exists) {
-            await interaction.editReply(`Invalid handle: ${handleInput}`);
-            return;
-          }
-          const handle = resolved.canonicalHandle ?? handleInput;
-          buildTargetHandles(targets, handle, handle);
-        }
-      } else {
-        const guildId = interaction.guild?.id ?? "";
-        const linkedUsers = await context.services.store.getLinkedUsers(guildId);
-        const filteredLinkedUsers = interaction.guild
-          ? await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
-              correlationId: context.correlationId,
-              command: interaction.commandName,
-              guildId: interaction.guild.id,
-              userId: interaction.user.id,
-            })
-          : linkedUsers;
-        if (filteredLinkedUsers.length === 0) {
-          await interaction.editReply("No linked handles found in this server yet.");
-          return;
-        }
-        if (filteredLinkedUsers.length > MAX_HANDLES) {
-          await interaction.editReply(
-            `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`
-          );
-          return;
-        }
-        for (const linked of filteredLinkedUsers) {
-          buildTargetHandles(targets, linked.handle, `<@${linked.userId}>`);
-        }
-      }
-
-      const targetList = Array.from(targets.values());
+      const targetList = targetResult.targets;
       if (targetList.length === 0) {
         await interaction.editReply("No handles found to check.");
         return;
