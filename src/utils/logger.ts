@@ -27,13 +27,20 @@ export function setLogSink(sink: LogSink | null) {
 }
 
 function shouldSuppressSinkError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "";
+  if (!message) {
     return false;
   }
-  const message = error.message.toLowerCase();
+  const lowered = message.toLowerCase();
   return (
-    message.includes("driver has already been destroyed") ||
-    message.includes("database is closed")
+    lowered.includes("driver has already been destroyed") || lowered.includes("database is closed")
   );
 }
 

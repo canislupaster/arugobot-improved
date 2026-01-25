@@ -160,7 +160,7 @@ describe("web app", () => {
     const response = await app.request("http://localhost/guilds/guild-1");
     expect(response.status).toBe(200);
     const body = await response.text();
-    expect(body).toContain("arena");
+    expect(body).toContain("Arena");
     expect(body).toContain("problems");
   });
 

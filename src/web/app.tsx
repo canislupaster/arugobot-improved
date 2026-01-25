@@ -36,16 +36,6 @@ function resolveGuildName(client: Client, guildId: string): string {
   return cached?.name ?? "Unknown server";
 }
 
-function formatTournamentFormat(value: string): string {
-  if (value === "swiss") {
-    return "Swiss";
-  }
-  if (value === "elimination") {
-    return "Elimination";
-  }
-  return value;
-}
-
 function escapeCsv(value: string | number): string {
   const raw = String(value);
   if (/[",\n]/.test(raw)) {
@@ -171,10 +161,7 @@ export function createWebApp({ website, client }: WebAppContext) {
           topSolvers,
         },
         contestActivity: overview.contestActivity,
-        tournaments: overview.tournaments.map((tournament) => ({
-          ...tournament,
-          format: formatTournamentFormat(tournament.format),
-        })),
+        tournaments: overview.tournaments,
       },
     };
     return c.html(renderGuildPage(viewModel));

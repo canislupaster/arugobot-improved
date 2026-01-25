@@ -1,6 +1,7 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 
 import type { GlobalOverview, TournamentSummary } from "../services/website.js";
+import { capitalize } from "../utils/text.js";
 
 type GuildCard = {
   id: string;
@@ -536,7 +537,8 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
                   <div class="tournament-row">
                     <div>
                       <div class="title">
-                        {tournament.format} • {tournament.lengthMinutes}m • {tournament.status}
+                        {capitalize(tournament.format)} • {tournament.lengthMinutes}m •{" "}
+                        {tournament.status}
                       </div>
                       <div class="muted">
                         {formatNumber(tournament.participantCount)} players •{" "}

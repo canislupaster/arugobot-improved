@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { formatTime } from "../utils/rating.js";
+import { capitalize } from "../utils/text.js";
 import { formatTournamentRecapMarkdown } from "../utils/tournamentRecap.js";
 
 import type { TournamentRecap, TournamentService } from "./tournaments.js";
@@ -42,12 +43,7 @@ function formatTags(tags: string): string {
 
 function buildRecapEmbed(recap: TournamentRecap): EmbedBuilder {
   const winnerLabel = recap.entry.winnerId ? `<@${recap.entry.winnerId}>` : "None";
-  const formatLabel =
-    recap.entry.format === "swiss"
-      ? "Swiss"
-      : recap.entry.format === "elimination"
-        ? "Elimination"
-        : "Arena";
+  const formatLabel = capitalize(recap.entry.format);
   const statusLabel = recap.entry.status === "completed" ? "Completed" : "Cancelled";
   const updatedLabel = recap.entry.updatedAt;
   const embed = new EmbedBuilder()

@@ -20,6 +20,7 @@ import {
   formatTournamentRecapCsv,
   formatTournamentRecapMarkdown,
 } from "../utils/tournamentRecap.js";
+import { capitalize } from "../utils/text.js";
 
 import type { Command } from "./types.js";
 
@@ -40,16 +41,6 @@ const HISTORY_DETAIL_ROUND_LIMIT = 3;
 const HISTORY_DETAIL_STANDINGS_LIMIT = 5;
 
 type TournamentFormat = "swiss" | "elimination" | "arena";
-
-function formatTournamentFormat(format: TournamentFormat): string {
-  if (format === "swiss") {
-    return "Swiss";
-  }
-  if (format === "elimination") {
-    return "Elimination";
-  }
-  return "Arena";
-}
 
 function formatScore(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -81,7 +72,7 @@ function formatHistoryLine(entry: TournamentHistoryEntry): string {
   const statusLabel = entry.status === "completed" ? "Completed" : "Cancelled";
   const winnerLabel = entry.winnerId ? `<@${entry.winnerId}>` : "None";
   const timestamp = formatHistoryTimestamp(entry.updatedAt);
-  return `- ${statusLabel} • ${formatTournamentFormat(entry.format)} • ${entry.participantCount} players • ${entry.roundCount} rounds • ${entry.lengthMinutes}m • Winner: ${winnerLabel} • ${timestamp}`;
+  return `- ${statusLabel} • ${capitalize(entry.format)} • ${entry.participantCount} players • ${entry.roundCount} rounds • ${entry.lengthMinutes}m • Winner: ${winnerLabel} • ${timestamp}`;
 }
 
 function formatRatingRanges(ranges: Array<{ min: number; max: number }>): string {
@@ -103,7 +94,7 @@ function buildHistorySelectOptions(
 ): StringSelectMenuOptionBuilder[] {
   return entries.map((entry, index) => {
     const label = truncateLabel(
-      `${index + 1}. ${formatTournamentFormat(entry.format)} • ${entry.lengthMinutes}m`,
+      `${index + 1}. ${capitalize(entry.format)} • ${entry.lengthMinutes}m`,
       100
     );
     const statusLabel = entry.status === "completed" ? "Completed" : "Cancelled";
@@ -154,7 +145,7 @@ function buildHistoryDetailEmbed(detail: TournamentHistoryDetail): EmbedBuilder 
     .setTitle("Tournament recap")
     .setColor(0x3498db)
     .setDescription(
-      `${statusLabel} • ${formatTournamentFormat(detail.entry.format)} • ${detail.entry.lengthMinutes}m`
+      `${statusLabel} • ${capitalize(detail.entry.format)} • ${detail.entry.lengthMinutes}m`
     )
     .addFields(
       { name: "Participants", value: String(detail.entry.participantCount), inline: true },
@@ -481,7 +472,7 @@ export const tournamentCommand: Command = {
             .setDescription("Use /tournament join, /tournament leave, or /tournament start.")
             .setColor(0x3498db)
             .addFields(
-              { name: "Format", value: formatTournamentFormat(lobby.format), inline: true },
+              { name: "Format", value: capitalize(lobby.format), inline: true },
               { name: "Time", value: formatTime(lobby.lengthMinutes * 60), inline: true },
               { name: "Capacity", value: String(lobby.maxParticipants), inline: true },
               {
@@ -599,7 +590,7 @@ export const tournamentCommand: Command = {
           .setTitle("Active tournament")
           .setColor(0x3498db)
           .addFields(
-            { name: "Format", value: formatTournamentFormat(tournament.format), inline: true },
+            { name: "Format", value: capitalize(tournament.format), inline: true },
             {
               name: "Round",
               value: `${tournament.currentRound}/${tournament.roundCount}`,
@@ -851,7 +842,7 @@ export const tournamentCommand: Command = {
           .setDescription("Use /tournament join, /tournament leave, or /tournament start.")
           .setColor(0x3498db)
           .addFields(
-            { name: "Format", value: formatTournamentFormat(format), inline: true },
+            { name: "Format", value: capitalize(format), inline: true },
             { name: "Time", value: formatTime(length * 60), inline: true },
             { name: "Capacity", value: String(maxParticipants), inline: true },
             { name: "Rating ranges", value: formatRatingRanges(lobby.ratingRanges), inline: true },
