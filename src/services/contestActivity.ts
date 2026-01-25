@@ -26,6 +26,8 @@ export type ContestParticipantSummary = {
   userId: string;
   handle: string;
   contestCount: number;
+  officialCount: number;
+  gymCount: number;
   lastContestAt: number | null;
 };
 
@@ -183,6 +185,10 @@ export class ContestActivityService {
         const changes = parseRatingChangesPayload(row.payload);
         let lastContestAt: number | null = null;
         const contestIds = new Set<number>();
+        const contestIdsByScope = {
+          official: new Set<number>(),
+          gym: new Set<number>(),
+        };
 
         for (const change of changes) {
           if (change.ratingUpdateTimeSeconds < cutoffSeconds) {
@@ -193,6 +199,7 @@ export class ContestActivityService {
             lastContestAt = change.ratingUpdateTimeSeconds;
           }
           const scope = contestScopes.get(change.contestId) ?? "official";
+          contestIdsByScope[scope].add(change.contestId);
           scopeParticipants[scope].add(row.handle);
           if (
             scopeLastContest[scope] === null ||
@@ -222,6 +229,8 @@ export class ContestActivityService {
             userId: rosterEntry.userId,
             handle: rosterEntry.handle,
             contestCount: contestIds.size,
+            officialCount: contestIdsByScope.official.size,
+            gymCount: contestIdsByScope.gym.size,
             lastContestAt,
           });
         }

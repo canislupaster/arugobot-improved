@@ -92,6 +92,8 @@ describe("ContestActivityService", () => {
     expect(activity.byScope.gym.contestCount).toBe(1);
     expect(activity.participants[0]?.handle).toBe("Alice");
     expect(activity.participants[0]?.contestCount).toBe(2);
+    expect(activity.participants[0]?.officialCount).toBe(1);
+    expect(activity.participants[0]?.gymCount).toBe(1);
     expect(activity.recentContests.length).toBeGreaterThan(0);
 
     await db.destroy();

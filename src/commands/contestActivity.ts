@@ -1,5 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
+import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -10,15 +11,53 @@ const MIN_DAYS = 1;
 const MAX_DAYS = 365;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
+const DEFAULT_SCOPE: ContestScopeFilter = "all";
+
+function parseScope(raw: string | null): ContestScopeFilter {
+  if (raw === "official" || raw === "gym" || raw === "all") {
+    return raw;
+  }
+  return DEFAULT_SCOPE;
+}
+
+function formatScope(scope: ContestScopeFilter): string {
+  return scope === "official" ? "Official" : scope === "gym" ? "Gym" : "All";
+}
+
+function formatScopeSummary(
+  label: string,
+  summary: { contestCount: number; participantCount: number; lastContestAt: number | null }
+): string {
+  const last =
+    summary.lastContestAt && summary.lastContestAt > 0
+      ? formatDiscordRelativeTime(summary.lastContestAt)
+      : "None";
+  return `${label}: ${summary.contestCount} contests • ${summary.participantCount} participants • last ${last}`;
+}
 
 function formatContestLine(contest: {
   contestId: number;
   contestName: string;
   ratingUpdateTimeSeconds: number;
+  scope: "official" | "gym";
 }): string {
-  return `${contest.contestName} (${contest.contestId}) • ${formatDiscordRelativeTime(
+  const scopeLabel = contest.scope === "gym" ? "Gym" : "Official";
+  return `${contest.contestName} (${contest.contestId}) • ${scopeLabel} • ${formatDiscordRelativeTime(
     contest.ratingUpdateTimeSeconds
   )}`;
+}
+
+function getParticipantCountForScope(
+  participant: { contestCount: number; officialCount: number; gymCount: number },
+  scope: ContestScopeFilter
+): number {
+  if (scope === "official") {
+    return participant.officialCount;
+  }
+  if (scope === "gym") {
+    return participant.gymCount;
+  }
+  return participant.contestCount;
 }
 
 export const contestActivityCommand: Command = {
@@ -38,6 +77,16 @@ export const contestActivityCommand: Command = {
         .setDescription(`Top participants to show (1-${MAX_LIMIT})`)
         .setMinValue(1)
         .setMaxValue(MAX_LIMIT)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("scope")
+        .setDescription("Which contests to include")
+        .addChoices(
+          { name: "All", value: "all" },
+          { name: "Official", value: "official" },
+          { name: "Gym", value: "gym" }
+        )
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {
@@ -49,6 +98,7 @@ export const contestActivityCommand: Command = {
 
     const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
     const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
+    const scope = parseScope(interaction.options.getString("scope"));
     if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
       await interaction.reply({ content: "Invalid lookback window." });
       return;
@@ -65,7 +115,11 @@ export const contestActivityCommand: Command = {
         interaction.guild.id,
         { lookbackDays: days, participantLimit: limit }
       );
-      if (activity.contestCount === 0) {
+      const scopeSummary =
+        scope === "all"
+          ? { contestCount: activity.contestCount, participantCount: activity.participantCount }
+          : activity.byScope[scope];
+      if (scopeSummary.contestCount === 0) {
         await interaction.editReply(
           `No contest activity for linked handles in the last ${days} days.`
         );
@@ -75,25 +129,56 @@ export const contestActivityCommand: Command = {
       const embed = new EmbedBuilder()
         .setTitle("Contest activity")
         .setColor(0x3498db)
-        .setDescription(`Last ${days} days`)
+        .setDescription(`Last ${days} days • Scope: ${formatScope(scope)}`)
         .addFields(
-          { name: "Contests", value: String(activity.contestCount), inline: true },
-          { name: "Participants", value: String(activity.participantCount), inline: true }
+          { name: "Contests", value: String(scopeSummary.contestCount), inline: true },
+          { name: "Participants", value: String(scopeSummary.participantCount), inline: true }
         );
 
+      if (scope === "all") {
+        embed.addFields({
+          name: "By scope",
+          value: [
+            formatScopeSummary("Official", activity.byScope.official),
+            formatScopeSummary("Gym", activity.byScope.gym),
+          ].join("\n"),
+          inline: false,
+        });
+      }
+
       if (activity.participants.length > 0) {
-        const lines = activity.participants
+        const sorted = activity.participants.slice().sort((a, b) => {
+          const countA = getParticipantCountForScope(a, scope);
+          const countB = getParticipantCountForScope(b, scope);
+          if (countB !== countA) {
+            return countB - countA;
+          }
+          return a.handle.localeCompare(b.handle);
+        });
+        const lines = sorted
+          .filter((entry) => getParticipantCountForScope(entry, scope) > 0)
           .map(
             (entry, index) =>
-              `${index + 1}. <@${entry.userId}> (${entry.handle}) - ${entry.contestCount}`
+              `${index + 1}. <@${entry.userId}> (${entry.handle}) - ${getParticipantCountForScope(
+                entry,
+                scope
+              )}`
           )
           .join("\n");
-        embed.addFields({ name: "Top participants", value: lines, inline: false });
+        if (lines) {
+          embed.addFields({ name: "Top participants", value: lines, inline: false });
+        }
       }
 
       if (activity.recentContests.length > 0) {
-        const lines = activity.recentContests.map(formatContestLine).join("\n");
-        embed.addFields({ name: "Recent contests", value: lines, inline: false });
+        const filtered =
+          scope === "all"
+            ? activity.recentContests
+            : activity.recentContests.filter((contest) => contest.scope === scope);
+        if (filtered.length > 0) {
+          const lines = filtered.map(formatContestLine).join("\n");
+          embed.addFields({ name: "Recent contests", value: lines, inline: false });
+        }
       }
 
       await interaction.editReply({ embeds: [embed] });

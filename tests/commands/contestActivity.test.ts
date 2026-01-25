@@ -8,6 +8,7 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     guild: { id: "guild-1" },
     options: {
       getInteger: jest.fn().mockReturnValue(null),
+      getString: jest.fn().mockReturnValue(null),
     },
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),
@@ -38,8 +39,22 @@ describe("contestActivityCommand", () => {
               gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
             },
             participants: [
-              { userId: "user-1", handle: "Alice", contestCount: 2, lastContestAt: 1 },
-              { userId: "user-2", handle: "Bob", contestCount: 1, lastContestAt: 2 },
+              {
+                userId: "user-1",
+                handle: "Alice",
+                contestCount: 2,
+                officialCount: 1,
+                gymCount: 1,
+                lastContestAt: 1,
+              },
+              {
+                userId: "user-2",
+                handle: "Bob",
+                contestCount: 1,
+                officialCount: 1,
+                gymCount: 0,
+                lastContestAt: 2,
+              },
             ],
           }),
         },
@@ -55,6 +70,63 @@ describe("contestActivityCommand", () => {
     expect(fieldText).toContain("Top participants");
     expect(fieldText).toContain("user-1");
     expect(fieldText).toContain("Contest A");
+  });
+
+  it("filters contest activity by scope", async () => {
+    const interaction = createInteraction({
+      options: {
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn((name: string) => (name === "scope" ? "official" : null)),
+      },
+    });
+    const context = {
+      services: {
+        contestActivity: {
+          getGuildContestActivity: jest.fn().mockResolvedValue({
+            lookbackDays: 90,
+            contestCount: 2,
+            participantCount: 2,
+            recentContests: [
+              {
+                contestId: 1000,
+                contestName: "Contest A",
+                ratingUpdateTimeSeconds: Math.floor(Date.now() / 1000),
+                scope: "official",
+              },
+              {
+                contestId: 1001,
+                contestName: "Contest B",
+                ratingUpdateTimeSeconds: Math.floor(Date.now() / 1000),
+                scope: "gym",
+              },
+            ],
+            byScope: {
+              official: { contestCount: 1, participantCount: 1, lastContestAt: 1 },
+              gym: { contestCount: 1, participantCount: 1, lastContestAt: 2 },
+            },
+            participants: [
+              {
+                userId: "user-1",
+                handle: "Alice",
+                contestCount: 2,
+                officialCount: 1,
+                gymCount: 1,
+                lastContestAt: 1,
+              },
+            ],
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestActivityCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0];
+    const fields = embed.data.fields ?? [];
+    const fieldText = JSON.stringify(fields);
+    expect(fieldText).toContain("Contest A");
+    expect(fieldText).not.toContain("Contest B");
   });
 
   it("handles empty activity windows", async () => {

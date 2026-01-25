@@ -172,7 +172,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Shows recent Codeforces contest rating changes for a linked user or handle.
 
-- **/contestactivity** `[days]` `[limit]`
+- **/contestactivity** `[days]` `[limit]` `[scope]`
 
   Shows recent contest participation for the server's linked handles, including top participants and recent contests.
 
