@@ -93,7 +93,60 @@ function createScopeBreakdown(): ContestScopeBreakdown {
   };
 }
 
+function createScopeStats(): ScopeStats {
+  return {
+    scopeContestMap: {
+      official: new Map<number, number>(),
+      gym: new Map<number, number>(),
+    },
+    scopeParticipants: {
+      official: new Set<string>(),
+      gym: new Set<string>(),
+    },
+    scopeLastContest: {
+      official: null,
+      gym: null,
+    },
+  };
+}
+
+function buildScopeBreakdown(stats: ScopeStats): ContestScopeBreakdown {
+  return {
+    official: {
+      contestCount: stats.scopeContestMap.official.size,
+      participantCount: stats.scopeParticipants.official.size,
+      lastContestAt: stats.scopeLastContest.official,
+    },
+    gym: {
+      contestCount: stats.scopeContestMap.gym.size,
+      participantCount: stats.scopeParticipants.gym.size,
+      lastContestAt: stats.scopeLastContest.gym,
+    },
+  };
+}
+
 type CachedContest = { id: number; isGym?: boolean };
+
+type ScopeContestMap = {
+  official: Map<number, number>;
+  gym: Map<number, number>;
+};
+
+type ScopeParticipants = {
+  official: Set<string>;
+  gym: Set<string>;
+};
+
+type ScopeLastContest = {
+  official: number | null;
+  gym: number | null;
+};
+
+type ScopeStats = {
+  scopeContestMap: ScopeContestMap;
+  scopeParticipants: ScopeParticipants;
+  scopeLastContest: ScopeLastContest;
+};
 
 function sortParticipants(a: ContestParticipantSummary, b: ContestParticipantSummary): number {
   if (b.contestCount !== a.contestCount) {
@@ -192,18 +245,7 @@ export class ContestActivityService {
           scope: ContestScope;
         }
       >();
-      const scopeContestMap = {
-        official: new Map<number, number>(),
-        gym: new Map<number, number>(),
-      };
-      const scopeParticipants = {
-        official: new Set<string>(),
-        gym: new Set<string>(),
-      };
-      const scopeLastContest = {
-        official: null as number | null,
-        gym: null as number | null,
-      };
+      const scopeStats = createScopeStats();
       const participants = new Map<string, ContestParticipantSummary>();
 
       for (const row of rows) {
@@ -229,18 +271,13 @@ export class ContestActivityService {
           }
           const scope = contestScopes.get(change.contestId) ?? "official";
           contestIdsByScope[scope].add(change.contestId);
-          scopeParticipants[scope].add(row.handle);
-          if (
-            scopeLastContest[scope] === null ||
-            change.ratingUpdateTimeSeconds > scopeLastContest[scope]!
-          ) {
-            scopeLastContest[scope] = change.ratingUpdateTimeSeconds;
-          }
-          const scopedMap = scopeContestMap[scope];
-          const scopedExisting = scopedMap.get(change.contestId);
-          if (!scopedExisting || change.ratingUpdateTimeSeconds > scopedExisting) {
-            scopedMap.set(change.contestId, change.ratingUpdateTimeSeconds);
-          }
+          this.updateScopeStats(
+            scopeStats,
+            scope,
+            change.contestId,
+            change.ratingUpdateTimeSeconds,
+            row.handle
+          );
 
           const existing = contestMap.get(change.contestId);
           if (!existing || change.ratingUpdateTimeSeconds > existing.ratingUpdateTimeSeconds) {
@@ -273,18 +310,7 @@ export class ContestActivityService {
       const recentContests = Array.from(contestMap.values())
         .sort((a, b) => b.ratingUpdateTimeSeconds - a.ratingUpdateTimeSeconds)
         .slice(0, recentLimit);
-      const byScope: ContestScopeBreakdown = {
-        official: {
-          contestCount: scopeContestMap.official.size,
-          participantCount: scopeParticipants.official.size,
-          lastContestAt: scopeLastContest.official,
-        },
-        gym: {
-          contestCount: scopeContestMap.gym.size,
-          participantCount: scopeParticipants.gym.size,
-          lastContestAt: scopeLastContest.gym,
-        },
-      };
+      const byScope = buildScopeBreakdown(scopeStats);
 
       return {
         lookbackDays,
@@ -468,18 +494,7 @@ export class ContestActivityService {
       const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
       const contestScopes = await this.loadContestScopeMap();
       const contestMap = new Map<number, number>();
-      const scopeContestMap = {
-        official: new Map<number, number>(),
-        gym: new Map<number, number>(),
-      };
-      const scopeParticipants = {
-        official: new Set<string>(),
-        gym: new Set<string>(),
-      };
-      const scopeLastContest = {
-        official: null as number | null,
-        gym: null as number | null,
-      };
+      const scopeStats = createScopeStats();
       const participantSet = new Set<string>();
       let lastContestAt: number | null = null;
 
@@ -492,18 +507,13 @@ export class ContestActivityService {
           }
           hasEntry = true;
           const scope = contestScopes.get(change.contestId) ?? "official";
-          scopeParticipants[scope].add(row.handle);
-          if (
-            scopeLastContest[scope] === null ||
-            change.ratingUpdateTimeSeconds > scopeLastContest[scope]!
-          ) {
-            scopeLastContest[scope] = change.ratingUpdateTimeSeconds;
-          }
-          const scopedMap = scopeContestMap[scope];
-          const scopedExisting = scopedMap.get(change.contestId);
-          if (!scopedExisting || change.ratingUpdateTimeSeconds > scopedExisting) {
-            scopedMap.set(change.contestId, change.ratingUpdateTimeSeconds);
-          }
+          this.updateScopeStats(
+            scopeStats,
+            scope,
+            change.contestId,
+            change.ratingUpdateTimeSeconds,
+            row.handle
+          );
           contestMap.set(
             change.contestId,
             Math.max(contestMap.get(change.contestId) ?? 0, change.ratingUpdateTimeSeconds)
@@ -522,18 +532,7 @@ export class ContestActivityService {
         contestCount: contestMap.size,
         participantCount: participantSet.size,
         lastContestAt,
-        byScope: {
-          official: {
-            contestCount: scopeContestMap.official.size,
-            participantCount: scopeParticipants.official.size,
-            lastContestAt: scopeLastContest.official,
-          },
-          gym: {
-            contestCount: scopeContestMap.gym.size,
-            participantCount: scopeParticipants.gym.size,
-            lastContestAt: scopeLastContest.gym,
-          },
-        },
+        byScope: buildScopeBreakdown(scopeStats),
       };
     } catch (error) {
       logError(`Database error (global contest activity): ${String(error)}`);
@@ -544,6 +543,27 @@ export class ContestActivityService {
         lastContestAt: null,
         byScope: createScopeBreakdown(),
       };
+    }
+  }
+
+  private updateScopeStats(
+    stats: ScopeStats,
+    scope: ContestScope,
+    contestId: number,
+    ratingUpdateTimeSeconds: number,
+    handle: string
+  ): void {
+    stats.scopeParticipants[scope].add(handle);
+    if (
+      stats.scopeLastContest[scope] === null ||
+      ratingUpdateTimeSeconds > stats.scopeLastContest[scope]
+    ) {
+      stats.scopeLastContest[scope] = ratingUpdateTimeSeconds;
+    }
+    const scopedMap = stats.scopeContestMap[scope];
+    const scopedExisting = scopedMap.get(contestId);
+    if (!scopedExisting || ratingUpdateTimeSeconds > scopedExisting) {
+      scopedMap.set(contestId, ratingUpdateTimeSeconds);
     }
   }
 

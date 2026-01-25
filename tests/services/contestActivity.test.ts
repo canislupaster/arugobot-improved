@@ -112,6 +112,10 @@ describe("ContestActivityService", () => {
     expect(activity.participantCount).toBe(2);
     expect(activity.byScope.official.contestCount).toBe(1);
     expect(activity.byScope.gym.contestCount).toBe(1);
+    expect(activity.byScope.official.participantCount).toBe(2);
+    expect(activity.byScope.gym.participantCount).toBe(1);
+    expect(activity.byScope.official.lastContestAt).toBe(nowSeconds - 1800);
+    expect(activity.byScope.gym.lastContestAt).toBe(nowSeconds - 7200);
     expect(activity.participants[0]?.handle).toBe("Alice");
     expect(activity.participants[0]?.contestCount).toBe(2);
     expect(activity.participants[0]?.officialCount).toBe(1);
@@ -201,6 +205,10 @@ describe("ContestActivityService", () => {
     expect(activity.participantCount).toBe(2);
     expect(activity.byScope.official.contestCount).toBe(1);
     expect(activity.byScope.gym.contestCount).toBe(1);
+    expect(activity.byScope.official.participantCount).toBe(1);
+    expect(activity.byScope.gym.participantCount).toBe(1);
+    expect(activity.byScope.official.lastContestAt).toBe(nowSeconds - 60);
+    expect(activity.byScope.gym.lastContestAt).toBe(nowSeconds - 120);
     expect(activity.lastContestAt).not.toBeNull();
 
     await db.destroy();
