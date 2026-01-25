@@ -8,6 +8,10 @@ const immediateScheduler: RequestScheduler = {
 };
 
 describe("CodeforcesClient", () => {
+  beforeEach(() => {
+    jest.useRealTimers();
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
