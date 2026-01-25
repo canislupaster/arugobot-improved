@@ -1,6 +1,6 @@
 import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 
-import { registerCommand, unlinkCommand } from "../../src/commands/register.js";
+import { registerCommand, relinkCommand, unlinkCommand } from "../../src/commands/register.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
 type MockInteraction = ChatInputCommandInteraction & {
@@ -115,5 +115,60 @@ describe("unlinkCommand", () => {
       content: "You have not linked a handle.",
       flags: MessageFlags.Ephemeral,
     });
+  });
+});
+
+describe("relinkCommand", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("rejects relink when no handle is linked", async () => {
+    const interaction = createInteraction({ commandName: "relink" });
+    const context = {
+      correlationId: "corr-4",
+      services: {
+        store: {
+          getHandle: jest.fn().mockResolvedValue(null),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await relinkCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "You do not have a linked handle yet. Use /register first.",
+      flags: MessageFlags.Ephemeral,
+    });
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
+  it("rejects relink when handle is unchanged", async () => {
+    const interaction = createInteraction({
+      commandName: "relink",
+      options: {
+        getString: jest.fn().mockReturnValue("Petr"),
+      },
+    });
+    const context = {
+      correlationId: "corr-5",
+      services: {
+        store: {
+          getHandle: jest.fn().mockResolvedValue("Petr"),
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: true,
+            canonicalHandle: "Petr",
+            source: "api",
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await relinkCommand.execute(interaction, context);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "That handle is already linked to your account."
+    );
   });
 });

@@ -1,6 +1,7 @@
 import {
   ActionRowBuilder,
   ButtonBuilder,
+  type ButtonInteraction,
   ButtonStyle,
   ComponentType,
   EmbedBuilder,
@@ -40,14 +41,22 @@ type ResolvedHandle =
 type InsertResult = "ok" | "handle_exists" | "already_linked" | "error";
 type UpdateResult = "ok" | "handle_exists" | "not_linked" | "error";
 
+async function replyEphemeral(
+  interaction: ChatInputCommandInteraction,
+  content: string
+): Promise<void> {
+  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+}
+
+async function replyButtonEphemeral(button: ButtonInteraction, content: string): Promise<void> {
+  await button.reply({ content, flags: MessageFlags.Ephemeral });
+}
+
 async function requireGuild(
   interaction: ChatInputCommandInteraction
 ): Promise<{ guildId: string } | null> {
   if (!interaction.guild) {
-    await interaction.reply({
-      content: "This command can only be used in a server.",
-      flags: MessageFlags.Ephemeral,
-    });
+    await replyEphemeral(interaction, "This command can only be used in a server.");
     return null;
   }
   return { guildId: interaction.guild.id };
@@ -245,11 +254,11 @@ function createCancelCollector(
 
     collector.on("collect", async (button) => {
       if (button.customId !== customId) {
-        await button.reply({ content: "Unknown action.", flags: MessageFlags.Ephemeral });
+        await replyButtonEphemeral(button, "Unknown action.");
         return;
       }
       if (button.user.id !== userId) {
-        await button.reply({ content: "Only the requester can cancel.", flags: MessageFlags.Ephemeral });
+        await replyButtonEphemeral(button, "Only the requester can cancel.");
         return;
       }
       abortController.abort();
@@ -346,10 +355,10 @@ export const relinkCommand: Command = {
 
     const currentHandle = await context.services.store.getHandle(guildId, interaction.user.id);
     if (!currentHandle) {
-      await interaction.reply({
-        content: "You do not have a linked handle yet. Use /register first.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(
+        interaction,
+        "You do not have a linked handle yet. Use /register first."
+      );
       return;
     }
 
@@ -398,7 +407,7 @@ export const unlinkCommand: Command = {
     }
     const { guildId } = guild;
     if (!(await context.services.store.handleLinked(guildId, interaction.user.id))) {
-      await interaction.reply({ content: "You have not linked a handle.", flags: MessageFlags.Ephemeral });
+      await replyEphemeral(interaction, "You have not linked a handle.");
       return;
     }
 
@@ -428,7 +437,7 @@ export const unlinkCommand: Command = {
 
     collector.on("collect", async (button) => {
       if (button.user.id !== interaction.user.id) {
-        await button.reply({ content: "This confirmation isn't for you.", flags: MessageFlags.Ephemeral });
+        await replyButtonEphemeral(button, "This confirmation isn't for you.");
         return;
       }
 
