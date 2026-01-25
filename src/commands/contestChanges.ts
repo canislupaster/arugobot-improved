@@ -9,6 +9,12 @@ import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import {
+  buildContestMatchEmbed,
+  formatContestPhase,
+  formatContestTag,
+  resolveContestLookup,
+} from "../utils/contestLookup.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -37,73 +43,8 @@ function parseHandleList(raw: string): string[] {
     .filter(Boolean);
 }
 
-function parseContestId(raw: string): number | null {
-  const trimmed = raw.trim();
-  const urlMatch = trimmed.match(/\bcontests?\/(\d+)/i);
-  if (urlMatch) {
-    const id = Number(urlMatch[1]);
-    return Number.isFinite(id) ? id : null;
-  }
-  if (/^\d+$/.test(trimmed)) {
-    const id = Number(trimmed);
-    return Number.isFinite(id) ? id : null;
-  }
-  return null;
-}
-
-const LATEST_CONTEST_QUERIES = new Set(["latest", "last", "recent"]);
-
-function isLatestQuery(raw: string): boolean {
-  return LATEST_CONTEST_QUERIES.has(raw.trim().toLowerCase());
-}
-
 function formatDelta(delta: number): string {
   return delta >= 0 ? `+${delta}` : String(delta);
-}
-
-function formatPhase(phase: Contest["phase"]): string {
-  switch (phase) {
-    case "BEFORE":
-      return "Upcoming";
-    case "CODING":
-      return "Ongoing";
-    case "FINISHED":
-      return "Finished";
-    case "PENDING_SYSTEM_TEST":
-      return "Pending system test";
-    case "SYSTEM_TEST":
-      return "System test";
-    default:
-      return phase;
-  }
-}
-
-function formatContestTag(contest: Contest, scope: ContestScopeFilter): string {
-  if (scope === "official") {
-    return "";
-  }
-  return contest.isGym ? "Gym" : "Official";
-}
-
-function buildMatchEmbed(
-  query: string,
-  matches: Contest[],
-  scope: ContestScopeFilter
-): EmbedBuilder {
-  const lines = matches
-    .map((contest) => {
-      const when = formatDiscordRelativeTime(contest.startTimeSeconds);
-      const scopeLabel = formatContestTag(contest, scope);
-      const scopeSuffix = scopeLabel ? `, ${scopeLabel}` : "";
-      return `- ${contest.name} (ID ${contest.id}, ${when}${scopeSuffix})`;
-    })
-    .join("\n");
-
-  return new EmbedBuilder()
-    .setTitle("Contest matches")
-    .setColor(EMBED_COLORS.info)
-    .setDescription(`Results for "${query}":\n${lines}`)
-    .setFooter({ text: "Use /contestchanges with the contest ID for rating changes." });
 }
 
 function buildContestEmbed(contest: Contest): EmbedBuilder {
@@ -113,7 +54,7 @@ function buildContestEmbed(contest: Contest): EmbedBuilder {
     .setDescription(`[Open contest](${buildContestUrl(contest)})`)
     .addFields(
       { name: "Contest ID", value: String(contest.id), inline: true },
-      { name: "Status", value: formatPhase(contest.phase), inline: true },
+      { name: "Status", value: formatContestPhase(contest.phase), inline: true },
       {
         name: "Starts",
         value: `${formatDiscordTimestamp(contest.startTimeSeconds)} (${formatDiscordRelativeTime(
@@ -301,42 +242,40 @@ export const contestChangesCommand: Command = {
     const stale = refreshResult.stale;
 
     try {
-      const wantsLatest = isLatestQuery(queryRaw);
-      const contestId = parseContestId(queryRaw);
-      let contest: Contest | null = null;
-      if (wantsLatest) {
-        contest = context.services.contests.getLatestFinished(scope);
-        if (!contest) {
-          await interaction.editReply("No finished contests found yet.");
-          return;
-        }
-      } else if (contestId) {
-        contest = context.services.contests.getContestById(contestId, scope);
-        if (!contest) {
-          await interaction.editReply("No contest found with that ID.");
-          return;
-        }
-      } else {
-        const matches = context.services.contests.searchContests(queryRaw, MAX_MATCHES, scope);
-        if (matches.length === 0) {
-          await interaction.editReply("No contests found matching that name.");
-          return;
-        }
-        if (matches.length > 1) {
-          const embed = buildMatchEmbed(queryRaw, matches, scope);
-          if (stale) {
-            embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+      const lookup = resolveContestLookup(
+        queryRaw,
+        scope,
+        context.services.contests,
+        MAX_MATCHES
+      );
+      if (lookup.status !== "ok") {
+        switch (lookup.status) {
+          case "missing_latest":
+            await interaction.editReply("No finished contests found yet.");
+            return;
+          case "missing_id":
+            await interaction.editReply("No contest found with that ID.");
+            return;
+          case "missing_name":
+            await interaction.editReply("No contests found matching that name.");
+            return;
+          case "ambiguous": {
+            const embed = buildContestMatchEmbed({
+              query: queryRaw,
+              matches: lookup.matches,
+              scope,
+              footerText: "Use /contestchanges with the contest ID for rating changes.",
+            });
+            if (stale) {
+              embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+            }
+            await interaction.editReply({ embeds: [embed] });
+            return;
           }
-          await interaction.editReply({ embeds: [embed] });
-          return;
         }
-        contest = matches[0] ?? null;
       }
 
-      if (!contest) {
-        await interaction.editReply("No contest found for that query.");
-        return;
-      }
+      const contest = lookup.contest;
 
       if (contest.isGym) {
         const embed = buildContestStatusEmbed(

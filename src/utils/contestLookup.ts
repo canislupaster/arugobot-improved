@@ -19,6 +19,17 @@ type ContestMatchEmbedOptions = {
   footerText: string;
 };
 
+export type ContestLookupResult =
+  | { status: "ok"; contest: Contest }
+  | { status: "ambiguous"; matches: Contest[] }
+  | { status: "missing_latest" | "missing_id" | "missing_name" };
+
+export type ContestLookupService = {
+  getLatestFinished: (scopeFilter: ContestScopeFilter) => Contest | null;
+  getContestById: (contestId: number, scopeFilter: ContestScopeFilter) => Contest | null;
+  searchContests: (query: string, limit: number, scopeFilter: ContestScopeFilter) => Contest[];
+};
+
 type ContestEmbedOptions = {
   contest: Contest;
   title: string;
@@ -42,6 +53,38 @@ export function parseContestId(raw: string): number | null {
 
 export function isLatestQuery(raw: string): boolean {
   return LATEST_CONTEST_QUERIES.has(raw.trim().toLowerCase());
+}
+
+export function resolveContestLookup(
+  queryRaw: string,
+  scope: ContestScopeFilter,
+  contests: ContestLookupService,
+  maxMatches = 5
+): ContestLookupResult {
+  const wantsLatest = isLatestQuery(queryRaw);
+  const contestId = parseContestId(queryRaw);
+  if (wantsLatest) {
+    const contest = contests.getLatestFinished(scope);
+    if (!contest) {
+      return { status: "missing_latest" };
+    }
+    return { status: "ok", contest };
+  }
+  if (contestId) {
+    const contest = contests.getContestById(contestId, scope);
+    if (!contest) {
+      return { status: "missing_id" };
+    }
+    return { status: "ok", contest };
+  }
+  const matches = contests.searchContests(queryRaw, maxMatches, scope);
+  if (matches.length === 0) {
+    return { status: "missing_name" };
+  }
+  if (matches.length > 1) {
+    return { status: "ambiguous", matches };
+  }
+  return { status: "ok", contest: matches[0] };
 }
 
 export function formatContestPhase(phase: Contest["phase"]): string {

@@ -1,13 +1,11 @@
 import { SlashCommandBuilder } from "discord.js";
 
-import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   buildContestEmbed,
   buildContestMatchEmbed,
-  isLatestQuery,
-  parseContestId,
+  resolveContestLookup,
 } from "../utils/contestLookup.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
@@ -18,50 +16,11 @@ const MAX_MATCHES = 5;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
 
-type ContestLookup =
-  | { status: "ok"; contest: Contest }
-  | { status: "ambiguous"; matches: Contest[] }
-  | { status: "missing_latest" | "missing_id" | "missing_name" };
-
 type ProblemSolveSummary = {
   problem: Problem;
   solvedCount: number;
 };
 
-function lookupContest(
-  queryRaw: string,
-  scope: ContestScopeFilter,
-  contests: {
-    getLatestFinished: (scopeFilter: ContestScopeFilter) => Contest | null;
-    getContestById: (contestId: number, scopeFilter: ContestScopeFilter) => Contest | null;
-    searchContests: (query: string, limit: number, scopeFilter: ContestScopeFilter) => Contest[];
-  }
-): ContestLookup {
-  const wantsLatest = isLatestQuery(queryRaw);
-  const contestId = parseContestId(queryRaw);
-  if (wantsLatest) {
-    const contest = contests.getLatestFinished(scope);
-    if (!contest) {
-      return { status: "missing_latest" };
-    }
-    return { status: "ok", contest };
-  }
-  if (contestId) {
-    const contest = contests.getContestById(contestId, scope);
-    if (!contest) {
-      return { status: "missing_id" };
-    }
-    return { status: "ok", contest };
-  }
-  const matches = contests.searchContests(queryRaw, MAX_MATCHES, scope);
-  if (matches.length === 0) {
-    return { status: "missing_name" };
-  }
-  if (matches.length > 1) {
-    return { status: "ambiguous", matches };
-  }
-  return { status: "ok", contest: matches[0] };
-}
 
 function compareProblemIndex(a: Problem, b: Problem): number {
   return a.index.localeCompare(b.index, "en", { numeric: true });
@@ -126,7 +85,12 @@ export const contestSolvesCommand: Command = {
     }
 
     try {
-      const lookup = lookupContest(queryRaw, scope, context.services.contests);
+      const lookup = resolveContestLookup(
+        queryRaw,
+        scope,
+        context.services.contests,
+        MAX_MATCHES
+      );
       if (lookup.status !== "ok") {
         switch (lookup.status) {
           case "missing_latest":
