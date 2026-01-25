@@ -218,6 +218,23 @@ describe("web app", () => {
     expect(body.cacheEntries.some((entry) => entry.label === "Problemset cache")).toBe(true);
   });
 
+  it("returns health status", async () => {
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/healthz");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      status: string;
+      dbOk: boolean;
+    };
+    expect(body.status).toBe("ok");
+    expect(body.dbOk).toBe(true);
+  });
+
   it("exports rating leaderboard as csv", async () => {
     const app = createWebApp({
       website,

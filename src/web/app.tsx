@@ -234,6 +234,11 @@ export function createWebApp({ website, client }: WebAppContext) {
     return c.json({ generatedAt: new Date().toISOString(), cacheEntries });
   });
 
+  app.get("/healthz", async (c) => {
+    const health = await website.getHealthStatus();
+    return c.json({ status: health.dbOk ? "ok" : "degraded", ...health });
+  });
+
   app.notFound((c) => c.html(renderNotFoundPage("Page not found."), 404));
 
   app.onError((error, c) => {

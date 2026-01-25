@@ -514,5 +514,22 @@ export class WebsiteService {
     }
   }
 
+  async getHealthStatus(): Promise<{
+    generatedAt: string;
+    dbOk: boolean;
+    cacheEntries: CacheStatusEntry[];
+  }> {
+    const generatedAt = new Date().toISOString();
+    let dbOk = true;
+    try {
+      await sql`select 1`.execute(this.db);
+    } catch (error) {
+      dbOk = false;
+      logError(`Database error (health status): ${String(error)}`);
+    }
+    const cacheEntries = await this.getCacheStatus();
+    return { generatedAt, dbOk, cacheEntries };
+  }
+
   // contest activity lives in ContestActivityService
 }
