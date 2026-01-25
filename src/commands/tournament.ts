@@ -3,8 +3,12 @@ import {
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
+  type ChatInputCommandInteraction,
   ComponentType,
   EmbedBuilder,
+  type InteractionEditReplyOptions,
+  type InteractionReplyOptions,
+  MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder,
   StringSelectMenuBuilder,
@@ -47,6 +51,30 @@ const HISTORY_DETAIL_ROUND_LIMIT = 3;
 const HISTORY_DETAIL_STANDINGS_LIMIT = 5;
 
 type TournamentFormat = "swiss" | "elimination" | "arena";
+type TournamentReplyPayload = string | InteractionReplyOptions;
+
+async function respondToInteraction(
+  interaction: ChatInputCommandInteraction,
+  payload: TournamentReplyPayload
+): Promise<void> {
+  if (interaction.deferred) {
+    const editPayload =
+      typeof payload === "string" ? payload : (payload as InteractionEditReplyOptions);
+    await interaction.editReply(editPayload);
+    return;
+  }
+  if (interaction.replied) {
+    await interaction.followUp(payload);
+    return;
+  }
+  await interaction.reply(payload);
+}
+
+async function deferIfNeeded(interaction: ChatInputCommandInteraction): Promise<void> {
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply();
+  }
+}
 
 function formatScore(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -372,7 +400,7 @@ export const tournamentCommand: Command = {
             if (selection.user.id !== interaction.user.id) {
               await selection.reply({
                 content: "Only the command user can use this menu.",
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
               });
               return;
             }
@@ -402,7 +430,7 @@ export const tournamentCommand: Command = {
               context.correlationId
             );
             if (!selection.deferred && !selection.replied) {
-              await selection.reply({ content: "Something went wrong.", ephemeral: true });
+              await selection.reply({ content: "Something went wrong.", flags: MessageFlags.Ephemeral });
             }
           }
         });
@@ -417,7 +445,7 @@ export const tournamentCommand: Command = {
             if (button.user.id !== interaction.user.id) {
               await button.reply({
                 content: "Only the command user can use this button.",
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
               });
               return;
             }
@@ -455,12 +483,12 @@ export const tournamentCommand: Command = {
             if (!selectedTournamentId) {
               await button.reply({
                 content: "Select a tournament first.",
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
               });
               return;
             }
 
-            await button.deferReply({ ephemeral: true });
+            await button.deferReply({ flags: MessageFlags.Ephemeral });
             const recap = await context.services.tournaments.getRecap(
               guildId,
               selectedTournamentId
@@ -486,7 +514,7 @@ export const tournamentCommand: Command = {
             if (button.deferred || button.replied) {
               await button.editReply("Something went wrong.");
             } else {
-              await button.reply({ content: "Something went wrong.", ephemeral: true });
+              await button.reply({ content: "Something went wrong.", flags: MessageFlags.Ephemeral });
             }
           }
         });
@@ -769,25 +797,25 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "cancel") {
+        await deferIfNeeded(interaction);
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
           const lobby = await context.services.tournaments.getLobby(guildId);
           if (!lobby) {
-            await interaction.reply({
-              content: "No active tournament or lobby to cancel.",
-            });
+            await respondToInteraction(interaction, "No active tournament or lobby to cancel.");
             return;
           }
           const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
           if (!isAdmin && lobby.hostUserId !== interaction.user.id) {
-            await interaction.reply({
-              content: "Only the host or an admin can cancel a lobby.",
-            });
+            await respondToInteraction(
+              interaction,
+              "Only the host or an admin can cancel a lobby."
+            );
             return;
           }
-          await interaction.deferReply();
           const cancelled = await context.services.tournaments.cancelLobby(guildId);
-          await interaction.editReply(
+          await respondToInteraction(
+            interaction,
             cancelled ? "Tournament lobby cancelled." : "No lobby found."
           );
           return;
@@ -795,19 +823,20 @@ export const tournamentCommand: Command = {
 
         const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
         if (!isAdmin && tournament.hostUserId !== interaction.user.id) {
-          await interaction.reply({
-            content: "Only the host or an admin can cancel a tournament.",
-          });
+          await respondToInteraction(
+            interaction,
+            "Only the host or an admin can cancel a tournament."
+          );
           return;
         }
 
-        await interaction.deferReply();
         const cancelled = await context.services.tournaments.cancelTournament(
           guildId,
           interaction.user.id,
           context.client
         );
-        await interaction.editReply(
+        await respondToInteraction(
+          interaction,
           cancelled ? "Tournament cancelled." : "No active tournament to cancel."
         );
         return;
@@ -923,29 +952,30 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "join") {
+        await deferIfNeeded(interaction);
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (tournament) {
-          await interaction.reply({
-            content: "A tournament is already active for this server.",
-          });
+          await respondToInteraction(
+            interaction,
+            "A tournament is already active for this server."
+          );
           return;
         }
         const lobby = await context.services.tournaments.getLobby(guildId);
         if (!lobby) {
-          await interaction.reply({
-            content: "No tournament lobby is open. Use /tournament create first.",
-          });
+          await respondToInteraction(
+            interaction,
+            "No tournament lobby is open. Use /tournament create first."
+          );
           return;
         }
         const participants = await context.services.tournaments.listLobbyParticipants(lobby.id);
         if (participants.includes(interaction.user.id)) {
-          await interaction.reply({ content: "You already joined." });
+          await respondToInteraction(interaction, "You already joined.");
           return;
         }
         if (participants.length >= lobby.maxParticipants) {
-          await interaction.reply({
-            content: `Lobby is full (max ${lobby.maxParticipants}).`,
-          });
+          await respondToInteraction(interaction, `Lobby is full (max ${lobby.maxParticipants}).`);
           return;
         }
         const conflicts = await context.services.challenges.getActiveChallengesForUsers(guildId, [
@@ -953,78 +983,81 @@ export const tournamentCommand: Command = {
         ]);
         if (conflicts.has(interaction.user.id)) {
           const challenge = conflicts.get(interaction.user.id)!;
-          await interaction.reply({
-            content: `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
+          await respondToInteraction(
+            interaction,
+            `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
               challenge.endsAt
-            )}).`,
-          });
+            )}).`
+          );
           return;
         }
         const linked = await context.services.store.handleLinked(guildId, interaction.user.id);
         if (!linked) {
-          await interaction.reply({
-            content: "Link a handle with /register first.",
-          });
+          await respondToInteraction(interaction, "Link a handle with /register first.");
           return;
         }
         await context.services.tournaments.addLobbyParticipant(lobby.id, interaction.user.id);
-        await interaction.reply({
-          content: `Joined the lobby (${participants.length + 1}/${lobby.maxParticipants}).`,
-        });
+        await respondToInteraction(
+          interaction,
+          `Joined the lobby (${participants.length + 1}/${lobby.maxParticipants}).`
+        );
         return;
       }
 
       if (subcommand === "leave") {
+        await deferIfNeeded(interaction);
         const lobby = await context.services.tournaments.getLobby(guildId);
         if (!lobby) {
-          await interaction.reply({
-            content: "No tournament lobby is open.",
-          });
+          await respondToInteraction(interaction, "No tournament lobby is open.");
           return;
         }
         if (lobby.hostUserId === interaction.user.id) {
-          await interaction.reply({
-            content: "The host cannot leave. Use /tournament cancel to close the lobby.",
-          });
+          await respondToInteraction(
+            interaction,
+            "The host cannot leave. Use /tournament cancel to close the lobby."
+          );
           return;
         }
         const removed = await context.services.tournaments.removeLobbyParticipant(
           lobby.id,
           interaction.user.id
         );
-        await interaction.reply({
-          content: removed ? "You left the lobby." : "You are not in this lobby.",
-        });
+        await respondToInteraction(
+          interaction,
+          removed ? "You left the lobby." : "You are not in this lobby."
+        );
         return;
       }
 
       if (subcommand === "start") {
+        await deferIfNeeded(interaction);
         const lobby = await context.services.tournaments.getLobby(guildId);
         if (!lobby) {
-          await interaction.reply({
-            content: "No tournament lobby is open.",
-          });
+          await respondToInteraction(interaction, "No tournament lobby is open.");
           return;
         }
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (tournament) {
-          await interaction.reply({
-            content: "A tournament is already active for this server.",
-          });
+          await respondToInteraction(
+            interaction,
+            "A tournament is already active for this server."
+          );
           return;
         }
         const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
         if (!isAdmin && lobby.hostUserId !== interaction.user.id) {
-          await interaction.reply({
-            content: "Only the host or an admin can start the tournament.",
-          });
+          await respondToInteraction(
+            interaction,
+            "Only the host or an admin can start the tournament."
+          );
           return;
         }
         const participants = await context.services.tournaments.listLobbyParticipants(lobby.id);
         if (participants.length < MIN_PARTICIPANTS) {
-          await interaction.reply({
-            content: `Need at least ${MIN_PARTICIPANTS} participants to start.`,
-          });
+          await respondToInteraction(
+            interaction,
+            `Need at least ${MIN_PARTICIPANTS} participants to start.`
+          );
           return;
         }
         const rounds =
@@ -1035,7 +1068,6 @@ export const tournamentCommand: Command = {
               ? Math.max(1, Math.ceil(Math.log2(participants.length)))
               : (lobby.arenaProblemCount ?? DEFAULT_ARENA_PROBLEM_COUNT);
 
-        await interaction.deferReply();
         const result = await context.services.tournaments.createTournament({
           guildId,
           channelId: lobby.channelId,
@@ -1059,7 +1091,8 @@ export const tournamentCommand: Command = {
               return `- [${problem.contestId}${problem.index}](${url})${ratingLabel} • ${problem.name}`;
             })
             .join("\n");
-          await interaction.editReply(
+          await respondToInteraction(
+            interaction,
             `Arena tournament created with ${participants.length} participants. Ends ${formatDiscordRelativeTime(
               result.endsAt
             )}.\n${problemsList}`
@@ -1067,7 +1100,8 @@ export const tournamentCommand: Command = {
           return;
         }
 
-        await interaction.editReply(
+        await respondToInteraction(
+          interaction,
           `Tournament created with ${participants.length} participants. Round ${result.round.roundNumber} started (${result.round.matchCount} matches, ${result.round.byeCount} byes).`
         );
         return;
@@ -1077,11 +1111,7 @@ export const tournamentCommand: Command = {
         error: error instanceof Error ? error.message : String(error),
       });
       try {
-        if (interaction.deferred || interaction.replied) {
-          await interaction.followUp({ content: "Something went wrong." });
-        } else {
-          await interaction.reply({ content: "Something went wrong." });
-        }
+        await respondToInteraction(interaction, { content: "Something went wrong." });
       } catch (replyError) {
         logCommandError(
           "Tournament command error response failed.",

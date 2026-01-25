@@ -1,6 +1,6 @@
 import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 
-import { relinkCommand } from "../../src/commands/register.js";
+import { registerCommand, unlinkCommand } from "../../src/commands/register.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
 type MockInteraction = ChatInputCommandInteraction & {
@@ -11,7 +11,7 @@ type MockInteraction = ChatInputCommandInteraction & {
 
 const createInteraction = (overrides: Record<string, unknown> = {}): MockInteraction =>
   ({
-    commandName: "relink",
+    commandName: "register",
     user: { id: "user-1", username: "User" },
     guild: { id: "guild-1" },
     options: {
@@ -23,12 +23,12 @@ const createInteraction = (overrides: Record<string, unknown> = {}): MockInterac
     ...overrides,
   }) as unknown as MockInteraction;
 
-describe("relinkCommand", () => {
+describe("registerCommand", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it("verifies and updates a linked handle", async () => {
+  it("verifies and links a handle", async () => {
     jest.spyOn(Date, "now").mockReturnValue(1_000_000);
 
     const interaction = createInteraction();
@@ -53,44 +53,66 @@ describe("relinkCommand", () => {
           ]),
         },
         store: {
-          getHandle: jest.fn().mockResolvedValue("tourist"),
           resolveHandle: jest.fn().mockResolvedValue({
             exists: true,
             canonicalHandle: "Petr",
             source: "api",
           }),
           handleExists: jest.fn().mockResolvedValue(false),
-          updateUserHandle: jest.fn().mockResolvedValue("ok"),
+          handleLinked: jest.fn().mockResolvedValue(false),
+          insertUser: jest.fn().mockResolvedValue("ok"),
         },
       },
     } as unknown as CommandContext;
 
-    await relinkCommand.execute(interaction, context);
+    await registerCommand.execute(interaction, context);
 
     expect(interaction.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
-    expect(context.services.store.updateUserHandle).toHaveBeenCalledWith(
-      "guild-1",
-      "user-1",
-      "Petr"
-    );
-    expect(interaction.editReply).toHaveBeenLastCalledWith("Handle updated to Petr.");
+    expect(context.services.store.insertUser).toHaveBeenCalledWith("guild-1", "user-1", "Petr");
+    expect(interaction.editReply).toHaveBeenLastCalledWith("Handle set to Petr.");
   });
 
-  it("rejects relink when no handle is linked", async () => {
+  it("rejects invalid handles", async () => {
     const interaction = createInteraction();
     const context = {
       correlationId: "corr-2",
       services: {
         store: {
-          getHandle: jest.fn().mockResolvedValue(null),
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: false,
+            canonicalHandle: null,
+            source: "api",
+          }),
         },
       },
     } as unknown as CommandContext;
 
-    await relinkCommand.execute(interaction, context);
+    await registerCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith("Invalid handle.");
+  });
+});
+
+describe("unlinkCommand", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("rejects unlink when no handle is linked", async () => {
+    const interaction = createInteraction({ commandName: "unlink" });
+    const context = {
+      correlationId: "corr-3",
+      services: {
+        store: {
+          handleLinked: jest.fn().mockResolvedValue(false),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await unlinkCommand.execute(interaction, context);
 
     expect(interaction.reply).toHaveBeenCalledWith({
-      content: "You do not have a linked handle yet. Use /register first.",
+      content: "You have not linked a handle.",
       flags: MessageFlags.Ephemeral,
     });
   });

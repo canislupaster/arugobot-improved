@@ -1,4 +1,4 @@
-import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
@@ -47,7 +47,7 @@ export const dashboardCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -62,7 +62,7 @@ export const dashboardCommand: Command = {
           await interaction.reply({
             content:
               "Dashboard visibility is private by default. Use `/dashboard set public:true` to opt in.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
@@ -74,7 +74,7 @@ export const dashboardCommand: Command = {
           content: `Dashboard visibility is ${settings.isPublic ? "public" : "private"}. Last updated ${formatUpdatedAt(
             settings.updatedAt
           )}.${urlLine}`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -83,7 +83,7 @@ export const dashboardCommand: Command = {
         await context.services.guildSettings.clearDashboardSettings(guildId);
         await interaction.reply({
           content: "Dashboard visibility reset to private.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -96,7 +96,7 @@ export const dashboardCommand: Command = {
       const urlLine = dashboardUrl ? ` Dashboard URL: ${dashboardUrl}.` : "";
       await interaction.reply({
         content: `Dashboard visibility updated: ${isPublic ? "public" : "private"}.${urlLine}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (error) {
       logCommandError("Dashboard command failed.", interaction, context.correlationId, {
@@ -104,7 +104,7 @@ export const dashboardCommand: Command = {
       });
       await interaction.reply({
         content: "Failed to update dashboard settings.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   },

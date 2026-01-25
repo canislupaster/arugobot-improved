@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from "discord.js";
+import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 
 import { handleAdminCommand } from "../../src/commands/handleAdmin.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
@@ -39,7 +39,7 @@ describe("handleAdminCommand", () => {
 
     await handleAdminCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
     expect(context.services.store.insertUser).toHaveBeenCalledWith("guild-1", "user-1", "Tourist");
     expect(interaction.editReply).toHaveBeenCalledWith(
       "Linked handle for <@user-1> set to Tourist."
@@ -63,7 +63,7 @@ describe("handleAdminCommand", () => {
 
     await handleAdminCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
     expect(interaction.editReply).toHaveBeenCalledWith("Invalid handle.");
   });
 
@@ -86,7 +86,7 @@ describe("handleAdminCommand", () => {
 
     await handleAdminCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
     expect(interaction.editReply).toHaveBeenCalledWith("No handle linked for <@user-1>.");
   });
 });

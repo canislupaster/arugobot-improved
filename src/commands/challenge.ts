@@ -4,6 +4,7 @@ import {
   ButtonStyle,
   ComponentType,
   EmbedBuilder,
+  MessageFlags,
   SlashCommandBuilder,
   type SlashCommandSubcommandBuilder,
   type User,
@@ -403,13 +404,13 @@ export const challengeCommand: Command = {
 
       collector.on("collect", async (button) => {
         if (!participantUsers.some((user) => user.id === button.user.id)) {
-          await button.reply({ content: "You are not part of this challenge.", ephemeral: true });
+          await button.reply({ content: "You are not part of this challenge.", flags: MessageFlags.Ephemeral });
           return;
         }
 
         if (button.customId === cancelId) {
           if (button.user.id !== interaction.user.id) {
-            await button.reply({ content: "Only the host can cancel.", ephemeral: true });
+            await button.reply({ content: "Only the host can cancel.", flags: MessageFlags.Ephemeral });
             return;
           }
           confirmEmbed.setDescription("Challenge cancelled.");
@@ -491,13 +492,13 @@ export const challengeCommand: Command = {
       collector.on("collect", async (button) => {
         if (button.customId === joinId) {
           if (participants.has(button.user.id)) {
-            await button.reply({ content: "You already joined.", ephemeral: true });
+            await button.reply({ content: "You already joined.", flags: MessageFlags.Ephemeral });
             return;
           }
           if (participants.size >= maxParticipants) {
             await button.reply({
               content: `Lobby is full (max ${maxParticipants}).`,
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -510,7 +511,7 @@ export const challengeCommand: Command = {
               content: `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
                 challenge.endsAt
               )}).`,
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -518,7 +519,7 @@ export const challengeCommand: Command = {
           if (!linked) {
             await button.reply({
               content: "Link a handle with /register first.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -526,7 +527,7 @@ export const challengeCommand: Command = {
           if (history.includes(problemId)) {
             await button.reply({
               content: "You have already done this problem in a prior challenge.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -534,7 +535,7 @@ export const challengeCommand: Command = {
           if (!handle) {
             await button.reply({
               content: "Missing handle data. Try again in a bit.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -542,14 +543,14 @@ export const challengeCommand: Command = {
           if (!solved) {
             await button.reply({
               content: "Unable to verify solved problems right now. Try again later.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
           if (solved.includes(problemId)) {
             await button.reply({
               content: "You have already solved this problem on Codeforces.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -565,13 +566,13 @@ export const challengeCommand: Command = {
 
         if (button.customId === leaveId) {
           if (!participants.has(button.user.id)) {
-            await button.reply({ content: "You are not in this lobby.", ephemeral: true });
+            await button.reply({ content: "You are not in this lobby.", flags: MessageFlags.Ephemeral });
             return;
           }
           if (button.user.id === interaction.user.id) {
             await button.reply({
               content: "The host cannot leave. Use cancel to stop the lobby.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -587,7 +588,7 @@ export const challengeCommand: Command = {
 
         if (button.customId === startId) {
           if (button.user.id !== interaction.user.id) {
-            await button.reply({ content: "Only the host can start.", ephemeral: true });
+            await button.reply({ content: "Only the host can start.", flags: MessageFlags.Ephemeral });
             return;
           }
           lobbyEmbed.setDescription("Challenge starting.");
@@ -598,7 +599,7 @@ export const challengeCommand: Command = {
 
         if (button.customId === cancelId) {
           if (button.user.id !== interaction.user.id) {
-            await button.reply({ content: "Only the host can cancel.", ephemeral: true });
+            await button.reply({ content: "Only the host can cancel.", flags: MessageFlags.Ephemeral });
             return;
           }
           lobbyEmbed.setDescription("Challenge cancelled.");

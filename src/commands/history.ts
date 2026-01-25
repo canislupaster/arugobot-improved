@@ -1,6 +1,7 @@
 import {
   ComponentType,
   EmbedBuilder,
+  MessageFlags,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
@@ -55,7 +56,7 @@ async function runPagination(options: {
     if (button.user.id !== interaction.user.id) {
       await button.reply({
         content: "Only the command user can use these buttons.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }

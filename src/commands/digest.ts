@@ -1,4 +1,4 @@
-import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextWeeklyScheduledUtcMs } from "../services/weeklyDigest.js";
 import { logCommandError } from "../utils/commandLogging.js";
@@ -144,7 +144,7 @@ export const digestCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }

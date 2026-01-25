@@ -1,4 +1,4 @@
-import { ComponentType, EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { ComponentType, EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -132,7 +132,7 @@ export const leaderboardCommand: Command = {
         if (button.user.id !== interaction.user.id) {
           await button.reply({
             content: "Only the command user can use these buttons.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }

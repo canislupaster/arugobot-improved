@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from "discord.js";
+import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 
 import { practicePrefsCommand } from "../../src/commands/practicePrefs.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
@@ -38,7 +38,7 @@ describe("practicePrefsCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No practice preferences saved yet. Use /practiceprefs set to configure.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   });
 
