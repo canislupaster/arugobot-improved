@@ -96,6 +96,7 @@ export type StatusViewModel = {
 };
 
 type ViewResult = HtmlEscapedString | Promise<HtmlEscapedString>;
+type UpcomingContestEntry = UpcomingContestsOverview["official"][number];
 
 const numberFormatter = new Intl.NumberFormat("en-US");
 const defaultDescription =
@@ -111,6 +112,45 @@ function formatNumber(value: number | null): string {
 function formatStreakValue(value: number): string {
   const emojis = formatStreakEmojis(value);
   return emojis ? `${formatNumber(value)} ${emojis}` : formatNumber(value);
+}
+
+function renderContestRow(contest: UpcomingContestEntry) {
+  return (
+    <div class="tournament-row">
+      <div>
+        <div class="title">{contest.name}</div>
+        <div class="muted">
+          Starts {renderLocalTimeFromUnix(contest.startTimeSeconds)} •{" "}
+          {formatDurationSeconds(contest.durationSeconds)}
+        </div>
+      </div>
+      <div class="pill">#{contest.id}</div>
+    </div>
+  );
+}
+
+function renderUpcomingContestCard(
+  title: string,
+  contests: UpcomingContestEntry[],
+  lastRefreshAt: string | null,
+  emptyLabel: string
+): ViewResult {
+  const subtitle = lastRefreshAt
+    ? `Last refresh ${formatTimestamp(lastRefreshAt)}`
+    : "Upcoming contests from the cached contest list.";
+
+  return (
+    <div class="card">
+      <SectionHeader title={title} subtitle={subtitle} />
+      <div class="stack">
+        {contests.length === 0 ? (
+          <div class="muted">{emptyLabel}</div>
+        ) : (
+          contests.map((contest) => renderContestRow(contest))
+        )}
+      </div>
+    </div>
+  );
 }
 
 function renderLeaderboard(
@@ -459,62 +499,18 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
       </section>
 
       <section class="section split">
-        <div class="card">
-          <SectionHeader
-            title="Upcoming official contests"
-            subtitle={
-              model.upcomingContests.lastRefreshAt
-                ? `Last refresh ${formatTimestamp(model.upcomingContests.lastRefreshAt)}`
-                : "Upcoming contests from the cached contest list."
-            }
-          />
-          <div class="stack">
-            {model.upcomingContests.official.length === 0 ? (
-              <div class="muted">No upcoming official contests cached.</div>
-            ) : (
-              model.upcomingContests.official.map((contest) => (
-                <div class="tournament-row">
-                  <div>
-                    <div class="title">{contest.name}</div>
-                    <div class="muted">
-                      Starts {renderLocalTimeFromUnix(contest.startTimeSeconds)} •{" "}
-                      {formatDurationSeconds(contest.durationSeconds)}
-                    </div>
-                  </div>
-                  <div class="pill">#{contest.id}</div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-        <div class="card">
-          <SectionHeader
-            title="Upcoming gym contests"
-            subtitle={
-              model.upcomingContests.lastRefreshAt
-                ? `Last refresh ${formatTimestamp(model.upcomingContests.lastRefreshAt)}`
-                : "Upcoming contests from the cached contest list."
-            }
-          />
-          <div class="stack">
-            {model.upcomingContests.gym.length === 0 ? (
-              <div class="muted">No upcoming gym contests cached.</div>
-            ) : (
-              model.upcomingContests.gym.map((contest) => (
-                <div class="tournament-row">
-                  <div>
-                    <div class="title">{contest.name}</div>
-                    <div class="muted">
-                      Starts {renderLocalTimeFromUnix(contest.startTimeSeconds)} •{" "}
-                      {formatDurationSeconds(contest.durationSeconds)}
-                    </div>
-                  </div>
-                  <div class="pill">#{contest.id}</div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        {renderUpcomingContestCard(
+          "Upcoming official contests",
+          model.upcomingContests.official,
+          model.upcomingContests.lastRefreshAt,
+          "No upcoming official contests cached."
+        )}
+        {renderUpcomingContestCard(
+          "Upcoming gym contests",
+          model.upcomingContests.gym,
+          model.upcomingContests.lastRefreshAt,
+          "No upcoming gym contests cached."
+        )}
       </section>
 
       <section class="section">
