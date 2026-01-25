@@ -135,10 +135,7 @@ export function createWebApp({ website, client }: WebAppContext) {
   app.get("/guilds/:guildId", async (c) => {
     const guildId = c.req.param("guildId");
     const activityDays = 30;
-    const overview = await website.getGuildOverview(guildId, {
-      activityDays,
-      tournamentLimit: 4,
-    });
+    const overview = await website.getGuildOverview(guildId);
     if (!overview || !overview.hasData) {
       return c.html(renderNotFoundPage("Guild not found or no data available."), 404);
     }

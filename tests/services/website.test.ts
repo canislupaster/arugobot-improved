@@ -371,7 +371,7 @@ describe("WebsiteService", () => {
   });
 
   it("returns per-guild overview data", async () => {
-    const overview = await website.getGuildOverview("guild-1", { activityDays: 365 });
+    const overview = await website.getGuildOverview("guild-1");
     expect(overview).not.toBeNull();
     expect(overview?.stats.userCount).toBe(2);
     expect(overview?.ratingLeaderboard).toHaveLength(2);

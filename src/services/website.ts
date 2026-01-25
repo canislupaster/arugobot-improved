@@ -100,7 +100,7 @@ export type GuildLeaderboardExport = {
 };
 
 const DEFAULT_ACTIVITY_DAYS = 30;
-const DEFAULT_TOURNAMENT_LIMIT = 3;
+const DEFAULT_TOURNAMENT_LIMIT = 4;
 const DEFAULT_CONTEST_ACTIVITY_DAYS = 90;
 const CACHE_STATUS_KEYS: Array<{ key: CacheKey; label: string }> = [
   { key: "problemset", label: "Problemset cache" },
@@ -340,10 +340,7 @@ export class WebsiteService {
     }
   }
 
-  async getGuildOverview(
-    guildId: string,
-    options?: { activityDays?: number; tournamentLimit?: number; contestActivityDays?: number }
-  ): Promise<GuildOverview | null> {
+  async getGuildOverview(guildId: string): Promise<GuildOverview | null> {
     try {
       const isPublic = await this.settings.isDashboardPublic(guildId);
       if (!isPublic) {
@@ -366,15 +363,16 @@ export class WebsiteService {
       const solveLeaderboard = (await this.store.getSolveLeaderboard(guildId)) ?? [];
       const roster = await this.store.getServerRoster(guildId);
 
-      const activityDays = options?.activityDays ?? DEFAULT_ACTIVITY_DAYS;
+      const activityDays = DEFAULT_ACTIVITY_DAYS;
       const sinceIso = new Date(Date.now() - activityDays * 24 * 60 * 60 * 1000).toISOString();
       const activity = await this.store.getChallengeActivity(guildId, sinceIso, 5);
 
-      const contestActivityDays = options?.contestActivityDays ?? DEFAULT_CONTEST_ACTIVITY_DAYS;
+      const contestActivityDays = DEFAULT_CONTEST_ACTIVITY_DAYS;
       const contestActivity = await this.contestActivity.getContestActivityForRoster(roster, {
         lookbackDays: contestActivityDays,
         recentLimit: 4,
       });
+      const tournamentLimit = DEFAULT_TOURNAMENT_LIMIT;
 
       const tournaments = await this.db
         .selectFrom("tournaments")
@@ -402,7 +400,7 @@ export class WebsiteService {
         .where("tournaments.guild_id", "=", guildId)
         .groupBy("tournaments.id")
         .orderBy("tournaments.updated_at", "desc")
-        .limit(Math.max(1, options?.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT))
+        .limit(Math.max(1, tournamentLimit))
         .execute();
 
       return {
