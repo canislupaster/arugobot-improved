@@ -198,8 +198,8 @@ Most command responses are public; handle-linking and admin diagnostics remain e
   (`include`/`exclude`, comma-separated) plus contest `scope` (official, gym, or all). Use
   `list`/`status` to see subscription ids, `remove` to delete one, and `clear` to delete all.
   `preview`/`post` accept an optional subscription id when multiple are configured. `post` can
-  `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 2
-  or Educational) with sensible keyword filters.
+  `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 2,
+  Div 3, or Educational) with sensible keyword filters.
 
 - **/contestratingalerts** `set|status|list|remove|clear|preview|post`
 

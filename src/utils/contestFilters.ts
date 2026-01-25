@@ -3,21 +3,22 @@ export type KeywordFilters = {
   excludeKeywords: string[];
 };
 
-export type ContestReminderPreset = "div2" | "educational";
+export type ContestReminderPreset = "div2" | "div3" | "educational";
 
 type ContestReminderPresetConfig = KeywordFilters & { label: string };
 
+function buildPreset(
+  label: string,
+  includeKeywords: string[],
+  excludeKeywords: string[] = []
+): ContestReminderPresetConfig {
+  return { label, includeKeywords, excludeKeywords };
+}
+
 const CONTEST_REMINDER_PRESETS: Record<ContestReminderPreset, ContestReminderPresetConfig> = {
-  div2: {
-    label: "Div 2",
-    includeKeywords: ["div. 2", "div.2", "div 2"],
-    excludeKeywords: [],
-  },
-  educational: {
-    label: "Educational",
-    includeKeywords: ["educational"],
-    excludeKeywords: [],
-  },
+  div2: buildPreset("Div 2", ["div. 2", "div.2", "div 2"]),
+  div3: buildPreset("Div 3", ["div. 3", "div.3", "div 3"]),
+  educational: buildPreset("Educational", ["educational"]),
 };
 
 function normalizeKeywords(raw: string | null | undefined): string[] {
