@@ -31,8 +31,26 @@ export type ContestParticipantSummary = {
   lastContestAt: number | null;
 };
 
+export type RatingChangeParticipantSummary = {
+  userId: string;
+  handle: string;
+  contestCount: number;
+  delta: number;
+  lastContestAt: number | null;
+};
+
 export type GuildContestActivity = ContestActivitySummary & {
   participants: ContestParticipantSummary[];
+};
+
+export type GuildRatingChangeSummary = {
+  lookbackDays: number;
+  contestCount: number;
+  participantCount: number;
+  totalDelta: number;
+  lastContestAt: number | null;
+  topGainers: RatingChangeParticipantSummary[];
+  topLosers: RatingChangeParticipantSummary[];
 };
 
 export type GlobalContestActivity = {
@@ -56,6 +74,7 @@ export type ContestScopeBreakdown = {
 
 const DEFAULT_LOOKBACK_DAYS = 90;
 const DEFAULT_RECENT_LIMIT = 4;
+const DEFAULT_DELTA_LIMIT = 3;
 const MAX_REFRESH_HANDLES = 500;
 
 function normalizeHandle(handle: string): string {
@@ -101,6 +120,20 @@ function sortParticipants(a: ContestParticipantSummary, b: ContestParticipantSum
   return a.handle.localeCompare(b.handle);
 }
 
+function sortDeltaDescending(a: RatingChangeParticipantSummary, b: RatingChangeParticipantSummary) {
+  if (b.delta !== a.delta) {
+    return b.delta - a.delta;
+  }
+  return a.handle.localeCompare(b.handle);
+}
+
+function sortDeltaAscending(a: RatingChangeParticipantSummary, b: RatingChangeParticipantSummary) {
+  if (a.delta !== b.delta) {
+    return a.delta - b.delta;
+  }
+  return a.handle.localeCompare(b.handle);
+}
+
 export class ContestActivityService {
   constructor(
     private readonly db: Kysely<Database>,
@@ -118,6 +151,17 @@ export class ContestActivityService {
   ): Promise<GuildContestActivity> {
     const roster = await this.store.getServerRoster(guildId);
     return this.getContestActivityForRoster(roster, options);
+  }
+
+  async getGuildRatingChangeSummary(
+    guildId: string,
+    options?: {
+      lookbackDays?: number;
+      limit?: number;
+    }
+  ): Promise<GuildRatingChangeSummary> {
+    const roster = await this.store.getServerRoster(guildId);
+    return this.getRatingChangeSummaryForRoster(roster, options);
   }
 
   async getContestActivityForRoster(
@@ -277,6 +321,123 @@ export class ContestActivityService {
         recentContests: [],
         byScope: createScopeBreakdown(),
         participants: [],
+      };
+    }
+  }
+
+  async getRatingChangeSummaryForRoster(
+    roster: RosterEntry[],
+    options?: {
+      lookbackDays?: number;
+      limit?: number;
+    }
+  ): Promise<GuildRatingChangeSummary> {
+    const lookbackDays = options?.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
+    const limit = options?.limit ?? DEFAULT_DELTA_LIMIT;
+    const handles = roster.map((row) => normalizeHandle(row.handle)).filter(Boolean);
+    if (handles.length === 0) {
+      return {
+        lookbackDays,
+        contestCount: 0,
+        participantCount: 0,
+        totalDelta: 0,
+        lastContestAt: null,
+        topGainers: [],
+        topLosers: [],
+      };
+    }
+
+    const rosterMap = new Map(
+      roster.map((row) => [normalizeHandle(row.handle), { userId: row.userId, handle: row.handle }])
+    );
+
+    try {
+      await this.refreshMissingRatingChanges(handles, rosterMap);
+      const rows = await this.db
+        .selectFrom("cf_rating_changes")
+        .select(["handle", "payload"])
+        .where("handle", "in", handles)
+        .execute();
+
+      const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
+      const contestMap = new Map<number, number>();
+      const participants = new Map<string, RatingChangeParticipantSummary>();
+      let lastContestAt: number | null = null;
+      let totalDelta = 0;
+
+      for (const row of rows) {
+        const rosterEntry = rosterMap.get(row.handle);
+        if (!rosterEntry) {
+          continue;
+        }
+        const changes = parseRatingChangesPayload(row.payload);
+        const contestIds = new Set<number>();
+        let participantDelta = 0;
+        let participantLastContestAt: number | null = null;
+
+        for (const change of changes) {
+          if (change.ratingUpdateTimeSeconds < cutoffSeconds) {
+            continue;
+          }
+          const delta = change.newRating - change.oldRating;
+          participantDelta += delta;
+          totalDelta += delta;
+          contestIds.add(change.contestId);
+          contestMap.set(
+            change.contestId,
+            Math.max(contestMap.get(change.contestId) ?? 0, change.ratingUpdateTimeSeconds)
+          );
+          if (
+            participantLastContestAt === null ||
+            change.ratingUpdateTimeSeconds > participantLastContestAt
+          ) {
+            participantLastContestAt = change.ratingUpdateTimeSeconds;
+          }
+          if (lastContestAt === null || change.ratingUpdateTimeSeconds > lastContestAt) {
+            lastContestAt = change.ratingUpdateTimeSeconds;
+          }
+        }
+
+        if (contestIds.size > 0) {
+          participants.set(row.handle, {
+            userId: rosterEntry.userId,
+            handle: rosterEntry.handle,
+            contestCount: contestIds.size,
+            delta: participantDelta,
+            lastContestAt: participantLastContestAt,
+          });
+        }
+      }
+
+      const participantList = Array.from(participants.values());
+      const topGainers = participantList
+        .filter((entry) => entry.delta > 0)
+        .sort(sortDeltaDescending)
+        .slice(0, limit);
+      const topLosers = participantList
+        .filter((entry) => entry.delta < 0)
+        .sort(sortDeltaAscending)
+        .slice(0, limit);
+
+      return {
+        lookbackDays,
+        contestCount: contestMap.size,
+        participantCount: participants.size,
+        totalDelta,
+        lastContestAt,
+        topGainers,
+        topLosers,
+      };
+    } catch (error) {
+      logError(`Database error (rating change summary): ${String(error)}`);
+      return {
+        lookbackDays,
+        contestCount: 0,
+        participantCount: 0,
+        totalDelta: 0,
+        lastContestAt: null,
+        topGainers: [],
+        topLosers: [],
       };
     }
   }

@@ -19,6 +19,20 @@ const createChange = (contestId: number, contestName: string, timestamp: number)
   ratingUpdateTimeSeconds: timestamp,
 });
 
+const createChangeWithDelta = (
+  contestId: number,
+  contestName: string,
+  timestamp: number,
+  delta: number
+) => ({
+  contestId,
+  contestName,
+  rank: 1,
+  oldRating: 1500,
+  newRating: 1500 + delta,
+  ratingUpdateTimeSeconds: timestamp,
+});
+
 describe("ContestActivityService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -188,6 +202,69 @@ describe("ContestActivityService", () => {
     expect(activity.byScope.official.contestCount).toBe(1);
     expect(activity.byScope.gym.contestCount).toBe(1);
     expect(activity.lastContestAt).not.toBeNull();
+
+    await db.destroy();
+  });
+
+  it("summarizes rating change deltas", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const store = new StoreService(db, mockCodeforces);
+    const service = new ContestActivityService(db, store, mockRatingChanges);
+
+    await db
+      .insertInto("users")
+      .values([
+        {
+          server_id: "guild-1",
+          user_id: "user-1",
+          handle: "Alice",
+          rating: 1500,
+          history: "[]",
+          rating_history: "[]",
+        },
+        {
+          server_id: "guild-1",
+          user_id: "user-2",
+          handle: "Bob",
+          rating: 1400,
+          history: "[]",
+          rating_history: "[]",
+        },
+      ])
+      .execute();
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    await db
+      .insertInto("cf_rating_changes")
+      .values([
+        {
+          handle: "alice",
+          payload: JSON.stringify([
+            createChangeWithDelta(2000, "Contest A", nowSeconds - 3600, 120),
+          ]),
+        },
+        {
+          handle: "bob",
+          payload: JSON.stringify([
+            createChangeWithDelta(2000, "Contest A", nowSeconds - 3600, -80),
+          ]),
+        },
+      ])
+      .execute();
+
+    const summary = await service.getGuildRatingChangeSummary("guild-1", {
+      lookbackDays: 30,
+      limit: 2,
+    });
+
+    expect(summary.contestCount).toBe(1);
+    expect(summary.participantCount).toBe(2);
+    expect(summary.totalDelta).toBe(40);
+    expect(summary.topGainers[0]?.handle).toBe("Alice");
+    expect(summary.topGainers[0]?.delta).toBe(120);
+    expect(summary.topLosers[0]?.handle).toBe("Bob");
+    expect(summary.topLosers[0]?.delta).toBe(-80);
 
     await db.destroy();
   });

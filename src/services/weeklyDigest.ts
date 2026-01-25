@@ -35,6 +35,7 @@ export type ManualWeeklyDigestResult =
 const DEFAULT_LOOKBACK_DAYS = 7;
 const DEFAULT_RECENT_CONTESTS = 3;
 const DEFAULT_PARTICIPANT_LIMIT = 5;
+const DEFAULT_RATING_DELTA_LIMIT = 3;
 
 function normalizeDayOfWeek(value: number): number {
   if (Number.isInteger(value) && value >= 0 && value <= 6) {
@@ -114,6 +115,14 @@ function formatUserLine(userId: string, count: number, label: string): string {
 
 function buildRoleMention(roleId: string | null): string | undefined {
   return roleId ? `<@&${roleId}>` : undefined;
+}
+
+function formatDelta(delta: number): string {
+  if (!Number.isFinite(delta)) {
+    return "0";
+  }
+  const rounded = Math.round(delta);
+  return rounded > 0 ? `+${rounded}` : String(rounded);
 }
 
 export class WeeklyDigestService {
@@ -405,6 +414,13 @@ export class WeeklyDigestService {
         participantLimit: DEFAULT_PARTICIPANT_LIMIT,
       }),
     ]);
+    const ratingSummary = await this.contestActivity.getGuildRatingChangeSummary(
+      subscription.guildId,
+      {
+        lookbackDays,
+        limit: DEFAULT_RATING_DELTA_LIMIT,
+      }
+    );
 
     const embed = new EmbedBuilder()
       .setTitle("Weekly digest")
@@ -440,6 +456,39 @@ export class WeeklyDigestService {
     embed.addFields({
       name: "Contest activity",
       value: contestSummaryLines.join("\n"),
+      inline: false,
+    });
+
+    const ratingLines = [
+      `Rated contests: ${ratingSummary.contestCount}`,
+      `Participants: ${ratingSummary.participantCount}`,
+      `Net delta: ${formatDelta(ratingSummary.totalDelta)}`,
+    ];
+    if (ratingSummary.topGainers.length > 0) {
+      const lines = ratingSummary.topGainers
+        .map(
+          (entry, index) =>
+            `${index + 1}. <@${entry.userId}> (${entry.handle}) • ${formatDelta(entry.delta)}`
+        )
+        .join("\n");
+      ratingLines.push(`Top gainers:\n${lines}`);
+    } else {
+      ratingLines.push("Top gainers: none yet");
+    }
+    if (ratingSummary.topLosers.length > 0) {
+      const lines = ratingSummary.topLosers
+        .map(
+          (entry, index) =>
+            `${index + 1}. <@${entry.userId}> (${entry.handle}) • ${formatDelta(entry.delta)}`
+        )
+        .join("\n");
+      ratingLines.push(`Top losses:\n${lines}`);
+    } else {
+      ratingLines.push("Top losses: none yet");
+    }
+    embed.addFields({
+      name: "Rating changes",
+      value: ratingLines.join("\n"),
       inline: false,
     });
 

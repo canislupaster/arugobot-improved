@@ -40,6 +40,23 @@ const mockContestActivity = {
     },
     participants: [{ userId: "user-1", handle: "alice", contestCount: 1, lastContestAt: null }],
   }),
+  getGuildRatingChangeSummary: jest.fn().mockResolvedValue({
+    lookbackDays: 7,
+    contestCount: 1,
+    participantCount: 1,
+    totalDelta: 42,
+    lastContestAt: 1_700_000_000,
+    topGainers: [
+      {
+        userId: "user-1",
+        handle: "alice",
+        contestCount: 1,
+        delta: 42,
+        lastContestAt: 1_700_000_000,
+      },
+    ],
+    topLosers: [],
+  }),
 } as unknown as ContestActivityService;
 
 describe("WeeklyDigestService", () => {
@@ -68,6 +85,8 @@ describe("WeeklyDigestService", () => {
     const preview = await service.getPreview("guild-1");
     expect(preview).not.toBeNull();
     expect(preview?.embed.data.title).toBe("Weekly digest");
+    const fieldNames = preview?.embed.data.fields?.map((field) => field.name) ?? [];
+    expect(fieldNames).toContain("Rating changes");
   });
 
   it("blocks manual posts already sent this week", async () => {
