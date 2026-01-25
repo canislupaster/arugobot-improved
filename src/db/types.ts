@@ -264,6 +264,28 @@ export type TournamentArenaSolvesTable = {
   created_at: Generated<string>;
 };
 
+export type TournamentLobbiesTable = {
+  id: string;
+  guild_id: string;
+  channel_id: string;
+  host_user_id: string;
+  format: string;
+  length_minutes: number;
+  max_participants: number;
+  rating_ranges: string;
+  tags: string;
+  swiss_rounds: number | null;
+  arena_problem_count: number | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type TournamentLobbyParticipantsTable = {
+  lobby_id: string;
+  user_id: string;
+  created_at: Generated<string>;
+};
+
 export type CommandMetricsTable = {
   command: string;
   count: number;
@@ -324,6 +346,8 @@ export type Database = {
   tournament_arena_state: TournamentArenaStateTable;
   tournament_arena_problems: TournamentArenaProblemsTable;
   tournament_arena_solves: TournamentArenaSolvesTable;
+  tournament_lobbies: TournamentLobbiesTable;
+  tournament_lobby_participants: TournamentLobbyParticipantsTable;
   command_metrics: CommandMetricsTable;
   log_entries: LogEntriesTable;
   guild_settings: GuildSettingsTable;

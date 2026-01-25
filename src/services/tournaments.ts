@@ -44,6 +44,22 @@ export type Tournament = {
   tags: string;
 };
 
+export type TournamentLobby = {
+  id: string;
+  guildId: string;
+  channelId: string;
+  hostUserId: string;
+  format: TournamentFormat;
+  lengthMinutes: number;
+  maxParticipants: number;
+  ratingRanges: RatingRange[];
+  tags: string;
+  swissRounds: number | null;
+  arenaProblemCount: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TournamentParticipant = {
   userId: string;
   seed: number;
@@ -211,6 +227,145 @@ export class TournamentService implements ChallengeCompletionNotifier {
       return null;
     }
     return this.mapTournament(row);
+  }
+
+  async getLobby(guildId: string): Promise<TournamentLobby | null> {
+    const row = await this.db
+      .selectFrom("tournament_lobbies")
+      .selectAll()
+      .where("guild_id", "=", guildId)
+      .executeTakeFirst();
+    if (!row) {
+      return null;
+    }
+    return this.mapLobby(row);
+  }
+
+  async listLobbyParticipants(lobbyId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom("tournament_lobby_participants")
+      .select("user_id")
+      .where("lobby_id", "=", lobbyId)
+      .orderBy("created_at")
+      .execute();
+    return rows.map((row) => row.user_id);
+  }
+
+  async createLobby({
+    guildId,
+    channelId,
+    hostUserId,
+    format,
+    lengthMinutes,
+    maxParticipants,
+    ratingRanges,
+    tags,
+    swissRounds,
+    arenaProblemCount,
+  }: {
+    guildId: string;
+    channelId: string;
+    hostUserId: string;
+    format: TournamentFormat;
+    lengthMinutes: number;
+    maxParticipants: number;
+    ratingRanges: RatingRange[];
+    tags: string;
+    swissRounds: number | null;
+    arenaProblemCount: number | null;
+  }): Promise<TournamentLobby> {
+    const existing = await this.getActiveTournament(guildId);
+    if (existing) {
+      throw new Error("An active tournament already exists for this server.");
+    }
+    const existingLobby = await this.getLobby(guildId);
+    if (existingLobby) {
+      throw new Error("A tournament lobby is already open for this server.");
+    }
+
+    const id = randomUUID();
+    const nowIso = new Date().toISOString();
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+        .insertInto("tournament_lobbies")
+        .values({
+          id,
+          guild_id: guildId,
+          channel_id: channelId,
+          host_user_id: hostUserId,
+          format,
+          length_minutes: lengthMinutes,
+          max_participants: maxParticipants,
+          rating_ranges: JSON.stringify(ratingRanges),
+          tags,
+          swiss_rounds: swissRounds,
+          arena_problem_count: arenaProblemCount,
+          created_at: nowIso,
+          updated_at: nowIso,
+        })
+        .execute();
+      await trx
+        .insertInto("tournament_lobby_participants")
+        .values({
+          lobby_id: id,
+          user_id: hostUserId,
+          created_at: nowIso,
+        })
+        .execute();
+    });
+
+    return {
+      id,
+      guildId,
+      channelId,
+      hostUserId,
+      format,
+      lengthMinutes,
+      maxParticipants,
+      ratingRanges,
+      tags,
+      swissRounds,
+      arenaProblemCount,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+  }
+
+  async addLobbyParticipant(lobbyId: string, userId: string): Promise<boolean> {
+    const result = await this.db
+      .insertInto("tournament_lobby_participants")
+      .values({
+        lobby_id: lobbyId,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+      })
+      .onConflict((oc) => oc.columns(["lobby_id", "user_id"]).doNothing())
+      .executeTakeFirst();
+    return Number(result.numInsertedOrUpdatedRows ?? 0) > 0;
+  }
+
+  async removeLobbyParticipant(lobbyId: string, userId: string): Promise<boolean> {
+    const result = await this.db
+      .deleteFrom("tournament_lobby_participants")
+      .where("lobby_id", "=", lobbyId)
+      .where("user_id", "=", userId)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0) > 0;
+  }
+
+  async cancelLobby(guildId: string): Promise<boolean> {
+    const lobby = await this.getLobby(guildId);
+    if (!lobby) {
+      return false;
+    }
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+        .deleteFrom("tournament_lobby_participants")
+        .where("lobby_id", "=", lobby.id)
+        .execute();
+      await trx.deleteFrom("tournament_lobbies").where("id", "=", lobby.id).execute();
+    });
+    return true;
   }
 
   async getHistoryPage(
@@ -1109,6 +1264,38 @@ export class TournamentService implements ChallengeCompletionNotifier {
       currentRound: row.current_round,
       ratingRanges,
       tags: row.tags,
+    };
+  }
+
+  private mapLobby(row: {
+    id: string;
+    guild_id: string;
+    channel_id: string;
+    host_user_id: string;
+    format: string;
+    length_minutes: number;
+    max_participants: number;
+    rating_ranges: string;
+    tags: string;
+    swiss_rounds: number | null;
+    arena_problem_count: number | null;
+    created_at: string;
+    updated_at: string;
+  }): TournamentLobby {
+    return {
+      id: row.id,
+      guildId: row.guild_id,
+      channelId: row.channel_id,
+      hostUserId: row.host_user_id,
+      format: row.format as TournamentFormat,
+      lengthMinutes: row.length_minutes,
+      maxParticipants: row.max_participants,
+      ratingRanges: this.parseRatingRanges(row.rating_ranges),
+      tags: row.tags,
+      swissRounds: row.swiss_rounds,
+      arenaProblemCount: row.arena_problem_count,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     };
   }
 

@@ -481,6 +481,52 @@ describe("TournamentService", () => {
     expect(history.entries[1]?.winnerId).toBeNull();
   });
 
+  it("creates a lobby with the host as a participant", async () => {
+    const service = new TournamentService(db, {} as never, {} as never, {} as never);
+    const lobby = await service.createLobby({
+      guildId: "guild-1",
+      channelId: "channel-1",
+      hostUserId: "host-1",
+      format: "swiss",
+      lengthMinutes: 40,
+      maxParticipants: 8,
+      ratingRanges: [],
+      tags: "",
+      swissRounds: 3,
+      arenaProblemCount: null,
+    });
+
+    const fetched = await service.getLobby("guild-1");
+    const participants = await service.listLobbyParticipants(lobby.id);
+
+    expect(fetched?.id).toBe(lobby.id);
+    expect(participants).toEqual(["host-1"]);
+  });
+
+  it("adds and removes lobby participants", async () => {
+    const service = new TournamentService(db, {} as never, {} as never, {} as never);
+    const lobby = await service.createLobby({
+      guildId: "guild-1",
+      channelId: "channel-1",
+      hostUserId: "host-1",
+      format: "swiss",
+      lengthMinutes: 40,
+      maxParticipants: 8,
+      ratingRanges: [],
+      tags: "",
+      swissRounds: null,
+      arenaProblemCount: null,
+    });
+
+    const added = await service.addLobbyParticipant(lobby.id, "user-2");
+    const removed = await service.removeLobbyParticipant(lobby.id, "user-2");
+    const participants = await service.listLobbyParticipants(lobby.id);
+
+    expect(added).toBe(true);
+    expect(removed).toBe(true);
+    expect(participants).toEqual(["host-1"]);
+  });
+
   it("returns tournament history detail with standings and rounds", async () => {
     const service = new TournamentService(db, {} as never, {} as never, {} as never);
     const tournamentId = "tournament-history-1";

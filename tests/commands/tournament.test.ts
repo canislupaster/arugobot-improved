@@ -177,4 +177,40 @@ describe("tournamentCommand", () => {
     expect(historyField?.value).toContain("Winner: <@user-1>");
     expect(payload.components).toHaveLength(2);
   });
+
+  it("shows lobby status when no tournament is active", async () => {
+    const interaction = createInteraction();
+    const context = {
+      services: {
+        tournaments: {
+          getActiveTournament: jest.fn().mockResolvedValue(null),
+          getLobby: jest.fn().mockResolvedValue({
+            id: "lobby-1",
+            guildId: "guild-1",
+            channelId: "channel-1",
+            hostUserId: "host-1",
+            format: "swiss",
+            lengthMinutes: 40,
+            maxParticipants: 10,
+            ratingRanges: [],
+            tags: "",
+            swissRounds: 3,
+            arenaProblemCount: null,
+            createdAt: "2026-01-24T10:00:00.000Z",
+            updatedAt: "2026-01-24T10:00:00.000Z",
+          }),
+          listLobbyParticipants: jest.fn().mockResolvedValue(["host-1", "user-2"]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await tournamentCommand.execute(interaction, context);
+
+    const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0].data;
+    expect(embed.title).toBe("Tournament lobby");
+    const fields = (embed.fields ?? []) as Array<{ name: string; value: string }>;
+    const participantField = fields.find((field) => field.name === "Participants");
+    expect(participantField?.value).toContain("<@host-1>");
+  });
 });

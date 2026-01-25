@@ -9,7 +9,6 @@ import {
   SlashCommandBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
-  type User,
 } from "discord.js";
 
 import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../services/tournaments.js";
@@ -31,7 +30,6 @@ const DEFAULT_MAX_RATING = 3500;
 const DEFAULT_MAX_PARTICIPANTS = 24;
 const MIN_PARTICIPANTS = 2;
 const MAX_PARTICIPANTS = 64;
-const OPEN_LOBBY_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_SWISS_MIN_ROUNDS = 3;
 const MAX_SWISS_ROUNDS = 10;
 const MIN_ARENA_PROBLEM_COUNT = 3;
@@ -65,11 +63,11 @@ function truncateLabel(value: string, maxLength: number): string {
   return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
-function buildUsersValue(users: User[]): string {
-  if (users.length === 0) {
+function buildLobbyUsersValue(userIds: string[]): string {
+  if (userIds.length === 0) {
     return "No participants yet.";
   }
-  return users.map((user) => `- ${user}`).join("\n");
+  return userIds.map((userId) => `- <@${userId}>`).join("\n");
 }
 
 function formatHistoryTimestamp(isoTimestamp: string): string {
@@ -272,6 +270,15 @@ export const tournamentCommand: Command = {
         )
     )
     .addSubcommand((subcommand) =>
+      subcommand.setName("join").setDescription("Join the open tournament lobby")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand.setName("leave").setDescription("Leave the open tournament lobby")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand.setName("start").setDescription("Start the open tournament lobby")
+    )
+    .addSubcommand((subcommand) =>
       subcommand.setName("status").setDescription("Show the active tournament status")
     )
     .addSubcommand((subcommand) =>
@@ -457,10 +464,50 @@ export const tournamentCommand: Command = {
       if (subcommand === "status") {
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
-          await interaction.reply({
-            content: "No active tournament for this server.",
-            ...ephemeralFlags,
-          });
+          const lobby = await context.services.tournaments.getLobby(guildId);
+          if (!lobby) {
+            await interaction.reply({
+              content: "No active tournament or lobby for this server.",
+              ...ephemeralFlags,
+            });
+            return;
+          }
+          const participants = await context.services.tournaments.listLobbyParticipants(lobby.id);
+          const lobbyEmbed = new EmbedBuilder()
+            .setTitle("Tournament lobby")
+            .setDescription("Use /tournament join, /tournament leave, or /tournament start.")
+            .setColor(0x3498db)
+            .addFields(
+              { name: "Format", value: formatTournamentFormat(lobby.format), inline: true },
+              { name: "Time", value: formatTime(lobby.lengthMinutes * 60), inline: true },
+              { name: "Capacity", value: String(lobby.maxParticipants), inline: true },
+              {
+                name: "Rating ranges",
+                value: formatRatingRanges(lobby.ratingRanges),
+                inline: true,
+              },
+              { name: "Tags", value: formatTags(lobby.tags), inline: true },
+              {
+                name: "Participants",
+                value: buildLobbyUsersValue(participants),
+                inline: false,
+              }
+            );
+          if (lobby.format === "arena") {
+            lobbyEmbed.spliceFields(3, 0, {
+              name: "Problems",
+              value: String(lobby.arenaProblemCount ?? DEFAULT_ARENA_PROBLEM_COUNT),
+              inline: true,
+            });
+          }
+          if (lobby.format === "swiss" && lobby.swissRounds) {
+            lobbyEmbed.addFields({
+              name: "Swiss rounds",
+              value: String(lobby.swissRounds),
+              inline: true,
+            });
+          }
+          await interaction.reply({ embeds: [lobbyEmbed], ...ephemeralFlags });
           return;
         }
 
@@ -675,10 +722,27 @@ export const tournamentCommand: Command = {
       if (subcommand === "cancel") {
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
-          await interaction.reply({
-            content: "No active tournament to cancel.",
-            ...ephemeralFlags,
-          });
+          const lobby = await context.services.tournaments.getLobby(guildId);
+          if (!lobby) {
+            await interaction.reply({
+              content: "No active tournament or lobby to cancel.",
+              ...ephemeralFlags,
+            });
+            return;
+          }
+          const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+          if (!isAdmin && lobby.hostUserId !== interaction.user.id) {
+            await interaction.reply({
+              content: "Only the host or an admin can cancel a lobby.",
+              ...ephemeralFlags,
+            });
+            return;
+          }
+          await interaction.deferReply({ ...ephemeralFlags });
+          const cancelled = await context.services.tournaments.cancelLobby(guildId);
+          await interaction.editReply(
+            cancelled ? "Tournament lobby cancelled." : "No lobby found."
+          );
           return;
         }
 
@@ -764,17 +828,39 @@ export const tournamentCommand: Command = {
           await interaction.editReply("An active tournament already exists for this server.");
           return;
         }
+        const existingLobby = await context.services.tournaments.getLobby(guildId);
+        if (existingLobby) {
+          await interaction.editReply(
+            "A tournament lobby is already open. Use /tournament join or /tournament start."
+          );
+          return;
+        }
 
-        const participants = new Map<string, User>([[interaction.user.id, interaction.user]]);
+        const swissRounds = format === "swiss" ? (roundsOption ?? null) : null;
+        const arenaCount = format === "arena" ? arenaProblemCount : null;
+        const lobby = await context.services.tournaments.createLobby({
+          guildId,
+          channelId: interaction.channelId,
+          hostUserId: interaction.user.id,
+          format,
+          lengthMinutes: length,
+          maxParticipants,
+          ratingRanges: rangeResult.ranges,
+          tags: tagsRaw,
+          swissRounds,
+          arenaProblemCount: arenaCount,
+        });
         const lobbyEmbed = new EmbedBuilder()
           .setTitle("Tournament lobby")
-          .setDescription("Click Join to participate. The host can start when ready.")
+          .setDescription("Use /tournament join, /tournament leave, or /tournament start.")
           .setColor(0x3498db)
           .addFields(
             { name: "Format", value: formatTournamentFormat(format), inline: true },
             { name: "Time", value: formatTime(length * 60), inline: true },
             { name: "Capacity", value: String(maxParticipants), inline: true },
-            { name: "Users", value: buildUsersValue([...participants.values()]), inline: false }
+            { name: "Rating ranges", value: formatRatingRanges(lobby.ratingRanges), inline: true },
+            { name: "Tags", value: formatTags(lobby.tags), inline: true },
+            { name: "Participants", value: buildLobbyUsersValue([lobby.hostUserId]) }
           );
         if (format === "arena") {
           lobbyEmbed.spliceFields(3, 0, {
@@ -783,166 +869,157 @@ export const tournamentCommand: Command = {
             inline: true,
           });
         }
-
-        const joinId = `tournament_join_${interaction.id}`;
-        const leaveId = `tournament_leave_${interaction.id}`;
-        const startId = `tournament_start_${interaction.id}`;
-        const cancelId = `tournament_cancel_${interaction.id}`;
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId(joinId).setLabel("Join").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder()
-            .setCustomId(leaveId)
-            .setLabel("Leave")
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId(startId).setLabel("Start").setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId(cancelId)
-            .setLabel("Cancel")
-            .setStyle(ButtonStyle.Secondary)
-        );
-
-        const response = await interaction.followUp({
+        if (format === "swiss" && swissRounds) {
+          lobbyEmbed.addFields({ name: "Swiss rounds", value: String(swissRounds), inline: true });
+        }
+        await interaction.editReply({
+          content: "Lobby created. Invite players with /tournament join.",
           embeds: [lobbyEmbed],
-          components: [row],
-          fetchReply: true,
         });
+        return;
+      }
 
-        const collector = response.createMessageComponentCollector({
-          componentType: ComponentType.Button,
-          time: OPEN_LOBBY_TIMEOUT_MS,
-        });
-
-        collector.on("collect", async (button) => {
-          if (button.customId === joinId) {
-            if (participants.has(button.user.id)) {
-              await button.reply({ content: "You already joined.", ...privateFlags });
-              return;
-            }
-            if (participants.size >= maxParticipants) {
-              await button.reply({
-                content: `Lobby is full (max ${maxParticipants}).`,
-                ...privateFlags,
-              });
-              return;
-            }
-            const conflicts = await context.services.challenges.getActiveChallengesForUsers(
-              guildId,
-              [button.user.id]
-            );
-            if (conflicts.has(button.user.id)) {
-              const challenge = conflicts.get(button.user.id)!;
-              await button.reply({
-                content: `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
-                  challenge.endsAt
-                )}).`,
-                ...privateFlags,
-              });
-              return;
-            }
-            const linked = await context.services.store.handleLinked(guildId, button.user.id);
-            if (!linked) {
-              await button.reply({
-                content: "Link a handle with /register first.",
-                ...privateFlags,
-              });
-              return;
-            }
-            participants.set(button.user.id, button.user);
-            lobbyEmbed.spliceFields(3, 1, {
-              name: "Users",
-              value: buildUsersValue([...participants.values()]),
-              inline: false,
-            });
-            await button.update({ embeds: [lobbyEmbed], components: [row] });
-            return;
-          }
-
-          if (button.customId === leaveId) {
-            if (!participants.has(button.user.id)) {
-              await button.reply({ content: "You are not in this lobby.", ...privateFlags });
-              return;
-            }
-            if (button.user.id === interaction.user.id) {
-              await button.reply({
-                content: "The host cannot leave. Use cancel to stop the lobby.",
-                ...privateFlags,
-              });
-              return;
-            }
-            participants.delete(button.user.id);
-            lobbyEmbed.spliceFields(3, 1, {
-              name: "Users",
-              value: buildUsersValue([...participants.values()]),
-              inline: false,
-            });
-            await button.update({ embeds: [lobbyEmbed], components: [row] });
-            return;
-          }
-
-          if (button.customId === startId) {
-            if (button.user.id !== interaction.user.id) {
-              await button.reply({ content: "Only the host can start.", ...privateFlags });
-              return;
-            }
-            if (participants.size < MIN_PARTICIPANTS) {
-              await button.reply({
-                content: `Need at least ${MIN_PARTICIPANTS} participants to start.`,
-                ...privateFlags,
-              });
-              return;
-            }
-            lobbyEmbed.setDescription("Tournament starting.");
-            await button.update({ embeds: [lobbyEmbed], components: [] });
-            collector.stop("started");
-            return;
-          }
-
-          if (button.customId === cancelId) {
-            if (button.user.id !== interaction.user.id) {
-              await button.reply({ content: "Only the host can cancel.", ...privateFlags });
-              return;
-            }
-            lobbyEmbed.setDescription("Tournament cancelled.");
-            await button.update({ embeds: [lobbyEmbed], components: [] });
-            collector.stop("cancelled");
-          }
-        });
-
-        const status = await new Promise<string>((resolve) => {
-          collector.on("end", (_collected, reason) => resolve(reason));
-        });
-
-        if (status !== "started") {
-          if (status !== "cancelled") {
-            lobbyEmbed.setDescription("Lobby timed out.");
-            await response.edit({ embeds: [lobbyEmbed], components: [] });
-          }
-          await interaction.editReply("Tournament was not started.");
+      if (subcommand === "join") {
+        const tournament = await context.services.tournaments.getActiveTournament(guildId);
+        if (tournament) {
+          await interaction.reply({
+            content: "A tournament is already active for this server.",
+            ...ephemeralFlags,
+          });
           return;
         }
+        const lobby = await context.services.tournaments.getLobby(guildId);
+        if (!lobby) {
+          await interaction.reply({
+            content: "No tournament lobby is open. Use /tournament create first.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        const participants = await context.services.tournaments.listLobbyParticipants(lobby.id);
+        if (participants.includes(interaction.user.id)) {
+          await interaction.reply({ content: "You already joined.", ...ephemeralFlags });
+          return;
+        }
+        if (participants.length >= lobby.maxParticipants) {
+          await interaction.reply({
+            content: `Lobby is full (max ${lobby.maxParticipants}).`,
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        const conflicts = await context.services.challenges.getActiveChallengesForUsers(guildId, [
+          interaction.user.id,
+        ]);
+        if (conflicts.has(interaction.user.id)) {
+          const challenge = conflicts.get(interaction.user.id)!;
+          await interaction.reply({
+            content: `You are already in an active challenge in <#${challenge.channelId}> (ends ${formatDiscordRelativeTime(
+              challenge.endsAt
+            )}).`,
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        const linked = await context.services.store.handleLinked(guildId, interaction.user.id);
+        if (!linked) {
+          await interaction.reply({
+            content: "Link a handle with /register first.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        await context.services.tournaments.addLobbyParticipant(lobby.id, interaction.user.id);
+        await interaction.reply({
+          content: `Joined the lobby (${participants.length + 1}/${lobby.maxParticipants}).`,
+          ...ephemeralFlags,
+        });
+        return;
+      }
 
-        const participantUsers = [...participants.values()];
+      if (subcommand === "leave") {
+        const lobby = await context.services.tournaments.getLobby(guildId);
+        if (!lobby) {
+          await interaction.reply({
+            content: "No tournament lobby is open.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        if (lobby.hostUserId === interaction.user.id) {
+          await interaction.reply({
+            content: "The host cannot leave. Use /tournament cancel to close the lobby.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        const removed = await context.services.tournaments.removeLobbyParticipant(
+          lobby.id,
+          interaction.user.id
+        );
+        await interaction.reply({
+          content: removed ? "You left the lobby." : "You are not in this lobby.",
+          ...ephemeralFlags,
+        });
+        return;
+      }
+
+      if (subcommand === "start") {
+        const lobby = await context.services.tournaments.getLobby(guildId);
+        if (!lobby) {
+          await interaction.reply({
+            content: "No tournament lobby is open.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        const tournament = await context.services.tournaments.getActiveTournament(guildId);
+        if (tournament) {
+          await interaction.reply({
+            content: "A tournament is already active for this server.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+        if (!isAdmin && lobby.hostUserId !== interaction.user.id) {
+          await interaction.reply({
+            content: "Only the host or an admin can start the tournament.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        const participants = await context.services.tournaments.listLobbyParticipants(lobby.id);
+        if (participants.length < MIN_PARTICIPANTS) {
+          await interaction.reply({
+            content: `Need at least ${MIN_PARTICIPANTS} participants to start.`,
+            ...ephemeralFlags,
+          });
+          return;
+        }
         const rounds =
-          format === "swiss"
-            ? (roundsOption ??
-              Math.max(DEFAULT_SWISS_MIN_ROUNDS, Math.ceil(Math.log2(participantUsers.length))))
-            : format === "elimination"
-              ? Math.max(1, Math.ceil(Math.log2(participantUsers.length)))
-              : arenaProblemCount;
+          lobby.format === "swiss"
+            ? (lobby.swissRounds ??
+              Math.max(DEFAULT_SWISS_MIN_ROUNDS, Math.ceil(Math.log2(participants.length))))
+            : lobby.format === "elimination"
+              ? Math.max(1, Math.ceil(Math.log2(participants.length)))
+              : (lobby.arenaProblemCount ?? DEFAULT_ARENA_PROBLEM_COUNT);
 
+        await interaction.deferReply({ ...ephemeralFlags });
         const result = await context.services.tournaments.createTournament({
           guildId,
-          channelId: interaction.channelId,
-          hostUserId: interaction.user.id,
-          format,
-          lengthMinutes: length,
+          channelId: lobby.channelId,
+          hostUserId: lobby.hostUserId,
+          format: lobby.format,
+          lengthMinutes: lobby.lengthMinutes,
           roundCount: rounds,
-          ratingRanges: rangeResult.ranges,
-          tags: tagsRaw,
-          participants: participantUsers.map((user) => user.id),
-          arenaProblemCount,
+          ratingRanges: lobby.ratingRanges,
+          tags: lobby.tags,
+          participants,
+          arenaProblemCount: lobby.arenaProblemCount ?? DEFAULT_ARENA_PROBLEM_COUNT,
           client: context.client,
         });
+        await context.services.tournaments.cancelLobby(guildId);
 
         if (result.kind === "arena") {
           const problemsList = result.problems
@@ -953,7 +1030,7 @@ export const tournamentCommand: Command = {
             })
             .join("\n");
           await interaction.editReply(
-            `Arena tournament created with ${participantUsers.length} participants. Ends ${formatDiscordRelativeTime(
+            `Arena tournament created with ${participants.length} participants. Ends ${formatDiscordRelativeTime(
               result.endsAt
             )}.\n${problemsList}`
           );
@@ -961,8 +1038,9 @@ export const tournamentCommand: Command = {
         }
 
         await interaction.editReply(
-          `Tournament created with ${participantUsers.length} participants. Round ${result.round.roundNumber} started (${result.round.matchCount} matches, ${result.round.byeCount} byes).`
+          `Tournament created with ${participants.length} participants. Round ${result.round.roundNumber} started (${result.round.matchCount} matches, ${result.round.byeCount} byes).`
         );
+        return;
       }
     } catch (error) {
       logCommandError("Tournament command failed.", interaction, context.correlationId, {
