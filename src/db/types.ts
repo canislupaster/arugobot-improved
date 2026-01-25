@@ -318,6 +318,14 @@ export type LogEntriesTable = {
   context_json: string | null;
 };
 
+export type InstanceLocksTable = {
+  name: string;
+  owner_id: string;
+  pid: number;
+  started_at: Generated<string>;
+  heartbeat_at: Generated<string>;
+};
+
 export type GuildSettingsTable = {
   guild_id: string;
   dashboard_public: number;
@@ -371,6 +379,7 @@ export type Database = {
   tournament_lobby_participants: TournamentLobbyParticipantsTable;
   command_metrics: CommandMetricsTable;
   log_entries: LogEntriesTable;
+  instance_locks: InstanceLocksTable;
   guild_settings: GuildSettingsTable;
   weekly_digests: WeeklyDigestsTable;
 };

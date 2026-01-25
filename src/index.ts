@@ -23,6 +23,7 @@ import { ContestService } from "./services/contests.js";
 import { ContestStandingsService } from "./services/contestStandings.js";
 import { DatabaseBackupService, databaseBackupIntervalMs } from "./services/databaseBackups.js";
 import { GuildSettingsService } from "./services/guildSettings.js";
+import { InstanceLockService } from "./services/instanceLocks.js";
 import { LogsService, logCleanupIntervalMs } from "./services/logs.js";
 import { MetricsService } from "./services/metrics.js";
 import {
@@ -58,6 +59,29 @@ async function main() {
   const logs = new LogsService(db, config.logRetentionDays);
   setLogSink(logs);
   logInfo("Configuration loaded.", { environment: config.environment });
+
+  const instanceLocks = new InstanceLockService(db);
+  const instanceOwnerId = randomUUID();
+  const instanceLockName = "bot";
+  const instanceLock = await instanceLocks.acquireLock(
+    instanceLockName,
+    instanceOwnerId,
+    process.pid,
+    config.instanceLockTtlSeconds
+  );
+  if (!instanceLock.acquired) {
+    logError("Instance lock is already held; shutting down.", {
+      lockName: instanceLockName,
+      ownerId: instanceLock.lock?.ownerId,
+      pid: instanceLock.lock?.pid,
+    });
+    throw new Error("Instance lock not acquired.");
+  }
+  logInfo("Instance lock acquired.", {
+    lockName: instanceLockName,
+    ownerId: instanceOwnerId,
+    pid: process.pid,
+  });
 
   const requestPool = await createRequestPool({
     proxyFetchUrl: config.proxyFetchUrl,
@@ -121,6 +145,7 @@ async function main() {
   let logCleanupInterval: NodeJS.Timeout | null = null;
   let weeklyDigestInterval: NodeJS.Timeout | null = null;
   let databaseBackupInterval: NodeJS.Timeout | null = null;
+  let instanceLockInterval: NodeJS.Timeout | null = null;
   let webServer: ServerType | null = null;
   let shuttingDown = false;
   let isChallengeTicking = false;
@@ -342,7 +367,17 @@ async function main() {
         weeklyDigest,
       },
     };
-    await handleCommandInteraction(interaction, commandMap, context, cooldowns, correlationId);
+    try {
+      await handleCommandInteraction(interaction, commandMap, context, cooldowns, correlationId);
+    } catch (error) {
+      logError("Interaction handler failed.", {
+        correlationId,
+        command: interaction.commandName,
+        guildId: interaction.guildId ?? undefined,
+        userId: interaction.user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   const shutdown = async (signal: string) => {
@@ -378,6 +413,9 @@ async function main() {
     if (databaseBackupInterval) {
       clearInterval(databaseBackupInterval);
     }
+    if (instanceLockInterval) {
+      clearInterval(instanceLockInterval);
+    }
     if (webServer) {
       await new Promise<void>((resolve) => {
         webServer?.close(() => resolve());
@@ -385,6 +423,7 @@ async function main() {
       webServer = null;
     }
     await client.destroy();
+    await instanceLocks.release(instanceLockName, instanceOwnerId);
     setLogSink(null);
     await destroyDb();
     logInfo("Shutdown complete.");
@@ -415,6 +454,27 @@ async function main() {
     await runDatabaseBackup();
     databaseBackupInterval = setInterval(runDatabaseBackup, databaseBackupIntervalMs);
   }
+
+  instanceLockInterval = setInterval(async () => {
+    if (shuttingDown) {
+      return;
+    }
+    try {
+      const ok = await instanceLocks.heartbeat(instanceLockName, instanceOwnerId);
+      if (!ok) {
+        logWarn("Instance lock heartbeat failed.", {
+          lockName: instanceLockName,
+          ownerId: instanceOwnerId,
+        });
+      }
+    } catch (error) {
+      logWarn("Instance lock heartbeat error.", {
+        lockName: instanceLockName,
+        ownerId: instanceOwnerId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, config.instanceLockHeartbeatSeconds * 1000);
 
   await validateConnectivity();
   await client.login(config.discordToken);

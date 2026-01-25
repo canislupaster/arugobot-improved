@@ -2,6 +2,7 @@ import { PermissionFlagsBits, type ChatInputCommandInteraction } from "discord.j
 
 import type { CommandContext } from "../types/commandContext.js";
 import type { CooldownManager } from "../utils/cooldown.js";
+import { safeInteractionReply } from "../utils/interaction.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
@@ -25,18 +26,11 @@ async function sendErrorResponse(
   correlationId: string,
   latencyMs: number
 ): Promise<void> {
-  try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content: "Something went wrong." });
-    } else {
-      await interaction.reply({ content: "Something went wrong." });
-    }
-  } catch (error) {
-    logWarn("Failed to send error response.", {
-      ...buildLogContext(interaction, correlationId, latencyMs),
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  await safeInteractionReply(
+    interaction,
+    { content: "Something went wrong." },
+    buildLogContext(interaction, correlationId, latencyMs)
+  );
 }
 
 export async function handleCommandInteraction(
@@ -51,7 +45,11 @@ export async function handleCommandInteraction(
   const command = commands.get(interaction.commandName);
   if (!command) {
     logWarn("Unknown command.", buildLogContext(interaction, correlationId, getLatencyMs()));
-    await interaction.reply({ content: "Unknown command." });
+    await safeInteractionReply(
+      interaction,
+      { content: "Unknown command." },
+      buildLogContext(interaction, correlationId, getLatencyMs())
+    );
     return;
   }
 
@@ -62,9 +60,11 @@ export async function handleCommandInteraction(
         "Command blocked (permissions).",
         buildLogContext(interaction, correlationId, getLatencyMs())
       );
-      await interaction.reply({
-        content: "You do not have permission to use this command.",
-      });
+      await safeInteractionReply(
+        interaction,
+        { content: "You do not have permission to use this command." },
+        buildLogContext(interaction, correlationId, getLatencyMs())
+      );
       return;
     }
   }
@@ -75,9 +75,11 @@ export async function handleCommandInteraction(
       ...buildLogContext(interaction, correlationId, getLatencyMs()),
       retryAfterSeconds: cooldown.retryAfterSeconds,
     });
-    await interaction.reply({
-      content: `Too many requests. Try again in ${cooldown.retryAfterSeconds}s.`,
-    });
+    await safeInteractionReply(
+      interaction,
+      { content: `Too many requests. Try again in ${cooldown.retryAfterSeconds}s.` },
+      buildLogContext(interaction, correlationId, getLatencyMs())
+    );
     return;
   }
 

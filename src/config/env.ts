@@ -15,6 +15,8 @@ export type AppConfig = {
   logRetentionDays: number;
   databaseBackupDir?: string;
   databaseBackupRetentionDays: number;
+  instanceLockTtlSeconds: number;
+  instanceLockHeartbeatSeconds: number;
   webHost: string;
   webPort: number;
   webPublicUrl?: string;
@@ -69,6 +71,15 @@ export function validateConfig(config: AppConfig): string[] {
   ) {
     errors.push("DATABASE_BACKUP_RETENTION_DAYS must be 0 or greater.");
   }
+  if (!Number.isFinite(config.instanceLockTtlSeconds) || config.instanceLockTtlSeconds <= 0) {
+    errors.push("INSTANCE_LOCK_TTL_SECONDS must be greater than 0.");
+  }
+  if (
+    !Number.isFinite(config.instanceLockHeartbeatSeconds) ||
+    config.instanceLockHeartbeatSeconds <= 0
+  ) {
+    errors.push("INSTANCE_LOCK_HEARTBEAT_SECONDS must be greater than 0.");
+  }
   if (!["development", "production", "test"].includes(config.environment)) {
     errors.push("NODE_ENV must be one of development, production, or test.");
   }
@@ -104,6 +115,11 @@ export function loadConfig(): AppConfig {
     process.env.DATABASE_BACKUP_RETENTION_DAYS ?? "7",
     7
   );
+  const instanceLockTtlSeconds = parseNumber(process.env.INSTANCE_LOCK_TTL_SECONDS ?? "120", 120);
+  const instanceLockHeartbeatSeconds = parseNumber(
+    process.env.INSTANCE_LOCK_HEARTBEAT_SECONDS ?? "30",
+    30
+  );
   const webHost = process.env.WEB_HOST?.trim() || "0.0.0.0";
   const webPort = parseNumber(process.env.WEB_PORT ?? "8787", 8787);
   const webPublicUrlRaw = process.env.WEB_PUBLIC_URL?.trim();
@@ -122,6 +138,8 @@ export function loadConfig(): AppConfig {
     logRetentionDays,
     databaseBackupDir,
     databaseBackupRetentionDays,
+    instanceLockTtlSeconds,
+    instanceLockHeartbeatSeconds,
     webHost,
     webPort,
     webPublicUrl,
