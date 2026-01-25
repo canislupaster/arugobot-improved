@@ -264,6 +264,56 @@ describe("contestRemindersCommand", () => {
     expect(payload.flags).toBeUndefined();
   });
 
+  it("previews gym reminders using the gym scope", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("preview"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn().mockReturnValue(null),
+      },
+    });
+    const refresh = jest.fn().mockResolvedValue(undefined);
+    const getUpcoming = jest.fn().mockReturnValue([
+      {
+        id: 202,
+        name: "Gym Round",
+        phase: "BEFORE",
+        startTimeSeconds: 1_700_000_000,
+        durationSeconds: 7200,
+      },
+    ]);
+    const context = {
+      correlationId: "corr-4b",
+      services: {
+        contestReminders: {
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-2",
+              guildId: "guild-1",
+              channelId: "channel-1",
+              minutesBefore: 30,
+              roleId: null,
+              includeKeywords: [],
+              excludeKeywords: [],
+              scope: "gym",
+            },
+          ]),
+        },
+        contests: {
+          refresh,
+          getUpcoming,
+          getLastRefreshAt: jest.fn().mockReturnValue(1_700_000_000),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRemindersCommand.execute(interaction, context);
+
+    expect(refresh).toHaveBeenCalledWith(false, "gym");
+    expect(getUpcoming).toHaveBeenCalledWith(10, "gym");
+  });
+
   it("returns an error when previewing without a subscription", async () => {
     const interaction = createInteraction({
       options: {

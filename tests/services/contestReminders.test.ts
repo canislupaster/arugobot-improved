@@ -213,6 +213,20 @@ describe("ContestReminderService", () => {
     expect(notifications[0]?.subscription_id).toBe(subscription.id);
   });
 
+  it("refreshes both scopes for all-contest subscriptions", async () => {
+    contestService.getUpcomingContests.mockReturnValue([]);
+
+    const service = new ContestReminderService(db, contestService);
+    await service.createSubscription("guild-1", "channel-1", 15, null, [], [], "all");
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "official");
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "gym");
+  });
+
   it("skips refresh when there are no subscriptions", async () => {
     const service = new ContestReminderService(db, contestService);
     const send = jest.fn().mockResolvedValue(undefined);
@@ -323,6 +337,39 @@ describe("ContestReminderService", () => {
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.contest_id).toBe(501);
     expect(notifications[0]?.subscription_id).toBe(subscription.id);
+  });
+
+  it("refreshes all scopes before sending manual reminders", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.getUpcomingContests.mockReturnValue([
+      {
+        id: 701,
+        name: "Combined Round",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 30 * 60,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestReminderService(db, contestService);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      30,
+      null,
+      [],
+      [],
+      "all"
+    );
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    const result = await service.sendManualReminder(subscription, client, false);
+
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "official");
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "gym");
+    expect(result.status).toBe("sent");
   });
 
   it("reports already-notified contests when posting manually", async () => {
