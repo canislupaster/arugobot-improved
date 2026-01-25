@@ -11,6 +11,7 @@ import { Canvas } from "skia-canvas";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { resolveTargetLabels } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -132,8 +133,7 @@ export const ratingCommand: Command = {
     const member = interaction.options.getMember("user");
     const user = interaction.options.getUser("user") ?? interaction.user;
     const targetId = user.id;
-    const targetName = member && "displayName" in member ? member.displayName : user.username;
-    const targetMention = member && "toString" in member ? member.toString() : user.toString();
+    const { displayName: targetName, mention: targetMention } = resolveTargetLabels(user, member);
 
     await interaction.deferReply();
 

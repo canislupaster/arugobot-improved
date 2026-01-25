@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { resolveTargetLabels } from "../utils/interaction.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -152,8 +153,7 @@ export const profileCommand: Command = {
 
     const user = userOption ?? interaction.user;
     const targetId = user.id;
-    const targetName = member && "displayName" in member ? member.displayName : user.username;
-    const targetMention = member && "toString" in member ? member.toString() : user.toString();
+    const { displayName: targetName, mention: targetMention } = resolveTargetLabels(user, member);
 
     await interaction.deferReply();
 

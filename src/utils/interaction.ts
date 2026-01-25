@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction, InteractionReplyOptions } from "discord.js";
+import type { ChatInputCommandInteraction, InteractionReplyOptions, User } from "discord.js";
 import { DiscordAPIError } from "discord.js";
 
 import type { LogContext } from "./logger.js";
@@ -55,4 +55,25 @@ export async function safeInteractionReply(
     });
     return false;
   }
+}
+
+type DisplayNameMember = {
+  displayName?: string;
+  toString?: () => string;
+};
+
+export function resolveTargetLabels(user: User, member: unknown) {
+  const displayName =
+    member && typeof member === "object" && "displayName" in member
+      ? (member as DisplayNameMember).displayName ?? user.username
+      : user.username;
+  const memberToString =
+    member && typeof member === "object" && "toString" in member
+      ? (member as DisplayNameMember).toString
+      : undefined;
+  const mention =
+    typeof memberToString === "function" && memberToString !== Object.prototype.toString
+      ? memberToString.call(member)
+      : user.toString();
+  return { displayName, mention };
 }
