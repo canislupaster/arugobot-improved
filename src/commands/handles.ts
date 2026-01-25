@@ -13,6 +13,19 @@ import type { Command } from "./types.js";
 
 const PAGE_SIZE = 10;
 
+const buildRosterLines = (
+  roster: Array<{ userId: string; handle: string; rating: number }>,
+  start: number,
+  count: number
+) =>
+  roster
+    .slice(start, start + count)
+    .map(
+      (entry, index) =>
+        `${start + index + 1}. <@${entry.userId}> - ${entry.handle} (${entry.rating})`
+    )
+    .join("\n");
+
 export const handlesCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("handles")
@@ -61,13 +74,7 @@ export const handlesCommand: Command = {
           return null;
         }
 
-        const lines = filteredRoster
-          .slice(start, start + PAGE_SIZE)
-          .map(
-            (entry, index) =>
-              `${start + index + 1}. <@${entry.userId}> - ${entry.handle} (${entry.rating})`
-          )
-          .join("\n");
+        const lines = buildRosterLines(filteredRoster, start, PAGE_SIZE);
 
         const embed = new EmbedBuilder()
           .setTitle("Linked handles")
