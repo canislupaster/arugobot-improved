@@ -5,6 +5,7 @@ Edit this file to document project structure and any features you have added. Th
 # ArugoBot
 
 Discord bot with all you need to practice competitive programming and compete against friends on Discord.
+Based on https://github.com/eggag32/ArugoBot/ and https://github.com/phattd15/arugo.
 
 ## Usage
 
