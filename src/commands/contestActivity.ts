@@ -61,6 +61,48 @@ function getParticipantCountForScope(
   return participant.contestCount;
 }
 
+function buildParticipantLines(
+  participants: Array<{
+    userId: string;
+    handle: string;
+    contestCount: number;
+    officialCount: number;
+    gymCount: number;
+  }>,
+  scope: ContestScopeFilter
+): string {
+  const countForScope = (participant: {
+    contestCount: number;
+    officialCount: number;
+    gymCount: number;
+  }) => getParticipantCountForScope(participant, scope);
+  const sorted = participants.slice().sort((a, b) => {
+    const countA = countForScope(a);
+    const countB = countForScope(b);
+    if (countB !== countA) {
+      return countB - countA;
+    }
+    return a.handle.localeCompare(b.handle);
+  });
+  return sorted
+    .filter((entry) => countForScope(entry) > 0)
+    .map(
+      (entry, index) =>
+        `${index + 1}. <@${entry.userId}> (${entry.handle}) - ${countForScope(entry)}`
+    )
+    .join("\n");
+}
+
+function filterRecentContests<T extends { scope: "official" | "gym" }>(
+  contests: T[],
+  scope: ContestScopeFilter
+): T[] {
+  if (scope === "all") {
+    return contests;
+  }
+  return contests.filter((contest) => contest.scope === scope);
+}
+
 export const contestActivityCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contestactivity")
@@ -155,34 +197,14 @@ export const contestActivityCommand: Command = {
       }
 
       if (activity.participants.length > 0) {
-        const sorted = activity.participants.slice().sort((a, b) => {
-          const countA = getParticipantCountForScope(a, scope);
-          const countB = getParticipantCountForScope(b, scope);
-          if (countB !== countA) {
-            return countB - countA;
-          }
-          return a.handle.localeCompare(b.handle);
-        });
-        const lines = sorted
-          .filter((entry) => getParticipantCountForScope(entry, scope) > 0)
-          .map(
-            (entry, index) =>
-              `${index + 1}. <@${entry.userId}> (${entry.handle}) - ${getParticipantCountForScope(
-                entry,
-                scope
-              )}`
-          )
-          .join("\n");
-        if (lines) {
-          embed.addFields({ name: "Top participants", value: lines, inline: false });
+        const participantLines = buildParticipantLines(activity.participants, scope);
+        if (participantLines) {
+          embed.addFields({ name: "Top participants", value: participantLines, inline: false });
         }
       }
 
       if (activity.recentContests.length > 0) {
-        const filtered =
-          scope === "all"
-            ? activity.recentContests
-            : activity.recentContests.filter((contest) => contest.scope === scope);
+        const filtered = filterRecentContests(activity.recentContests, scope);
         if (filtered.length > 0) {
           const lines = filtered.map(formatContestLine).join("\n");
           embed.addFields({ name: "Recent contests", value: lines, inline: false });
