@@ -1,4 +1,9 @@
-import type { ChatInputCommandInteraction, InteractionReplyOptions, User } from "discord.js";
+import type {
+  InteractionEditReplyOptions,
+  InteractionReplyOptions,
+  RepliableInteraction,
+  User,
+} from "discord.js";
 import { DiscordAPIError } from "discord.js";
 
 import { getErrorMessage } from "./errors.js";
@@ -24,7 +29,7 @@ export function isIgnorableInteractionError(error: unknown): boolean {
 }
 
 export async function safeInteractionReply(
-  interaction: ChatInputCommandInteraction,
+  interaction: RepliableInteraction,
   options: InteractionReplyOptions,
   context?: LogContext
 ): Promise<boolean> {
@@ -44,6 +49,30 @@ export async function safeInteractionReply(
       return false;
     }
     logWarn("Interaction response failed.", {
+      ...context,
+      error: getErrorMessage(error) || String(error),
+    });
+    return false;
+  }
+}
+
+export async function safeInteractionEdit(
+  interaction: RepliableInteraction,
+  options: InteractionEditReplyOptions | string,
+  context?: LogContext
+): Promise<boolean> {
+  try {
+    await interaction.editReply(options);
+    return true;
+  } catch (error) {
+    if (isIgnorableInteractionError(error)) {
+      logWarn("Skipping interaction edit (already acknowledged).", {
+        ...context,
+        error: getErrorMessage(error) || String(error),
+      });
+      return false;
+    }
+    logWarn("Interaction edit failed.", {
       ...context,
       error: getErrorMessage(error) || String(error),
     });

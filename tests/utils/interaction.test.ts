@@ -1,4 +1,8 @@
-import { resolveTargetLabels } from "../../src/utils/interaction.js";
+import {
+  resolveTargetLabels,
+  safeInteractionEdit,
+  safeInteractionReply,
+} from "../../src/utils/interaction.js";
 
 type FakeUser = { username: string; toString: () => string };
 
@@ -43,5 +47,45 @@ describe("resolveTargetLabels", () => {
       displayName: "Aru",
       mention: "<@123>",
     });
+  });
+});
+
+describe("safe interaction helpers", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      deferred: false,
+      replied: false,
+      reply: jest.fn().mockResolvedValue(undefined),
+      followUp: jest.fn().mockResolvedValue(undefined),
+      editReply: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    }) as unknown as { [key: string]: unknown };
+
+  it("replies directly when not deferred", async () => {
+    const interaction = createInteraction();
+
+    await expect(safeInteractionReply(interaction as never, { content: "Hi" })).resolves.toBe(true);
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Hi" });
+    expect(interaction.followUp).not.toHaveBeenCalled();
+  });
+
+  it("follows up when deferred", async () => {
+    const interaction = createInteraction({ deferred: true });
+
+    await expect(safeInteractionReply(interaction as never, { content: "Hi" })).resolves.toBe(true);
+
+    expect(interaction.followUp).toHaveBeenCalledWith({ content: "Hi" });
+    expect(interaction.reply).not.toHaveBeenCalled();
+  });
+
+  it("returns false for ignorable edit errors", async () => {
+    const interaction = createInteraction({
+      editReply: jest.fn().mockRejectedValue(new Error("Unknown interaction")),
+    });
+
+    await expect(safeInteractionEdit(interaction as never, "Nope")).resolves.toBe(false);
+
+    expect(interaction.editReply).toHaveBeenCalledWith("Nope");
   });
 });

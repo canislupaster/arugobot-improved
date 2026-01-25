@@ -31,6 +31,7 @@ import {
   formatTournamentRecapCsv,
   formatTournamentRecapMarkdown,
 } from "../utils/tournamentRecap.js";
+import { safeInteractionEdit, safeInteractionReply } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -60,14 +61,16 @@ async function respondToInteraction(
   if (interaction.deferred) {
     const editPayload =
       typeof payload === "string" ? payload : (payload as InteractionEditReplyOptions);
-    await interaction.editReply(editPayload);
+    await safeInteractionEdit(interaction, editPayload);
     return;
   }
   if (interaction.replied) {
-    await interaction.followUp(payload);
+    const replyPayload = typeof payload === "string" ? { content: payload } : payload;
+    await safeInteractionReply(interaction, replyPayload);
     return;
   }
-  await interaction.reply(payload);
+  const replyPayload = typeof payload === "string" ? { content: payload } : payload;
+  await safeInteractionReply(interaction, replyPayload);
 }
 
 async function deferIfNeeded(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -398,7 +401,7 @@ export const tournamentCommand: Command = {
               return;
             }
             if (selection.user.id !== interaction.user.id) {
-              await selection.reply({
+              await safeInteractionReply(selection, {
                 content: "Only the command user can use this menu.",
                 flags: MessageFlags.Ephemeral,
               });
@@ -414,12 +417,12 @@ export const tournamentCommand: Command = {
               HISTORY_DETAIL_STANDINGS_LIMIT
             );
             if (!detail) {
-              await selection.editReply("Tournament not found.");
+              await safeInteractionEdit(selection, "Tournament not found.");
               return;
             }
             const detailEmbed = buildHistoryDetailEmbed(detail);
             const enabledExportRow = buildHistoryExportRow(interaction.id, false);
-            await selection.editReply({
+            await safeInteractionEdit(selection, {
               embeds: [detailEmbed],
               components: [selectRow, paginationRow, enabledExportRow],
             });
@@ -430,7 +433,10 @@ export const tournamentCommand: Command = {
               context.correlationId
             );
             if (!selection.deferred && !selection.replied) {
-              await selection.reply({ content: "Something went wrong.", flags: MessageFlags.Ephemeral });
+              await safeInteractionReply(selection, {
+                content: "Something went wrong.",
+                flags: MessageFlags.Ephemeral,
+              });
             }
           }
         });
@@ -443,7 +449,7 @@ export const tournamentCommand: Command = {
         buttonCollector.on("collect", async (button) => {
           try {
             if (button.user.id !== interaction.user.id) {
-              await button.reply({
+              await safeInteractionReply(button, {
                 content: "Only the command user can use this button.",
                 flags: MessageFlags.Ephemeral,
               });
@@ -468,7 +474,7 @@ export const tournamentCommand: Command = {
               selectRow = buildSelectRow(currentEntries);
               paginationRow = buildPaginationRow(paginationIds, currentPage, totalPages);
               const disabledExportRow = buildHistoryExportRow(interaction.id, true);
-              await interaction.editReply({
+              await safeInteractionEdit(interaction, {
                 embeds: [buildListEmbed(currentEntries, currentPage)],
                 components: [selectRow, paginationRow, disabledExportRow],
               });
@@ -481,7 +487,7 @@ export const tournamentCommand: Command = {
               return;
             }
             if (!selectedTournamentId) {
-              await button.reply({
+              await safeInteractionReply(button, {
                 content: "Select a tournament first.",
                 flags: MessageFlags.Ephemeral,
               });
@@ -494,7 +500,7 @@ export const tournamentCommand: Command = {
               selectedTournamentId
             );
             if (!recap) {
-              await button.editReply("Tournament not found.");
+              await safeInteractionEdit(button, "Tournament not found.");
               return;
             }
             const payload = isCsv
@@ -504,7 +510,10 @@ export const tournamentCommand: Command = {
             const shortId = selectedTournamentId.slice(0, 8);
             const filename = `tournament-recap-${shortId}.${extension}`;
             const file = new AttachmentBuilder(Buffer.from(payload), { name: filename });
-            await button.editReply({ content: "Tournament recap export:", files: [file] });
+            await safeInteractionEdit(button, {
+              content: "Tournament recap export:",
+              files: [file],
+            });
           } catch (error) {
             logCommandError(
               `Error exporting tournament recap: ${String(error)}`,
@@ -512,9 +521,12 @@ export const tournamentCommand: Command = {
               context.correlationId
             );
             if (button.deferred || button.replied) {
-              await button.editReply("Something went wrong.");
+              await safeInteractionEdit(button, "Something went wrong.");
             } else {
-              await button.reply({ content: "Something went wrong.", flags: MessageFlags.Ephemeral });
+              await safeInteractionReply(button, {
+                content: "Something went wrong.",
+                flags: MessageFlags.Ephemeral,
+              });
             }
           }
         });
@@ -529,7 +541,7 @@ export const tournamentCommand: Command = {
               true
             );
             const disabledExportRow = buildHistoryExportRow(interaction.id, true);
-            await interaction.editReply({
+            await safeInteractionEdit(interaction, {
               components: [disabledSelectRow, disabledPaginationRow, disabledExportRow],
             });
           } catch {
