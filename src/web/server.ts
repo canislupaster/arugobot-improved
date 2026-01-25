@@ -1,4 +1,4 @@
-import { serve, type ServerType } from "@hono/node-server";
+import { createAdaptorServer, type ServerType } from "@hono/node-server";
 import type { Client } from "discord.js";
 
 import type { WebsiteService } from "../services/website.js";
@@ -11,17 +11,26 @@ export type WebServerConfig = {
   port: number;
 };
 
-export function startWebServer(
+export async function startWebServer(
   config: WebServerConfig,
   deps: { website: WebsiteService; client: Client }
-): ServerType | null {
+): Promise<ServerType | null> {
   const app = createWebApp(deps);
-  try {
-    const server = serve({
-      fetch: app.fetch,
-      port: config.port,
-      hostname: config.host,
-    });
+  const server = createAdaptorServer({
+    fetch: app.fetch,
+    hostname: config.host,
+  });
+
+  return await new Promise((resolve) => {
+    let resolved = false;
+    const finalize = (value: ServerType | null) => {
+      if (resolved) {
+        return;
+      }
+      resolved = true;
+      resolve(value);
+    };
+
     server.on("error", (error) => {
       const err = error as NodeJS.ErrnoException;
       logError("Web server error.", {
@@ -30,15 +39,12 @@ export function startWebServer(
         code: err.code ?? "unknown",
         message: err.message,
       });
+      finalize(null);
     });
-    logInfo("Web server started.", { host: config.host, port: config.port });
-    return server;
-  } catch (error) {
-    logError("Web server failed to start.", {
-      host: config.host,
-      port: config.port,
-      error: error instanceof Error ? error.message : String(error),
+
+    server.listen(config.port, config.host, () => {
+      logInfo("Web server started.", { host: config.host, port: config.port });
+      finalize(server);
     });
-    return null;
-  }
+  });
 }

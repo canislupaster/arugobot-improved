@@ -287,7 +287,10 @@ async function main() {
     logError(`Uncaught exception: ${String(error)}`);
   });
 
-  webServer = startWebServer({ host: config.webHost, port: config.webPort }, { website, client });
+  webServer = await startWebServer(
+    { host: config.webHost, port: config.webPort },
+    { website, client }
+  );
 
   await validateConnectivity();
   await client.login(config.discordToken);
