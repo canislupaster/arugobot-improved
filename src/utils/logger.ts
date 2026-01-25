@@ -1,3 +1,5 @@
+import { getErrorMessage } from "./errors.js";
+
 export type LogContext = Record<string, unknown> & {
   correlationId?: string;
   command?: string;
@@ -27,14 +29,7 @@ export function setLogSink(sink: LogSink | null) {
 }
 
 function shouldSuppressSinkError(error: unknown): boolean {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : typeof error === "object" && error !== null && "message" in error
-          ? String((error as { message: unknown }).message)
-          : "";
+  const message = getErrorMessage(error);
   if (!message) {
     return false;
   }
@@ -72,7 +67,7 @@ function write(level: LogLevel, message: string, context?: LogContext) {
         timestamp: new Date().toISOString(),
         level: "error",
         message: "Log sink failed.",
-        error: error instanceof Error ? error.message : String(error),
+        error: getErrorMessage(error) || String(error),
       });
       console.error(fallback);
     });

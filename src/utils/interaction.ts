@@ -1,6 +1,7 @@
 import type { ChatInputCommandInteraction, InteractionReplyOptions, User } from "discord.js";
 import { DiscordAPIError } from "discord.js";
 
+import { getErrorMessage } from "./errors.js";
 import type { LogContext } from "./logger.js";
 import { logWarn } from "./logger.js";
 
@@ -11,14 +12,7 @@ export function isIgnorableInteractionError(error: unknown): boolean {
     const code = typeof error.code === "number" ? error.code : Number(error.code);
     return Number.isFinite(code) && IGNORABLE_CODES.has(code);
   }
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : typeof error === "object" && error !== null && "message" in error
-          ? String((error as { message: unknown }).message)
-          : "";
+  const message = getErrorMessage(error);
   if (!message) {
     return false;
   }
@@ -45,13 +39,13 @@ export async function safeInteractionReply(
     if (isIgnorableInteractionError(error)) {
       logWarn("Skipping interaction response (already acknowledged).", {
         ...context,
-        error: error instanceof Error ? error.message : String(error),
+        error: getErrorMessage(error) || String(error),
       });
       return false;
     }
     logWarn("Interaction response failed.", {
       ...context,
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error) || String(error),
     });
     return false;
   }
