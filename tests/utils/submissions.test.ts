@@ -1,4 +1,8 @@
-import { filterSubmissionsByResult, formatSubmissionLine } from "../../src/utils/submissions.js";
+import {
+  filterSubmissionsByResult,
+  formatSubmissionLine,
+  formatSubmissionLines,
+} from "../../src/utils/submissions.js";
 
 describe("formatSubmissionLine", () => {
   it("formats contest submissions with links", () => {
@@ -68,5 +72,30 @@ describe("filterSubmissionsByResult", () => {
     const filtered = filterSubmissionsByResult(submissions, "rejected");
     expect(filtered).toHaveLength(2);
     expect(filtered.every((entry) => entry.verdict !== "OK")).toBe(true);
+  });
+});
+
+describe("formatSubmissionLines", () => {
+  it("formats multiple submissions as newline-separated lines", () => {
+    const lines = formatSubmissionLines([
+      {
+        contestId: 1000,
+        index: "A",
+        name: "Accepted Problem",
+        verdict: "OK",
+        creationTimeSeconds: 1_700_000_000,
+      },
+      {
+        contestId: null,
+        index: "B",
+        name: "Practice Problem",
+        verdict: null,
+        creationTimeSeconds: 1_700_000_100,
+      },
+    ]);
+
+    expect(lines.split("\n")).toHaveLength(2);
+    expect(lines).toContain("Accepted Problem");
+    expect(lines).toContain("Practice Problem");
   });
 });

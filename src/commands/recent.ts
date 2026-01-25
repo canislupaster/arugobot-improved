@@ -6,7 +6,7 @@ import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
 import {
   filterSubmissionsByResult,
-  formatSubmissionLine,
+  formatSubmissionLines,
   type SubmissionResultFilter,
 } from "../utils/submissions.js";
 
@@ -105,7 +105,7 @@ export const recentCommand: Command = {
         return;
       }
 
-      const lines = filtered.map(formatSubmissionLine).join("\n");
+      const lines = formatSubmissionLines(filtered);
       const filterLabel = RESULT_FILTER_LABELS[resultFilter] ?? "all";
       const titleSuffix = filterLabel === "all" ? "" : ` (${filterLabel})`;
       const embed = new EmbedBuilder()

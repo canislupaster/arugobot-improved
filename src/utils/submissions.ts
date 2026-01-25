@@ -31,3 +31,7 @@ export function formatSubmissionLine(submission: SubmissionSummary): string {
   }
   return `- ${submission.index}. ${submission.name} • ${verdict} • ${when}`;
 }
+
+export function formatSubmissionLines(submissions: SubmissionSummary[]): string {
+  return submissions.map(formatSubmissionLine).join("\n");
+}

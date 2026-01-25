@@ -5,7 +5,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
-import { formatSubmissionLine } from "../utils/submissions.js";
+import { formatSubmissionLines } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -80,7 +80,7 @@ async function loadRecentSubmissions(
     return { lines: "Unable to fetch recent submissions right now.", isStale: false };
   }
   return {
-    lines: recent.submissions.map(formatSubmissionLine).join("\n"),
+    lines: formatSubmissionLines(recent.submissions),
     isStale: recent.isStale,
   };
 }
