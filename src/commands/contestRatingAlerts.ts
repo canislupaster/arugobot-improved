@@ -9,9 +9,25 @@ import { ephemeralFlags } from "../utils/discordFlags.js";
 
 import type { Command } from "./types.js";
 
+function parseHandleFilter(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+  const handles = value
+    .split(",")
+    .map((handle) => handle.trim().toLowerCase())
+    .filter((handle) => handle.length > 0);
+  return Array.from(new Set(handles));
+}
+
 function formatSubscriptionSummary(subscription: ContestRatingAlertSubscription): string {
   const role = subscription.roleId ? `<@&${subscription.roleId}>` : "None";
-  return `Channel: <#${subscription.channelId}>\nRole: ${role}\nID: \`${subscription.id}\``;
+  const minDelta = subscription.minDelta > 0 ? String(subscription.minDelta) : "None";
+  const handles =
+    subscription.includeHandles.length > 0
+      ? subscription.includeHandles.join(", ")
+      : "All linked handles";
+  return `Channel: <#${subscription.channelId}>\nRole: ${role}\nMin delta: ${minDelta}\nHandles: ${handles}\nID: \`${subscription.id}\``;
 }
 
 function resolveSubscriptionId(
@@ -50,6 +66,17 @@ export const contestRatingAlertsCommand: Command = {
         )
         .addRoleOption((option) =>
           option.setName("role").setDescription("Role to mention for alerts")
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("min_delta")
+            .setDescription("Minimum rating delta to include in alerts")
+            .setMinValue(0)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("handles")
+            .setDescription("Comma-separated handles to include (linked handles only)")
         )
     )
     .addSubcommand((subcommand) =>
@@ -152,15 +179,26 @@ export const contestRatingAlertsCommand: Command = {
         }
         const role = interaction.options.getRole("role");
         const roleId = role?.id ?? null;
+        const minDelta = interaction.options.getInteger("min_delta") ?? 0;
+        const handleFilter = parseHandleFilter(interaction.options.getString("handles"));
 
         const subscription = await context.services.contestRatingAlerts.createSubscription(
           guildId,
           channel.id,
-          roleId
+          roleId,
+          {
+            minDelta,
+            includeHandles: handleFilter,
+          }
         );
         const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
+        const filterParts = [
+          minDelta > 0 ? `min delta ${minDelta}` : null,
+          handleFilter.length > 0 ? `handles ${handleFilter.join(", ")}` : null,
+        ].filter(Boolean);
+        const filterNote = filterParts.length > 0 ? ` Filters: ${filterParts.join("; ")}.` : "";
         await interaction.reply({
-          content: `Contest rating alerts enabled in <#${channel.id}>${roleMention}. Subscription id: \`${subscription.id}\`.`,
+          content: `Contest rating alerts enabled in <#${channel.id}>${roleMention}. Subscription id: \`${subscription.id}\`.${filterNote}`,
           ...ephemeralFlags,
         });
         return;
@@ -250,6 +288,13 @@ export const contestRatingAlertsCommand: Command = {
         if (preview.status === "no_handles") {
           await interaction.reply({
             content: "No linked handles found in this server yet.",
+            ...ephemeralFlags,
+          });
+          return;
+        }
+        if (preview.status === "no_matching_handles") {
+          await interaction.reply({
+            content: "No linked handles match the alert filters.",
             ...ephemeralFlags,
           });
           return;
@@ -349,6 +394,10 @@ export const contestRatingAlertsCommand: Command = {
         }
         if (result.status === "no_handles") {
           await interaction.editReply("No linked handles found in this server yet.");
+          return;
+        }
+        if (result.status === "no_matching_handles") {
+          await interaction.editReply("No linked handles match the alert filters.");
           return;
         }
         if (result.status === "no_contest") {

@@ -22,6 +22,8 @@ export type ContestRatingAlertSubscription = {
   guildId: string;
   channelId: string;
   roleId: string | null;
+  minDelta: number;
+  includeHandles: string[];
 };
 
 export type ContestRatingAlertEntry = {
@@ -40,6 +42,7 @@ export type ContestRatingAlertPreview = {
 export type ManualContestRatingAlertResult =
   | { status: "channel_missing"; channelId: string }
   | { status: "no_handles" }
+  | { status: "no_matching_handles" }
   | { status: "no_contest" }
   | { status: "no_changes"; contestId: number; contestName: string }
   | { status: "already_notified"; contestId: number; contestName: string; notifiedAt: string }
@@ -59,6 +62,7 @@ type StoreProvider = Pick<StoreService, "getLinkedUsers">;
 
 type AlertCandidateResult =
   | { status: "no_handles" }
+  | { status: "no_matching_handles" }
   | { status: "no_contest" }
   | { status: "no_changes"; contest: Contest }
   | { status: "already_notified"; contest: Contest; notifiedAt: string }
@@ -73,6 +77,24 @@ type AlertCandidateOptions = {
 
 function normalizeHandle(handle: string): string {
   return handle.trim().toLowerCase();
+}
+
+function parseHandleFilter(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+  const entries = value
+    .split(",")
+    .map((handle) => normalizeHandle(handle))
+    .filter((handle) => handle.length > 0);
+  return Array.from(new Set(entries));
+}
+
+function serializeHandleFilter(handles: string[]): string | null {
+  if (handles.length === 0) {
+    return null;
+  }
+  return Array.from(new Set(handles.map((handle) => normalizeHandle(handle)))).join(",");
 }
 
 function formatDelta(delta: number): string {
@@ -157,7 +179,7 @@ export class ContestRatingAlertService {
   ): Promise<ContestRatingAlertSubscription | null> {
     const row = await this.db
       .selectFrom("contest_rating_alert_subscriptions")
-      .select(["id", "guild_id", "channel_id", "role_id"])
+      .select(["id", "guild_id", "channel_id", "role_id", "min_delta", "include_handles"])
       .where("guild_id", "=", guildId)
       .where("id", "=", subscriptionId)
       .executeTakeFirst();
@@ -169,13 +191,15 @@ export class ContestRatingAlertService {
       guildId: row.guild_id,
       channelId: row.channel_id,
       roleId: row.role_id ?? null,
+      minDelta: row.min_delta ?? 0,
+      includeHandles: parseHandleFilter(row.include_handles),
     };
   }
 
   async listSubscriptions(guildId?: string): Promise<ContestRatingAlertSubscription[]> {
     let query = this.db
       .selectFrom("contest_rating_alert_subscriptions")
-      .select(["id", "guild_id", "channel_id", "role_id"])
+      .select(["id", "guild_id", "channel_id", "role_id", "min_delta", "include_handles"])
       .orderBy("created_at");
     if (guildId) {
       query = query.where("guild_id", "=", guildId);
@@ -186,6 +210,8 @@ export class ContestRatingAlertService {
       guildId: row.guild_id,
       channelId: row.channel_id,
       roleId: row.role_id ?? null,
+      minDelta: row.min_delta ?? 0,
+      includeHandles: parseHandleFilter(row.include_handles),
     }));
   }
 
@@ -200,10 +226,13 @@ export class ContestRatingAlertService {
   async createSubscription(
     guildId: string,
     channelId: string,
-    roleId: string | null
+    roleId: string | null,
+    options: { minDelta?: number; includeHandles?: string[] } = {}
   ): Promise<ContestRatingAlertSubscription> {
     const id = randomUUID();
     const timestamp = new Date().toISOString();
+    const minDelta = Math.max(0, options.minDelta ?? 0);
+    const includeHandles = options.includeHandles ?? [];
     await this.db
       .insertInto("contest_rating_alert_subscriptions")
       .values({
@@ -211,11 +240,13 @@ export class ContestRatingAlertService {
         guild_id: guildId,
         channel_id: channelId,
         role_id: roleId,
+        min_delta: minDelta,
+        include_handles: serializeHandleFilter(includeHandles),
         created_at: timestamp,
         updated_at: timestamp,
       })
       .execute();
-    return { id, guildId, channelId, roleId };
+    return { id, guildId, channelId, roleId, minDelta, includeHandles };
   }
 
   async removeSubscription(guildId: string, subscriptionId: string): Promise<boolean> {
@@ -295,6 +326,9 @@ export class ContestRatingAlertService {
 
     if (candidate.status === "no_handles") {
       return { status: "no_handles" };
+    }
+    if (candidate.status === "no_matching_handles") {
+      return { status: "no_matching_handles" };
     }
     if (candidate.status === "no_contest") {
       return { status: "no_contest" };
@@ -499,9 +533,20 @@ export class ContestRatingAlertService {
       return { status: "no_contest" };
     }
 
-    const handleMap = new Map(
+    let handleMap = new Map(
       linkedUsers.map((entry) => [normalizeHandle(entry.handle), entry.userId])
     );
+    if (subscription.includeHandles.length > 0) {
+      const allowedHandles = new Set(
+        subscription.includeHandles.map((handle) => normalizeHandle(handle))
+      );
+      handleMap = new Map(
+        Array.from(handleMap.entries()).filter(([handle]) => allowedHandles.has(handle))
+      );
+      if (handleMap.size === 0) {
+        return { status: "no_matching_handles" };
+      }
+    }
     const firstContest = recent[0]!;
 
     for (const contest of recent) {
@@ -535,7 +580,15 @@ export class ContestRatingAlertService {
           };
         });
 
-      if (entries.length === 0) {
+      const minDelta = Math.max(0, subscription.minDelta);
+      const filteredEntries =
+        minDelta > 0
+          ? entries.filter(
+              (entry) => Math.abs(entry.change.newRating - entry.change.oldRating) >= minDelta
+            )
+          : entries;
+
+      if (filteredEntries.length === 0) {
         continue;
       }
 
@@ -543,8 +596,8 @@ export class ContestRatingAlertService {
         status: "ready",
         preview: {
           contest,
-          entries,
-          totalEntries: entries.length,
+          entries: filteredEntries,
+          totalEntries: filteredEntries.length,
           isStale: isStale || changesResult.isStale,
         },
       };

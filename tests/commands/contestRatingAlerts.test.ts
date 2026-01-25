@@ -15,6 +15,7 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
       getBoolean: jest.fn(),
       getRole: jest.fn(),
       getString: jest.fn(),
+      getInteger: jest.fn(),
     },
     reply: jest.fn().mockResolvedValue(undefined),
     deferReply: jest.fn().mockResolvedValue(undefined),
@@ -59,6 +60,8 @@ describe("contestRatingAlertsCommand", () => {
         getSubcommand: jest.fn().mockReturnValue("set"),
         getChannel: jest.fn().mockReturnValue(channel),
         getRole: jest.fn().mockReturnValue({ id: "role-1" }),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockReturnValue(null),
       },
     });
     const context = {
@@ -70,6 +73,8 @@ describe("contestRatingAlertsCommand", () => {
             guildId: "guild-1",
             channelId: "channel-1",
             roleId: "role-1",
+            minDelta: 0,
+            includeHandles: [],
           }),
         },
       },
@@ -80,7 +85,8 @@ describe("contestRatingAlertsCommand", () => {
     expect(context.services.contestRatingAlerts.createSubscription).toHaveBeenCalledWith(
       "guild-1",
       "channel-1",
-      "role-1"
+      "role-1",
+      { includeHandles: [], minDelta: 0 }
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
@@ -106,6 +112,8 @@ describe("contestRatingAlertsCommand", () => {
               guildId: "guild-1",
               channelId: "channel-1",
               roleId: null,
+              minDelta: 0,
+              includeHandles: [],
             },
           ]),
           getPreview: jest.fn().mockResolvedValue({

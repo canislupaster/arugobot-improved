@@ -182,8 +182,9 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 - **/contestratingalerts** `set|status|list|remove|clear|preview|post`
 
   Configure rating change alerts for finished contests (admin only). Use `set` to choose a channel
-  and optional role mention. `preview` shows the next alert for linked handles, and `post` sends
-  the latest rating change summary immediately (optionally `force` to resend).
+  and optional role mention, `min_delta` filter, and `handles` filter (comma-separated, linked
+  handles only). `preview` shows the next alert for linked handles, and `post` sends the latest
+  rating change summary immediately (optionally `force` to resend).
 
 - **/practicereminders** `set|status|clear|preview|post`
 
@@ -287,6 +288,5 @@ pnpm start
 
 ## Future TODOs
 
-- Add optional filters for contest rating alerts (minimum delta, specific handles).
 - Add gym contest support for `/contests` and reminders.
 - Add a weekly digest post for guild activity and contest participation.

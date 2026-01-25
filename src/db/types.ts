@@ -107,6 +107,8 @@ export type ContestRatingAlertSubscriptionsTable = {
   guild_id: string;
   channel_id: string;
   role_id: string | null;
+  min_delta: number;
+  include_handles: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;
 };

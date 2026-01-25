@@ -140,4 +140,78 @@ describe("ContestRatingAlertService", () => {
 
     expect(send).not.toHaveBeenCalled();
   });
+
+  it("filters entries below the minimum delta", async () => {
+    contestService.getFinished.mockReturnValue([
+      {
+        id: 301,
+        name: "CF Round",
+        phase: "FINISHED",
+        startTimeSeconds: 1_700_000_000,
+        durationSeconds: 7200,
+      },
+    ]);
+    ratingChanges.getContestRatingChanges.mockResolvedValue({
+      changes: [
+        {
+          handle: "tourist",
+          contestId: 301,
+          contestName: "CF Round",
+          rank: 10,
+          oldRating: 2000,
+          newRating: 2075,
+          ratingUpdateTimeSeconds: 1_700_000_100,
+        },
+      ],
+      source: "api",
+      isStale: false,
+    });
+    store.getLinkedUsers.mockResolvedValue([{ userId: "user-1", handle: "tourist" }]);
+
+    const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
+    const subscription = await service.createSubscription("guild-1", "channel-1", null, {
+      minDelta: 100,
+    });
+
+    const preview = await service.getPreview(subscription);
+
+    expect(preview.status).toBe("no_changes");
+  });
+
+  it("returns no_matching_handles when filters exclude all linked users", async () => {
+    contestService.getFinished.mockReturnValue([
+      {
+        id: 401,
+        name: "CF Round",
+        phase: "FINISHED",
+        startTimeSeconds: 1_700_000_000,
+        durationSeconds: 7200,
+      },
+    ]);
+    ratingChanges.getContestRatingChanges.mockResolvedValue({
+      changes: [
+        {
+          handle: "tourist",
+          contestId: 401,
+          contestName: "CF Round",
+          rank: 10,
+          oldRating: 2000,
+          newRating: 2100,
+          ratingUpdateTimeSeconds: 1_700_000_100,
+        },
+      ],
+      source: "api",
+      isStale: false,
+    });
+    store.getLinkedUsers.mockResolvedValue([{ userId: "user-1", handle: "tourist" }]);
+
+    const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
+    const subscription = await service.createSubscription("guild-1", "channel-1", null, {
+      includeHandles: ["benq"],
+    });
+
+    const preview = await service.getPreview(subscription);
+
+    expect(preview.status).toBe("no_matching_handles");
+  });
 });
