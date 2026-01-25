@@ -227,9 +227,9 @@ Problem and contest caches are persisted in the database to keep basic functiona
 The bot serves a Hono-powered dashboard for global stats and per-guild leaderboards.
 By default it listens on `http://localhost:8787` (override with `WEB_HOST`/`WEB_PORT`).
 Only guilds that opt in via `/dashboard set public:true` appear on the public pages.
-The overview includes global contest participation cards sourced from cached rating changes.
-Per-guild pages include CSV/Markdown exports for rating/solve leaderboards, and `/status` shows
-cache ages for key Codeforces syncs.
+The overview highlights core bot features alongside global contest participation cards sourced from
+cached rating changes. Per-guild pages include CSV/Markdown exports for rating/solve leaderboards,
+and `/status` shows cache ages for key Codeforces syncs.
 
 ## Deployment (Supervisor + Caddy)
 

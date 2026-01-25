@@ -83,7 +83,15 @@ function formatLeaderboardMarkdown(rows: LeaderboardRow[], valueLabel: string): 
 export function createWebApp({ website, client }: WebAppContext) {
   const app = new Hono<{ Variables: WebVariables }>();
 
-  app.use("/static/*", serveStatic({ root: "./public" }));
+  app.use(
+    "/static/*",
+    serveStatic({
+      root: "./public",
+      rewriteRequestPath: (path) => path.replace(/^\/static/, ""),
+    })
+  );
+
+  app.get("/favicon.ico", (c) => c.redirect("/static/favicon.svg", 302));
 
   app.use("*", async (c, next) => {
     const requestId = randomUUID();

@@ -58,6 +58,7 @@ describe("web app", () => {
     const body = await response.text();
     expect(body).toContain("Global snapshot");
     expect(body).toContain("Guild One");
+    expect(body).toContain("og:image");
   });
 
   it("renders a guild page", async () => {
@@ -118,5 +119,22 @@ describe("web app", () => {
     const body = await response.text();
     expect(body).toContain("Rank,Handle,User ID,Rating");
     expect(body).toContain("alice");
+  });
+
+  it("serves static assets", async () => {
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map() },
+      } as never,
+    });
+    const cssResponse = await app.request("http://localhost/static/styles.css");
+    expect(cssResponse.status).toBe(200);
+    const cssBody = await cssResponse.text();
+    expect(cssBody).toContain(":root");
+
+    const faviconResponse = await app.request("http://localhost/favicon.ico");
+    expect(faviconResponse.status).toBe(302);
+    expect(faviconResponse.headers.get("location")).toBe("/static/favicon.svg");
   });
 });

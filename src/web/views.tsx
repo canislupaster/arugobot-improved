@@ -82,6 +82,8 @@ export type StatusViewModel = {
 type ViewResult = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 const numberFormatter = new Intl.NumberFormat("en-US");
+const defaultDescription =
+  "ArugoBot keeps Codeforces practice on track with challenges, tournaments, reminders, and stats.";
 
 function formatNumber(value: number | null): string {
   if (value === null || !Number.isFinite(value)) {
@@ -151,14 +153,27 @@ function SectionHeader(props: { title: string; subtitle?: string }): ViewResult 
   );
 }
 
-function Layout(props: { title: string; children: ViewResult | ViewResult[] }): ViewResult {
+function Layout(props: {
+  title: string;
+  description?: string;
+  children: ViewResult | ViewResult[];
+}): ViewResult {
+  const description = props.description ?? defaultDescription;
   return (
     <html lang="en">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="description" content={description} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={props.title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content="/static/og.svg" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="theme-color" content="#0b1b24" />
         <title>{props.title}</title>
         <link rel="stylesheet" href="/static/styles.css" />
+        <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
       </head>
       <body>
         <div class="page">
@@ -190,7 +205,10 @@ function Layout(props: { title: string; children: ViewResult | ViewResult[] }): 
 
 export function renderHomePage(model: HomeViewModel): ViewResult {
   return (
-    <Layout title="ArugoBot | Overview">
+    <Layout
+      title="ArugoBot | Overview"
+      description="Global stats, guild leaderboards, and a live view of Codeforces practice across Discord."
+    >
       <section class="hero">
         <div>
           <h1>Global snapshot</h1>
@@ -200,6 +218,62 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
           </p>
         </div>
         <div class="hero-glow" aria-hidden="true" />
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>What ArugoBot delivers</h2>
+          <p>Competitive programming flows, summarized in one command surface.</p>
+        </div>
+        <div class="feature-grid">
+          <div class="card feature-card">
+            <div class="eyebrow">Challenges</div>
+            <h3>Head-to-head sprints</h3>
+            <p>
+              Spin up problem duels with custom ranges, tags, and open lobbies that keep your server
+              engaged.
+            </p>
+            <div class="tags">
+              <span class="tag">/challenge random</span>
+              <span class="tag">/challenge problem</span>
+            </div>
+          </div>
+          <div class="card feature-card">
+            <div class="eyebrow">Tournaments</div>
+            <h3>Structured multi-round play</h3>
+            <p>
+              Swiss and elimination brackets with automatic recaps so every round ends with a story.
+            </p>
+            <div class="tags">
+              <span class="tag">/tournament create</span>
+              <span class="tag">/tournamentrecaps set</span>
+            </div>
+          </div>
+          <div class="card feature-card">
+            <div class="eyebrow">Practice</div>
+            <h3>Personalized problem picks</h3>
+            <p>
+              One-click practice suggestions based on handles, rating bands, and tags, plus
+              reminders to keep momentum.
+            </p>
+            <div class="tags">
+              <span class="tag">/practice</span>
+              <span class="tag">/practicereminders set</span>
+            </div>
+          </div>
+          <div class="card feature-card">
+            <div class="eyebrow">Contests</div>
+            <h3>Contest intelligence</h3>
+            <p>
+              Track upcoming contests, review rating changes, and keep the server aligned with
+              activity snapshots.
+            </p>
+            <div class="tags">
+              <span class="tag">/contests</span>
+              <span class="tag">/contestchanges</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="grid stats-grid">
@@ -237,6 +311,27 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
           label="Last contest update"
           value={formatUnixTimestamp(model.global.contestActivity.lastContestAt)}
         />
+      </section>
+
+      <section class="section">
+        <div class="card callout">
+          <div>
+            <div class="eyebrow">Get started</div>
+            <h3>Invite, link, compete</h3>
+            <p>
+              Add ArugoBot to your Discord server, link handles with <strong>/register</strong>,
+              then start a challenge or tournament in minutes.
+            </p>
+          </div>
+          <div class="callout-actions">
+            <a class="button" href="https://codeforces.com" rel="noreferrer">
+              Visit Codeforces
+            </a>
+            <a class="button ghost" href="/status">
+              View cache status
+            </a>
+          </div>
+        </div>
       </section>
 
       <section class="section">
@@ -286,7 +381,10 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
   const guild = model.guild;
   const latestContest = guild.contestActivity.recentContests[0];
   return (
-    <Layout title={`ArugoBot | ${guild.name}`}>
+    <Layout
+      title={`ArugoBot | ${guild.name}`}
+      description={`Live leaderboard and activity summary for ${guild.name}.`}
+    >
       <section class="hero compact">
         <div>
           <h1>{guild.name}</h1>
@@ -490,7 +588,7 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
 
 export function renderStatusPage(model: StatusViewModel): ViewResult {
   return (
-    <Layout title="ArugoBot | Status">
+    <Layout title="ArugoBot | Status" description="Diagnostics for Codeforces cache health.">
       <section class="hero compact">
         <div>
           <h1>Cache status</h1>
@@ -533,7 +631,7 @@ export function renderStatusPage(model: StatusViewModel): ViewResult {
 
 export function renderNotFoundPage(message: string): ViewResult {
   return (
-    <Layout title="ArugoBot | Not Found">
+    <Layout title="ArugoBot | Not Found" description="Page not found.">
       <section class="hero compact">
         <div>
           <h1>Not found</h1>

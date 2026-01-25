@@ -115,6 +115,7 @@ a:hover {
   margin-bottom: 28px;
   overflow: hidden;
   box-shadow: var(--shadow);
+  animation: rise 0.6s ease both;
 }
 
 .hero.compact {
@@ -158,6 +159,7 @@ a:hover {
   padding: 20px;
   box-shadow: var(--shadow);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  animation: rise 0.6s ease both;
 }
 
 .card.stat {
@@ -183,6 +185,46 @@ a:hover {
 
 .section {
   margin-top: 28px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
+}
+
+.feature-card h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+}
+
+.feature-card p {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  margin-bottom: 10px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tag {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(249, 199, 79, 0.18);
+  border: 1px solid rgba(249, 199, 79, 0.35);
 }
 
 .section-header {
@@ -319,6 +361,44 @@ tbody tr:hover {
   background: var(--accent);
   color: #0c1d28;
   font-weight: 700;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 24, 31, 0.35);
+}
+
+.button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.callout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 28px;
+  background: linear-gradient(125deg, rgba(242, 127, 66, 0.22), rgba(75, 184, 200, 0.18));
+}
+
+.callout h3 {
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+}
+
+.callout p {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.callout-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .site-footer {
@@ -327,6 +407,24 @@ tbody tr:hover {
   font-size: 0.85rem;
   display: flex;
   justify-content: center;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 @media (max-width: 720px) {
@@ -342,6 +440,11 @@ tbody tr:hover {
 
   .hero {
     padding: 24px 20px;
+  }
+
+  .callout {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   th,
