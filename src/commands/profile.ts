@@ -4,9 +4,19 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
+import type { CommandContext } from "../types/commandContext.js";
+
 import type { Command } from "./types.js";
 
 const MAX_RECENT = 5;
+
+type SubmissionSummary = {
+  contestId: number | null;
+  index: string;
+  name: string;
+  verdict: string | null;
+  creationTimeSeconds: number;
+};
 
 function buildProblemLine(
   problemId: string,
@@ -20,19 +30,99 @@ function buildProblemLine(
   return `- ${problemId}`;
 }
 
-function formatSubmissionLine(submission: {
-  contestId: number | null;
-  index: string;
-  name: string;
-  verdict: string | null;
-  creationTimeSeconds: number;
-}) {
+function formatSubmissionLine(submission: SubmissionSummary) {
   const verdict = submission.verdict ?? "UNKNOWN";
   const when = formatDiscordRelativeTime(submission.creationTimeSeconds);
   if (submission.contestId) {
     return `- [${submission.index}. ${submission.name}](https://codeforces.com/problemset/problem/${submission.contestId}/${submission.index}) • ${verdict} • ${when}`;
   }
   return `- ${submission.index}. ${submission.name} • ${verdict} • ${when}`;
+}
+
+async function resolveProfileTarget(
+  handleInput: string,
+  guildId: string,
+  targetId: string,
+  store: CommandContext["services"]["store"]
+): Promise<{ handle: string; linkedUserId: string | null } | { error: string }> {
+  if (handleInput) {
+    const handleInfo = await store.resolveHandle(handleInput);
+    if (!handleInfo.exists) {
+      return { error: "Invalid handle." } as const;
+    }
+    const handle = handleInfo.canonicalHandle ?? handleInput;
+    const linkedUserId = await store.getUserIdByHandle(guildId, handle);
+    return { handle, linkedUserId } as const;
+  }
+  const linkedHandle = await store.getHandle(guildId, targetId);
+  if (!linkedHandle) {
+    return { error: "Handle not linked." } as const;
+  }
+  return { handle: linkedHandle, linkedUserId: targetId } as const;
+}
+
+async function loadChallengeSummary(
+  guildId: string,
+  linkedUserId: string,
+  services: CommandContext["services"]
+) {
+  const botRating = await services.store.getRating(guildId, linkedUserId);
+  const recentHistory = await services.store.getChallengeHistoryPage(guildId, linkedUserId, 1, 5);
+  let totalChallenges = recentHistory.total;
+  let recentLines = recentHistory.entries
+    .map((entry) => buildProblemLine(entry.problemId, entry.name, entry.contestId, entry.index))
+    .join("\n");
+
+  if (totalChallenges === 0) {
+    const historyData = await services.store.getHistoryWithRatings(guildId, linkedUserId);
+    totalChallenges = historyData?.history.length ?? 0;
+    const problemDict = services.problems.getProblemDict();
+    const recent = historyData?.history.slice(-5) ?? [];
+    recentLines = recent
+      .map((problemId) => {
+        const problem = problemDict.get(problemId);
+        return buildProblemLine(
+          problemId,
+          problem?.name ?? null,
+          problem?.contestId,
+          problem?.index
+        );
+      })
+      .join("\n");
+  }
+
+  return { botRating, totalChallenges, recentLines };
+}
+
+async function loadRecentSubmissions(
+  handle: string,
+  services: CommandContext["services"]
+) {
+  const recent = await services.store.getRecentSubmissions(handle, MAX_RECENT);
+  if (!recent) {
+    return { lines: "Unable to fetch recent submissions right now.", isStale: false };
+  }
+  return {
+    lines: recent.submissions.map(formatSubmissionLine).join("\n"),
+    isStale: recent.isStale,
+  };
+}
+
+function formatRatingSummary(value: number | null | undefined, rank: string | null | undefined) {
+  if (value !== null && value !== undefined) {
+    return `${value} (${rank ?? "unrated"})`;
+  }
+  return "Unrated";
+}
+
+function formatMaxRatingSummary(
+  value: number | null | undefined,
+  rank: string | null | undefined
+) {
+  if (value !== null && value !== undefined) {
+    return `${value} (${rank ?? "unknown"})`;
+  }
+  return "N/A";
 }
 
 export const profileCommand: Command = {
@@ -70,26 +160,17 @@ export const profileCommand: Command = {
 
     try {
       const guildId = interaction.guild.id;
-      let handle = "";
-      let linkedUserId: string | null = null;
-
-      if (handleInput) {
-        const handleInfo = await context.services.store.resolveHandle(handleInput);
-        if (!handleInfo.exists) {
-          await interaction.editReply("Invalid handle.");
-          return;
-        }
-        handle = handleInfo.canonicalHandle ?? handleInput;
-        linkedUserId = await context.services.store.getUserIdByHandle(guildId, handle);
-      } else {
-        const linkedHandle = await context.services.store.getHandle(guildId, targetId);
-        if (!linkedHandle) {
-          await interaction.editReply("Handle not linked.");
-          return;
-        }
-        handle = linkedHandle;
-        linkedUserId = targetId;
+      const targetResolution = await resolveProfileTarget(
+        handleInput,
+        guildId,
+        targetId,
+        context.services.store
+      );
+      if ("error" in targetResolution) {
+        await interaction.editReply(targetResolution.error);
+        return;
       }
+      const { handle, linkedUserId } = targetResolution;
 
       const cfProfile = await context.services.store.getCodeforcesProfile(handle);
       if (!cfProfile) {
@@ -102,63 +183,26 @@ export const profileCommand: Command = {
       let botRating: number | null = null;
 
       if (linkedUserId) {
-        botRating = await context.services.store.getRating(guildId, linkedUserId);
-        const recentHistory = await context.services.store.getChallengeHistoryPage(
-          guildId,
-          linkedUserId,
-          1,
-          5
-        );
-        totalChallenges = recentHistory.total;
-        recentLines = recentHistory.entries
-          .map((entry) =>
-            buildProblemLine(entry.problemId, entry.name, entry.contestId, entry.index)
-          )
-          .join("\n");
-
-        if (totalChallenges === 0) {
-          const historyData = await context.services.store.getHistoryWithRatings(
-            guildId,
-            linkedUserId
-          );
-          totalChallenges = historyData?.history.length ?? 0;
-          const problemDict = context.services.problems.getProblemDict();
-          const recent = historyData?.history.slice(-5) ?? [];
-          recentLines = recent
-            .map((problemId) => {
-              const problem = problemDict.get(problemId);
-              return buildProblemLine(
-                problemId,
-                problem?.name ?? null,
-                problem?.contestId,
-                problem?.index
-              );
-            })
-            .join("\n");
-        }
+        const summary = await loadChallengeSummary(guildId, linkedUserId, context.services);
+        botRating = summary.botRating;
+        totalChallenges = summary.totalChallenges;
+        recentLines = summary.recentLines;
       }
 
       let recentSubmissionsLines = "";
       let submissionsStale = false;
       if (handleInput || !linkedUserId) {
-        const recent = await context.services.store.getRecentSubmissions(handle, MAX_RECENT);
-        if (recent) {
-          submissionsStale = recent.isStale;
-          recentSubmissionsLines = recent.submissions.map(formatSubmissionLine).join("\n");
-        } else {
-          recentSubmissionsLines = "Unable to fetch recent submissions right now.";
-        }
+        const recent = await loadRecentSubmissions(handle, context.services);
+        submissionsStale = recent.isStale;
+        recentSubmissionsLines = recent.lines;
       }
 
       const displayHandle = cfProfile.profile.displayHandle;
-      const cfRating =
-        cfProfile.profile.rating !== null && cfProfile.profile.rating !== undefined
-          ? `${cfProfile.profile.rating} (${cfProfile.profile.rank ?? "unrated"})`
-          : "Unrated";
-      const cfMaxRating =
-        cfProfile.profile.maxRating !== null && cfProfile.profile.maxRating !== undefined
-          ? `${cfProfile.profile.maxRating} (${cfProfile.profile.maxRank ?? "unknown"})`
-          : "N/A";
+      const cfRating = formatRatingSummary(cfProfile.profile.rating, cfProfile.profile.rank);
+      const cfMaxRating = formatMaxRatingSummary(
+        cfProfile.profile.maxRating,
+        cfProfile.profile.maxRank
+      );
       const cfLastOnline = cfProfile.profile.lastOnlineTimeSeconds
         ? formatDiscordRelativeTime(cfProfile.profile.lastOnlineTimeSeconds)
         : "Unknown";
