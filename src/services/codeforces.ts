@@ -3,6 +3,7 @@ import type { Dispatcher } from "undici";
 import { logWarn } from "../utils/logger.js";
 import { RateLimiter } from "../utils/rateLimiter.js";
 import { sleep } from "../utils/sleep.js";
+
 import type { RequestScheduler } from "./requestPool.js";
 
 export type CodeforcesResponse<T> = {
