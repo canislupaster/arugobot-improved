@@ -30,6 +30,7 @@ import { recentCommand } from "./recent.js";
 import { refreshCommand } from "./refresh.js";
 import { registerCommand, relinkCommand, unlinkCommand } from "./register.js";
 import { statsCommand } from "./stats.js";
+import { streakCommand } from "./streak.js";
 import { suggestCommand } from "./suggest.js";
 import { tournamentCommand } from "./tournament.js";
 import { tournamentRecapsCommand } from "./tournamentRecaps.js";
@@ -68,6 +69,7 @@ export const commandList: Command[] = [
   relinkCommand,
   unlinkCommand,
   suggestCommand,
+  streakCommand,
   statsCommand,
   tournamentCommand,
   tournamentRecapsCommand,

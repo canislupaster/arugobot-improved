@@ -125,6 +125,13 @@ export type PracticePreferences = {
   updatedAt: string;
 };
 
+export type ChallengeStreak = {
+  currentStreak: number;
+  longestStreak: number;
+  totalSolvedDays: number;
+  lastSolvedAt: string | null;
+};
+
 type HandleResolution = {
   exists: boolean;
   canonicalHandle: string | null;
@@ -170,6 +177,10 @@ function isCacheFresh(lastFetched: string | null | undefined, ttlMs: number): bo
   }
   const ageMs = Date.now() - lastFetchedAt;
   return ageMs >= 0 && ageMs <= ttlMs;
+}
+
+function toUtcDayNumber(epochSeconds: number): number {
+  return Math.floor(epochSeconds / 86400);
 }
 
 export class StoreService {
@@ -1125,6 +1136,84 @@ export class StoreService {
     } catch (error) {
       logError(`Database error: ${String(error)}`);
       return { participations: 0, solvedCount: 0, lastCompletedAt: null };
+    }
+  }
+
+  async getChallengeStreak(
+    serverId: string,
+    userId: string,
+    nowMs = Date.now()
+  ): Promise<ChallengeStreak> {
+    try {
+      const rows = await this.db
+        .selectFrom("challenge_participants")
+        .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
+        .select("challenge_participants.solved_at")
+        .where("challenges.server_id", "=", serverId)
+        .where("challenges.status", "=", "completed")
+        .where("challenge_participants.user_id", "=", userId)
+        .where("challenge_participants.solved_at", "is not", null)
+        .orderBy("challenge_participants.solved_at", "asc")
+        .execute();
+
+      if (rows.length === 0) {
+        return {
+          currentStreak: 0,
+          longestStreak: 0,
+          totalSolvedDays: 0,
+          lastSolvedAt: null,
+        };
+      }
+
+      const daySet = new Set<number>();
+      let lastSolvedSeconds = 0;
+      for (const row of rows) {
+        if (row.solved_at !== null) {
+          daySet.add(toUtcDayNumber(row.solved_at));
+          lastSolvedSeconds = Math.max(lastSolvedSeconds, row.solved_at);
+        }
+      }
+
+      const days = Array.from(daySet).sort((a, b) => a - b);
+      let longestStreak = 0;
+      let running = 0;
+      let prevDay: number | null = null;
+      for (const day of days) {
+        if (prevDay !== null && day === prevDay + 1) {
+          running += 1;
+        } else {
+          running = 1;
+        }
+        longestStreak = Math.max(longestStreak, running);
+        prevDay = day;
+      }
+
+      let streakEnding = 0;
+      for (let idx = days.length - 1; idx >= 0; idx -= 1) {
+        if (idx === days.length - 1) {
+          streakEnding = 1;
+          continue;
+        }
+        if (days[idx] === days[idx + 1] - 1) {
+          streakEnding += 1;
+        } else {
+          break;
+        }
+      }
+
+      const todayDay = Math.floor(nowMs / 86400000);
+      const lastDay = days[days.length - 1];
+      const currentStreak = todayDay - lastDay <= 1 ? streakEnding : 0;
+
+      return {
+        currentStreak,
+        longestStreak,
+        totalSolvedDays: days.length,
+        lastSolvedAt: lastSolvedSeconds ? new Date(lastSolvedSeconds * 1000).toISOString() : null,
+      };
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+      return { currentStreak: 0, longestStreak: 0, totalSolvedDays: 0, lastSolvedAt: null };
     }
   }
 

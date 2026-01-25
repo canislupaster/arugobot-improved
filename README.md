@@ -146,6 +146,10 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Shows challenge activity summaries for the server or a specific user over a lookback window.
 
+- **/streak** `[user]`
+
+  Shows the current and longest challenge streak for a user (UTC days with at least one solved challenge).
+
 - **/contests** `[limit]` `[include]` `[exclude]` `[scope]`
 
   Lists ongoing and upcoming Codeforces contests. Use `include`/`exclude` to filter by keywords

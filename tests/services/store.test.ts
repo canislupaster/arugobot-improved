@@ -490,6 +490,136 @@ describe("StoreService", () => {
     expect(userSummary.lastCompletedAt).toBe(recentIso);
   });
 
+  it("computes challenge streaks", async () => {
+    const base = 1_700_000_000;
+    const day = 86400;
+    const nowMs = (base + day * 5) * 1000;
+
+    await db
+      .insertInto("challenges")
+      .values([
+        {
+          id: "challenge-1",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-1",
+          host_user_id: "user-1",
+          problem_contest_id: 1000,
+          problem_index: "A",
+          problem_name: "Problem A",
+          problem_rating: 1200,
+          length_minutes: 40,
+          status: "completed",
+          started_at: base,
+          ends_at: base + 3600,
+          check_index: 0,
+        },
+        {
+          id: "challenge-2",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-2",
+          host_user_id: "user-1",
+          problem_contest_id: 1001,
+          problem_index: "B",
+          problem_name: "Problem B",
+          problem_rating: 1300,
+          length_minutes: 40,
+          status: "completed",
+          started_at: base + day,
+          ends_at: base + day + 3600,
+          check_index: 0,
+        },
+        {
+          id: "challenge-3",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-3",
+          host_user_id: "user-1",
+          problem_contest_id: 1002,
+          problem_index: "C",
+          problem_name: "Problem C",
+          problem_rating: 1400,
+          length_minutes: 40,
+          status: "completed",
+          started_at: base + day * 3,
+          ends_at: base + day * 3 + 3600,
+          check_index: 0,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("challenge_participants")
+      .values([
+        {
+          challenge_id: "challenge-1",
+          user_id: "user-1",
+          position: 0,
+          solved_at: base + day,
+        },
+        {
+          challenge_id: "challenge-2",
+          user_id: "user-1",
+          position: 0,
+          solved_at: base + day * 2,
+        },
+        {
+          challenge_id: "challenge-3",
+          user_id: "user-1",
+          position: 0,
+          solved_at: base + day * 4,
+        },
+      ])
+      .execute();
+
+    const streak = await store.getChallengeStreak("guild-1", "user-1", nowMs);
+    expect(streak.currentStreak).toBe(1);
+    expect(streak.longestStreak).toBe(2);
+    expect(streak.totalSolvedDays).toBe(3);
+    expect(streak.lastSolvedAt).toBe(new Date((base + day * 4) * 1000).toISOString());
+  });
+
+  it("clears current streak when last solve is older than yesterday", async () => {
+    const base = 1_700_000_000;
+    const day = 86400;
+    const nowMs = (base + day * 5) * 1000;
+
+    await db
+      .insertInto("challenges")
+      .values({
+        id: "challenge-4",
+        server_id: "guild-1",
+        channel_id: "channel-1",
+        message_id: "message-4",
+        host_user_id: "user-1",
+        problem_contest_id: 1003,
+        problem_index: "D",
+        problem_name: "Problem D",
+        problem_rating: 1500,
+        length_minutes: 40,
+        status: "completed",
+        started_at: base,
+        ends_at: base + 3600,
+        check_index: 0,
+      })
+      .execute();
+
+    await db
+      .insertInto("challenge_participants")
+      .values({
+        challenge_id: "challenge-4",
+        user_id: "user-1",
+        position: 0,
+        solved_at: base + day,
+      })
+      .execute();
+
+    const streak = await store.getChallengeStreak("guild-1", "user-1", nowMs);
+    expect(streak.currentStreak).toBe(0);
+    expect(streak.longestStreak).toBe(1);
+  });
+
   it("returns solve leaderboard ordered by solves", async () => {
     await db
       .insertInto("challenges")
