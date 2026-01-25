@@ -1,22 +1,10 @@
-import { createHash } from "node:crypto";
-
 import { Kysely } from "kysely";
 
 import { createDb } from "../../src/db/database.js";
 import { migrateToLatest } from "../../src/db/migrator.js";
 import type { Database } from "../../src/db/types.js";
 import type { CodeforcesClient } from "../../src/services/codeforces.js";
-import { ContestStandingsService } from "../../src/services/contestStandings.js";
-
-const hashHandles = (handles: string[]): string =>
-  createHash("sha1")
-    .update(
-      handles
-        .map((handle) => handle.toLowerCase())
-        .sort()
-        .join("|")
-    )
-    .digest("hex");
+import { ContestStandingsService, hashHandles } from "../../src/services/contestStandings.js";
 
 describe("ContestStandingsService", () => {
   let db: Kysely<Database>;
@@ -133,5 +121,18 @@ describe("ContestStandingsService", () => {
     expect(cacheRows[0]?.contest_id).toBe(789);
     expect(cacheRows[0]?.handles_hash).toBe(hashHandles(handles));
     expect(cacheRows[0]?.payload).toContain("tourist");
+  });
+
+  it("dedupes handles before requesting standings", async () => {
+    client.request.mockResolvedValue({ rows: [] });
+    const service = new ContestStandingsService(db, client);
+
+    await service.getStandings(101, ["Tourist", "tourist", " ", "Petr"], "CODING");
+
+    expect(client.request).toHaveBeenCalledWith("contest.standings", {
+      contestId: 101,
+      handles: "Tourist;Petr",
+      showUnofficial: true,
+    });
   });
 });

@@ -48,7 +48,7 @@ function getCacheTtl(phase?: Contest["phase"]): number {
   return DEFAULT_CACHE_TTL_MS;
 }
 
-function hashHandles(handles: string[]): string {
+export function hashHandles(handles: string[]): string {
   const normalized = handles.map((handle) => handle.toLowerCase()).sort();
   return createHash("sha1").update(normalized.join("|")).digest("hex");
 }
