@@ -12,6 +12,37 @@ function formatDelta(delta: number): string {
   return delta >= 0 ? `+${delta}` : String(delta);
 }
 
+function clampLimit(limit: number): number {
+  return Math.min(Math.max(limit, 1), MAX_LIMIT);
+}
+
+type HandleResolution =
+  | { ok: true; handle: string }
+  | { ok: false; errorMessage: string };
+
+async function resolveTargetHandle(
+  interaction: Parameters<Command["execute"]>[0],
+  context: Parameters<Command["execute"]>[1],
+  handleInput: string,
+  userOption: ReturnType<typeof interaction.options.getUser>
+): Promise<HandleResolution> {
+  if (handleInput) {
+    const handleInfo = await context.services.store.resolveHandle(handleInput);
+    if (!handleInfo.exists) {
+      return { ok: false, errorMessage: "Invalid handle." };
+    }
+    return { ok: true, handle: handleInfo.canonicalHandle ?? handleInput };
+  }
+
+  const targetUser = userOption ?? interaction.user;
+  const guildId = interaction.guild?.id ?? "";
+  const linkedHandle = await context.services.store.getHandle(guildId, targetUser.id);
+  if (!linkedHandle) {
+    return { ok: false, errorMessage: "Handle not linked." };
+  }
+  return { ok: true, handle: linkedHandle };
+}
+
 export const contestHistoryCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contesthistory")
@@ -49,27 +80,20 @@ export const contestHistoryCommand: Command = {
     await interaction.deferReply();
 
     try {
-      let handle = "";
-
-      if (handleInput) {
-        const handleInfo = await context.services.store.resolveHandle(handleInput);
-        if (!handleInfo.exists) {
-          await interaction.editReply("Invalid handle.");
-          return;
-        }
-        handle = handleInfo.canonicalHandle ?? handleInput;
-      } else {
-        const targetUser = userOption ?? interaction.user;
-        const guildId = interaction.guild?.id ?? "";
-        const linkedHandle = await context.services.store.getHandle(guildId, targetUser.id);
-        if (!linkedHandle) {
-          await interaction.editReply("Handle not linked.");
-          return;
-        }
-        handle = linkedHandle;
+      const handleResult = await resolveTargetHandle(
+        interaction,
+        context,
+        handleInput,
+        userOption
+      );
+      if (!handleResult.ok) {
+        await interaction.editReply(handleResult.errorMessage);
+        return;
       }
 
-      const changesResult = await context.services.ratingChanges.getRatingChanges(handle);
+      const changesResult = await context.services.ratingChanges.getRatingChanges(
+        handleResult.handle
+      );
       if (!changesResult) {
         await interaction.editReply("Unable to fetch contest history right now.");
         return;
@@ -83,7 +107,7 @@ export const contestHistoryCommand: Command = {
       const sorted = [...changesResult.changes].sort(
         (a, b) => b.ratingUpdateTimeSeconds - a.ratingUpdateTimeSeconds
       );
-      const entries = sorted.slice(0, Math.max(1, Math.min(limit, MAX_LIMIT)));
+      const entries = sorted.slice(0, clampLimit(limit));
 
       const lines = entries.map((entry) => {
         const delta = entry.newRating - entry.oldRating;
@@ -94,7 +118,7 @@ export const contestHistoryCommand: Command = {
       });
 
       const embed = new EmbedBuilder()
-        .setTitle(`Contest history: ${handle}`)
+        .setTitle(`Contest history: ${handleResult.handle}`)
         .setColor(0x3498db)
         .setDescription(lines.join("\n"));
 
