@@ -45,6 +45,7 @@ describe("RatingChangesService", () => {
     expect(result?.source).toBe("api");
     expect(result?.changes).toHaveLength(1);
     expect(mockClient.request).toHaveBeenCalledWith("user.rating", { handle: "tourist" });
+    expect(service.getLastError()).toBeNull();
 
     const cached = await service.getRatingChanges("tourist");
     expect(cached?.source).toBe("cache");
@@ -69,5 +70,9 @@ describe("RatingChangesService", () => {
 
     expect(result?.source).toBe("cache");
     expect(result?.isStale).toBe(true);
+    expect(service.getLastError()).toEqual({
+      message: "CF down",
+      timestamp: "2024-01-01T00:00:00.000Z",
+    });
   });
 });

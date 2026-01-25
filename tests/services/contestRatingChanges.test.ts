@@ -46,6 +46,7 @@ describe("ContestRatingChangesService", () => {
     expect(result?.source).toBe("api");
     expect(result?.changes).toHaveLength(1);
     expect(mockClient.request).toHaveBeenCalledWith("contest.ratingChanges", { contestId: 1234 });
+    expect(service.getLastError()).toBeNull();
 
     const cached = await service.getContestRatingChanges(1234);
     expect(cached?.source).toBe("cache");
@@ -53,6 +54,7 @@ describe("ContestRatingChangesService", () => {
   });
 
   it("falls back to cached data when the API fails", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-01-02T00:00:00.000Z"));
     await db
       .insertInto("contest_rating_changes")
       .values({
@@ -69,5 +71,9 @@ describe("ContestRatingChangesService", () => {
 
     expect(result?.source).toBe("cache");
     expect(result?.isStale).toBe(true);
+    expect(service.getLastError()).toEqual({
+      message: "CF down",
+      timestamp: "2024-01-02T00:00:00.000Z",
+    });
   });
 });

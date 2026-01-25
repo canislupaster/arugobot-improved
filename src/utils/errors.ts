@@ -10,3 +10,12 @@ export function getErrorMessage(error: unknown): string {
   }
   return "";
 }
+
+export type ServiceError = { message: string; timestamp: string };
+
+export function buildServiceError(message?: string | null): ServiceError | null {
+  if (!message) {
+    return null;
+  }
+  return { message, timestamp: new Date().toISOString() };
+}

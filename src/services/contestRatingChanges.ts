@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { buildServiceError } from "../utils/errors.js";
 import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
@@ -41,11 +42,7 @@ export class ContestRatingChangesService {
       { contestId }
     );
 
-    if (errorMessage) {
-      this.lastError = { message: errorMessage, timestamp: new Date().toISOString() };
-    } else {
-      this.lastError = null;
-    }
+    this.lastError = buildServiceError(errorMessage);
 
     return result;
   }
