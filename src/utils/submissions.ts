@@ -8,6 +8,21 @@ export type SubmissionSummary = {
   creationTimeSeconds: number;
 };
 
+export type SubmissionResultFilter = "all" | "accepted" | "rejected";
+
+export function filterSubmissionsByResult(
+  submissions: SubmissionSummary[],
+  filter: SubmissionResultFilter
+): SubmissionSummary[] {
+  if (filter === "accepted") {
+    return submissions.filter((submission) => submission.verdict === "OK");
+  }
+  if (filter === "rejected") {
+    return submissions.filter((submission) => submission.verdict !== "OK");
+  }
+  return submissions;
+}
+
 export function formatSubmissionLine(submission: SubmissionSummary): string {
   const verdict = submission.verdict ?? "UNKNOWN";
   const when = formatDiscordRelativeTime(submission.creationTimeSeconds);

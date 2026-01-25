@@ -64,9 +64,10 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Compares Codeforces stats for multiple linked users and/or handles.
 
-- **/recent** `[user]` `[handle]` `[limit]`
+- **/recent** `[user]` `[handle]` `[limit]` `[result]`
 
   Shows recent Codeforces submissions for a linked user or a handle.
+  Use `result` to filter by `all`, `accepted`, or `rejected` submissions.
 
 - **/register** `handle`
 
