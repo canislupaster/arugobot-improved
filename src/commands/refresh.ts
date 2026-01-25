@@ -6,6 +6,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import type { Command } from "./types.js";
 
 type RefreshScope = "all" | "contests" | "handles" | "problems";
+type RefreshTaskKey = Exclude<RefreshScope, "all">;
 
 function resolveScope(raw: string | null): RefreshScope {
   if (raw === "contests" || raw === "handles" || raw === "problems") {
@@ -68,8 +69,8 @@ export const refreshCommand: Command = {
 
     const embed = new EmbedBuilder().setTitle("Refresh results").setColor(EMBED_COLORS.info);
     const errors: string[] = [];
-    const refreshAll = scope === "all";
-    const tasks: Record<Exclude<RefreshScope, "all">, RefreshTask> = {
+    const taskOrder: RefreshTaskKey[] = ["problems", "contests", "handles"];
+    const tasks: Record<RefreshTaskKey, RefreshTask> = {
       problems: {
         label: "Problems",
         run: async () => {
@@ -101,15 +102,10 @@ export const refreshCommand: Command = {
         errorLog: "Handle refresh failed",
       },
     };
+    const tasksToRun: RefreshTaskKey[] = scope === "all" ? taskOrder : [scope];
 
-    if (refreshAll || scope === "problems") {
-      await runRefreshTask(tasks.problems, embed, errors, interaction, context.correlationId);
-    }
-    if (refreshAll || scope === "contests") {
-      await runRefreshTask(tasks.contests, embed, errors, interaction, context.correlationId);
-    }
-    if (refreshAll || scope === "handles") {
-      await runRefreshTask(tasks.handles, embed, errors, interaction, context.correlationId);
+    for (const taskKey of tasksToRun) {
+      await runRefreshTask(tasks[taskKey], embed, errors, interaction, context.correlationId);
     }
 
     if (errors.length > 0) {

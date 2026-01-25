@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from "discord.js";
+import type { APIEmbedField, ChatInputCommandInteraction } from "discord.js";
 
 import { refreshCommand } from "../../src/commands/refresh.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
@@ -75,5 +75,39 @@ describe("refreshCommand", () => {
     expect(context.services.store.refreshHandles).toHaveBeenCalled();
     expect(context.services.problems.refreshProblems).not.toHaveBeenCalled();
     expect(context.services.contests.refresh).not.toHaveBeenCalled();
+  });
+
+  it("reports refresh errors in the response embed", async () => {
+    const interaction = createInteraction({
+      options: { getString: jest.fn().mockReturnValue("problems") },
+    });
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const context = {
+      correlationId: "corr-3",
+      services: {
+        problems: {
+          refreshProblems: jest.fn().mockRejectedValue(new Error("boom")),
+          getProblems: jest.fn(),
+        },
+        contests: {
+          refresh: jest.fn(),
+          getUpcomingContests: jest.fn(),
+          getOngoing: jest.fn(),
+        },
+        store: {
+          refreshHandles: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await refreshCommand.execute(interaction, context);
+
+    const editArgs = (interaction.editReply as jest.Mock).mock.calls[0]?.[0];
+    const embed = editArgs?.embeds?.[0];
+    const errorsField = embed?.data?.fields?.find(
+      (field: APIEmbedField) => field.name === "Errors"
+    );
+    expect(errorsField?.value).toContain("Problem cache refresh failed.");
+    errorSpy.mockRestore();
   });
 });
