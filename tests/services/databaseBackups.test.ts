@@ -34,4 +34,12 @@ describe("DatabaseBackupService", () => {
     const result = await service.runBackup();
     expect(result.status).toBe("disabled");
   });
+
+  it("records an error for unsupported database urls", async () => {
+    const service = new DatabaseBackupService("postgres://localhost/db", "/tmp", 7);
+    const result = await service.runBackup();
+    expect(result).toEqual({ status: "skipped", reason: "unsupported_database_url" });
+    const lastError = service.getLastError();
+    expect(lastError?.message).toContain("unsupported DATABASE_URL");
+  });
 });

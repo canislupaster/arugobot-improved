@@ -41,8 +41,7 @@ export class DatabaseBackupService {
     }
     if (!this.databasePath) {
       const message = `Database backup skipped (unsupported DATABASE_URL: ${this.databaseUrl}).`;
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logWarn(message);
+      this.recordFailure(message, "warn");
       return { status: "skipped", reason: "unsupported_database_url" };
     }
 
@@ -67,8 +66,7 @@ export class DatabaseBackupService {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logError("Database backup failed.", { error: message });
+      this.recordFailure(message, "error");
       return { status: "skipped", reason: message };
     }
   }
@@ -114,6 +112,15 @@ export class DatabaseBackupService {
       logInfo("Database backup cleanup complete.", { deleted });
     }
     return deleted;
+  }
+
+  private recordFailure(message: string, level: "warn" | "error"): void {
+    this.lastError = { message, timestamp: new Date().toISOString() };
+    if (level === "warn") {
+      logWarn(message);
+      return;
+    }
+    logError("Database backup failed.", { error: message });
   }
 }
 
