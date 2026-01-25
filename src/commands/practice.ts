@@ -6,6 +6,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getProblemId } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
+
 import type { Command } from "./types.js";
 
 const DEFAULT_MIN_RATING = 800;
