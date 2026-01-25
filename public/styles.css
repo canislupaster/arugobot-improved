@@ -1,40 +1,64 @@
 @font-face {
-  font-family: "Space Grotesk";
-  src: url("/static/fonts/space-grotesk-400.woff2") format("woff2");
+  font-family: "IBM Plex Sans";
+  src: url("/static/fonts/ibm-plex-sans-400.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Space Grotesk";
-  src: url("/static/fonts/space-grotesk-700.woff2") format("woff2");
+  font-family: "IBM Plex Sans";
+  src: url("/static/fonts/ibm-plex-sans-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/static/fonts/ibm-plex-sans-700.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Space Mono";
-  src: url("/static/fonts/space-mono-400.woff2") format("woff2");
+  font-family: "Montserrat";
+  src: url("/static/fonts/montserrat-400.woff2") format("woff2");
   font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/static/fonts/montserrat-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/static/fonts/montserrat-700.woff2") format("woff2");
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
   color-scheme: light;
-  --bg: #0b1b24;
-  --bg-soft: #122936;
-  --bg-card: rgba(255, 255, 255, 0.08);
-  --bg-card-strong: rgba(255, 255, 255, 0.12);
-  --text: #f8f5ef;
-  --text-muted: rgba(248, 245, 239, 0.65);
-  --accent: #f27f42;
-  --accent-2: #4bb8c8;
-  --accent-3: #f9c74f;
-  --shadow: 0 20px 50px rgba(3, 11, 16, 0.55);
-  --radius: 18px;
+  --bg: #121316;
+  --bg-soft: #1a1d22;
+  --bg-card: #1b1f24;
+  --bg-card-strong: #22262c;
+  --text: #f5f2ea;
+  --text-muted: #b6b1a7;
+  --accent: #d1a756;
+  --accent-2: #888f98;
+  --accent-3: #e6c47d;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  --radius: 16px;
 }
 
 * {
@@ -44,13 +68,19 @@
 }
 
 body {
-  font-family: "Space Grotesk", "Helvetica Neue", sans-serif;
-  background:
-    radial-gradient(circle at top, rgba(75, 184, 200, 0.2), transparent 45%),
-    radial-gradient(circle at 80% 20%, rgba(242, 127, 66, 0.35), transparent 45%),
-    linear-gradient(160deg, #0b1b24 15%, #0f2332 55%, #0c1d28 100%);
+  font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Montserrat", "Helvetica Neue", sans-serif;
 }
 
 a {
@@ -85,11 +115,12 @@ a:hover {
   width: 46px;
   height: 46px;
   border-radius: 14px;
-  background: conic-gradient(from 180deg, var(--accent), var(--accent-2), var(--accent));
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.2);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
 }
 
 .brand-title {
+  font-family: "Montserrat", "Helvetica Neue", sans-serif;
   font-weight: 700;
   font-size: 1.3rem;
   letter-spacing: 0.02em;
@@ -111,7 +142,7 @@ a:hover {
   position: relative;
   padding: 34px 28px;
   border-radius: var(--radius);
-  background: linear-gradient(120deg, rgba(75, 184, 200, 0.25), rgba(242, 127, 66, 0.2));
+  background: var(--bg-soft);
   margin-bottom: 28px;
   overflow: hidden;
   box-shadow: var(--shadow);
@@ -123,6 +154,7 @@ a:hover {
 }
 
 .hero h1 {
+  font-family: "Montserrat", "Helvetica Neue", sans-serif;
   font-size: clamp(2rem, 5vw, 3.2rem);
   margin-bottom: 10px;
 }
@@ -134,13 +166,7 @@ a:hover {
 }
 
 .hero-glow {
-  position: absolute;
-  right: -50px;
-  top: -60px;
-  width: 220px;
-  height: 220px;
-  background: radial-gradient(circle, rgba(249, 199, 79, 0.45), transparent 70%);
-  opacity: 0.9;
+  display: none;
 }
 
 .grid {
@@ -160,7 +186,7 @@ a:hover {
   border-radius: var(--radius);
   padding: 20px;
   box-shadow: var(--shadow);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   animation: rise 0.6s ease both;
 }
 
@@ -221,12 +247,12 @@ a:hover {
 }
 
 .tag {
-  font-family: "Space Mono", monospace;
+  font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif;
   font-size: 0.72rem;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(249, 199, 79, 0.18);
-  border: 1px solid rgba(249, 199, 79, 0.35);
+  background: rgba(209, 167, 86, 0.12);
+  border: 1px solid rgba(209, 167, 86, 0.35);
 }
 
 .section-header {
@@ -234,6 +260,7 @@ a:hover {
 }
 
 .section-header h2 {
+  font-family: "Montserrat", "Helvetica Neue", sans-serif;
   font-size: 1.4rem;
   margin-bottom: 6px;
 }
@@ -260,7 +287,7 @@ table {
 }
 
 thead {
-  background: rgba(15, 35, 50, 0.85);
+  background: var(--bg-card-strong);
 }
 
 th,
@@ -299,12 +326,12 @@ tbody tr:hover {
 }
 
 .pill {
-  font-family: "Space Mono", monospace;
+  font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif;
   font-size: 0.85rem;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(75, 184, 200, 0.2);
-  border: 1px solid rgba(75, 184, 200, 0.35);
+  background: rgba(209, 167, 86, 0.12);
+  border: 1px solid rgba(209, 167, 86, 0.35);
 }
 
 .metrics {
@@ -342,7 +369,7 @@ tbody tr:hover {
   justify-content: space-between;
   gap: 12px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 12px;
 }
 
@@ -361,7 +388,7 @@ tbody tr:hover {
   padding: 10px 18px;
   border-radius: 999px;
   background: var(--accent);
-  color: #0c1d28;
+  color: #111316;
   font-weight: 700;
   transition:
     transform 0.2s ease,
@@ -384,7 +411,7 @@ tbody tr:hover {
   justify-content: space-between;
   align-items: center;
   gap: 28px;
-  background: linear-gradient(125deg, rgba(242, 127, 66, 0.22), rgba(75, 184, 200, 0.18));
+  background: var(--bg-card-strong);
 }
 
 .callout h3 {
