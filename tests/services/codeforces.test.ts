@@ -89,4 +89,47 @@ describe("CodeforcesClient", () => {
     jest.useRealTimers();
     setTimeoutSpy.mockRestore();
   });
+
+  it("does not retry on 404 responses", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ status: "FAILED", result: null }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const client = new CodeforcesClient({
+      baseUrl: "https://codeforces.com/api",
+      requestDelayMs: 0,
+      timeoutMs: 1000,
+    });
+
+    await expect(client.request("contest.list")).rejects.toThrow("HTTP 404");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries on 500 responses", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ status: "FAILED", result: null }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: "OK", result: { ok: true } }),
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const client = new CodeforcesClient({
+      baseUrl: "https://codeforces.com/api",
+      requestDelayMs: 0,
+      timeoutMs: 1000,
+    });
+
+    const result = await client.request<{ ok: boolean }>("contest.list");
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

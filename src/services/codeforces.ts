@@ -12,6 +12,8 @@ export type CodeforcesResponse<T> = {
   comment?: string;
 };
 
+type RetryableError = Error & { retryable?: boolean };
+
 type RequestOptions = {
   baseUrl: string;
   requestDelayMs: number;
@@ -61,7 +63,11 @@ export class CodeforcesClient {
           ...(dispatcher ? { dispatcher } : {}),
         });
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          const error = new Error(`HTTP ${response.status}`) as RetryableError;
+          if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+            error.retryable = false;
+          }
+          throw error;
         }
         const data = (await response.json()) as CodeforcesResponse<T>;
         if (data.status !== "OK") {
@@ -80,7 +86,11 @@ export class CodeforcesClient {
       try {
         return await this.scheduler.schedule(attempt);
       } catch (error) {
-        if (attemptIndex >= retries) {
+        const retryable =
+          !(error instanceof Error) ||
+          (error as RetryableError).retryable === undefined ||
+          (error as RetryableError).retryable === true;
+        if (!retryable || attemptIndex >= retries) {
           const message = error instanceof Error ? error.message : String(error);
           this.lastError = {
             message,
