@@ -1,6 +1,11 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { ComponentType, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import {
+  buildPaginationIds,
+  buildPaginationRow,
+  paginationTimeoutMs,
+} from "../utils/pagination.js";
 
 import type { Command } from "./types.js";
 
@@ -35,27 +40,84 @@ export const handlesCommand: Command = {
         return;
       }
 
-      const start = (page - 1) * PAGE_SIZE;
-      if (start >= roster.length) {
+      const totalPages = Math.max(1, Math.ceil(roster.length / PAGE_SIZE));
+      if (page > totalPages) {
         await interaction.editReply("Empty page.");
         return;
       }
 
-      const lines = roster
-        .slice(start, start + PAGE_SIZE)
-        .map(
-          (entry, index) =>
-            `${start + index + 1}. <@${entry.userId}> - ${entry.handle} (${entry.rating})`
-        )
-        .join("\n");
+      const paginationIds = buildPaginationIds("handles", interaction.id);
+      const renderPage = (pageNumber: number) => {
+        const start = (pageNumber - 1) * PAGE_SIZE;
+        if (start >= roster.length) {
+          return null;
+        }
 
-      const embed = new EmbedBuilder()
-        .setTitle("Linked handles")
-        .setDescription(`Page ${page}`)
-        .setColor(0x3498db)
-        .addFields({ name: "Users", value: lines || "No entries.", inline: false });
+        const lines = roster
+          .slice(start, start + PAGE_SIZE)
+          .map(
+            (entry, index) =>
+              `${start + index + 1}. <@${entry.userId}> - ${entry.handle} (${entry.rating})`
+          )
+          .join("\n");
 
-      await interaction.editReply({ embeds: [embed] });
+        const embed = new EmbedBuilder()
+          .setTitle("Linked handles")
+          .setDescription(`Page ${pageNumber} of ${totalPages}`)
+          .setColor(0x3498db)
+          .addFields({ name: "Users", value: lines || "No entries.", inline: false });
+        const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
+        return { embed, row };
+      };
+
+      let currentPage = page;
+      const initial = renderPage(currentPage);
+      if (!initial) {
+        await interaction.editReply("Empty page.");
+        return;
+      }
+
+      const response = await interaction.editReply({
+        embeds: [initial.embed],
+        components: [initial.row],
+      });
+
+      const collector = response.createMessageComponentCollector({
+        componentType: ComponentType.Button,
+        time: paginationTimeoutMs,
+      });
+
+      collector.on("collect", async (button) => {
+        if (button.customId !== paginationIds.prev && button.customId !== paginationIds.next) {
+          return;
+        }
+        if (button.user.id !== interaction.user.id) {
+          await button.reply({
+            content: "Only the command user can use these buttons.",
+            ephemeral: true,
+          });
+          return;
+        }
+        await button.deferUpdate();
+        currentPage =
+          button.customId === paginationIds.prev
+            ? Math.max(1, currentPage - 1)
+            : Math.min(totalPages, currentPage + 1);
+        const updated = renderPage(currentPage);
+        if (!updated) {
+          return;
+        }
+        await interaction.editReply({ embeds: [updated.embed], components: [updated.row] });
+      });
+
+      collector.on("end", async () => {
+        try {
+          const disabledRow = buildPaginationRow(paginationIds, currentPage, totalPages, true);
+          await interaction.editReply({ components: [disabledRow] });
+        } catch {
+          return;
+        }
+      });
     } catch (error) {
       logCommandError(`Error in handles: ${String(error)}`, interaction, context.correlationId);
       await interaction.editReply("Something went wrong.");

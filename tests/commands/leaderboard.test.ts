@@ -3,8 +3,11 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { leaderboardCommand } from "../../src/commands/leaderboard.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (overrides: Record<string, unknown> = {}) =>
-  ({
+const createInteraction = (overrides: Record<string, unknown> = {}) => {
+  const response = {
+    createMessageComponentCollector: jest.fn().mockReturnValue({ on: jest.fn() }),
+  };
+  return {
     options: {
       getInteger: jest.fn().mockReturnValue(1),
       getString: jest.fn().mockReturnValue("solves"),
@@ -17,9 +20,10 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     },
     reply: jest.fn().mockResolvedValue(undefined),
     deferReply: jest.fn().mockResolvedValue(undefined),
-    editReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(response),
     ...overrides,
-  }) as unknown as ChatInputCommandInteraction;
+  } as unknown as ChatInputCommandInteraction;
+};
 
 describe("leaderboardCommand", () => {
   it("renders the solve leaderboard when requested", async () => {

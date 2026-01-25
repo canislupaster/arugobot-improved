@@ -1,6 +1,15 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import {
+  ComponentType,
+  EmbedBuilder,
+  SlashCommandBuilder,
+} from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import {
+  buildPaginationIds,
+  buildPaginationRow,
+  paginationTimeoutMs,
+} from "../utils/pagination.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { Command } from "./types.js";
@@ -46,39 +55,89 @@ export const leaderboardCommand: Command = {
       fieldName: string,
       formatValue: (value: number) => string = (value) => String(value)
     ) => {
-      let content = "";
-      const start = (page - 1) * 10;
-      if (start >= rows.length) {
+      const totalPages = Math.max(1, Math.ceil(rows.length / 10));
+      const paginationIds = buildPaginationIds("leaderboard", interaction.id);
+      let currentPage = page;
+
+      const renderPage = async (pageNumber: number) => {
+        let content = "";
+        const start = (pageNumber - 1) * 10;
+        if (start >= rows.length) {
+          return null;
+        }
+        for (let i = 0; i < 10; i += 1) {
+          const index = start + i;
+          if (index >= rows.length) {
+            break;
+          }
+          const entry = rows[index];
+          const member = await guild.members.fetch(entry.userId).catch(() => null);
+          const mention = member ? member.toString() : `<@${entry.userId}>`;
+          content += `${index + 1}. ${mention} (${formatValue(entry.value)})`;
+          if (index === 0) {
+            content += " :first_place:\n";
+          } else if (index === 1) {
+            content += " :second_place:\n";
+          } else if (index === 2) {
+            content += " :third_place:\n";
+          } else {
+            content += "\n";
+          }
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(title)
+          .setDescription(`Page ${pageNumber} of ${totalPages}`)
+          .setColor(0x3498db)
+          .addFields({ name: fieldName, value: content || "No entries.", inline: false });
+        const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
+        return { embed, row };
+      };
+
+      const initial = await renderPage(currentPage);
+      if (!initial) {
         await interaction.editReply("Empty page.");
         return;
       }
-      for (let i = 0; i < 10; i += 1) {
-        const index = start + i;
-        if (index >= rows.length) {
-          break;
-        }
-        const entry = rows[index];
-        const member = await guild.members.fetch(entry.userId).catch(() => null);
-        const mention = member ? member.toString() : `<@${entry.userId}>`;
-        content += `${index + 1}. ${mention} (${formatValue(entry.value)})`;
-        if (index === 0) {
-          content += " :first_place:\n";
-        } else if (index === 1) {
-          content += " :second_place:\n";
-        } else if (index === 2) {
-          content += " :third_place:\n";
-        } else {
-          content += "\n";
-        }
-      }
+      const response = await interaction.editReply({
+        embeds: [initial.embed],
+        components: [initial.row],
+      });
 
-      const embed = new EmbedBuilder()
-        .setTitle(title)
-        .setDescription(`Page ${page}`)
-        .setColor(0x3498db)
-        .addFields({ name: fieldName, value: content || "No entries.", inline: false });
+      const collector = response.createMessageComponentCollector({
+        componentType: ComponentType.Button,
+        time: paginationTimeoutMs,
+      });
 
-      await interaction.editReply({ embeds: [embed] });
+      collector.on("collect", async (button) => {
+        if (button.customId !== paginationIds.prev && button.customId !== paginationIds.next) {
+          return;
+        }
+        if (button.user.id !== interaction.user.id) {
+          await button.reply({
+            content: "Only the command user can use these buttons.",
+            ephemeral: true,
+          });
+          return;
+        }
+        await button.deferUpdate();
+        currentPage =
+          button.customId === paginationIds.prev ? currentPage - 1 : currentPage + 1;
+        const updated = await renderPage(currentPage);
+        if (!updated) {
+          return;
+        }
+        await interaction.editReply({ embeds: [updated.embed], components: [updated.row] });
+      });
+
+      collector.on("end", async () => {
+        try {
+          const disabledRow = buildPaginationRow(paginationIds, currentPage, totalPages, true);
+          await interaction.editReply({ components: [disabledRow] });
+        } catch {
+          return;
+        }
+      });
     };
 
     try {

@@ -13,6 +13,11 @@ import {
 
 import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import {
+  buildPaginationIds,
+  buildPaginationRow,
+  paginationTimeoutMs,
+} from "../utils/pagination.js";
 import { formatTime } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
 import { capitalize } from "../utils/text.js";
@@ -304,6 +309,7 @@ export const tournamentCommand: Command = {
           return;
         }
         await interaction.deferReply();
+        const paginationIds = buildPaginationIds("tournament_history", interaction.id);
         const history = await context.services.tournaments.getHistoryPage(
           guildId,
           page,
@@ -313,32 +319,44 @@ export const tournamentCommand: Command = {
           await interaction.editReply("No completed tournaments yet.");
           return;
         }
-        if (history.entries.length === 0) {
+        const totalPages = Math.max(1, Math.ceil(history.total / HISTORY_PAGE_SIZE));
+        if (page > totalPages || history.entries.length === 0) {
           await interaction.editReply("Empty page.");
           return;
         }
-        const totalPages = Math.max(1, Math.ceil(history.total / HISTORY_PAGE_SIZE));
-        const lines = history.entries.map((entry) => formatHistoryLine(entry));
-        const embed = new EmbedBuilder()
-          .setTitle("Tournament history")
-          .setDescription(`Page ${page} of ${totalPages}`)
-          .setColor(0x3498db)
-          .addFields({ name: "Recent tournaments", value: lines.join("\n"), inline: false });
+
         const selectId = `tournament_history_${interaction.id}`;
+        const buildSelectRow = (entries: TournamentHistoryEntry[], disabled = false) => {
+          const options = buildHistorySelectOptions(entries);
+          return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId(selectId)
+              .setPlaceholder("Select a tournament for details")
+              .addOptions(options)
+              .setDisabled(disabled)
+          );
+        };
+
+        const buildListEmbed = (entries: TournamentHistoryEntry[], pageNumber: number) => {
+          const lines = entries.map((entry) => formatHistoryLine(entry));
+          return new EmbedBuilder()
+            .setTitle("Tournament history")
+            .setDescription(`Page ${pageNumber} of ${totalPages}`)
+            .setColor(0x3498db)
+            .addFields({ name: "Recent tournaments", value: lines.join("\n"), inline: false });
+        };
+
+        let currentEntries = history.entries;
+        let currentPage = page;
+        let selectedTournamentId: string | null = null;
+        let selectRow = buildSelectRow(currentEntries);
+        let paginationRow = buildPaginationRow(paginationIds, currentPage, totalPages);
         const exportRow = buildHistoryExportRow(interaction.id, true);
-        const options = buildHistorySelectOptions(history.entries);
-        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-          new StringSelectMenuBuilder()
-            .setCustomId(selectId)
-            .setPlaceholder("Select a tournament for details")
-            .addOptions(options)
-        );
 
         const response = await interaction.editReply({
-          embeds: [embed],
-          components: [row, exportRow],
+          embeds: [buildListEmbed(currentEntries, currentPage)],
+          components: [selectRow, paginationRow, exportRow],
         });
-        let selectedTournamentId: string | null = null;
 
         const collector = response.createMessageComponentCollector({
           componentType: ComponentType.StringSelect,
@@ -374,7 +392,7 @@ export const tournamentCommand: Command = {
             const enabledExportRow = buildHistoryExportRow(interaction.id, false);
             await selection.editReply({
               embeds: [detailEmbed],
-              components: [row, enabledExportRow],
+              components: [selectRow, paginationRow, enabledExportRow],
             });
           } catch (error) {
             logCommandError(
@@ -390,7 +408,7 @@ export const tournamentCommand: Command = {
 
         const buttonCollector = response.createMessageComponentCollector({
           componentType: ComponentType.Button,
-          time: HISTORY_SELECT_TIMEOUT_MS,
+          time: Math.min(HISTORY_SELECT_TIMEOUT_MS, paginationTimeoutMs),
         });
 
         buttonCollector.on("collect", async (button) => {
@@ -402,6 +420,32 @@ export const tournamentCommand: Command = {
               });
               return;
             }
+            if (button.customId === paginationIds.prev || button.customId === paginationIds.next) {
+              await button.deferUpdate();
+              currentPage =
+                button.customId === paginationIds.prev
+                  ? Math.max(1, currentPage - 1)
+                  : Math.min(totalPages, currentPage + 1);
+              const updated = await context.services.tournaments.getHistoryPage(
+                guildId,
+                currentPage,
+                HISTORY_PAGE_SIZE
+              );
+              if (updated.entries.length === 0) {
+                return;
+              }
+              currentEntries = updated.entries;
+              selectedTournamentId = null;
+              selectRow = buildSelectRow(currentEntries);
+              paginationRow = buildPaginationRow(paginationIds, currentPage, totalPages);
+              const disabledExportRow = buildHistoryExportRow(interaction.id, true);
+              await interaction.editReply({
+                embeds: [buildListEmbed(currentEntries, currentPage)],
+                components: [selectRow, paginationRow, disabledExportRow],
+              });
+              return;
+            }
+
             const isCsv = button.customId === `tournament_recap_csv_${interaction.id}`;
             const isMarkdown = button.customId === `tournament_recap_md_${interaction.id}`;
             if (!isCsv && !isMarkdown) {
@@ -448,7 +492,17 @@ export const tournamentCommand: Command = {
 
         collector.on("end", async () => {
           try {
-            await interaction.editReply({ components: [] });
+            const disabledSelectRow = buildSelectRow(currentEntries, true);
+            const disabledPaginationRow = buildPaginationRow(
+              paginationIds,
+              currentPage,
+              totalPages,
+              true
+            );
+            const disabledExportRow = buildHistoryExportRow(interaction.id, true);
+            await interaction.editReply({
+              components: [disabledSelectRow, disabledPaginationRow, disabledExportRow],
+            });
           } catch {
             return;
           }

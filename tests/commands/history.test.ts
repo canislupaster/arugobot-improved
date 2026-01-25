@@ -3,8 +3,11 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { historyCommand } from "../../src/commands/history.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (overrides: Record<string, unknown> = {}) =>
-  ({
+const createInteraction = (overrides: Record<string, unknown> = {}) => {
+  const response = {
+    createMessageComponentCollector: jest.fn().mockReturnValue({ on: jest.fn() }),
+  };
+  return {
     commandName: "history",
     user: { id: "user-1", username: "User" },
     guild: { id: "guild-1" },
@@ -12,10 +15,11 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
       getInteger: jest.fn().mockReturnValue(1),
     },
     deferReply: jest.fn().mockResolvedValue(undefined),
-    editReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(response),
     reply: jest.fn().mockResolvedValue(undefined),
     ...overrides,
-  }) as unknown as ChatInputCommandInteraction;
+  } as unknown as ChatInputCommandInteraction;
+};
 
 describe("historyCommand", () => {
   it("renders completed challenge history when available", async () => {
@@ -48,9 +52,9 @@ describe("historyCommand", () => {
     await historyCommand.execute(interaction, context);
 
     expect(interaction.deferReply).toHaveBeenCalled();
-    expect(interaction.editReply).toHaveBeenCalledWith(
-      expect.objectContaining({ embeds: expect.any(Array) })
-    );
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    expect(payload.embeds).toBeDefined();
+    expect(payload.components).toHaveLength(1);
   });
 
   it("falls back to legacy history when no completed challenges exist", async () => {
@@ -83,8 +87,8 @@ describe("historyCommand", () => {
     await historyCommand.execute(interaction, context);
 
     expect(interaction.deferReply).toHaveBeenCalled();
-    expect(interaction.editReply).toHaveBeenCalledWith(
-      expect.objectContaining({ embeds: expect.any(Array) })
-    );
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    expect(payload.embeds).toBeDefined();
+    expect(payload.components).toHaveLength(1);
   });
 });
