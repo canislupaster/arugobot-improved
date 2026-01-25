@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { handleCommandInteraction } from "../../src/commands/handler.js";
 import type { Command } from "../../src/commands/types.js";
+import type { WebServerStatus } from "../../src/types/webStatus.js";
 import { CooldownManager } from "../../src/utils/cooldown.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
@@ -19,6 +20,13 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
   }) as unknown as ChatInputCommandInteraction;
 
 describe("handleCommandInteraction", () => {
+  const webStatus: WebServerStatus = {
+    status: "starting",
+    host: "127.0.0.1",
+    requestedPort: 0,
+    actualPort: null,
+    lastError: null,
+  };
   const metrics = {
     recordCommandResult: jest.fn().mockResolvedValue(undefined),
   };
@@ -34,6 +42,7 @@ describe("handleCommandInteraction", () => {
       config: {} as never,
       commandSummaries: [],
       correlationId: "corr-1",
+      webStatus,
       services: { metrics } as never,
     };
     const cooldowns = new CooldownManager(1, 1);
@@ -57,6 +66,7 @@ describe("handleCommandInteraction", () => {
       config: {} as never,
       commandSummaries: [],
       correlationId: "corr-2",
+      webStatus,
       services: { metrics } as never,
     };
     const cooldowns = new CooldownManager(0, 0);
@@ -84,6 +94,7 @@ describe("handleCommandInteraction", () => {
       config: {} as never,
       commandSummaries: [],
       correlationId: "corr-3",
+      webStatus,
       services: { metrics } as never,
     };
     const cooldowns = new CooldownManager(0, 0);
