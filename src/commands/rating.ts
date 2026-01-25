@@ -57,8 +57,11 @@ const bandPlugin: Plugin<"line"> = {
   },
 };
 
-async function renderRatingChart(name: string, ratings: number[]): Promise<Buffer> {
+export async function renderRatingChart(name: string, ratings: number[]): Promise<Buffer> {
   ensureChartRegistered();
+  if (ratings.length === 0) {
+    throw new Error("Rating history is empty.");
+  }
   const canvas = new Canvas(width, height);
   const labels = ratings.map((_, index) => String(index + 1));
   const min = Math.min(...ratings) - 100;
@@ -118,59 +121,68 @@ async function renderRatingChart(name: string, ratings: number[]): Promise<Buffe
   return buffer;
 }
 
-export const ratingCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("rating")
-    .setDescription("Shows your (or another user's) rating graph")
-    .addUserOption((option) => option.setName("user").setDescription("User to inspect")),
-  async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
-      return;
-    }
-    const member = interaction.options.getMember("user");
-    const user = interaction.options.getUser("user") ?? interaction.user;
-    const targetId = user.id;
-    const { displayName: targetName, mention: targetMention } = resolveTargetLabels(user, member);
+export type RatingChartRenderer = (name: string, ratings: number[]) => Promise<Buffer>;
 
-    await interaction.deferReply();
-
-    if (!(await context.services.store.handleLinked(interaction.guild.id, targetId))) {
-      await interaction.editReply("Handle not linked.");
-      return;
-    }
-
-    const rating = await context.services.store.getRating(interaction.guild.id, targetId);
-    if (rating === -1) {
-      await interaction.editReply("Something went wrong, no rating found.");
-      return;
-    }
-
-    try {
-      const historyData = await context.services.store.getHistoryWithRatings(
-        interaction.guild.id,
-        targetId
-      );
-      if (!historyData) {
-        await interaction.editReply("No rating history yet.");
+export function createRatingCommand(renderer: RatingChartRenderer): Command {
+  return {
+    data: new SlashCommandBuilder()
+      .setName("rating")
+      .setDescription("Shows your (or another user's) rating graph")
+      .addUserOption((option) => option.setName("user").setDescription("User to inspect")),
+    async execute(interaction, context) {
+      if (!interaction.guild) {
+        await interaction.reply({
+          content: "This command can only be used in a server.",
+        });
         return;
       }
-      const buffer = await renderRatingChart(targetName, historyData.ratingHistory);
-      const attachment = new AttachmentBuilder(buffer, { name: "rating.png" });
-      const embed = new EmbedBuilder()
-        .setTitle("Rating graph")
-        .setDescription(`${targetMention}'s rating is ${rating}`)
-        .setColor(EMBED_COLORS.info)
-        .setImage("attachment://rating.png");
-
-      await interaction.editReply({ files: [attachment], embeds: [embed] });
-    } catch (error) {
-      logCommandError(`Rating chart failed: ${String(error)}`, interaction, context.correlationId);
-      await interaction.editReply(
-        "Something went wrong while rendering the rating graph. Try again later."
+      const member = interaction.options.getMember("user");
+      const user = interaction.options.getUser("user") ?? interaction.user;
+      const targetId = user.id;
+      const { displayName: targetName, mention: targetMention } = resolveTargetLabels(
+        user,
+        member
       );
-    }
-  },
-};
+
+      await interaction.deferReply();
+
+      if (!(await context.services.store.handleLinked(interaction.guild.id, targetId))) {
+        await interaction.editReply("Handle not linked.");
+        return;
+      }
+
+      const rating = await context.services.store.getRating(interaction.guild.id, targetId);
+      if (rating === -1) {
+        await interaction.editReply("Something went wrong, no rating found.");
+        return;
+      }
+
+      try {
+        const historyData = await context.services.store.getHistoryWithRatings(
+          interaction.guild.id,
+          targetId
+        );
+        if (!historyData || historyData.ratingHistory.length === 0) {
+          await interaction.editReply("No rating history yet.");
+          return;
+        }
+        const buffer = await renderer(targetName, historyData.ratingHistory);
+        const attachment = new AttachmentBuilder(buffer, { name: "rating.png" });
+        const embed = new EmbedBuilder()
+          .setTitle("Rating graph")
+          .setDescription(`${targetMention}'s rating is ${rating}`)
+          .setColor(EMBED_COLORS.info)
+          .setImage("attachment://rating.png");
+
+        await interaction.editReply({ files: [attachment], embeds: [embed] });
+      } catch (error) {
+        logCommandError(`Rating chart failed: ${String(error)}`, interaction, context.correlationId);
+        await interaction.editReply(
+          "Something went wrong while rendering the rating graph. Try again later."
+        );
+      }
+    },
+  };
+}
+
+export const ratingCommand = createRatingCommand(renderRatingChart);
