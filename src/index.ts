@@ -116,7 +116,7 @@ async function main() {
     contestRatingChanges,
     store
   );
-  const contestActivity = new ContestActivityService(db, store);
+  const contestActivity = new ContestActivityService(db, store, ratingChanges);
   const challenges = new ChallengeService(db, store, codeforces);
   const tournaments = new TournamentService(db, problems, store, challenges);
   const tournamentRecaps = new TournamentRecapService(db, tournaments);

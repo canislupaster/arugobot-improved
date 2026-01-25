@@ -2,9 +2,13 @@ import { createDb } from "../../src/db/database.js";
 import { migrateToLatest } from "../../src/db/migrator.js";
 import type { CodeforcesClient } from "../../src/services/codeforces.js";
 import { ContestActivityService } from "../../src/services/contestActivity.js";
+import type { RatingChangesService } from "../../src/services/ratingChanges.js";
 import { StoreService } from "../../src/services/store.js";
 
 const mockCodeforces = { request: jest.fn() } as unknown as CodeforcesClient;
+const mockRatingChanges = {
+  getRatingChanges: jest.fn().mockResolvedValue(null),
+} as unknown as RatingChangesService;
 
 const createChange = (contestId: number, contestName: string, timestamp: number) => ({
   contestId,
@@ -16,11 +20,15 @@ const createChange = (contestId: number, contestName: string, timestamp: number)
 });
 
 describe("ContestActivityService", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("summarizes guild contest activity", async () => {
     const db = createDb(":memory:");
     await migrateToLatest(db);
     const store = new StoreService(db, mockCodeforces);
-    const service = new ContestActivityService(db, store);
+    const service = new ContestActivityService(db, store, mockRatingChanges);
 
     await db
       .insertInto("users")
@@ -103,7 +111,7 @@ describe("ContestActivityService", () => {
     const db = createDb(":memory:");
     await migrateToLatest(db);
     const store = new StoreService(db, mockCodeforces);
-    const service = new ContestActivityService(db, store);
+    const service = new ContestActivityService(db, store, mockRatingChanges);
 
     const activity = await service.getGuildContestActivity("guild-1");
     expect(activity.contestCount).toBe(0);
@@ -119,7 +127,7 @@ describe("ContestActivityService", () => {
     const db = createDb(":memory:");
     await migrateToLatest(db);
     const store = new StoreService(db, mockCodeforces);
-    const service = new ContestActivityService(db, store);
+    const service = new ContestActivityService(db, store, mockRatingChanges);
 
     await db
       .insertInto("users")
@@ -180,6 +188,33 @@ describe("ContestActivityService", () => {
     expect(activity.byScope.official.contestCount).toBe(1);
     expect(activity.byScope.gym.contestCount).toBe(1);
     expect(activity.lastContestAt).not.toBeNull();
+
+    await db.destroy();
+  });
+
+  it("refreshes missing rating changes for roster handles", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const store = new StoreService(db, mockCodeforces);
+    const ratingChanges = {
+      getRatingChanges: jest.fn().mockResolvedValue(null),
+    } as unknown as RatingChangesService;
+    const service = new ContestActivityService(db, store, ratingChanges);
+
+    await db
+      .insertInto("users")
+      .values({
+        server_id: "guild-1",
+        user_id: "user-1",
+        handle: "Alice",
+        rating: 1500,
+        history: "[]",
+        rating_history: "[]",
+      })
+      .execute();
+
+    await service.getGuildContestActivity("guild-1");
+    expect(ratingChanges.getRatingChanges).toHaveBeenCalledWith("Alice");
 
     await db.destroy();
   });

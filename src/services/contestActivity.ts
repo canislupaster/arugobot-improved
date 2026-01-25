@@ -4,7 +4,7 @@ import type { Database } from "../db/types.js";
 import { logError, logWarn } from "../utils/logger.js";
 
 import type { ContestScope } from "./contests.js";
-import type { RatingChange } from "./ratingChanges.js";
+import type { RatingChange, RatingChangesService } from "./ratingChanges.js";
 import type { StoreService } from "./store.js";
 
 type RosterEntry = { userId: string; handle: string };
@@ -56,6 +56,7 @@ export type ContestScopeBreakdown = {
 
 const DEFAULT_LOOKBACK_DAYS = 90;
 const DEFAULT_RECENT_LIMIT = 4;
+const MAX_REFRESH_HANDLES = 500;
 
 function normalizeHandle(handle: string): string {
   return handle.trim().toLowerCase();
@@ -103,7 +104,8 @@ function sortParticipants(a: ContestParticipantSummary, b: ContestParticipantSum
 export class ContestActivityService {
   constructor(
     private readonly db: Kysely<Database>,
-    private readonly store: StoreService
+    private readonly store: StoreService,
+    private readonly ratingChanges: RatingChangesService
   ) {}
 
   async getGuildContestActivity(
@@ -146,6 +148,7 @@ export class ContestActivityService {
     );
 
     try {
+      await this.refreshMissingRatingChanges(handles, rosterMap);
       const rows = await this.db
         .selectFrom("cf_rating_changes")
         .select(["handle", "payload"])
@@ -311,6 +314,8 @@ export class ContestActivityService {
         };
       }
 
+      const handleMap = new Map(handles.map((handle) => [normalizeHandle(handle), { handle }]));
+      await this.refreshMissingRatingChanges(handles, handleMap);
       const rows = await this.db
         .selectFrom("cf_rating_changes")
         .select(["handle", "payload"])
@@ -434,5 +439,47 @@ export class ContestActivityService {
       });
     }
     return map;
+  }
+
+  private async refreshMissingRatingChanges(
+    handles: string[],
+    handleMap: Map<string, { handle: string }>
+  ): Promise<void> {
+    const normalized = handles.map((handle) => normalizeHandle(handle)).filter(Boolean);
+    if (normalized.length === 0) {
+      return;
+    }
+    const uniqueHandles = Array.from(new Set(normalized));
+    const cached = await this.db
+      .selectFrom("cf_rating_changes")
+      .select("handle")
+      .where("handle", "in", uniqueHandles)
+      .execute();
+    const cachedSet = new Set(cached.map((row) => normalizeHandle(row.handle)));
+    const missing = uniqueHandles.filter((handle) => !cachedSet.has(handle));
+    if (missing.length === 0) {
+      return;
+    }
+
+    const toRefresh = missing.slice(0, MAX_REFRESH_HANDLES);
+    for (const handle of toRefresh) {
+      const entry = handleMap.get(handle);
+      const originalHandle = entry?.handle ?? handle;
+      try {
+        await this.ratingChanges.getRatingChanges(originalHandle);
+      } catch (error) {
+        logWarn("Contest activity rating refresh failed.", {
+          handle: originalHandle,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (missing.length > toRefresh.length) {
+      logWarn("Contest activity rating refresh truncated.", {
+        attempted: toRefresh.length,
+        totalMissing: missing.length,
+      });
+    }
   }
 }

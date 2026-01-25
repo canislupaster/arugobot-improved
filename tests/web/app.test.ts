@@ -6,6 +6,7 @@ import type { Database } from "../../src/db/types.js";
 import type { CodeforcesClient } from "../../src/services/codeforces.js";
 import { ContestActivityService } from "../../src/services/contestActivity.js";
 import { GuildSettingsService } from "../../src/services/guildSettings.js";
+import type { RatingChangesService } from "../../src/services/ratingChanges.js";
 import { StoreService } from "../../src/services/store.js";
 import { WebsiteService } from "../../src/services/website.js";
 import { createWebApp } from "../../src/web/app.js";
@@ -16,6 +17,10 @@ const mockCodeforces = {
   getLastSuccessAt: jest.fn().mockReturnValue("2024-01-01T00:00:00.000Z"),
 } as unknown as CodeforcesClient;
 
+const mockRatingChanges = {
+  getRatingChanges: jest.fn().mockResolvedValue(null),
+} as unknown as RatingChangesService;
+
 describe("web app", () => {
   let db: Kysely<Database>;
   let website: WebsiteService;
@@ -25,7 +30,7 @@ describe("web app", () => {
     await migrateToLatest(db);
     const store = new StoreService(db, mockCodeforces);
     const settings = new GuildSettingsService(db);
-    const contestActivity = new ContestActivityService(db, store);
+    const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
     website = new WebsiteService(db, store, settings, contestActivity, mockCodeforces);
 
     await db
