@@ -1,6 +1,6 @@
 import { createDb } from "../../src/db/database.js";
 import { migrateToLatest } from "../../src/db/migrator.js";
-import { LogsService } from "../../src/services/logs.js";
+import { LOG_ENTRY_LIMIT, LogsService } from "../../src/services/logs.js";
 
 describe("LogsService", () => {
   it("stores log entries with structured context", async () => {
@@ -94,6 +94,30 @@ describe("LogsService", () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0]?.message).toBe("Error entry.");
+
+    await db.destroy();
+  });
+
+  it("clamps the log entry limit", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const logs = new LogsService(db, 30);
+
+    const timestamp = new Date().toISOString();
+    const entries = Array.from({ length: LOG_ENTRY_LIMIT + 5 }, (_, index) => ({
+      timestamp,
+      level: "info" as const,
+      message: `Entry ${index + 1}`,
+      context: { guildId: "guild-1" },
+    }));
+
+    for (const entry of entries) {
+      await logs.write(entry);
+    }
+
+    const recent = await logs.getRecentEntries({ limit: LOG_ENTRY_LIMIT + 50 });
+
+    expect(recent).toHaveLength(LOG_ENTRY_LIMIT);
 
     await db.destroy();
   });

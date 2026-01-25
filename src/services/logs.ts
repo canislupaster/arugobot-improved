@@ -4,6 +4,7 @@ import type { Database } from "../db/types.js";
 import type { LogContext, LogEntry, LogLevel, LogSink } from "../utils/logger.js";
 
 export const logCleanupIntervalMs = 12 * 60 * 60 * 1000;
+export const LOG_ENTRY_LIMIT = 20;
 
 type LogContextFields = {
   correlationId?: string;
@@ -73,6 +74,13 @@ function applyLogFilters(
   return filtered;
 }
 
+function clampLogLimit(value: number | undefined, fallback: number): number {
+  if (!value || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(1, Math.min(LOG_ENTRY_LIMIT, Math.trunc(value)));
+}
+
 export class LogsService implements LogSink {
   constructor(
     private readonly db: Kysely<Database>,
@@ -118,7 +126,7 @@ export class LogsService implements LogSink {
   }
 
   async getRecentEntries(options: LogFilterOptions): Promise<LogEntry[]> {
-    const limit = Math.max(1, Math.min(20, options.limit ?? 10));
+    const limit = clampLogLimit(options.limit, 10);
     let query = this.db
       .selectFrom("log_entries")
       .select([

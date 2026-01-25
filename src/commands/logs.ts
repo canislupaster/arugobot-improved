@@ -1,13 +1,13 @@
 import { EmbedBuilder, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { LOG_ENTRY_LIMIT } from "../services/logs.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import type { LogLevel } from "../utils/logger.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
-const MAX_LIMIT = 20;
 const DEFAULT_LIMIT = 6;
 
 type LogCommandFilters = {
@@ -74,9 +74,9 @@ export const logsCommand: Command = {
     .addIntegerOption((option) =>
       option
         .setName("limit")
-        .setDescription(`Number of entries to show (1-${MAX_LIMIT})`)
+        .setDescription(`Number of entries to show (1-${LOG_ENTRY_LIMIT})`)
         .setMinValue(1)
-        .setMaxValue(MAX_LIMIT)
+        .setMaxValue(LOG_ENTRY_LIMIT)
     )
     .addStringOption((option) =>
       option
