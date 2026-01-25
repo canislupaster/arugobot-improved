@@ -18,6 +18,7 @@ import {
 import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { safeInteractionEdit, safeInteractionReply } from "../utils/interaction.js";
 import {
   buildPaginationIds,
   buildPaginationRow,
@@ -31,7 +32,6 @@ import {
   formatTournamentRecapCsv,
   formatTournamentRecapMarkdown,
 } from "../utils/tournamentRecap.js";
-import { safeInteractionEdit, safeInteractionReply } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
