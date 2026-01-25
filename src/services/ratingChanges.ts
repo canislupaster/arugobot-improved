@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { isCacheFresh } from "../utils/cache.js";
 import { logError, logWarn } from "../utils/logger.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
@@ -32,18 +33,6 @@ const DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000;
 
 function normalizeHandle(handle: string): string {
   return handle.trim().toLowerCase();
-}
-
-function isCacheFresh(lastFetched: string, ttlMs: number): boolean {
-  if (!lastFetched || ttlMs <= 0) {
-    return false;
-  }
-  const timestamp = Date.parse(lastFetched);
-  if (!Number.isFinite(timestamp)) {
-    return false;
-  }
-  const ageMs = Date.now() - timestamp;
-  return ageMs >= 0 && ageMs <= ttlMs;
 }
 
 function parseChanges(payload: string): RatingChange[] {

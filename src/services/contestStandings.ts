@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { isCacheFresh } from "../utils/cache.js";
 import { logError, logWarn } from "../utils/logger.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
@@ -68,15 +69,6 @@ function dedupeHandles(handles: string[]): string[] {
     result.push(trimmed);
   }
   return result;
-}
-
-function isCacheFresh(lastFetched: string, ttlMs: number): boolean {
-  const timestamp = Date.parse(lastFetched);
-  if (!Number.isFinite(timestamp)) {
-    return false;
-  }
-  const ageMs = Date.now() - timestamp;
-  return ageMs >= 0 && ageMs <= ttlMs;
 }
 
 function mapEntries(rows: ContestStandingsResponse["rows"]): ContestStandingEntry[] {

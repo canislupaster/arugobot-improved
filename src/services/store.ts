@@ -1,6 +1,7 @@
 import { sql, type Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { isCacheFresh } from "../utils/cache.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
 
@@ -196,18 +197,6 @@ function parseRatingRanges(raw: string | null | undefined): RatingRange[] {
   } catch {
     return [];
   }
-}
-
-function isCacheFresh(lastFetched: string | null | undefined, ttlMs: number): boolean {
-  if (!lastFetched || ttlMs <= 0) {
-    return false;
-  }
-  const lastFetchedAt = Date.parse(lastFetched);
-  if (!Number.isFinite(lastFetchedAt)) {
-    return false;
-  }
-  const ageMs = Date.now() - lastFetchedAt;
-  return ageMs >= 0 && ageMs <= ttlMs;
 }
 
 function toUtcDayNumber(epochSeconds: number): number {
