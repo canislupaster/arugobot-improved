@@ -54,7 +54,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
 - **/leaderboard** `[page]` `[metric]`
 
-  Shows a page of the server leaderboard (metric can be `rating` or `solves`).
+  Shows a page of the server leaderboard (metric can be `rating`, `solves`, `streak`, or `longest_streak`).
 
 - **/profile** `[user]` `[handle]`
 

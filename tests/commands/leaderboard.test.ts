@@ -41,4 +41,34 @@ describe("leaderboardCommand", () => {
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds[0].data.title).toBe("Solve leaderboard");
   });
+
+  it("renders the current streak leaderboard", async () => {
+    const interaction = createInteraction({
+      options: {
+        getInteger: jest.fn().mockReturnValue(1),
+        getString: jest.fn().mockReturnValue("streak"),
+      },
+    });
+    const context = {
+      services: {
+        store: {
+          getStreakLeaderboard: jest.fn().mockResolvedValue([
+            {
+              userId: "user-1",
+              currentStreak: 3,
+              longestStreak: 5,
+              totalSolvedDays: 10,
+              lastSolvedAt: new Date().toISOString(),
+            },
+          ]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await leaderboardCommand.execute(interaction, context);
+
+    expect(context.services.store.getStreakLeaderboard).toHaveBeenCalledWith("guild-1");
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    expect(payload.embeds[0].data.title).toBe("Current streak leaderboard");
+  });
 });

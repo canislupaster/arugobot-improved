@@ -12,7 +12,12 @@ export const leaderboardCommand: Command = {
       option
         .setName("metric")
         .setDescription("What to rank")
-        .addChoices({ name: "Rating", value: "rating" }, { name: "Solves", value: "solves" })
+        .addChoices(
+          { name: "Rating", value: "rating" },
+          { name: "Solves", value: "solves" },
+          { name: "Current streak", value: "streak" },
+          { name: "Longest streak", value: "longest_streak" }
+        )
     )
     .addIntegerOption((option) =>
       option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
@@ -85,6 +90,24 @@ export const leaderboardCommand: Command = {
           leaderboard.map((entry) => ({ userId: entry.userId, value: entry.solvedCount })),
           "Solve leaderboard",
           "Solves"
+        );
+        return;
+      }
+
+      if (metric === "streak" || metric === "longest_streak") {
+        const leaderboard = await context.services.store.getStreakLeaderboard(interaction.guild.id);
+        if (!leaderboard || leaderboard.length === 0) {
+          await interaction.editReply("No streaks recorded yet.");
+          return;
+        }
+        const entries = leaderboard.map((entry) => ({
+          userId: entry.userId,
+          value: metric === "streak" ? entry.currentStreak : entry.longestStreak,
+        }));
+        await renderLeaderboard(
+          entries,
+          metric === "streak" ? "Current streak leaderboard" : "Longest streak leaderboard",
+          metric === "streak" ? "Current streak (days)" : "Longest streak (days)"
         );
         return;
       }

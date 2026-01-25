@@ -620,6 +620,73 @@ describe("StoreService", () => {
     expect(streak.longestStreak).toBe(1);
   });
 
+  it("builds a streak leaderboard", async () => {
+    const base = 1_700_000_000;
+    const day = 86400;
+    const nowMs = (base + day * 3) * 1000;
+
+    await db
+      .insertInto("challenges")
+      .values([
+        {
+          id: "challenge-10",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-10",
+          host_user_id: "user-1",
+          problem_contest_id: 2000,
+          problem_index: "A",
+          problem_name: "Problem A",
+          problem_rating: 1200,
+          length_minutes: 40,
+          status: "completed",
+          started_at: base,
+          ends_at: base + 3600,
+          check_index: 0,
+        },
+        {
+          id: "challenge-11",
+          server_id: "guild-1",
+          channel_id: "channel-1",
+          message_id: "message-11",
+          host_user_id: "user-2",
+          problem_contest_id: 2001,
+          problem_index: "B",
+          problem_name: "Problem B",
+          problem_rating: 1300,
+          length_minutes: 40,
+          status: "completed",
+          started_at: base + day,
+          ends_at: base + day + 3600,
+          check_index: 0,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("challenge_participants")
+      .values([
+        {
+          challenge_id: "challenge-10",
+          user_id: "user-1",
+          position: 0,
+          solved_at: base + day * 2,
+        },
+        {
+          challenge_id: "challenge-11",
+          user_id: "user-2",
+          position: 0,
+          solved_at: base + day,
+        },
+      ])
+      .execute();
+
+    const leaderboard = await store.getStreakLeaderboard("guild-1", nowMs);
+    expect(leaderboard[0]?.userId).toBe("user-1");
+    expect(leaderboard[0]?.currentStreak).toBe(1);
+    expect(leaderboard[1]?.userId).toBe("user-2");
+  });
+
   it("returns solve leaderboard ordered by solves", async () => {
     await db
       .insertInto("challenges")
