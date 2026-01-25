@@ -3,28 +3,13 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { formatDiscordRelativeTime } from "../utils/time.js";
+import { formatSubmissionLine } from "../utils/submissions.js";
 
 import type { Command } from "./types.js";
 
 const MAX_RECENT = 10;
 
 type HandleResolution = { handle: string } | { error: string };
-
-function formatSubmissionLine(submission: {
-  contestId: number | null;
-  index: string;
-  name: string;
-  verdict: string | null;
-  creationTimeSeconds: number;
-}) {
-  const verdict = submission.verdict ?? "UNKNOWN";
-  const when = formatDiscordRelativeTime(submission.creationTimeSeconds);
-  if (submission.contestId) {
-    return `- [${submission.index}. ${submission.name}](https://codeforces.com/problemset/problem/${submission.contestId}/${submission.index}) • ${verdict} • ${when}`;
-  }
-  return `- ${submission.index}. ${submission.name} • ${verdict} • ${when}`;
-}
 
 function resolveTargetName(handleInput: string, user: { username: string }, member: unknown): string {
   if (handleInput) {

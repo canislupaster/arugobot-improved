@@ -4,19 +4,12 @@ import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveTargetLabels } from "../utils/interaction.js";
+import { formatSubmissionLine } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
 const MAX_RECENT = 5;
-
-type SubmissionSummary = {
-  contestId: number | null;
-  index: string;
-  name: string;
-  verdict: string | null;
-  creationTimeSeconds: number;
-};
 
 function buildProblemLine(
   problemId: string,
@@ -28,15 +21,6 @@ function buildProblemLine(
     return `- [${problemId}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
   }
   return `- ${problemId}`;
-}
-
-function formatSubmissionLine(submission: SubmissionSummary) {
-  const verdict = submission.verdict ?? "UNKNOWN";
-  const when = formatDiscordRelativeTime(submission.creationTimeSeconds);
-  if (submission.contestId) {
-    return `- [${submission.index}. ${submission.name}](https://codeforces.com/problemset/problem/${submission.contestId}/${submission.index}) • ${verdict} • ${when}`;
-  }
-  return `- ${submission.index}. ${submission.name} • ${verdict} • ${when}`;
 }
 
 async function resolveProfileTarget(
