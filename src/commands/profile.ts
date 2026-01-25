@@ -85,31 +85,16 @@ async function loadRecentSubmissions(
   };
 }
 
-async function loadOptional<T>(
-  enabled: boolean,
-  loader: () => Promise<T>
-): Promise<T | null> {
-  if (!enabled) {
-    return null;
-  }
-  return loader();
-}
-
-function formatRatingSummary(value: number | null | undefined, rank: string | null | undefined) {
-  if (value !== null && value !== undefined) {
-    return `${value} (${rank ?? "unrated"})`;
-  }
-  return "Unrated";
-}
-
-function formatMaxRatingSummary(
+function formatRatingSummary(
   value: number | null | undefined,
-  rank: string | null | undefined
+  rank: string | null | undefined,
+  fallbackValue: string,
+  fallbackRank: string
 ) {
   if (value !== null && value !== undefined) {
-    return `${value} (${rank ?? "unknown"})`;
+    return `${value} (${rank ?? fallbackRank})`;
   }
-  return "N/A";
+  return fallbackValue;
 }
 
 export const profileCommand: Command = {
@@ -164,13 +149,13 @@ export const profileCommand: Command = {
         return;
       }
 
+      const hasLinkedUser = Boolean(linkedUserId);
+      const showSubmissions = handleInput.length > 0 || !linkedUserId;
       const [challengeSummary, recentSubmissions] = await Promise.all([
-        loadOptional(!!linkedUserId, () =>
-          loadChallengeSummary(guildId, linkedUserId ?? "", context.services)
-        ),
-        loadOptional(handleInput.length > 0 || !linkedUserId, () =>
-          loadRecentSubmissions(handle, context.services)
-        ),
+        hasLinkedUser
+          ? loadChallengeSummary(guildId, linkedUserId ?? "", context.services)
+          : Promise.resolve(null),
+        showSubmissions ? loadRecentSubmissions(handle, context.services) : Promise.resolve(null),
       ]);
 
       const botRating = challengeSummary?.botRating ?? null;
@@ -180,10 +165,17 @@ export const profileCommand: Command = {
       const submissionsStale = recentSubmissions?.isStale ?? false;
 
       const displayHandle = cfProfile.profile.displayHandle;
-      const cfRating = formatRatingSummary(cfProfile.profile.rating, cfProfile.profile.rank);
-      const cfMaxRating = formatMaxRatingSummary(
+      const cfRating = formatRatingSummary(
+        cfProfile.profile.rating,
+        cfProfile.profile.rank,
+        "Unrated",
+        "unrated"
+      );
+      const cfMaxRating = formatRatingSummary(
         cfProfile.profile.maxRating,
-        cfProfile.profile.maxRank
+        cfProfile.profile.maxRank,
+        "N/A",
+        "unknown"
       );
       const cfLastOnline = cfProfile.profile.lastOnlineTimeSeconds
         ? formatDiscordRelativeTime(cfProfile.profile.lastOnlineTimeSeconds)
@@ -219,7 +211,7 @@ export const profileCommand: Command = {
           { name: "CF last online", value: cfLastOnline, inline: true }
         );
 
-      if (linkedUserId) {
+      if (hasLinkedUser) {
         embed.addFields({
           name: "Recent problems",
           value: recentLines || "No challenges yet.",
@@ -227,7 +219,7 @@ export const profileCommand: Command = {
         });
       }
 
-      if (handleInput || !linkedUserId) {
+      if (showSubmissions) {
         embed.addFields({
           name: "Recent submissions",
           value: recentSubmissionsLines || "No recent submissions found.",

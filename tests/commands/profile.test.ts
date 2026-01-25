@@ -181,4 +181,40 @@ describe("profileCommand", () => {
     expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith("Invalid handle.");
   });
+
+  it("rejects handle and user together", async () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn().mockReturnValue("tourist"),
+        getUser: jest.fn().mockReturnValue({ id: "user-2", username: "Other" }),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = { correlationId: "corr-4", services: {} } as unknown as CommandContext;
+
+    await profileCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "Provide either a handle or a user, not both.",
+      })
+    );
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
+  it("rejects DMs", async () => {
+    const interaction = createInteraction({
+      guild: null,
+    });
+    const context = { correlationId: "corr-5", services: {} } as unknown as CommandContext;
+
+    await profileCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "This command can only be used in a server.",
+      })
+    );
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
 });
