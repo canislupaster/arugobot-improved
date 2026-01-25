@@ -6,6 +6,11 @@ import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
+import type {
+  GuildRatingChangeSummary,
+  RatingChangeParticipantSummary,
+} from "../services/contestActivity.js";
+
 import type { Command } from "./types.js";
 
 const DEFAULT_DAYS = 90;
@@ -14,13 +19,7 @@ const MAX_DAYS = 365;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 
-function formatParticipantLine(entry: {
-  userId: string;
-  handle: string;
-  delta: number;
-  contestCount: number;
-  lastContestAt: number | null;
-}): string {
+function formatParticipantLine(entry: RatingChangeParticipantSummary): string {
   const lastContest =
     entry.lastContestAt && entry.lastContestAt > 0
       ? ` • last ${formatDiscordRelativeTime(entry.lastContestAt)}`
@@ -33,19 +32,73 @@ function formatParticipantLine(entry: {
 }
 
 function formatParticipantSection(
-  entries: Array<{
-    userId: string;
-    handle: string;
-    delta: number;
-    contestCount: number;
-    lastContestAt: number | null;
-  }>,
+  entries: RatingChangeParticipantSummary[],
   emptyLabel: string
 ): string {
   if (entries.length === 0) {
     return emptyLabel;
   }
   return entries.map((entry, index) => `${index + 1}. ${formatParticipantLine(entry)}`).join("\n");
+}
+
+type ContestDeltaOptions =
+  | { status: "ok"; days: number; limit: number }
+  | { status: "error"; message: string };
+
+function getContestDeltaOptions(interaction: {
+  options: { getInteger: (name: string) => number | null };
+}): ContestDeltaOptions {
+  const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
+  const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
+  if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
+    return { status: "error", message: "Invalid lookback window." };
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+    return { status: "error", message: "Invalid limit." };
+  }
+  return { status: "ok", days, limit };
+}
+
+function buildSummaryEmbed(
+  summary: GuildRatingChangeSummary,
+  days: number
+): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle("Contest rating deltas")
+    .setColor(EMBED_COLORS.info)
+    .setDescription(`Last ${days} days`)
+    .addFields(
+      { name: "Contests", value: String(summary.contestCount), inline: true },
+      { name: "Participants", value: String(summary.participantCount), inline: true },
+      {
+        name: "Total delta",
+        value: formatRatingDelta(summary.totalDelta, { round: true }),
+        inline: true,
+      }
+    );
+
+  if (summary.lastContestAt) {
+    embed.addFields({
+      name: "Last contest",
+      value: formatDiscordRelativeTime(summary.lastContestAt),
+      inline: true,
+    });
+  }
+
+  embed.addFields(
+    {
+      name: "Top gainers",
+      value: formatParticipantSection(summary.topGainers, "No gainers yet."),
+      inline: false,
+    },
+    {
+      name: "Top losers",
+      value: formatParticipantSection(summary.topLosers, "No losers yet."),
+      inline: false,
+    }
+  );
+
+  return embed;
 }
 
 export const contestDeltasCommand: Command = {
@@ -74,16 +127,12 @@ export const contestDeltasCommand: Command = {
       return;
     }
 
-    const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
-    const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-    if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
-      await interaction.reply({ content: "Invalid lookback window." });
+    const optionResult = getContestDeltaOptions(interaction);
+    if (optionResult.status === "error") {
+      await interaction.reply({ content: optionResult.message });
       return;
     }
-    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-      await interaction.reply({ content: "Invalid limit." });
-      return;
-    }
+    const { days, limit } = optionResult;
 
     await interaction.deferReply();
 
@@ -107,41 +156,7 @@ export const contestDeltasCommand: Command = {
         return;
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle("Contest rating deltas")
-        .setColor(EMBED_COLORS.info)
-        .setDescription(`Last ${days} days`)
-        .addFields(
-          { name: "Contests", value: String(summary.contestCount), inline: true },
-          { name: "Participants", value: String(summary.participantCount), inline: true },
-          {
-            name: "Total delta",
-            value: formatRatingDelta(summary.totalDelta, { round: true }),
-            inline: true,
-          }
-        );
-
-      if (summary.lastContestAt) {
-        embed.addFields({
-          name: "Last contest",
-          value: formatDiscordRelativeTime(summary.lastContestAt),
-          inline: true,
-        });
-      }
-
-      embed.addFields(
-        {
-          name: "Top gainers",
-          value: formatParticipantSection(summary.topGainers, "No gainers yet."),
-          inline: false,
-        },
-        {
-          name: "Top losers",
-          value: formatParticipantSection(summary.topLosers, "No losers yet."),
-          inline: false,
-        }
-      );
-
+      const embed = buildSummaryEmbed(summary, days);
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       logCommandError(
