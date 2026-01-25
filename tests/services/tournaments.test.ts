@@ -3,6 +3,11 @@ import { Kysely } from "kysely";
 import { createDb } from "../../src/db/database.js";
 import { migrateToLatest } from "../../src/db/migrator.js";
 import type { Database } from "../../src/db/types.js";
+import type { ChallengeService } from "../../src/services/challenges.js";
+import type { CodeforcesClient } from "../../src/services/codeforces.js";
+import { NoopCodeforcesCache } from "../../src/services/codeforcesCache.js";
+import { ProblemService } from "../../src/services/problems.js";
+import { StoreService } from "../../src/services/store.js";
 import { TournamentService } from "../../src/services/tournaments.js";
 
 describe("TournamentService", () => {
@@ -695,5 +700,262 @@ describe("TournamentService", () => {
     expect(recap?.entry.participantCount).toBe(2);
     expect(recap?.participantHandles["user-1"]).toBe("tourist");
     expect(recap?.rounds[0]?.matches[0]?.winnerId).toBe("user-1");
+  });
+
+  it("computes arena standings using solve counts and time tiebreaks", async () => {
+    const nowIso = new Date().toISOString();
+    const tournamentId = "arena-standings";
+    await db
+      .insertInto("tournaments")
+      .values({
+        id: tournamentId,
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        host_user_id: "host-1",
+        format: "arena",
+        status: "active",
+        length_minutes: 60,
+        round_count: 3,
+        current_round: 1,
+        rating_ranges: "[]",
+        tags: "",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_participants")
+      .values([
+        {
+          tournament_id: tournamentId,
+          user_id: "user-1",
+          seed: 1,
+          score: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-2",
+          seed: 2,
+          score: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("tournament_arena_state")
+      .values({
+        tournament_id: tournamentId,
+        starts_at: 1000,
+        ends_at: 2000,
+        problem_count: 3,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_arena_solves")
+      .values([
+        {
+          tournament_id: tournamentId,
+          user_id: "user-1",
+          problem_contest_id: 1000,
+          problem_index: "A",
+          submission_id: 10,
+          solved_at: 1100,
+          created_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-1",
+          problem_contest_id: 1001,
+          problem_index: "B",
+          submission_id: 11,
+          solved_at: 1200,
+          created_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-2",
+          problem_contest_id: 1000,
+          problem_index: "A",
+          submission_id: 12,
+          solved_at: 1300,
+          created_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          user_id: "user-2",
+          problem_contest_id: 1001,
+          problem_index: "B",
+          submission_id: 13,
+          solved_at: 1400,
+          created_at: nowIso,
+        },
+      ])
+      .execute();
+
+    const cfClient = { request: jest.fn() } as unknown as CodeforcesClient;
+    const store = new StoreService(db, cfClient);
+    const problems = new ProblemService(cfClient, new NoopCodeforcesCache());
+    const service = new TournamentService(db, problems, store, {} as ChallengeService);
+
+    const standings = await service.getStandings(tournamentId, "arena");
+    expect(standings[0]?.userId).toBe("user-1");
+    expect(standings[0]?.score).toBe(2);
+    expect(standings[1]?.userId).toBe("user-2");
+  });
+
+  it("records arena solves and updates participant scores", async () => {
+    const nowIso = new Date().toISOString();
+    const now = Math.floor(Date.now() / 1000);
+    const tournamentId = "arena-sync";
+
+    await db
+      .insertInto("tournaments")
+      .values({
+        id: tournamentId,
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        host_user_id: "host-1",
+        format: "arena",
+        status: "active",
+        length_minutes: 60,
+        round_count: 2,
+        current_round: 1,
+        rating_ranges: "[]",
+        tags: "",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_participants")
+      .values([
+        {
+          tournament_id: tournamentId,
+          user_id: "user-1",
+          seed: 1,
+          score: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("users")
+      .values({
+        server_id: "guild-1",
+        user_id: "user-1",
+        handle: "tourist",
+        rating: 3000,
+        history: "[]",
+        rating_history: "[]",
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_arena_state")
+      .values({
+        tournament_id: tournamentId,
+        starts_at: now - 100,
+        ends_at: now + 1000,
+        problem_count: 2,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_arena_problems")
+      .values([
+        {
+          tournament_id: tournamentId,
+          problem_contest_id: 1000,
+          problem_index: "A",
+          problem_name: "Alpha",
+          problem_rating: 1200,
+          problem_tags: "[]",
+          created_at: nowIso,
+        },
+        {
+          tournament_id: tournamentId,
+          problem_contest_id: 1001,
+          problem_index: "B",
+          problem_name: "Beta",
+          problem_rating: 1400,
+          problem_tags: "[]",
+          created_at: nowIso,
+        },
+      ])
+      .execute();
+
+    const cfClient = {
+      request: jest.fn().mockImplementation((_endpoint: string, params: { handle: string }) => {
+        if (params.handle === "tourist") {
+          return [
+            {
+              id: 101,
+              contestId: 1000,
+              problem: { contestId: 1000, index: "A", name: "Alpha" },
+              verdict: "OK",
+              creationTimeSeconds: now - 10,
+              programmingLanguage: "GNU C++20",
+            },
+            {
+              id: 102,
+              contestId: 1002,
+              problem: { contestId: 1002, index: "C", name: "Skip" },
+              verdict: "OK",
+              creationTimeSeconds: now - 10,
+              programmingLanguage: "GNU C++20",
+            },
+          ];
+        }
+        return [];
+      }),
+    } as unknown as CodeforcesClient;
+
+    const store = new StoreService(db, cfClient);
+    const problems = new ProblemService(cfClient, new NoopCodeforcesCache());
+    const service = new TournamentService(db, problems, store, {} as ChallengeService);
+
+    await service.runArenaTick();
+
+    const solves = await db
+      .selectFrom("tournament_arena_solves")
+      .select(["user_id", "problem_contest_id"])
+      .where("tournament_id", "=", tournamentId)
+      .execute();
+    expect(solves).toHaveLength(1);
+
+    const participant = await db
+      .selectFrom("tournament_participants")
+      .select(["score"])
+      .where("tournament_id", "=", tournamentId)
+      .where("user_id", "=", "user-1")
+      .executeTakeFirst();
+    expect(participant?.score).toBe(1);
   });
 });

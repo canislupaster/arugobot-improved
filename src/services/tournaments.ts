@@ -8,8 +8,10 @@ import { logError, logInfo } from "../utils/logger.js";
 import {
   filterProblemsByRatingRanges,
   filterProblemsByTags,
+  getProblemId,
   parseTagFilters,
   selectRandomProblem,
+  selectRandomProblems,
 } from "../utils/problemSelection.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
 import {
@@ -25,7 +27,7 @@ import type { ChallengeCompletionNotifier, ChallengeService } from "./challenges
 import type { Problem, ProblemService } from "./problems.js";
 import type { StoreService } from "./store.js";
 
-export type TournamentFormat = "swiss" | "elimination";
+export type TournamentFormat = "swiss" | "elimination" | "arena";
 export type TournamentStatus = "active" | "completed" | "cancelled";
 export type TournamentRoundStatus = "active" | "completed";
 export type Tournament = {
@@ -109,12 +111,22 @@ export type TournamentRecap = {
   standings: TournamentStandingsEntry[];
   rounds: TournamentRecapRound[];
   participantHandles: Record<string, string | null>;
+  arenaProblems?: Problem[];
 };
 
-export type TournamentStartResult = {
-  tournamentId: string;
-  round: TournamentRoundSummary;
-};
+export type TournamentStartResult =
+  | {
+      kind: "match";
+      tournamentId: string;
+      round: TournamentRoundSummary;
+    }
+  | {
+      kind: "arena";
+      tournamentId: string;
+      problems: Problem[];
+      startsAt: number;
+      endsAt: number;
+    };
 
 export type TournamentAdvanceResult =
   | { status: "no_active" }
@@ -142,6 +154,27 @@ export type TournamentMatchSummary = {
   winnerId: string | null;
   status: "pending" | "completed" | "bye";
   isDraw: boolean;
+};
+
+export const tournamentArenaIntervalMs = 60 * 1000;
+const ARENA_RECENT_SUBMISSIONS_LIMIT = 50;
+const ARENA_RECENT_SUBMISSIONS_TTL_MS = 30_000;
+
+export type ArenaState = {
+  startsAt: number;
+  endsAt: number;
+  problemCount: number;
+};
+
+export type ArenaStatus = {
+  state: ArenaState;
+  problems: Problem[];
+  standings: TournamentStandingsEntry[];
+};
+
+export type ArenaCompletion = {
+  tournamentId: string;
+  guildId: string;
 };
 
 export class TournamentService implements ChallengeCompletionNotifier {
@@ -328,6 +361,9 @@ export class TournamentService implements ChallengeCompletionNotifier {
     tournamentId: string,
     format: TournamentFormat
   ): Promise<TournamentStandingsEntry[]> {
+    if (format === "arena") {
+      return this.getArenaStandings(tournamentId);
+    }
     const participants = await this.listParticipants(tournamentId);
     if (participants.length === 0) {
       return [];
@@ -393,6 +429,84 @@ export class TournamentService implements ChallengeCompletionNotifier {
     });
 
     return entries;
+  }
+
+  async getArenaStatus(tournamentId: string): Promise<ArenaStatus | null> {
+    const state = await this.getArenaState(tournamentId);
+    if (!state) {
+      return null;
+    }
+    const problems = await this.listArenaProblems(tournamentId);
+    const standings = await this.getStandings(tournamentId, "arena");
+    return { state, problems, standings };
+  }
+
+  async getArenaState(tournamentId: string): Promise<ArenaState | null> {
+    const row = await this.db
+      .selectFrom("tournament_arena_state")
+      .select(["starts_at", "ends_at", "problem_count"])
+      .where("tournament_id", "=", tournamentId)
+      .executeTakeFirst();
+    if (!row) {
+      return null;
+    }
+    return {
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      problemCount: row.problem_count,
+    };
+  }
+
+  async listArenaProblems(tournamentId: string): Promise<Problem[]> {
+    const rows = await this.db
+      .selectFrom("tournament_arena_problems")
+      .select([
+        "problem_contest_id",
+        "problem_index",
+        "problem_name",
+        "problem_rating",
+        "problem_tags",
+      ])
+      .where("tournament_id", "=", tournamentId)
+      .orderBy("problem_rating", "asc")
+      .execute();
+    return rows.map((row) => ({
+      contestId: row.problem_contest_id,
+      index: row.problem_index,
+      name: row.problem_name,
+      rating: row.problem_rating,
+      tags: this.parseTags(row.problem_tags),
+    }));
+  }
+
+  async runArenaTick(): Promise<ArenaCompletion[]> {
+    const tournaments = await this.db
+      .selectFrom("tournaments")
+      .select(["id", "guild_id"])
+      .where("status", "=", "active")
+      .where("format", "=", "arena")
+      .execute();
+    if (tournaments.length === 0) {
+      return [];
+    }
+
+    const completions: ArenaCompletion[] = [];
+    const now = Math.floor(Date.now() / 1000);
+    for (const tournament of tournaments) {
+      const state = await this.getArenaState(tournament.id);
+      if (!state) {
+        continue;
+      }
+      if (now >= state.endsAt) {
+        await this.syncArenaSolves(tournament.id, tournament.guild_id, state);
+        await this.completeTournament(tournament.id);
+        completions.push({ tournamentId: tournament.id, guildId: tournament.guild_id });
+        continue;
+      }
+      await this.syncArenaSolves(tournament.id, tournament.guild_id, state);
+    }
+
+    return completions;
   }
 
   async getCurrentRound(
@@ -568,19 +682,25 @@ export class TournamentService implements ChallengeCompletionNotifier {
 
     const standings = await this.getStandings(tournament.id, tournament.format);
 
-    const rounds = await this.db
-      .selectFrom("tournament_rounds")
-      .selectAll()
-      .where("tournament_id", "=", tournament.id)
-      .orderBy("round_number", "asc")
-      .execute();
-    const matches = await this.db
-      .selectFrom("tournament_matches")
-      .select(["round_id", "match_number", "player1_id", "player2_id", "winner_id", "status"])
-      .where("tournament_id", "=", tournament.id)
-      .orderBy("round_id", "asc")
-      .orderBy("match_number", "asc")
-      .execute();
+    const rounds =
+      tournament.format === "arena"
+        ? []
+        : await this.db
+            .selectFrom("tournament_rounds")
+            .selectAll()
+            .where("tournament_id", "=", tournament.id)
+            .orderBy("round_number", "asc")
+            .execute();
+    const matches =
+      tournament.format === "arena"
+        ? []
+        : await this.db
+            .selectFrom("tournament_matches")
+            .select(["round_id", "match_number", "player1_id", "player2_id", "winner_id", "status"])
+            .where("tournament_id", "=", tournament.id)
+            .orderBy("round_id", "asc")
+            .orderBy("match_number", "asc")
+            .execute();
     const matchMap = new Map<string, TournamentMatchSummary[]>();
     for (const match of matches) {
       const entry = matchMap.get(match.round_id) ?? [];
@@ -608,6 +728,9 @@ export class TournamentService implements ChallengeCompletionNotifier {
       matches: matchMap.get(round.id) ?? [],
     }));
 
+    const arenaProblems =
+      tournament.format === "arena" ? await this.listArenaProblems(tournament.id) : undefined;
+
     return {
       entry,
       channelId: tournament.channelId,
@@ -615,6 +738,7 @@ export class TournamentService implements ChallengeCompletionNotifier {
       standings,
       rounds: roundEntries,
       participantHandles,
+      arenaProblems,
     };
   }
 
@@ -628,6 +752,7 @@ export class TournamentService implements ChallengeCompletionNotifier {
     ratingRanges,
     tags,
     participants,
+    arenaProblemCount,
     client,
   }: {
     guildId: string;
@@ -639,6 +764,7 @@ export class TournamentService implements ChallengeCompletionNotifier {
     ratingRanges: RatingRange[];
     tags: string;
     participants: string[];
+    arenaProblemCount?: number;
     client: Client;
   }): Promise<TournamentStartResult> {
     const existing = await this.getActiveTournament(guildId);
@@ -647,6 +773,19 @@ export class TournamentService implements ChallengeCompletionNotifier {
     }
     if (participants.length < 2) {
       throw new Error("At least two participants are required.");
+    }
+
+    if (format === "arena") {
+      return this.createArenaTournament({
+        guildId,
+        channelId,
+        hostUserId,
+        lengthMinutes,
+        ratingRanges,
+        tags,
+        participants,
+        problemCount: arenaProblemCount ?? roundCount,
+      });
     }
 
     const tournamentId = randomUUID();
@@ -691,13 +830,128 @@ export class TournamentService implements ChallengeCompletionNotifier {
 
     const round = await this.startRound(tournament, client);
     logInfo("Tournament created.", { tournamentId, guildId, format, round: round.roundNumber });
-    return { tournamentId, round };
+    return { kind: "match", tournamentId, round };
+  }
+
+  async createArenaTournament({
+    guildId,
+    channelId,
+    hostUserId,
+    lengthMinutes,
+    ratingRanges,
+    tags,
+    participants,
+    problemCount,
+  }: {
+    guildId: string;
+    channelId: string;
+    hostUserId: string;
+    lengthMinutes: number;
+    ratingRanges: RatingRange[];
+    tags: string;
+    participants: string[];
+    problemCount: number;
+  }): Promise<TournamentStartResult> {
+    const totalCount = Number.isFinite(problemCount) ? Math.max(1, problemCount) : 1;
+    const problems = await this.selectArenaProblems(
+      guildId,
+      participants,
+      ratingRanges,
+      tags,
+      totalCount
+    );
+    if (problems.length === 0) {
+      throw new Error("No eligible problems found for arena tournament.");
+    }
+
+    const tournamentId = randomUUID();
+    const nowIso = new Date().toISOString();
+    const startsAt = Math.floor(Date.now() / 1000);
+    const endsAt = startsAt + lengthMinutes * 60;
+
+    await this.db
+      .insertInto("tournaments")
+      .values({
+        id: tournamentId,
+        guild_id: guildId,
+        channel_id: channelId,
+        host_user_id: hostUserId,
+        format: "arena",
+        status: "active",
+        length_minutes: lengthMinutes,
+        round_count: problems.length,
+        current_round: 1,
+        rating_ranges: JSON.stringify(ratingRanges),
+        tags,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    const participantRows = participants.map((userId, index) => ({
+      tournament_id: tournamentId,
+      user_id: userId,
+      seed: index + 1,
+      score: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      eliminated: 0,
+      created_at: nowIso,
+      updated_at: nowIso,
+    }));
+    await this.db.insertInto("tournament_participants").values(participantRows).execute();
+
+    await this.db
+      .insertInto("tournament_arena_state")
+      .values({
+        tournament_id: tournamentId,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        problem_count: problems.length,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .execute();
+
+    await this.db
+      .insertInto("tournament_arena_problems")
+      .values(
+        problems.map((problem) => ({
+          tournament_id: tournamentId,
+          problem_contest_id: problem.contestId,
+          problem_index: problem.index,
+          problem_name: problem.name,
+          problem_rating: problem.rating ?? 0,
+          problem_tags: JSON.stringify(problem.tags ?? []),
+          created_at: nowIso,
+        }))
+      )
+      .execute();
+
+    logInfo("Arena tournament created.", {
+      tournamentId,
+      guildId,
+      format: "arena",
+      problemCount: problems.length,
+    });
+
+    return {
+      kind: "arena",
+      tournamentId,
+      problems,
+      startsAt,
+      endsAt,
+    };
   }
 
   async advanceTournament(guildId: string, client: Client): Promise<TournamentAdvanceResult> {
     const tournament = await this.getActiveTournament(guildId);
     if (!tournament) {
       return { status: "no_active" };
+    }
+    if (tournament.format === "arena") {
+      return { status: "error", message: "Arena tournaments advance automatically." };
     }
 
     const currentRound = await this.getCurrentRound(tournament.id, tournament.currentRound);
@@ -873,6 +1127,21 @@ export class TournamentService implements ChallengeCompletionNotifier {
     }
   }
 
+  private parseTags(raw: string): string[] {
+    if (!raw) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(raw) as string[];
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed.filter((tag) => typeof tag === "string");
+    } catch {
+      return [];
+    }
+  }
+
   private async listActiveParticipants(tournamentId: string): Promise<TournamentParticipant[]> {
     const participants = await this.listParticipants(tournamentId);
     return participants.filter((participant) => !participant.eliminated);
@@ -890,6 +1159,204 @@ export class TournamentService implements ChallengeCompletionNotifier {
       return standings.find((entry) => !entry.eliminated)?.userId ?? standings[0]?.userId ?? null;
     }
     return standings[0]?.userId ?? null;
+  }
+
+  private async getArenaStandings(tournamentId: string): Promise<TournamentStandingsEntry[]> {
+    const participants = await this.listParticipants(tournamentId);
+    if (participants.length === 0) {
+      return [];
+    }
+
+    const state = await this.getArenaState(tournamentId);
+    const rows = await this.db
+      .selectFrom("tournament_arena_solves")
+      .select(["user_id", "solved_at"])
+      .where("tournament_id", "=", tournamentId)
+      .execute();
+
+    const scoreMap = new Map<string, { count: number; tiebreak: number }>();
+    for (const participant of participants) {
+      scoreMap.set(participant.userId, { count: 0, tiebreak: 0 });
+    }
+
+    for (const row of rows) {
+      const current = scoreMap.get(row.user_id);
+      if (!current) {
+        continue;
+      }
+      current.count += 1;
+      const base = state ? state.startsAt : 0;
+      current.tiebreak += Math.max(0, row.solved_at - base);
+    }
+
+    const entries = participants.map((participant) => {
+      const score = scoreMap.get(participant.userId);
+      return {
+        userId: participant.userId,
+        seed: participant.seed,
+        score: score?.count ?? 0,
+        wins: score?.count ?? 0,
+        losses: 0,
+        draws: 0,
+        eliminated: false,
+        tiebreak: score?.tiebreak ?? 0,
+        matchesPlayed: score?.count ?? 0,
+      };
+    });
+
+    entries.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      if (a.tiebreak !== b.tiebreak) {
+        return a.tiebreak - b.tiebreak;
+      }
+      return a.seed - b.seed;
+    });
+
+    return entries;
+  }
+
+  private async syncArenaSolves(
+    tournamentId: string,
+    guildId: string,
+    state: ArenaState
+  ): Promise<void> {
+    const problems = await this.listArenaProblems(tournamentId);
+    if (problems.length === 0) {
+      return;
+    }
+    const problemSet = new Set(problems.map((problem) => getProblemId(problem)));
+    const participants = await this.listParticipants(tournamentId);
+    if (participants.length === 0) {
+      return;
+    }
+    const linked = await this.store.getLinkedUsers(guildId);
+    const handleMap = new Map(linked.map((entry) => [entry.userId, entry.handle]));
+
+    for (const participant of participants) {
+      const handle = handleMap.get(participant.userId);
+      if (!handle) {
+        continue;
+      }
+      const recent = await this.store.getRecentSubmissions(
+        handle,
+        ARENA_RECENT_SUBMISSIONS_LIMIT,
+        ARENA_RECENT_SUBMISSIONS_TTL_MS
+      );
+      if (!recent) {
+        continue;
+      }
+      for (const submission of recent.submissions) {
+        if (submission.verdict !== "OK") {
+          continue;
+        }
+        if (!submission.contestId) {
+          continue;
+        }
+        if (
+          submission.creationTimeSeconds < state.startsAt ||
+          submission.creationTimeSeconds > state.endsAt
+        ) {
+          continue;
+        }
+        const problemId = `${submission.contestId}${submission.index}`;
+        if (!problemSet.has(problemId)) {
+          continue;
+        }
+        await this.db
+          .insertInto("tournament_arena_solves")
+          .values({
+            tournament_id: tournamentId,
+            user_id: participant.userId,
+            problem_contest_id: submission.contestId,
+            problem_index: submission.index,
+            submission_id: submission.id,
+            solved_at: submission.creationTimeSeconds,
+          })
+          .onConflict((oc) => oc.doNothing())
+          .execute();
+      }
+    }
+
+    await this.updateArenaScores(tournamentId);
+  }
+
+  private async updateArenaScores(tournamentId: string): Promise<void> {
+    const rows = await this.db
+      .selectFrom("tournament_arena_solves")
+      .select((eb) => ["user_id", eb.fn.count<number>("user_id").as("count")])
+      .where("tournament_id", "=", tournamentId)
+      .groupBy("user_id")
+      .execute();
+    const counts = new Map(rows.map((row) => [row.user_id, Number(row.count ?? 0)]));
+    const participants = await this.listParticipants(tournamentId);
+    const nowIso = new Date().toISOString();
+    for (const participant of participants) {
+      const score = counts.get(participant.userId) ?? 0;
+      await this.db
+        .updateTable("tournament_participants")
+        .set({
+          score,
+          wins: score,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+          updated_at: nowIso,
+        })
+        .where("tournament_id", "=", tournamentId)
+        .where("user_id", "=", participant.userId)
+        .execute();
+    }
+  }
+
+  private async selectArenaProblems(
+    guildId: string,
+    participants: string[],
+    ratingRanges: RatingRange[],
+    tags: string,
+    problemCount: number
+  ): Promise<Problem[]> {
+    const pool = filterProblemsByTags(
+      filterProblemsByRatingRanges(await this.problems.ensureProblemsLoaded(), ratingRanges),
+      parseTagFilters(tags)
+    );
+    if (pool.length === 0) {
+      return [];
+    }
+
+    const solved = await this.collectSolvedProblemIds(guildId, participants);
+    let picked = selectRandomProblems(pool, solved, problemCount);
+    if (picked.length < problemCount && solved.size > 0) {
+      picked = selectRandomProblems(pool, new Set(), problemCount);
+    }
+    return picked;
+  }
+
+  private async collectSolvedProblemIds(
+    guildId: string,
+    participants: string[]
+  ): Promise<Set<string>> {
+    const solvedIds = new Set<string>();
+    const linked = await this.store.getLinkedUsers(guildId);
+    const handleMap = new Map(linked.map((entry) => [entry.userId, entry.handle]));
+    const handles = participants
+      .map((userId) => handleMap.get(userId))
+      .filter((handle): handle is string => Boolean(handle));
+
+    await Promise.all(
+      handles.map(async (handle) => {
+        const solved = await this.store.getSolvedProblems(handle);
+        if (!solved) {
+          return;
+        }
+        for (const problemId of solved) {
+          solvedIds.add(problemId);
+        }
+      })
+    );
+
+    return solvedIds;
   }
 
   private async startRound(

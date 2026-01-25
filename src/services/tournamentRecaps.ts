@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { formatTime } from "../utils/rating.js";
 import { formatTournamentRecapMarkdown } from "../utils/tournamentRecap.js";
 
 import type { TournamentRecap, TournamentService } from "./tournaments.js";
@@ -41,7 +42,12 @@ function formatTags(tags: string): string {
 
 function buildRecapEmbed(recap: TournamentRecap): EmbedBuilder {
   const winnerLabel = recap.entry.winnerId ? `<@${recap.entry.winnerId}>` : "None";
-  const formatLabel = recap.entry.format === "swiss" ? "Swiss" : "Elimination";
+  const formatLabel =
+    recap.entry.format === "swiss"
+      ? "Swiss"
+      : recap.entry.format === "elimination"
+        ? "Elimination"
+        : "Arena";
   const statusLabel = recap.entry.status === "completed" ? "Completed" : "Cancelled";
   const updatedLabel = recap.entry.updatedAt;
   const embed = new EmbedBuilder()
@@ -65,8 +71,15 @@ function buildRecapEmbed(recap: TournamentRecap): EmbedBuilder {
       .slice(0, STANDINGS_PREVIEW_LIMIT)
       .map((participant, index) => {
         const tiebreak =
-          recap.entry.format === "swiss" ? ` • TB ${participant.tiebreak.toFixed(1)}` : "";
+          recap.entry.format === "swiss"
+            ? ` • TB ${participant.tiebreak.toFixed(1)}`
+            : recap.entry.format === "arena"
+              ? ` • ${formatTime(participant.tiebreak)}`
+              : "";
         const status = participant.eliminated ? " • eliminated" : "";
+        if (recap.entry.format === "arena") {
+          return `${index + 1}. <@${participant.userId}> • ${participant.score} solves${tiebreak}`;
+        }
         return `${index + 1}. <@${participant.userId}> • ${participant.score} pts (${participant.wins}-${participant.losses}-${participant.draws})${tiebreak}${status}`;
       })
       .join("\n");
@@ -75,6 +88,13 @@ function buildRecapEmbed(recap: TournamentRecap): EmbedBuilder {
       value: standingsValue,
       inline: false,
     });
+  }
+
+  if (recap.entry.format === "arena" && recap.arenaProblems?.length) {
+    const problemLines = recap.arenaProblems
+      .map((problem) => `${problem.contestId}${problem.index} • ${problem.name}`)
+      .join("\n");
+    embed.addFields({ name: "Problems", value: problemLines, inline: false });
   }
 
   return embed;

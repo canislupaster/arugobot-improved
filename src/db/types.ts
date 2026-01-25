@@ -235,6 +235,35 @@ export type TournamentRecapSettingsTable = {
   updated_at: Generated<string>;
 };
 
+export type TournamentArenaStateTable = {
+  tournament_id: string;
+  starts_at: number;
+  ends_at: number;
+  problem_count: number;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type TournamentArenaProblemsTable = {
+  tournament_id: string;
+  problem_contest_id: number;
+  problem_index: string;
+  problem_name: string;
+  problem_rating: number;
+  problem_tags: string;
+  created_at: Generated<string>;
+};
+
+export type TournamentArenaSolvesTable = {
+  tournament_id: string;
+  user_id: string;
+  problem_contest_id: number;
+  problem_index: string;
+  submission_id: number | null;
+  solved_at: number;
+  created_at: Generated<string>;
+};
+
 export type CommandMetricsTable = {
   command: string;
   count: number;
@@ -292,6 +321,9 @@ export type Database = {
   tournament_rounds: TournamentRoundsTable;
   tournament_matches: TournamentMatchesTable;
   tournament_recap_settings: TournamentRecapSettingsTable;
+  tournament_arena_state: TournamentArenaStateTable;
+  tournament_arena_problems: TournamentArenaProblemsTable;
+  tournament_arena_solves: TournamentArenaSolvesTable;
   command_metrics: CommandMetricsTable;
   log_entries: LogEntriesTable;
   guild_settings: GuildSettingsTable;

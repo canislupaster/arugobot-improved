@@ -34,15 +34,24 @@ const MAX_PARTICIPANTS = 64;
 const OPEN_LOBBY_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_SWISS_MIN_ROUNDS = 3;
 const MAX_SWISS_ROUNDS = 10;
+const MIN_ARENA_PROBLEM_COUNT = 3;
+const DEFAULT_ARENA_PROBLEM_COUNT = 5;
+const MAX_ARENA_PROBLEM_COUNT = 10;
 const HISTORY_PAGE_SIZE = 5;
 const HISTORY_SELECT_TIMEOUT_MS = 30_000;
 const HISTORY_DETAIL_ROUND_LIMIT = 3;
 const HISTORY_DETAIL_STANDINGS_LIMIT = 5;
 
-type TournamentFormat = "swiss" | "elimination";
+type TournamentFormat = "swiss" | "elimination" | "arena";
 
 function formatTournamentFormat(format: TournamentFormat): string {
-  return format === "swiss" ? "Swiss" : "Elimination";
+  if (format === "swiss") {
+    return "Swiss";
+  }
+  if (format === "elimination") {
+    return "Elimination";
+  }
+  return "Arena";
 }
 
 function formatScore(value: number): string {
@@ -164,8 +173,15 @@ function buildHistoryDetailEmbed(detail: TournamentHistoryDetail): EmbedBuilder 
     const standingsValue = detail.standings
       .map((participant, index) => {
         const tiebreak =
-          detail.entry.format === "swiss" ? ` • TB ${formatScore(participant.tiebreak)}` : "";
+          detail.entry.format === "swiss"
+            ? ` • TB ${formatScore(participant.tiebreak)}`
+            : detail.entry.format === "arena"
+              ? ` • ${formatTime(participant.tiebreak)}`
+              : "";
         const status = participant.eliminated ? " • eliminated" : "";
+        if (detail.entry.format === "arena") {
+          return `${index + 1}. <@${participant.userId}> • ${participant.score} solves${tiebreak}${status}`;
+        }
         return `${index + 1}. <@${participant.userId}> • ${formatScore(
           participant.score
         )} pts (${participant.wins}-${participant.losses}-${participant.draws})${tiebreak}${status}`;
@@ -201,7 +217,8 @@ export const tournamentCommand: Command = {
             .setRequired(true)
             .addChoices(
               { name: "Swiss", value: "swiss" },
-              { name: "Elimination", value: "elimination" }
+              { name: "Elimination", value: "elimination" },
+              { name: "Arena", value: "arena" }
             )
         )
         .addIntegerOption((option) =>
@@ -214,6 +231,15 @@ export const tournamentCommand: Command = {
               { name: "60", value: 60 },
               { name: "80", value: 80 }
             )
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("problem_count")
+            .setDescription(
+              `Arena problems (${MIN_ARENA_PROBLEM_COUNT}-${MAX_ARENA_PROBLEM_COUNT})`
+            )
+            .setMinValue(MIN_ARENA_PROBLEM_COUNT)
+            .setMaxValue(MAX_ARENA_PROBLEM_COUNT)
         )
         .addIntegerOption((option) =>
           option
@@ -438,6 +464,53 @@ export const tournamentCommand: Command = {
           return;
         }
 
+        if (tournament.format === "arena") {
+          const arena = await context.services.tournaments.getArenaStatus(tournament.id);
+          if (!arena) {
+            await interaction.reply({
+              content: "Arena tournament details are unavailable.",
+              ...ephemeralFlags,
+            });
+            return;
+          }
+          const endsAtLabel = formatDiscordRelativeTime(arena.state.endsAt);
+          const standingsValue = arena.standings
+            .slice(0, 10)
+            .map((participant, index) => {
+              const timeLabel =
+                participant.score > 0 ? ` • ${formatTime(participant.tiebreak)}` : "";
+              return `${index + 1}. <@${participant.userId}> • ${participant.score} solves${timeLabel}`;
+            })
+            .join("\n");
+
+          const problemLines = arena.problems
+            .map((problem) => {
+              const ratingLabel = problem.rating ? ` (${problem.rating})` : "";
+              const url = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
+              return `[${problem.contestId}${problem.index}](${url})${ratingLabel} • ${problem.name}`;
+            })
+            .join("\n");
+
+          const embed = new EmbedBuilder()
+            .setTitle("Active arena tournament")
+            .setColor(0x3498db)
+            .addFields(
+              { name: "Ends", value: endsAtLabel, inline: true },
+              {
+                name: "Problems",
+                value: problemLines || "No problems recorded.",
+                inline: false,
+              }
+            );
+
+          if (standingsValue) {
+            embed.addFields({ name: "Standings (top 10)", value: standingsValue, inline: false });
+          }
+
+          await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+          return;
+        }
+
         const standings = await context.services.tournaments.getStandings(
           tournament.id,
           tournament.format
@@ -636,6 +709,8 @@ export const tournamentCommand: Command = {
         const maxParticipants =
           interaction.options.getInteger("max_participants") ?? DEFAULT_MAX_PARTICIPANTS;
         const roundsOption = interaction.options.getInteger("rounds");
+        const arenaProblemCount =
+          interaction.options.getInteger("problem_count") ?? DEFAULT_ARENA_PROBLEM_COUNT;
         const rating = interaction.options.getInteger("rating");
         const minRatingOption = interaction.options.getInteger("min_rating");
         const maxRatingOption = interaction.options.getInteger("max_rating");
@@ -653,6 +728,18 @@ export const tournamentCommand: Command = {
         if (maxParticipants < MIN_PARTICIPANTS || maxParticipants > MAX_PARTICIPANTS) {
           await interaction.reply({
             content: `Invalid max participants. Choose ${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS}.`,
+            ...ephemeralFlags,
+          });
+          return;
+        }
+
+        if (
+          format === "arena" &&
+          (arenaProblemCount < MIN_ARENA_PROBLEM_COUNT ||
+            arenaProblemCount > MAX_ARENA_PROBLEM_COUNT)
+        ) {
+          await interaction.reply({
+            content: `Invalid arena problem count. Choose ${MIN_ARENA_PROBLEM_COUNT}-${MAX_ARENA_PROBLEM_COUNT}.`,
             ...ephemeralFlags,
           });
           return;
@@ -689,6 +776,13 @@ export const tournamentCommand: Command = {
             { name: "Capacity", value: String(maxParticipants), inline: true },
             { name: "Users", value: buildUsersValue([...participants.values()]), inline: false }
           );
+        if (format === "arena") {
+          lobbyEmbed.spliceFields(3, 0, {
+            name: "Problems",
+            value: String(arenaProblemCount),
+            inline: true,
+          });
+        }
 
         const joinId = `tournament_join_${interaction.id}`;
         const leaveId = `tournament_leave_${interaction.id}`;
@@ -832,7 +926,9 @@ export const tournamentCommand: Command = {
           format === "swiss"
             ? (roundsOption ??
               Math.max(DEFAULT_SWISS_MIN_ROUNDS, Math.ceil(Math.log2(participantUsers.length))))
-            : Math.max(1, Math.ceil(Math.log2(participantUsers.length)));
+            : format === "elimination"
+              ? Math.max(1, Math.ceil(Math.log2(participantUsers.length)))
+              : arenaProblemCount;
 
         const result = await context.services.tournaments.createTournament({
           guildId,
@@ -844,8 +940,25 @@ export const tournamentCommand: Command = {
           ratingRanges: rangeResult.ranges,
           tags: tagsRaw,
           participants: participantUsers.map((user) => user.id),
+          arenaProblemCount,
           client: context.client,
         });
+
+        if (result.kind === "arena") {
+          const problemsList = result.problems
+            .map((problem) => {
+              const url = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
+              const ratingLabel = problem.rating ? ` (${problem.rating})` : "";
+              return `- [${problem.contestId}${problem.index}](${url})${ratingLabel} • ${problem.name}`;
+            })
+            .join("\n");
+          await interaction.editReply(
+            `Arena tournament created with ${participantUsers.length} participants. Ends ${formatDiscordRelativeTime(
+              result.endsAt
+            )}.\n${problemsList}`
+          );
+          return;
+        }
 
         await interaction.editReply(
           `Tournament created with ${participantUsers.length} participants. Round ${result.round.roundNumber} started (${result.round.matchCount} matches, ${result.round.byeCount} byes).`

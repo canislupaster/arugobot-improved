@@ -1,5 +1,7 @@
 import type { TournamentRecap, TournamentStandingsEntry } from "../services/tournaments.js";
 
+import { formatTime } from "./rating.js";
+
 function formatRatingRanges(ranges: Array<{ min: number; max: number }>): string {
   if (ranges.length === 0) {
     return "Any";
@@ -26,6 +28,10 @@ function formatStandingsLine(
   handle: string | null,
   format: TournamentRecap["entry"]["format"]
 ): string {
+  if (format === "arena") {
+    const timeLabel = entry.score > 0 ? ` • ${formatTime(entry.tiebreak)}` : "";
+    return `${formatUserLabel(entry.userId, handle)} • ${entry.score} solves${timeLabel}`;
+  }
   const tiebreakLabel = format === "swiss" ? ` • TB ${entry.tiebreak.toFixed(1)}` : "";
   const statusLabel = entry.eliminated ? " • eliminated" : "";
   return `${formatUserLabel(entry.userId, handle)} • ${entry.score} pts (${entry.wins}-${entry.losses}-${entry.draws})${tiebreakLabel}${statusLabel}`;
@@ -66,7 +72,9 @@ export function formatTournamentRecapMarkdown(recap: TournamentRecap): string {
   const lines: string[] = [
     "# Tournament recap",
     `Status: ${entry.status === "completed" ? "Completed" : "Cancelled"}`,
-    `Format: ${entry.format === "swiss" ? "Swiss" : "Elimination"}`,
+    `Format: ${
+      entry.format === "swiss" ? "Swiss" : entry.format === "elimination" ? "Elimination" : "Arena"
+    }`,
     `Length: ${entry.lengthMinutes}m`,
     `Rounds: ${entry.roundCount}`,
     `Participants: ${entry.participantCount}`,
@@ -86,6 +94,14 @@ export function formatTournamentRecapMarkdown(recap: TournamentRecap): string {
     standings.forEach((participant, index) => {
       const handle = participantHandles[participant.userId] ?? null;
       lines.push(`${index + 1}. ${formatStandingsLine(participant, handle, entry.format)}`);
+    });
+  }
+
+  if (entry.format === "arena" && recap.arenaProblems?.length) {
+    lines.push("", "## Arena problems");
+    recap.arenaProblems.forEach((problem) => {
+      const problemId = `${problem.contestId}${problem.index}`;
+      lines.push(`- ${problemId} - ${problem.name} (${problem.rating ?? "?"})`);
     });
   }
 
@@ -154,7 +170,7 @@ export function formatTournamentRecapCsv(recap: TournamentRecap): string {
         participant.wins,
         participant.losses,
         participant.draws,
-        entry.format === "swiss" ? participant.tiebreak : "",
+        entry.format === "swiss" || entry.format === "arena" ? participant.tiebreak : "",
         participant.seed,
         participant.eliminated ? "1" : "0",
       ].map(escapeCsv)

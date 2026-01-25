@@ -25,9 +25,10 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
 - **/tournament** `create|status|advance|cancel|history`
 
-  Runs multi-round tournaments with Swiss or elimination formats. Use `create` to open a lobby, pick
-  format, match length, rating ranges, tags, and (optionally) Swiss round count. Use `advance` to
-  start the next round after all matches finish. `status` shows standings, recent rounds, and the current round.
+  Runs tournaments in Swiss, elimination, or arena formats. Use `create` to open a lobby, pick
+  format, match length, rating ranges, tags, and (optionally) Swiss round count or arena problem count.
+  Use `advance` to start the next round after all matches finish. `status` shows standings, recent rounds,
+  and the current round (or arena problem list and time remaining).
   `history` lists recently completed or cancelled tournaments for the server (select a tournament for a recap
   and export CSV/markdown results).
 

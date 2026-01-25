@@ -33,7 +33,7 @@ import { ProblemService } from "./services/problems.js";
 import { RatingChangesService } from "./services/ratingChanges.js";
 import { StoreService } from "./services/store.js";
 import { TournamentRecapService } from "./services/tournamentRecaps.js";
-import { TournamentService } from "./services/tournaments.js";
+import { TournamentService, tournamentArenaIntervalMs } from "./services/tournaments.js";
 import { WebsiteService } from "./services/website.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo, logWarn, setLogSink } from "./utils/logger.js";
@@ -103,6 +103,7 @@ async function main() {
   let contestReminderInterval: NodeJS.Timeout | null = null;
   let practiceReminderInterval: NodeJS.Timeout | null = null;
   let contestRatingAlertInterval: NodeJS.Timeout | null = null;
+  let tournamentArenaInterval: NodeJS.Timeout | null = null;
   let logCleanupInterval: NodeJS.Timeout | null = null;
   let webServer: ServerType | null = null;
   let shuttingDown = false;
@@ -234,6 +235,36 @@ async function main() {
     };
     await tickContestRatingAlerts();
     contestRatingAlertInterval = setInterval(tickContestRatingAlerts, contestRatingAlertIntervalMs);
+
+    const tickArena = async () => {
+      if (shuttingDown) {
+        return;
+      }
+      try {
+        const completions = await tournaments.runArenaTick();
+        for (const completion of completions) {
+          const recapResult = await tournamentRecaps.postRecapForTournament(
+            completion.guildId,
+            completion.tournamentId,
+            client,
+            true
+          );
+          if (recapResult.status === "sent") {
+            logInfo("Arena tournament recap posted.", {
+              guildId: completion.guildId,
+              tournamentId: completion.tournamentId,
+              channelId: recapResult.channelId,
+            });
+          }
+        }
+      } catch (error) {
+        logWarn("Arena tournament tick failed.", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+    await tickArena();
+    tournamentArenaInterval = setInterval(tickArena, tournamentArenaIntervalMs);
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
@@ -286,6 +317,9 @@ async function main() {
     }
     if (contestRatingAlertInterval) {
       clearInterval(contestRatingAlertInterval);
+    }
+    if (tournamentArenaInterval) {
+      clearInterval(tournamentArenaInterval);
     }
     if (logCleanupInterval) {
       clearInterval(logCleanupInterval);
