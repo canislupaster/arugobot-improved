@@ -69,24 +69,26 @@ describe("LogsService", () => {
       timestamp: "2024-01-01T00:00:00.000Z",
       level: "info",
       message: "Info entry.",
-      context: { guildId: "guild-1", command: "ping" },
+      context: { guildId: "guild-1", command: "ping", correlationId: "aaa" },
     });
     await logs.write({
       timestamp: "2024-01-02T00:00:00.000Z",
       level: "error",
       message: "Error entry.",
-      context: { guildId: "guild-1", command: "health" },
+      context: { guildId: "guild-1", command: "health", correlationId: "bbb", userId: "user-1" },
     });
     await logs.write({
       timestamp: "2024-01-03T00:00:00.000Z",
       level: "error",
       message: "Other guild.",
-      context: { guildId: "guild-2", command: "health" },
+      context: { guildId: "guild-2", command: "health", correlationId: "ccc" },
     });
 
     const entries = await logs.getRecentEntries({
       guildId: "guild-1",
       level: "error",
+      correlationId: "bbb",
+      userId: "user-1",
       limit: 5,
     });
 

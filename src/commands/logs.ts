@@ -10,6 +10,35 @@ import type { Command } from "./types.js";
 const MAX_LIMIT = 20;
 const DEFAULT_LIMIT = 6;
 
+type LogCommandFilters = {
+  level?: LogLevel;
+  command?: string;
+  correlationId?: string;
+  user?: { id: string; username: string };
+};
+
+function normalizeFilterValue(value: string | null): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function formatFilterFooter(filters: LogCommandFilters): string | null {
+  const items: string[] = [];
+  if (filters.level) {
+    items.push(`level: ${filters.level}`);
+  }
+  if (filters.command) {
+    items.push(`command: /${filters.command}`);
+  }
+  if (filters.user) {
+    items.push(`user: ${filters.user.username}`);
+  }
+  if (filters.correlationId) {
+    items.push(`correlation: ${filters.correlationId}`);
+  }
+  return items.length > 0 ? `Filters • ${items.join(" • ")}` : null;
+}
+
 function formatTimestamp(timestamp: string): string {
   const ms = Date.parse(timestamp);
   if (!Number.isFinite(ms)) {
@@ -22,7 +51,7 @@ function formatEntryLine(entry: {
   timestamp: string;
   level: LogLevel;
   message: string;
-  context?: { command?: string; userId?: string };
+  context?: { command?: string; userId?: string; latencyMs?: number };
 }): string {
   const parts = [formatTimestamp(entry.timestamp), entry.message];
   if (entry.context?.command) {
@@ -30,6 +59,9 @@ function formatEntryLine(entry: {
   }
   if (entry.context?.userId) {
     parts.push(`<@${entry.context.userId}>`);
+  }
+  if (Number.isFinite(entry.context?.latencyMs)) {
+    parts.push(`${Math.round(entry.context?.latencyMs ?? 0)}ms`);
   }
   return `- [${entry.level}] ${parts.join(" • ")}`;
 }
@@ -57,6 +89,9 @@ export const logsCommand: Command = {
         )
     )
     .addStringOption((option) => option.setName("command").setDescription("Filter by command name"))
+    .addStringOption((option) =>
+      option.setName("correlation").setDescription("Filter by correlation id")
+    )
     .addUserOption((option) => option.setName("user").setDescription("Filter by user")),
   adminOnly: true,
   async execute(interaction, context) {
@@ -70,18 +105,26 @@ export const logsCommand: Command = {
 
     const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
     const level = interaction.options.getString("level") as LogLevel | null;
-    const command = interaction.options.getString("command")?.trim() ?? "";
-    const user = interaction.options.getUser("user");
+    const command = normalizeFilterValue(interaction.options.getString("command"));
+    const correlationId = normalizeFilterValue(interaction.options.getString("correlation"));
+    const user = interaction.options.getUser("user") ?? undefined;
+    const filters: LogCommandFilters = {
+      level: level ?? undefined,
+      command,
+      correlationId,
+      user: user ? { id: user.id, username: user.username } : undefined,
+    };
 
     await interaction.deferReply({ ephemeral: true });
 
     try {
       const entries = await context.services.logs.getRecentEntries({
         limit,
-        level: level ?? undefined,
+        level: filters.level,
         guildId: interaction.guild.id,
-        userId: user?.id,
-        command: command || undefined,
+        userId: filters.user?.id,
+        command: filters.command,
+        correlationId: filters.correlationId,
       });
 
       if (entries.length === 0) {
@@ -94,18 +137,9 @@ export const logsCommand: Command = {
         .setColor(EMBED_COLORS.info)
         .setDescription(entries.map(formatEntryLine).join("\n"));
 
-      const filters: string[] = [];
-      if (level) {
-        filters.push(`level: ${level}`);
-      }
-      if (command) {
-        filters.push(`command: /${command}`);
-      }
-      if (user) {
-        filters.push(`user: ${user.username}`);
-      }
-      if (filters.length > 0) {
-        embed.setFooter({ text: `Filters • ${filters.join(" • ")}` });
+      const footerText = formatFilterFooter(filters);
+      if (footerText) {
+        embed.setFooter({ text: footerText });
       }
 
       await interaction.editReply({ embeds: [embed] });

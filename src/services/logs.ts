@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import type { Kysely, SelectQueryBuilder } from "kysely";
 
 import type { Database } from "../db/types.js";
 import type { LogContext, LogEntry, LogLevel, LogSink } from "../utils/logger.js";
@@ -12,6 +12,29 @@ type LogContextFields = {
   userId?: string;
   latencyMs?: number;
   extraJson: string | null;
+};
+
+type LogFilterOptions = {
+  limit?: number;
+  level?: LogLevel;
+  guildId?: string;
+  userId?: string;
+  command?: string;
+  correlationId?: string;
+};
+
+type LogFilterColumn = "level" | "guild_id" | "user_id" | "command" | "correlation_id";
+
+type LogEntriesRow = {
+  timestamp: string;
+  level: string;
+  message: string;
+  correlation_id: string | null;
+  command: string | null;
+  guild_id: string | null;
+  user_id: string | null;
+  latency_ms: number | null;
+  context_json: string | null;
 };
 
 function splitContext(context?: LogContext): LogContextFields {
@@ -28,6 +51,26 @@ function splitContext(context?: LogContext): LogContextFields {
     latencyMs,
     extraJson,
   };
+}
+
+function applyLogFilters(
+  query: SelectQueryBuilder<Database, "log_entries", LogEntriesRow>,
+  options: LogFilterOptions
+) {
+  const filters: Array<[LogFilterColumn, LogLevel | string | undefined]> = [
+    ["level", options.level],
+    ["guild_id", options.guildId],
+    ["user_id", options.userId],
+    ["command", options.command],
+    ["correlation_id", options.correlationId],
+  ];
+  let filtered = query;
+  for (const [column, value] of filters) {
+    if (value) {
+      filtered = filtered.where(column, "=", value);
+    }
+  }
+  return filtered;
 }
 
 export class LogsService implements LogSink {
@@ -74,13 +117,7 @@ export class LogsService implements LogSink {
     return result?.count ?? 0;
   }
 
-  async getRecentEntries(options: {
-    limit?: number;
-    level?: LogLevel;
-    guildId?: string;
-    userId?: string;
-    command?: string;
-  }): Promise<LogEntry[]> {
+  async getRecentEntries(options: LogFilterOptions): Promise<LogEntry[]> {
     const limit = Math.max(1, Math.min(20, options.limit ?? 10));
     let query = this.db
       .selectFrom("log_entries")
@@ -96,22 +133,11 @@ export class LogsService implements LogSink {
         "context_json",
       ])
       .orderBy("timestamp", "desc")
-      .limit(limit);
+      .limit(limit) as SelectQueryBuilder<Database, "log_entries", LogEntriesRow>;
 
-    if (options.level) {
-      query = query.where("level", "=", options.level);
-    }
-    if (options.guildId) {
-      query = query.where("guild_id", "=", options.guildId);
-    }
-    if (options.userId) {
-      query = query.where("user_id", "=", options.userId);
-    }
-    if (options.command) {
-      query = query.where("command", "=", options.command);
-    }
+    query = applyLogFilters(query, options);
 
-    const rows = await query.execute();
+    const rows = (await query.execute()) as LogEntriesRow[];
     return rows.map((row) => ({
       timestamp: row.timestamp,
       level: row.level as LogLevel,
