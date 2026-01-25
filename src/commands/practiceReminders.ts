@@ -4,7 +4,15 @@ import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
-import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
+import {
+  formatDiscordRelativeTime,
+  formatDiscordTimestamp,
+  formatHourMinute,
+  formatUtcOffset,
+  parseUtcOffset,
+  toLocalTime,
+  toUtcTime,
+} from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
@@ -13,8 +21,6 @@ const DEFAULT_MAX_RATING = 3500;
 const DEFAULT_HOUR_UTC = 9;
 const DEFAULT_MINUTE_UTC = 0;
 const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6];
-const MIN_OFFSET_MINUTES = -12 * 60;
-const MAX_OFFSET_MINUTES = 14 * 60;
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKENDS = [0, 6];
@@ -23,18 +29,6 @@ function formatRanges(ranges: RatingRange[]): string {
   return ranges
     .map((range) => (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`))
     .join(", ");
-}
-
-function formatHourMinute(hour: number, minute: number): string {
-  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-}
-
-function formatUtcOffset(minutes: number): string {
-  const sign = minutes < 0 ? "-" : "+";
-  const absoluteMinutes = Math.abs(minutes);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const remainder = absoluteMinutes % 60;
-  return `UTC${sign}${hours.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`;
 }
 
 function formatDaysLabel(days: number[]): string {
@@ -133,43 +127,6 @@ function parseDaysInput(raw: string | null | undefined): { days: number[] } | { 
     return { error: "Select at least one day for reminders." };
   }
   return { days: Array.from(days.values()).sort((a, b) => a - b) };
-}
-
-function normalizeMinutes(totalMinutes: number): number {
-  const modulo = 24 * 60;
-  return ((totalMinutes % modulo) + modulo) % modulo;
-}
-
-function toUtcTime(hour: number, minute: number, offsetMinutes: number) {
-  const totalMinutes = normalizeMinutes(hour * 60 + minute - offsetMinutes);
-  return { hour: Math.floor(totalMinutes / 60), minute: totalMinutes % 60 };
-}
-
-function toLocalTime(hour: number, minute: number, offsetMinutes: number) {
-  const totalMinutes = normalizeMinutes(hour * 60 + minute + offsetMinutes);
-  return { hour: Math.floor(totalMinutes / 60), minute: totalMinutes % 60 };
-}
-
-function parseUtcOffset(raw: string): { minutes: number } | { error: string } {
-  const trimmed = raw.trim().toUpperCase();
-  if (trimmed === "Z" || trimmed === "UTC") {
-    return { minutes: 0 };
-  }
-  const match = trimmed.match(/^([+-])(\d{1,2})(?::?(\d{2}))?$/);
-  if (!match) {
-    return { error: "Invalid UTC offset. Use formats like +02:00, -05:30, or Z." };
-  }
-  const sign = match[1] === "-" ? -1 : 1;
-  const hours = Number(match[2]);
-  const minutes = match[3] ? Number(match[3]) : 0;
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes >= 60) {
-    return { error: "Invalid UTC offset. Hours/minutes are out of range." };
-  }
-  const totalMinutes = sign * (hours * 60 + minutes);
-  if (totalMinutes < MIN_OFFSET_MINUTES || totalMinutes > MAX_OFFSET_MINUTES) {
-    return { error: "UTC offset must be between -12:00 and +14:00." };
-  }
-  return { minutes: totalMinutes };
 }
 
 export const practiceRemindersCommand: Command = {
