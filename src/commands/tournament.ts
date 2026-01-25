@@ -1029,10 +1029,19 @@ export const tournamentCommand: Command = {
       logCommandError("Tournament command failed.", interaction, context.correlationId, {
         error: error instanceof Error ? error.message : String(error),
       });
-      if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: "Something went wrong." });
-      } else {
-        await interaction.reply({ content: "Something went wrong." });
+      try {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.followUp({ content: "Something went wrong." });
+        } else {
+          await interaction.reply({ content: "Something went wrong." });
+        }
+      } catch (replyError) {
+        logCommandError(
+          "Tournament command error response failed.",
+          interaction,
+          context.correlationId,
+          { error: replyError instanceof Error ? replyError.message : String(replyError) }
+        );
       }
     }
   },

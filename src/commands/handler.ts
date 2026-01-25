@@ -20,6 +20,25 @@ function buildLogContext(
   };
 }
 
+async function sendErrorResponse(
+  interaction: ChatInputCommandInteraction,
+  correlationId: string,
+  latencyMs: number
+): Promise<void> {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.followUp({ content: "Something went wrong." });
+    } else {
+      await interaction.reply({ content: "Something went wrong." });
+    }
+  } catch (error) {
+    logWarn("Failed to send error response.", {
+      ...buildLogContext(interaction, correlationId, latencyMs),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export async function handleCommandInteraction(
   interaction: ChatInputCommandInteraction,
   commands: Map<string, Command>,
@@ -74,11 +93,7 @@ export async function handleCommandInteraction(
       ...buildLogContext(interaction, correlationId, getLatencyMs()),
       error: error instanceof Error ? error.message : String(error),
     });
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content: "Something went wrong." });
-    } else {
-      await interaction.reply({ content: "Something went wrong." });
-    }
+    await sendErrorResponse(interaction, correlationId, getLatencyMs());
   } finally {
     await context.services.metrics.recordCommandResult(
       interaction.commandName,

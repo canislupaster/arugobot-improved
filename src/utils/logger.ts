@@ -26,6 +26,17 @@ export function setLogSink(sink: LogSink | null) {
   logSink = sink;
 }
 
+function shouldSuppressSinkError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("driver has already been destroyed") ||
+    message.includes("database is closed")
+  );
+}
+
 function write(level: LogLevel, message: string, context?: LogContext) {
   const timestamp = new Date().toISOString();
   const entry = {
@@ -47,6 +58,9 @@ function write(level: LogLevel, message: string, context?: LogContext) {
       context,
     };
     void logSink.write(sinkEntry).catch((error) => {
+      if (shouldSuppressSinkError(error)) {
+        return;
+      }
       const fallback = JSON.stringify({
         timestamp: new Date().toISOString(),
         level: "error",

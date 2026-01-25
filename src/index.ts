@@ -368,6 +368,9 @@ async function main() {
     { host: config.webHost, port: config.webPort },
     { website, client }
   );
+  if (!webServer) {
+    logWarn("Web server failed to start; continuing without dashboard.");
+  }
 
   if (config.logRetentionDays > 0) {
     await runLogCleanup();

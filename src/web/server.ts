@@ -42,9 +42,20 @@ export async function startWebServer(
       finalize(null);
     });
 
-    server.listen(config.port, config.host, () => {
-      logInfo("Web server started.", { host: config.host, port: config.port });
-      finalize(server);
-    });
+    try {
+      server.listen(config.port, config.host, () => {
+        logInfo("Web server started.", { host: config.host, port: config.port });
+        finalize(server);
+      });
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      logError("Web server error.", {
+        host: config.host,
+        port: config.port,
+        code: err.code ?? "unknown",
+        message: err.message ?? String(error),
+      });
+      finalize(null);
+    }
   });
 }
