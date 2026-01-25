@@ -12,6 +12,7 @@ import type { StoreService } from "./store.js";
 type ServerStats = Awaited<ReturnType<StoreService["getServerStats"]>>;
 type RatingEntry = NonNullable<Awaited<ReturnType<StoreService["getLeaderboard"]>>>[number];
 type SolveEntry = NonNullable<Awaited<ReturnType<StoreService["getSolveLeaderboard"]>>>[number];
+type StreakEntry = Awaited<ReturnType<StoreService["getStreakLeaderboard"]>>[number];
 type RosterEntry = Awaited<ReturnType<StoreService["getServerRoster"]>>[number];
 type ChallengeActivitySummary = Awaited<ReturnType<StoreService["getChallengeActivity"]>>;
 
@@ -79,6 +80,8 @@ export type GuildOverview = {
   stats: ServerStats;
   ratingLeaderboard: RatingEntry[];
   solveLeaderboard: SolveEntry[];
+  currentStreakLeaderboard: StreakEntry[];
+  longestStreakLeaderboard: StreakEntry[];
   roster: RosterEntry[];
   activity: ChallengeActivitySummary;
   contestActivity: ContestActivitySummary;
@@ -361,6 +364,20 @@ export class WebsiteService {
 
       const ratingLeaderboard = (await this.store.getLeaderboard(guildId)) ?? [];
       const solveLeaderboard = (await this.store.getSolveLeaderboard(guildId)) ?? [];
+      const streakLeaderboard = (await this.store.getStreakLeaderboard(guildId)) ?? [];
+      const currentStreakLeaderboard = streakLeaderboard.slice();
+      const longestStreakLeaderboard = streakLeaderboard.slice().sort((a, b) => {
+        if (b.longestStreak !== a.longestStreak) {
+          return b.longestStreak - a.longestStreak;
+        }
+        if (b.currentStreak !== a.currentStreak) {
+          return b.currentStreak - a.currentStreak;
+        }
+        if (b.totalSolvedDays !== a.totalSolvedDays) {
+          return b.totalSolvedDays - a.totalSolvedDays;
+        }
+        return a.userId.localeCompare(b.userId);
+      });
       const roster = await this.store.getServerRoster(guildId);
 
       const activityDays = DEFAULT_ACTIVITY_DAYS;
@@ -408,6 +425,8 @@ export class WebsiteService {
         stats,
         ratingLeaderboard,
         solveLeaderboard,
+        currentStreakLeaderboard,
+        longestStreakLeaderboard,
         roster,
         activity,
         tournaments: tournaments.map((row) => ({

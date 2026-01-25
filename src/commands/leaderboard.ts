@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { Command } from "./types.js";
 
@@ -42,7 +43,8 @@ export const leaderboardCommand: Command = {
     const renderLeaderboard = async (
       rows: Array<{ userId: string; value: number }>,
       title: string,
-      fieldName: string
+      fieldName: string,
+      formatValue: (value: number) => string = (value) => String(value)
     ) => {
       let content = "";
       const start = (page - 1) * 10;
@@ -58,7 +60,7 @@ export const leaderboardCommand: Command = {
         const entry = rows[index];
         const member = await guild.members.fetch(entry.userId).catch(() => null);
         const mention = member ? member.toString() : `<@${entry.userId}>`;
-        content += `${index + 1}. ${mention} (${entry.value})`;
+        content += `${index + 1}. ${mention} (${formatValue(entry.value)})`;
         if (index === 0) {
           content += " :first_place:\n";
         } else if (index === 1) {
@@ -104,10 +106,15 @@ export const leaderboardCommand: Command = {
           userId: entry.userId,
           value: metric === "streak" ? entry.currentStreak : entry.longestStreak,
         }));
+        const formatValue = (value: number) => {
+          const emojis = formatStreakEmojis(value);
+          return emojis ? `${value} ${emojis}` : String(value);
+        };
         await renderLeaderboard(
           entries,
           metric === "streak" ? "Current streak leaderboard" : "Longest streak leaderboard",
-          metric === "streak" ? "Current streak (days)" : "Longest streak (days)"
+          metric === "streak" ? "Current streak (days)" : "Longest streak (days)",
+          formatValue
         );
         return;
       }

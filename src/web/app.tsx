@@ -138,6 +138,18 @@ export function createWebApp({ website, client }: WebAppContext) {
       label: rosterMap.get(row.userId) ?? row.userId,
       value: row.solvedCount,
     }));
+    const currentStreakLeaderboard = overview.currentStreakLeaderboard
+      .slice(0, 10)
+      .map((row) => ({
+        label: rosterMap.get(row.userId) ?? row.userId,
+        value: row.currentStreak,
+      }));
+    const longestStreakLeaderboard = overview.longestStreakLeaderboard
+      .slice(0, 10)
+      .map((row) => ({
+        label: rosterMap.get(row.userId) ?? row.userId,
+        value: row.longestStreak,
+      }));
     const topSolvers = overview.activity.topSolvers.map((row) => ({
       label: rosterMap.get(row.userId) ?? row.userId,
       value: row.solvedCount,
@@ -151,6 +163,8 @@ export function createWebApp({ website, client }: WebAppContext) {
         stats: overview.stats,
         ratingLeaderboard,
         solveLeaderboard,
+        currentStreakLeaderboard,
+        longestStreakLeaderboard,
         roster: overview.roster,
         activity: {
           windowLabel: `Last ${activityDays}d`,

@@ -1439,19 +1439,22 @@ export class StoreService {
   async getChallengeStreak(
     serverId: string,
     userId: string,
-    nowMs = Date.now()
+    nowMs = Date.now(),
+    excludeChallengeId?: string
   ): Promise<ChallengeStreak> {
     try {
-      const rows = await this.db
+      let query = this.db
         .selectFrom("challenge_participants")
         .innerJoin("challenges", "challenges.id", "challenge_participants.challenge_id")
         .select("challenge_participants.solved_at")
         .where("challenges.server_id", "=", serverId)
         .where("challenges.status", "=", "completed")
         .where("challenge_participants.user_id", "=", userId)
-        .where("challenge_participants.solved_at", "is not", null)
-        .orderBy("challenge_participants.solved_at", "asc")
-        .execute();
+        .where("challenge_participants.solved_at", "is not", null);
+      if (excludeChallengeId) {
+        query = query.where("challenge_participants.challenge_id", "!=", excludeChallengeId);
+      }
+      const rows = await query.orderBy("challenge_participants.solved_at", "asc").execute();
 
       const daySet = new Set<number>();
       let lastSolvedSeconds: number | null = null;

@@ -6,6 +6,7 @@ import { type Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
+import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
 import type { StoreService } from "./store.js";
@@ -404,8 +405,8 @@ export class ChallengeService {
           continue;
         }
 
-        await this.checkOneParticipant(challenge);
-        await this.updateChallengeMessage(challenge, client, nowSeconds);
+        const streakUpdates = await this.checkOneParticipant(challenge);
+        await this.updateChallengeMessage(challenge, client, nowSeconds, streakUpdates);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.lastError = { message, timestamp: new Date().toISOString() };
@@ -420,12 +421,14 @@ export class ChallengeService {
     lengthMinutes,
     timeLeftSeconds,
     participants,
+    streakUpdates,
   }: {
     serverId: string;
     problem: ChallengeProblem;
     lengthMinutes: number;
     timeLeftSeconds: number;
     participants: ChallengeParticipant[];
+    streakUpdates?: string[];
   }): Promise<EmbedBuilder> {
     const embed = new EmbedBuilder()
       .setTitle("Challenge")
@@ -448,15 +451,20 @@ export class ChallengeService {
       })
       .join("\n");
     embed.addFields({ name: "Users", value: usersValue || "No participants.", inline: false });
+    if (streakUpdates && streakUpdates.length > 0) {
+      embed.addFields({ name: "Streaks", value: streakUpdates.join("\n"), inline: false });
+    }
     return embed;
   }
 
   async buildResultsEmbed({
+    challengeId,
     serverId,
     problem,
     participants,
     startedAt,
   }: {
+    challengeId: string;
     serverId: string;
     problem: ChallengeProblem;
     participants: ChallengeParticipant[];
@@ -487,6 +495,11 @@ export class ChallengeService {
       .join("\n");
 
     embed.addFields({ name: "Users", value: usersValue || "No participants.", inline: false });
+
+    const streakUpdates = await this.buildStreakUpdates(serverId, challengeId, participants);
+    if (streakUpdates.length > 0) {
+      embed.addFields({ name: "Streaks", value: streakUpdates.join("\n"), inline: false });
+    }
     return embed;
   }
 
@@ -586,7 +599,8 @@ export class ChallengeService {
   private async updateChallengeMessage(
     challenge: ActiveChallenge,
     client: Client,
-    nowSeconds: number
+    nowSeconds: number,
+    streakUpdates: string[] = []
   ): Promise<void> {
     const timeLeftSeconds = Math.max(0, challenge.endsAt - nowSeconds);
     const embed = await this.buildActiveEmbed({
@@ -595,6 +609,7 @@ export class ChallengeService {
       lengthMinutes: challenge.lengthMinutes,
       timeLeftSeconds,
       participants: challenge.participants,
+      streakUpdates,
     });
     const message = await fetchMessage(client, challenge.channelId, challenge.messageId);
     if (!message) {
@@ -607,7 +622,7 @@ export class ChallengeService {
     await message.edit({ embeds: [embed] });
   }
 
-  private async checkOneParticipant(challenge: ActiveChallenge): Promise<void> {
+  private async checkOneParticipant(challenge: ActiveChallenge): Promise<string[]> {
     const candidate = pickNextUnsolved(challenge.participants, challenge.checkIndex);
     const nextIndex = (challenge.checkIndex + 1) % Math.max(challenge.participants.length, 1);
     await this.db
@@ -617,13 +632,20 @@ export class ChallengeService {
       .execute();
 
     if (!candidate) {
-      return;
+      return [];
     }
 
     const solved = await this.checkSolve(challenge, candidate);
-    if (solved) {
-      candidate.solvedAt = this.clock.nowSeconds();
+    if (!solved) {
+      return [];
     }
+    candidate.solvedAt = this.clock.nowSeconds();
+    const update = await this.buildStreakUpdateForParticipant(
+      challenge.serverId,
+      challenge.id,
+      candidate.userId
+    );
+    return update ? [update] : [];
   }
 
   private async checkSolve(
@@ -730,6 +752,7 @@ export class ChallengeService {
       .execute();
 
     const embed = await this.buildResultsEmbed({
+      challengeId: challenge.id,
       serverId: challenge.serverId,
       problem: challenge.problem,
       participants,
@@ -826,6 +849,48 @@ export class ChallengeService {
       });
       return false;
     }
+  }
+
+  private async buildStreakUpdates(
+    serverId: string,
+    challengeId: string,
+    participants: ChallengeParticipant[]
+  ): Promise<string[]> {
+    const solvedParticipants = participants.filter((participant) => participant.solvedAt !== null);
+    if (solvedParticipants.length === 0) {
+      return [];
+    }
+    const updates: string[] = [];
+    for (const participant of solvedParticipants) {
+      const update = await this.buildStreakUpdateForParticipant(
+        serverId,
+        challengeId,
+        participant.userId
+      );
+      if (update) {
+        updates.push(update);
+      }
+    }
+    return updates;
+  }
+
+  private async buildStreakUpdateForParticipant(
+    serverId: string,
+    challengeId: string,
+    userId: string
+  ): Promise<string | null> {
+    const nowMs = this.clock.nowSeconds() * 1000;
+    const before = await this.store.getChallengeStreak(serverId, userId, nowMs, challengeId);
+    const after = await this.store.getChallengeStreak(serverId, userId, nowMs);
+    if (after.currentStreak <= before.currentStreak) {
+      return null;
+    }
+    const emojis = formatStreakEmojis(after.currentStreak);
+    const newBest =
+      after.longestStreak > before.longestStreak && after.currentStreak === after.longestStreak;
+    return `- <@${userId}> streak now ${after.currentStreak} days${
+      emojis ? ` ${emojis}` : ""
+    }${newBest ? " (new best!)" : ""}`;
   }
 
   private async getRatings(

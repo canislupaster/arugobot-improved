@@ -92,6 +92,43 @@ describe("ChallengeService", () => {
     expect(down).toBeLessThan(0);
   });
 
+  it("includes streak updates when a challenge completes", async () => {
+    const store = new StoreService(db, mockCodeforces as never);
+    await store.insertUser("guild-1", "user-1", "tourist");
+
+    const clock = { nowSeconds: () => 1010 };
+    const service = new ChallengeService(db, store, mockCodeforces as never, clock);
+    const { client, message } = createClientMock();
+
+    mockCodeforces.request.mockResolvedValueOnce([
+      {
+        verdict: "OK",
+        creationTimeSeconds: 1005,
+        problem: { contestId: 1000, index: "A" },
+      },
+    ]);
+
+    await service.createChallenge({
+      serverId: "guild-1",
+      channelId: "channel-1",
+      messageId: "message-1",
+      hostUserId: "user-1",
+      problem: { contestId: 1000, index: "A", name: "Test", rating: 1200 },
+      lengthMinutes: 40,
+      participants: ["user-1"],
+      startedAt: 1000,
+    });
+
+    await service.runTick(client);
+    await service.runTick(client);
+
+    const calls = (message.edit as jest.Mock).mock.calls;
+    const payload = calls[calls.length - 1]?.[0];
+    const fields = payload?.embeds?.[0]?.data?.fields ?? [];
+    const streakField = fields.find((field: { name: string }) => field.name === "Streaks");
+    expect(streakField?.value ?? "").toContain("streak now 1 days");
+  });
+
   it("completes a challenge and applies penalties after time expires", async () => {
     const store = new StoreService(db, mockCodeforces as never);
     await store.insertUser("guild-1", "user-1", "tourist");

@@ -70,5 +70,7 @@ describe("leaderboardCommand", () => {
     expect(context.services.store.getStreakLeaderboard).toHaveBeenCalledWith("guild-1");
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds[0].data.title).toBe("Current streak leaderboard");
+    const fieldValue = payload.embeds[0].data.fields?.[0]?.value ?? "";
+    expect(fieldValue).toContain("🔥");
   });
 });

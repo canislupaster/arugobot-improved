@@ -1,6 +1,7 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 
 import type { GlobalOverview, TournamentSummary } from "../services/website.js";
+import { formatStreakEmojis } from "../utils/streaks.js";
 import { capitalize } from "../utils/text.js";
 
 type GuildCard = {
@@ -59,6 +60,8 @@ type GuildView = {
   };
   ratingLeaderboard: LeaderboardRow[];
   solveLeaderboard: LeaderboardRow[];
+  currentStreakLeaderboard: LeaderboardRow[];
+  longestStreakLeaderboard: LeaderboardRow[];
   roster: RosterRow[];
   activity: ActivityView;
   contestActivity: ContestActivityView;
@@ -96,6 +99,11 @@ function formatNumber(value: number | null): string {
     return "N/A";
   }
   return numberFormatter.format(value);
+}
+
+function formatStreakValue(value: number): string {
+  const emojis = formatStreakEmojis(value);
+  return emojis ? `${formatNumber(value)} ${emojis}` : formatNumber(value);
 }
 
 function formatTimestamp(iso: string | null): string {
@@ -487,6 +495,39 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
                 <li>
                   <span>{row.label}</span>
                   <span class="pill">{formatNumber(row.value)}</span>
+                </li>
+              ))
+            )}
+          </ol>
+        </div>
+      </section>
+
+      <section class="section split">
+        <div class="card">
+          <SectionHeader title="Current streaks" subtitle="Challenge streaks ending today." />
+          <ol class="leaderboard">
+            {guild.currentStreakLeaderboard.length === 0 ? (
+              <li>No streaks yet.</li>
+            ) : (
+              guild.currentStreakLeaderboard.map((row) => (
+                <li>
+                  <span>{row.label}</span>
+                  <span class="pill">{formatStreakValue(row.value)}</span>
+                </li>
+              ))
+            )}
+          </ol>
+        </div>
+        <div class="card">
+          <SectionHeader title="Longest streaks" subtitle="Best challenge streaks on record." />
+          <ol class="leaderboard">
+            {guild.longestStreakLeaderboard.length === 0 ? (
+              <li>No streaks yet.</li>
+            ) : (
+              guild.longestStreakLeaderboard.map((row) => (
+                <li>
+                  <span>{row.label}</span>
+                  <span class="pill">{formatStreakValue(row.value)}</span>
                 </li>
               ))
             )}
