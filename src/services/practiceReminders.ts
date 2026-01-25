@@ -1,14 +1,8 @@
-import {
-  ChannelType,
-  type Channel,
-  EmbedBuilder,
-  type Client,
-  type NewsChannel,
-  type TextChannel,
-} from "discord.js";
+import { EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database, PracticeRemindersTable } from "../db/types.js";
+import { resolveSendableChannel, type SendableChannel } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
@@ -40,8 +34,6 @@ const PRACTICE_REMINDER_COLUMNS = [
   "role_id",
   "last_sent_at",
 ] as const;
-
-type SendableChannel = TextChannel | NewsChannel;
 
 export type PracticeReminder = {
   guildId: string;
@@ -98,13 +90,6 @@ type PracticeReminderRow = Pick<
   | "role_id"
   | "last_sent_at"
 >;
-
-function isSendableChannel(channel: Channel | null): channel is SendableChannel {
-  return (
-    !!channel &&
-    (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)
-  );
-}
 
 function parseRatingRanges(raw: string | null | undefined): RatingRange[] {
   if (!raw) {
@@ -597,8 +582,7 @@ export class PracticeReminderService {
     channelId: string,
     client: Client
   ): Promise<SendableChannel | null> {
-    const channel = await client.channels.fetch(channelId).catch(() => null);
-    return isSendableChannel(channel) ? channel : null;
+    return resolveSendableChannel(client, channelId);
   }
 
   private async sendReminderMessage(

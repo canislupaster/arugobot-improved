@@ -1,7 +1,8 @@
-import { ChannelType, EmbedBuilder, type Client } from "discord.js";
+import { EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { resolveSendableChannel } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
@@ -286,11 +287,8 @@ export class WeeklyDigestService {
       };
     }
 
-    const channel = await client.channels.fetch(subscription.channelId).catch(() => null);
-    if (
-      !channel ||
-      (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
-    ) {
+    const channel = await resolveSendableChannel(client, subscription.channelId);
+    if (!channel) {
       return { status: "channel_missing", channelId: subscription.channelId };
     }
 
@@ -359,11 +357,8 @@ export class WeeklyDigestService {
           continue;
         }
 
-        const channel = await client.channels.fetch(subscription.channelId).catch(() => null);
-        if (
-          !channel ||
-          (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
-        ) {
+        const channel = await resolveSendableChannel(client, subscription.channelId);
+        if (!channel) {
           logWarn("Weekly digest channel missing.", {
             guildId: subscription.guildId,
             channelId: subscription.channelId,
