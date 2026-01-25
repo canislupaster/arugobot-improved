@@ -143,6 +143,24 @@ export async function startWebServer(
     }
   }
 
+  if (lastError?.code === "EADDRINUSE" && config.port !== 0) {
+    logWarn("Web server ports busy; trying a random port.", {
+      host: config.host,
+      requestedPort: config.port,
+    });
+    const fallbackResult = await listenOnce(0);
+    lastPort = fallbackResult.port;
+    if (fallbackResult.server) {
+      if (status) {
+        status.status = "listening";
+        status.actualPort = fallbackResult.actualPort;
+        status.lastError = null;
+      }
+      return fallbackResult.server;
+    }
+    lastError = fallbackResult.error;
+  }
+
   if (lastError) {
     updateFailure(lastPort, lastError);
   }

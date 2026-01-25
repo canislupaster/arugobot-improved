@@ -256,6 +256,8 @@ on a schedule and removes backups older than `DATABASE_BACKUP_RETENTION_DAYS`.
 
 The bot serves a Hono-powered dashboard for global stats and per-guild leaderboards.
 By default it listens on `http://localhost:8787` (override with `WEB_HOST`/`WEB_PORT`).
+If the configured port is busy, the bot will retry a couple of nearby ports and fall back to a random
+open port, logging the chosen port on startup.
 Only guilds that opt in via `/dashboard set public:true` appear on the public pages.
 If `WEB_PUBLIC_URL` is set, `/dashboard` responses include direct links to your guild page.
 The overview highlights core bot features alongside global contest participation cards sourced from

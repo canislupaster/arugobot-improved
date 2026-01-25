@@ -1,3 +1,5 @@
+import { createServer, type Server } from "node:http";
+
 import { Kysely } from "kysely";
 
 import { createDb } from "../../src/db/database.js";
@@ -30,6 +32,51 @@ async function createWebsite(): Promise<{ db: Kysely<Database>; website: Website
   const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
   const website = new WebsiteService(db, store, settings, contestActivity, mockCodeforces);
   return { db, website };
+}
+
+async function listenServer(server: Server, port: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const handleError = (error: Error) => {
+      server.removeListener("listening", handleListening);
+      reject(error);
+    };
+    const handleListening = () => {
+      server.removeListener("error", handleError);
+      const address = server.address();
+      const actualPort = typeof address === "object" && address ? Number(address.port) : port;
+      resolve(actualPort);
+    };
+    server.once("error", handleError);
+    server.once("listening", handleListening);
+    server.listen(port, "127.0.0.1");
+  });
+}
+
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+}
+
+async function reserveConsecutivePorts(
+  count: number,
+  attempts = 10
+): Promise<{ basePort: number; servers: Server[] }> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const servers: Server[] = [];
+    try {
+      const baseServer = createServer();
+      const basePort = await listenServer(baseServer, 0);
+      servers.push(baseServer);
+      for (let offset = 1; offset < count; offset += 1) {
+        const server = createServer();
+        await listenServer(server, basePort + offset);
+        servers.push(server);
+      }
+      return { basePort, servers };
+    } catch (error) {
+      await Promise.all(servers.map((server) => closeServer(server)));
+    }
+  }
+  throw new Error("Failed to reserve consecutive ports.");
 }
 
 describe("startWebServer", () => {
@@ -95,6 +142,35 @@ describe("startWebServer", () => {
 
     await new Promise<void>((resolve) => server?.close(() => resolve()));
     await new Promise<void>((resolve) => secondServer?.close(() => resolve()));
+    await db.destroy();
+  });
+
+  it("falls back to a random port when consecutive ports are busy", async () => {
+    const { db, website } = await createWebsite();
+    const reservation = await reserveConsecutivePorts(3);
+    const status: WebServerStatus = {
+      status: "starting",
+      host: "127.0.0.1",
+      requestedPort: reservation.basePort,
+      actualPort: null,
+      lastError: null,
+    };
+
+    const server = await startWebServer(
+      { host: "127.0.0.1", port: reservation.basePort },
+      { website, client: { guilds: { cache: new Map() } } as never },
+      status
+    );
+
+    expect(server).not.toBeNull();
+    expect(status.status).toBe("listening");
+    expect(status.actualPort).not.toBeNull();
+    expect(status.actualPort).not.toBe(reservation.basePort);
+    expect(status.actualPort).not.toBe(reservation.basePort + 1);
+    expect(status.actualPort).not.toBe(reservation.basePort + 2);
+
+    await new Promise<void>((resolve) => server?.close(() => resolve()));
+    await Promise.all(reservation.servers.map((reserved) => closeServer(reserved)));
     await db.destroy();
   });
 });
