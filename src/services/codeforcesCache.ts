@@ -3,7 +3,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { logWarn } from "../utils/logger.js";
 
-export type CacheKey = "problemset" | "contest_list";
+export type CacheKey = "problemset" | "contest_list" | "contest_list_gym";
 
 export type CacheEntry<T> = {
   value: T;

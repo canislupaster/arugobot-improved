@@ -188,4 +188,40 @@ describe("ContestService", () => {
     const finished = service.getFinished(5, 1_650_000_000);
     expect(finished.map((contest) => contest.id)).toEqual([2]);
   });
+
+  it("supports gym contests and all scope lookups", async () => {
+    const nowMs = 1_700_000_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowMs);
+    const nowSeconds = Math.floor(nowMs / 1000);
+
+    mockClient.request
+      .mockResolvedValueOnce([
+        {
+          id: 101,
+          name: "Codeforces Round #101",
+          phase: "BEFORE",
+          startTimeSeconds: nowSeconds + 3600,
+          durationSeconds: 7200,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 9001,
+          name: "Gym Contest #1",
+          phase: "BEFORE",
+          startTimeSeconds: nowSeconds + 5400,
+          durationSeconds: 7200,
+        },
+      ]);
+
+    const service = new ContestService(mockClient as never, cache);
+    await service.refresh(true, "official");
+    await service.refresh(true, "gym");
+
+    const gymContest = service.getContestById(9001, "all");
+    expect(gymContest?.isGym).toBe(true);
+
+    const upcomingAll = service.getUpcoming(5, "all");
+    expect(upcomingAll.map((contest) => contest.id)).toEqual([101, 9001]);
+  });
 });

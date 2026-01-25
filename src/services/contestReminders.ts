@@ -9,6 +9,7 @@ import {
   parseKeywordFilters,
   serializeKeywords,
 } from "../utils/contestFilters.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import {
   formatDiscordRelativeTime,
@@ -458,7 +459,7 @@ function buildReminderEmbed(contest: Contest, secondsUntil: number): EmbedBuilde
     .setTitle("Contest reminder")
     .setColor(0x3498db)
     .setDescription(
-      `[${contest.name}](https://codeforces.com/contest/${contest.id}) starts ${formatDiscordRelativeTime(
+      `[${contest.name}](${buildContestUrl(contest)}) starts ${formatDiscordRelativeTime(
         contest.startTimeSeconds
       )}.`
     )

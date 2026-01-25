@@ -3,87 +3,111 @@ import { logError, logInfo } from "../utils/logger.js";
 import type { CodeforcesClient } from "./codeforces.js";
 import { type CodeforcesCache, NoopCodeforcesCache } from "./codeforcesCache.js";
 
+export type ContestScope = "official" | "gym";
+
+export type ContestScopeFilter = ContestScope | "all";
+
 export type Contest = {
   id: number;
   name: string;
   phase: "BEFORE" | "CODING" | "FINISHED" | "PENDING_SYSTEM_TEST" | "SYSTEM_TEST";
   startTimeSeconds: number;
   durationSeconds: number;
+  isGym?: boolean;
 };
 
 type ContestListResponse = Contest[];
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_SCOPE: ContestScope = "official";
+
+type ContestStore = {
+  contests: Contest[];
+  lastRefresh: number;
+  lastError: { message: string; timestamp: string } | null;
+};
 
 export class ContestService {
-  private contests: Contest[] = [];
-  private lastRefresh = 0;
-  private lastError: { message: string; timestamp: string } | null = null;
+  private store: Record<ContestScope, ContestStore> = {
+    official: { contests: [], lastRefresh: 0, lastError: null },
+    gym: { contests: [], lastRefresh: 0, lastError: null },
+  };
 
   constructor(
     private client: CodeforcesClient,
     private cache: CodeforcesCache = new NoopCodeforcesCache()
   ) {}
 
-  getLastRefreshAt(): number {
-    return this.lastRefresh;
+  getLastRefreshAt(scope: ContestScopeFilter = DEFAULT_SCOPE): number {
+    if (scope === "all") {
+      return Math.max(this.store.official.lastRefresh, this.store.gym.lastRefresh);
+    }
+    return this.store[scope].lastRefresh;
   }
 
-  getLastError() {
-    return this.lastError;
+  getLastError(scope: ContestScopeFilter = DEFAULT_SCOPE) {
+    if (scope === "all") {
+      return this.store.official.lastError ?? this.store.gym.lastError;
+    }
+    return this.store[scope].lastError;
   }
 
-  async refresh(force = false): Promise<void> {
-    if (this.contests.length === 0) {
-      await this.loadFromCache();
+  async refresh(force = false, scope: ContestScope = DEFAULT_SCOPE): Promise<void> {
+    const store = this.store[scope];
+    if (store.contests.length === 0) {
+      await this.loadFromCache(scope);
     }
     const now = Date.now();
-    if (!force && this.contests.length > 0 && now - this.lastRefresh < CACHE_TTL_MS) {
+    if (!force && store.contests.length > 0 && now - store.lastRefresh < CACHE_TTL_MS) {
       return;
     }
     try {
       const result = await this.client.request<ContestListResponse>("contest.list", {
-        gym: false,
+        gym: scope === "gym",
       });
-      this.contests = result;
-      this.lastRefresh = now;
-      this.lastError = null;
-      await this.cache.set("contest_list", result);
-      logInfo("Loaded contests from Codeforces.", { contestCount: result.length });
+      const normalized = result.map((contest) => ({
+        ...contest,
+        isGym: contest.isGym ?? scope === "gym",
+      }));
+      store.contests = normalized;
+      store.lastRefresh = now;
+      store.lastError = null;
+      await this.cache.set(scope === "gym" ? "contest_list_gym" : "contest_list", normalized);
+      logInfo("Loaded contests from Codeforces.", { contestCount: result.length, scope });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logError("Failed to load contests.", { error: message });
+      store.lastError = { message, timestamp: new Date().toISOString() };
+      logError("Failed to load contests.", { error: message, scope });
       throw error;
     }
   }
 
-  getUpcomingContests(): Contest[] {
+  getUpcomingContests(scope: ContestScopeFilter = DEFAULT_SCOPE): Contest[] {
     const nowSeconds = Math.floor(Date.now() / 1000);
-    return this.contests
+    return this.getContestsByScope(scope)
       .filter((contest) => contest.phase === "BEFORE" && contest.startTimeSeconds > nowSeconds)
       .sort((a, b) => a.startTimeSeconds - b.startTimeSeconds)
       .slice();
   }
 
-  getUpcoming(limit = 5): Contest[] {
-    return this.getUpcomingContests().slice(0, limit);
+  getUpcoming(limit = 5, scope: ContestScopeFilter = DEFAULT_SCOPE): Contest[] {
+    return this.getUpcomingContests(scope).slice(0, limit);
   }
 
-  getOngoing(): Contest[] {
-    return this.contests
+  getOngoing(scope: ContestScopeFilter = DEFAULT_SCOPE): Contest[] {
+    return this.getContestsByScope(scope)
       .filter((contest) => contest.phase === "CODING")
       .sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
   }
 
-  getContestById(contestId: number): Contest | null {
-    const match = this.contests.find((contest) => contest.id === contestId);
+  getContestById(contestId: number, scope: ContestScopeFilter = DEFAULT_SCOPE): Contest | null {
+    const match = this.getContestsByScope(scope).find((contest) => contest.id === contestId);
     return match ?? null;
   }
 
-  getLatestFinished(): Contest | null {
+  getLatestFinished(scope: ContestScopeFilter = DEFAULT_SCOPE): Contest | null {
     let latest: Contest | null = null;
-    for (const contest of this.contests) {
+    for (const contest of this.getContestsByScope(scope)) {
       if (contest.phase !== "FINISHED") {
         continue;
       }
@@ -94,8 +118,14 @@ export class ContestService {
     return latest;
   }
 
-  getFinished(limit = 10, sinceSeconds?: number): Contest[] {
-    const filtered = this.contests.filter((contest) => contest.phase === "FINISHED");
+  getFinished(
+    limit = 10,
+    sinceSeconds?: number,
+    scope: ContestScopeFilter = DEFAULT_SCOPE
+  ): Contest[] {
+    const filtered = this.getContestsByScope(scope).filter(
+      (contest) => contest.phase === "FINISHED"
+    );
     const since = Number.isFinite(sinceSeconds) ? (sinceSeconds as number) : null;
     const matches = since
       ? filtered.filter((contest) => contest.startTimeSeconds >= since)
@@ -103,26 +133,48 @@ export class ContestService {
     return matches.sort((a, b) => b.startTimeSeconds - a.startTimeSeconds).slice(0, limit);
   }
 
-  searchContests(query: string, limit = 5): Contest[] {
+  searchContests(query: string, limit = 5, scope: ContestScopeFilter = DEFAULT_SCOPE): Contest[] {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {
       return [];
     }
-    return this.contests
+    return this.getContestsByScope(scope)
       .filter((contest) => contest.name.toLowerCase().includes(normalized))
       .sort((a, b) => b.startTimeSeconds - a.startTimeSeconds)
       .slice(0, limit);
   }
 
-  private async loadFromCache(): Promise<boolean> {
-    const cached = await this.cache.get<Contest[]>("contest_list");
+  private getContestsByScope(scope: ContestScopeFilter): Contest[] {
+    if (scope === "all") {
+      const combined = new Map<number, Contest>();
+      for (const contest of this.store.official.contests) {
+        combined.set(contest.id, contest);
+      }
+      for (const contest of this.store.gym.contests) {
+        if (!combined.has(contest.id)) {
+          combined.set(contest.id, contest);
+        }
+      }
+      return Array.from(combined.values());
+    }
+    return this.store[scope].contests;
+  }
+
+  private async loadFromCache(scope: ContestScope): Promise<boolean> {
+    const cached = await this.cache.get<Contest[]>(
+      scope === "gym" ? "contest_list_gym" : "contest_list"
+    );
     if (!cached || !Array.isArray(cached.value) || cached.value.length === 0) {
       return false;
     }
-    this.contests = cached.value;
+    const normalized = cached.value.map((contest) => ({
+      ...contest,
+      isGym: contest.isGym ?? scope === "gym",
+    }));
+    this.store[scope].contests = normalized;
     const timestamp = Date.parse(cached.lastFetched);
-    this.lastRefresh = Number.isFinite(timestamp) ? timestamp : 0;
-    logInfo("Loaded contests from cache.", { contestCount: cached.value.length });
+    this.store[scope].lastRefresh = Number.isFinite(timestamp) ? timestamp : 0;
+    logInfo("Loaded contests from cache.", { contestCount: cached.value.length, scope });
     return true;
   }
 }

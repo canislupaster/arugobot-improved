@@ -143,14 +143,16 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Shows challenge activity summaries for the server or a specific user over a lookback window.
 
-- **/contests** `[limit]` `[include]` `[exclude]`
+- **/contests** `[limit]` `[include]` `[exclude]` `[scope]`
 
   Lists ongoing and upcoming Codeforces contests. Use `include`/`exclude` to filter by keywords
-  (comma-separated, matched against the contest name).
+  (comma-separated, matched against the contest name). Use `scope` to show `official`, `gym`,
+  or `all` contests.
 
-- **/contest** `query`
+- **/contest** `query` `[scope]`
 
-  Shows details for a contest by id, URL, or name.
+  Shows details for a contest by id, URL, or name. Use `scope` to search `official`, `gym`,
+  or `all` contests.
 
 - **/contestresults** `query` `[limit]` `[user1..user4]` `[handles]`
 

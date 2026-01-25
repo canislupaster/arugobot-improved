@@ -1,7 +1,8 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import type { Contest } from "../services/contests.js";
+import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
 import { ephemeralFlags } from "../utils/discordFlags.js";
 import {
   formatDiscordRelativeTime,
@@ -12,6 +13,7 @@ import {
 import type { Command } from "./types.js";
 
 const MAX_MATCHES = 5;
+const DEFAULT_SCOPE: ContestScopeFilter = "official";
 
 function parseContestId(raw: string): number | null {
   const trimmed = raw.trim();
@@ -44,11 +46,25 @@ function formatPhase(phase: Contest["phase"]): string {
   }
 }
 
+function formatContestTag(contest: Contest, scope: ContestScopeFilter): string {
+  if (scope === "official") {
+    return "";
+  }
+  return contest.isGym ? "Gym" : "Official";
+}
+
+function parseScope(raw: string | null): ContestScopeFilter {
+  if (raw === "gym" || raw === "all" || raw === "official") {
+    return raw;
+  }
+  return DEFAULT_SCOPE;
+}
+
 function buildContestEmbed(contest: Contest): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(contest.name)
     .setColor(0x3498db)
-    .setDescription(`[Open contest](https://codeforces.com/contest/${contest.id})`)
+    .setDescription(`[Open contest](${buildContestUrl(contest)})`)
     .addFields(
       { name: "Contest ID", value: String(contest.id), inline: true },
       { name: "Status", value: formatPhase(contest.phase), inline: true },
@@ -74,11 +90,17 @@ function buildContestEmbed(contest: Contest): EmbedBuilder {
   return embed;
 }
 
-function buildMatchEmbed(query: string, matches: Contest[]): EmbedBuilder {
+function buildMatchEmbed(
+  query: string,
+  matches: Contest[],
+  scope: ContestScopeFilter
+): EmbedBuilder {
   const lines = matches
     .map((contest) => {
       const when = formatDiscordRelativeTime(contest.startTimeSeconds);
-      return `- ${contest.name} (ID ${contest.id}, ${when})`;
+      const scopeLabel = formatContestTag(contest, scope);
+      const scopeSuffix = scopeLabel ? `, ${scopeLabel}` : "";
+      return `- ${contest.name} (ID ${contest.id}, ${when}${scopeSuffix})`;
     })
     .join("\n");
 
@@ -95,35 +117,67 @@ export const contestCommand: Command = {
     .setDescription("Shows details for a Codeforces contest")
     .addStringOption((option) =>
       option.setName("query").setDescription("Contest id, URL, or name").setRequired(true)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("scope")
+        .setDescription("Which contests to search")
+        .addChoices(
+          { name: "Official", value: "official" },
+          { name: "Gym", value: "gym" },
+          { name: "All", value: "all" }
+        )
     ),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
+    const scope = parseScope(interaction.options.getString("scope"));
     await interaction.deferReply({ ...ephemeralFlags });
 
     let stale = false;
-    try {
-      await context.services.contests.refresh();
-    } catch {
-      if (context.services.contests.getLastRefreshAt() > 0) {
+    if (scope === "all") {
+      const results = await Promise.allSettled([
+        context.services.contests.refresh(false, "official"),
+        context.services.contests.refresh(false, "gym"),
+      ]);
+      if (results.some((result) => result.status === "rejected")) {
         stale = true;
-      } else {
+      }
+      const lastRefresh = context.services.contests.getLastRefreshAt("all");
+      if (lastRefresh <= 0) {
         await interaction.editReply(
           "Unable to reach Codeforces right now. Try again in a few minutes."
         );
         return;
+      }
+    } else {
+      try {
+        await context.services.contests.refresh(false, scope);
+      } catch {
+        if (context.services.contests.getLastRefreshAt(scope) > 0) {
+          stale = true;
+        } else {
+          await interaction.editReply(
+            "Unable to reach Codeforces right now. Try again in a few minutes."
+          );
+          return;
+        }
       }
     }
 
     try {
       const contestId = parseContestId(queryRaw);
       if (contestId) {
-        const contest = context.services.contests.getContestById(contestId);
+        const contest = context.services.contests.getContestById(contestId, scope);
         if (!contest) {
           await interaction.editReply("No contest found with that ID.");
           return;
         }
 
         const embed = buildContestEmbed(contest);
+        const scopeLabel = formatContestTag(contest, scope);
+        if (scopeLabel) {
+          embed.addFields({ name: "Section", value: scopeLabel, inline: true });
+        }
         if (stale) {
           embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
         }
@@ -131,7 +185,7 @@ export const contestCommand: Command = {
         return;
       }
 
-      const matches = context.services.contests.searchContests(queryRaw, MAX_MATCHES);
+      const matches = context.services.contests.searchContests(queryRaw, MAX_MATCHES, scope);
       if (matches.length === 0) {
         await interaction.editReply("No contests found matching that name.");
         return;
@@ -139,6 +193,10 @@ export const contestCommand: Command = {
 
       if (matches.length === 1) {
         const embed = buildContestEmbed(matches[0]!);
+        const scopeLabel = formatContestTag(matches[0]!, scope);
+        if (scopeLabel) {
+          embed.addFields({ name: "Section", value: scopeLabel, inline: true });
+        }
         if (stale) {
           embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
         }
@@ -146,7 +204,7 @@ export const contestCommand: Command = {
         return;
       }
 
-      const embed = buildMatchEmbed(queryRaw, matches);
+      const embed = buildMatchEmbed(queryRaw, matches, scope);
       if (stale) {
         embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
       }

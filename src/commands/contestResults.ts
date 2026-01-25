@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder, type User } from "discord.js";
 
 import type { Contest } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
 import { ephemeralFlags } from "../utils/discordFlags.js";
 import {
   formatDiscordRelativeTime,
@@ -110,7 +111,7 @@ function buildContestEmbed(contest: Contest): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(`Contest results: ${contest.name}`)
     .setColor(0x3498db)
-    .setDescription(`[Open contest](https://codeforces.com/contest/${contest.id})`)
+    .setDescription(`[Open contest](${buildContestUrl(contest)})`)
     .addFields(
       { name: "Contest ID", value: String(contest.id), inline: true },
       { name: "Status", value: formatPhase(contest.phase), inline: true },

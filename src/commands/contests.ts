@@ -1,6 +1,8 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
+import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { filterContestsByKeywords, parseKeywordFilters } from "../utils/contestFilters.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -10,9 +12,25 @@ import {
 import type { Command } from "./types.js";
 
 const MAX_CONTESTS = 5;
+const DEFAULT_SCOPE: ContestScopeFilter = "official";
 
-function buildContestLine(contest: { id: number; name: string }, timing: string) {
-  return `- [${contest.name}](https://codeforces.com/contest/${contest.id}) ${timing}`;
+function formatContestTag(contest: Contest, scope: ContestScopeFilter): string {
+  if (scope === "official") {
+    return "";
+  }
+  return contest.isGym ? " [Gym]" : " [Official]";
+}
+
+function buildContestLine(contest: Contest, timing: string, scope: ContestScopeFilter) {
+  const label = formatContestTag(contest, scope);
+  return `- [${contest.name}](${buildContestUrl(contest)})${label} ${timing}`;
+}
+
+function parseScope(raw: string | null): ContestScopeFilter {
+  if (raw === "gym" || raw === "all" || raw === "official") {
+    return raw;
+  }
+  return DEFAULT_SCOPE;
 }
 
 export const contestsCommand: Command = {
@@ -33,6 +51,16 @@ export const contestsCommand: Command = {
     )
     .addStringOption((option) =>
       option.setName("exclude").setDescription("Hide contests matching keywords (comma-separated)")
+    )
+    .addStringOption((option) =>
+      option
+        .setName("scope")
+        .setDescription("Which contests to show")
+        .addChoices(
+          { name: "Official", value: "official" },
+          { name: "Gym", value: "gym" },
+          { name: "All", value: "all" }
+        )
     ),
   async execute(interaction, context) {
     const limit = interaction.options.getInteger("limit") ?? MAX_CONTESTS;
@@ -40,25 +68,43 @@ export const contestsCommand: Command = {
       interaction.options.getString("include"),
       interaction.options.getString("exclude")
     );
+    const scope = parseScope(interaction.options.getString("scope"));
     await interaction.deferReply();
 
     let stale = false;
-    try {
-      await context.services.contests.refresh();
-    } catch {
-      if (context.services.contests.getLastRefreshAt() > 0) {
+    if (scope === "all") {
+      const results = await Promise.allSettled([
+        context.services.contests.refresh(false, "official"),
+        context.services.contests.refresh(false, "gym"),
+      ]);
+      if (results.some((result) => result.status === "rejected")) {
         stale = true;
-      } else {
+      }
+      const lastRefresh = context.services.contests.getLastRefreshAt("all");
+      if (lastRefresh <= 0) {
         await interaction.editReply(
           "Unable to reach Codeforces right now. Try again in a few minutes."
         );
         return;
       }
+    } else {
+      try {
+        await context.services.contests.refresh(false, scope);
+      } catch {
+        if (context.services.contests.getLastRefreshAt(scope) > 0) {
+          stale = true;
+        } else {
+          await interaction.editReply(
+            "Unable to reach Codeforces right now. Try again in a few minutes."
+          );
+          return;
+        }
+      }
     }
 
-    const ongoing = filterContestsByKeywords(context.services.contests.getOngoing(), filters);
+    const ongoing = filterContestsByKeywords(context.services.contests.getOngoing(scope), filters);
     const upcoming = filterContestsByKeywords(
-      context.services.contests.getUpcoming(limit),
+      context.services.contests.getUpcoming(limit, scope),
       filters
     );
 
@@ -67,13 +113,16 @@ export const contestsCommand: Command = {
       return;
     }
 
-    const embed = new EmbedBuilder().setTitle("Codeforces Contests").setColor(0x3498db);
+    const scopeLabel = scope === "all" ? " (Official + Gym)" : scope === "gym" ? " (Gym)" : "";
+    const embed = new EmbedBuilder()
+      .setTitle(`Codeforces Contests${scopeLabel}`)
+      .setColor(0x3498db);
 
     if (ongoing.length > 0) {
       const ongoingLines = ongoing
         .map((contest) => {
           const endsAt = contest.startTimeSeconds + contest.durationSeconds;
-          return buildContestLine(contest, `(ends ${formatDiscordRelativeTime(endsAt)})`);
+          return buildContestLine(contest, `(ends ${formatDiscordRelativeTime(endsAt)})`, scope);
         })
         .join("\n");
       embed.addFields({ name: "Ongoing", value: ongoingLines, inline: false });
@@ -86,7 +135,8 @@ export const contestsCommand: Command = {
             contest,
             `(starts ${formatDiscordRelativeTime(contest.startTimeSeconds)} • ${formatDuration(
               contest.durationSeconds
-            )} • ${formatDiscordTimestamp(contest.startTimeSeconds)})`
+            )} • ${formatDiscordTimestamp(contest.startTimeSeconds)})`,
+            scope
           )
         )
         .join("\n");

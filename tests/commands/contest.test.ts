@@ -3,10 +3,18 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { contestCommand } from "../../src/commands/contest.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (query: string) =>
+const createInteraction = (query: string, scope?: string | null) =>
   ({
     options: {
-      getString: jest.fn().mockReturnValue(query),
+      getString: jest.fn((name: string) => {
+        if (name === "query") {
+          return query;
+        }
+        if (name === "scope") {
+          return scope ?? null;
+        }
+        return null;
+      }),
     },
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),
@@ -34,7 +42,7 @@ describe("contestCommand", () => {
 
     await contestCommand.execute(interaction, context);
 
-    expect(context.services.contests.getContestById).toHaveBeenCalledWith(1234);
+    expect(context.services.contests.getContestById).toHaveBeenCalledWith(1234, "official");
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     const embed = payload.embeds[0].data;
     expect(embed.title).toContain("Codeforces Round #1234");

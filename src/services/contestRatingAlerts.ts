@@ -4,6 +4,7 @@ import { ChannelType, EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -125,9 +126,7 @@ export function buildContestRatingAlertEmbed(preview: ContestRatingAlertPreview)
   const embed = new EmbedBuilder()
     .setTitle("Contest rating changes published")
     .setColor(0x3498db)
-    .setDescription(
-      `[${preview.contest.name}](https://codeforces.com/contest/${preview.contest.id})`
-    )
+    .setDescription(`[${preview.contest.name}](${buildContestUrl(preview.contest)})`)
     .addFields(
       {
         name: "Updated",
