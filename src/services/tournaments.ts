@@ -173,8 +173,7 @@ export type TournamentMatchSummary = {
 };
 
 export const tournamentArenaIntervalMs = 60 * 1000;
-const ARENA_RECENT_SUBMISSIONS_LIMIT = 50;
-const ARENA_RECENT_SUBMISSIONS_TTL_MS = 30_000;
+const ARENA_CONTEST_SOLVES_TTL_MS = 30_000;
 
 export type ArenaState = {
   startsAt: number;
@@ -192,6 +191,10 @@ export type ArenaCompletion = {
   tournamentId: string;
   guildId: string;
 };
+
+function normalizeHandle(handle: string): string {
+  return handle.trim().toLowerCase();
+}
 
 export class TournamentService implements ChallengeCompletionNotifier {
   private lastError: { message: string; timestamp: string } | null = null;
@@ -1414,52 +1417,58 @@ export class TournamentService implements ChallengeCompletionNotifier {
       return;
     }
     const problemSet = new Set(problems.map((problem) => getProblemId(problem)));
+    const problemsByContest = new Map<number, Set<string>>();
+    for (const problem of problems) {
+      const contestId = problem.contestId;
+      const contestProblems = problemsByContest.get(contestId) ?? new Set<string>();
+      contestProblems.add(getProblemId(problem));
+      problemsByContest.set(contestId, contestProblems);
+    }
     const participants = await this.listParticipants(tournamentId);
     if (participants.length === 0) {
       return;
     }
     const linked = await this.store.getLinkedUsers(guildId);
-    const handleMap = new Map(linked.map((entry) => [entry.userId, entry.handle]));
+    const participantIds = new Set(participants.map((participant) => participant.userId));
+    const handleMap = new Map<string, string>();
+    for (const entry of linked) {
+      if (participantIds.has(entry.userId)) {
+        handleMap.set(normalizeHandle(entry.handle), entry.userId);
+      }
+    }
 
-    for (const participant of participants) {
-      const handle = handleMap.get(participant.userId);
-      if (!handle) {
-        continue;
-      }
-      const recent = await this.store.getRecentSubmissions(
-        handle,
-        ARENA_RECENT_SUBMISSIONS_LIMIT,
-        ARENA_RECENT_SUBMISSIONS_TTL_MS
+    for (const [contestId, contestProblems] of problemsByContest.entries()) {
+      const contestSolves = await this.store.getContestSolvesResult(
+        contestId,
+        ARENA_CONTEST_SOLVES_TTL_MS
       );
-      if (!recent) {
+      if (!contestSolves) {
         continue;
       }
-      for (const submission of recent.submissions) {
-        if (submission.verdict !== "OK") {
-          continue;
-        }
-        if (!submission.contestId) {
-          continue;
-        }
+      for (const solve of contestSolves.solves) {
         if (
-          submission.creationTimeSeconds < state.startsAt ||
-          submission.creationTimeSeconds > state.endsAt
+          solve.creationTimeSeconds < state.startsAt ||
+          solve.creationTimeSeconds > state.endsAt
         ) {
           continue;
         }
-        const problemId = `${submission.contestId}${submission.index}`;
-        if (!problemSet.has(problemId)) {
+        const problemId = `${solve.contestId}${solve.index}`;
+        if (!contestProblems.has(problemId) || !problemSet.has(problemId)) {
+          continue;
+        }
+        const userId = handleMap.get(normalizeHandle(solve.handle));
+        if (!userId) {
           continue;
         }
         await this.db
           .insertInto("tournament_arena_solves")
           .values({
             tournament_id: tournamentId,
-            user_id: participant.userId,
-            problem_contest_id: submission.contestId,
-            problem_index: submission.index,
-            submission_id: submission.id,
-            solved_at: submission.creationTimeSeconds,
+            user_id: userId,
+            problem_contest_id: solve.contestId,
+            problem_index: solve.index,
+            submission_id: solve.id,
+            solved_at: solve.creationTimeSeconds,
           })
           .onConflict((oc) => oc.doNothing())
           .execute();

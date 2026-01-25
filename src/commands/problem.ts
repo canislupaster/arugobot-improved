@@ -24,17 +24,50 @@ function buildProblemLink(problem: Problem): string {
   return `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
 }
 
+function normalizeHandle(handle: string): string {
+  return handle.trim().toLowerCase();
+}
+
 async function getSolvedSummary(
   store: StoreService,
   guildId: string,
-  problemId: string
+  problem: Problem
 ): Promise<SolvedSummary> {
+  const problemId = `${problem.contestId}${problem.index}`;
   const linkedUsers = await store.getLinkedUsers(guildId);
-  const limitedUsers = linkedUsers.slice(0, MAX_HANDLES_CHECK);
-  const skippedHandles = Math.max(0, linkedUsers.length - limitedUsers.length);
-  const solvedBy: string[] = [];
+  const solvedBy = new Set<string>();
   let staleHandles = 0;
   let unavailableHandles = 0;
+
+  const contestSolves = await store.getContestSolvesResult(problem.contestId);
+  if (contestSolves) {
+    const handleToUserId = new Map(
+      linkedUsers.map((user) => [normalizeHandle(user.handle), user.userId])
+    );
+    for (const solve of contestSolves.solves) {
+      if (`${solve.contestId}${solve.index}` !== problemId) {
+        continue;
+      }
+      const userId = handleToUserId.get(normalizeHandle(solve.handle));
+      if (userId) {
+        solvedBy.add(`<@${userId}>`);
+      }
+    }
+    if (contestSolves.isStale) {
+      staleHandles = linkedUsers.length;
+    }
+    return {
+      solvedBy: Array.from(solvedBy),
+      checkedHandles: linkedUsers.length,
+      skippedHandles: 0,
+      staleHandles,
+      unavailableHandles: 0,
+      totalLinked: linkedUsers.length,
+    };
+  }
+
+  const limitedUsers = linkedUsers.slice(0, MAX_HANDLES_CHECK);
+  const skippedHandles = Math.max(0, linkedUsers.length - limitedUsers.length);
   let checkedHandles = 0;
 
   for (const user of limitedUsers) {
@@ -48,12 +81,12 @@ async function getSolvedSummary(
       staleHandles += 1;
     }
     if (solvedResult.solved.includes(problemId)) {
-      solvedBy.push(`<@${user.userId}>`);
+      solvedBy.add(`<@${user.userId}>`);
     }
   }
 
   return {
-    solvedBy,
+    solvedBy: Array.from(solvedBy),
     checkedHandles,
     skippedHandles,
     staleHandles,
@@ -119,7 +152,7 @@ export const problemCommand: Command = {
         const summary = await getSolvedSummary(
           context.services.store,
           interaction.guild.id,
-          reference.id
+          problem
         );
         if (summary.totalLinked > 0) {
           let solvedValue = "No linked users have solved this yet.";

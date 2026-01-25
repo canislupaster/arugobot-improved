@@ -116,6 +116,49 @@ describe("StoreService", () => {
     expect(fallback.source).toBe("cache");
   });
 
+  it("caches contest solves and reuses fresh cache", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        id: 10,
+        contestId: 1000,
+        creationTimeSeconds: 1200,
+        verdict: "OK",
+        problem: { contestId: 1000, index: "A" },
+        author: { members: [{ handle: "tourist" }] },
+      },
+    ]);
+
+    const first = await store.getContestSolvesResult(1000);
+    expect(first?.solves).toHaveLength(1);
+    expect(first?.solves[0]?.handle).toBe("tourist");
+
+    const second = await store.getContestSolvesResult(1000);
+    expect(second?.source).toBe("cache");
+    expect(mockClient.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to cached contest solves when the API fails", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        id: 11,
+        contestId: 1000,
+        creationTimeSeconds: 1300,
+        verdict: "OK",
+        problem: { contestId: 1000, index: "B" },
+        author: { members: [{ handle: "tourist" }] },
+      },
+    ]);
+
+    await store.getContestSolvesResult(1000);
+
+    mockClient.request.mockRejectedValueOnce(new Error("CF down"));
+    const fallback = await store.getContestSolvesResult(1000, 0);
+
+    expect(fallback?.source).toBe("cache");
+    expect(fallback?.isStale).toBe(true);
+    expect(fallback?.solves).toHaveLength(1);
+  });
+
   it("returns server roster and stats", async () => {
     await store.insertUser("guild-1", "user-1", "tourist");
     await store.insertUser("guild-1", "user-2", "petr");

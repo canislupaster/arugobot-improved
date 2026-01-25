@@ -40,8 +40,8 @@ describe("problemCommand", () => {
         },
         store: {
           getLinkedUsers: jest.fn().mockResolvedValue([]),
-          getSolvedProblemsResult: jest.fn().mockResolvedValue({
-            solved: [],
+          getContestSolvesResult: jest.fn().mockResolvedValue({
+            solves: [],
             source: "cache",
             isStale: false,
           }),
@@ -77,8 +77,16 @@ describe("problemCommand", () => {
         },
         store: {
           getLinkedUsers: jest.fn().mockResolvedValue([{ userId: "user-1", handle: "tourist" }]),
-          getSolvedProblemsResult: jest.fn().mockResolvedValue({
-            solved: ["1000A"],
+          getContestSolvesResult: jest.fn().mockResolvedValue({
+            solves: [
+              {
+                id: 101,
+                handle: "tourist",
+                contestId: 1000,
+                index: "A",
+                creationTimeSeconds: 1000,
+              },
+            ],
             source: "cache",
             isStale: false,
           }),

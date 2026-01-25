@@ -42,6 +42,13 @@ export type CfRecentSubmissionsTable = {
   last_fetched: Generated<string>;
 };
 
+export type CfContestSubmissionsTable = {
+  contest_id: number;
+  submissions: string;
+  last_submission_id: number | null;
+  updated_at: Generated<string>;
+};
+
 export type CfCacheTable = {
   key: string;
   payload: string;
@@ -337,6 +344,7 @@ export type Database = {
   cf_handles: CfHandlesTable;
   cf_profiles: CfProfilesTable;
   cf_recent_submissions: CfRecentSubmissionsTable;
+  cf_contest_submissions: CfContestSubmissionsTable;
   cf_cache: CfCacheTable;
   cf_rating_changes: CfRatingChangesTable;
   challenges: ChallengesTable;

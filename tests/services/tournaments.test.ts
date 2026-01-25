@@ -958,8 +958,8 @@ describe("TournamentService", () => {
       .execute();
 
     const cfClient = {
-      request: jest.fn().mockImplementation((_endpoint: string, params: { handle: string }) => {
-        if (params.handle === "tourist") {
+      request: jest.fn().mockImplementation((_endpoint: string, params: { contestId: number }) => {
+        if (params.contestId === 1000) {
           return [
             {
               id: 101,
@@ -967,15 +967,15 @@ describe("TournamentService", () => {
               problem: { contestId: 1000, index: "A", name: "Alpha" },
               verdict: "OK",
               creationTimeSeconds: now - 10,
-              programmingLanguage: "GNU C++20",
+              author: { members: [{ handle: "tourist" }] },
             },
             {
               id: 102,
-              contestId: 1002,
-              problem: { contestId: 1002, index: "C", name: "Skip" },
+              contestId: 1000,
+              problem: { contestId: 1000, index: "B", name: "Skip" },
               verdict: "OK",
               creationTimeSeconds: now - 10,
-              programmingLanguage: "GNU C++20",
+              author: { members: [{ handle: "someone" }] },
             },
           ];
         }

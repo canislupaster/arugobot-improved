@@ -40,6 +40,10 @@ const HANDLE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 60 * 60 * 1000;
 const RECENT_SUBMISSIONS_TTL_MS = 5 * 60 * 1000;
 const RECENT_SUBMISSIONS_FETCH_COUNT = 20;
+const CONTEST_SUBMISSIONS_TTL_MS = 5 * 60 * 1000;
+const CONTEST_SUBMISSIONS_RECENT_FETCH_COUNT = 200;
+const CONTEST_SUBMISSIONS_RECENT_MAX_PAGES = 5;
+const CONTEST_SUBMISSIONS_FULL_FETCH_COUNT = 1000;
 const SOLVED_CACHE_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_SOLVED_PAGES = 10;
 
@@ -72,6 +76,20 @@ export type RecentSubmission = {
 
 export type RecentSubmissionsResult = {
   submissions: RecentSubmission[];
+  source: "cache" | "api";
+  isStale: boolean;
+};
+
+export type ContestSolve = {
+  id: number;
+  handle: string;
+  contestId: number;
+  index: string;
+  creationTimeSeconds: number;
+};
+
+export type ContestSolvesResult = {
+  solves: ContestSolve[];
   source: "cache" | "api";
   isStale: boolean;
 };
@@ -135,6 +153,15 @@ export type ChallengeStreak = {
 export type ChallengeStreakEntry = ChallengeStreak & {
   userId: string;
 };
+
+type ContestStatusResponse = Array<{
+  id: number;
+  contestId: number;
+  creationTimeSeconds: number;
+  verdict?: string;
+  problem: { contestId?: number; index: string; name?: string };
+  author?: { members?: Array<{ handle: string }> };
+}>;
 
 type HandleResolution = {
   exists: boolean;
@@ -249,6 +276,46 @@ export class StoreService {
 
   private normalizeHandle(handle: string): string {
     return handle.trim().toLowerCase();
+  }
+
+  private buildContestSolveKey(solve: ContestSolve): string {
+    return `${solve.id}:${this.normalizeHandle(solve.handle)}`;
+  }
+
+  private mergeContestSolves(existing: ContestSolve[], incoming: ContestSolve[]): ContestSolve[] {
+    const merged = existing.slice();
+    const seen = new Set(existing.map((solve) => this.buildContestSolveKey(solve)));
+    for (const solve of incoming) {
+      const key = this.buildContestSolveKey(solve);
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      merged.push(solve);
+    }
+    return merged;
+  }
+
+  private mapContestStatusSubmission(submission: ContestStatusResponse[number]): ContestSolve[] {
+    if (submission.verdict !== "OK") {
+      return [];
+    }
+    const contestId = submission.problem.contestId ?? submission.contestId;
+    const index = submission.problem.index;
+    const members = submission.author?.members ?? [];
+    if (members.length === 0) {
+      return [];
+    }
+    return members
+      .map((member) => member.handle?.trim())
+      .filter((handle): handle is string => Boolean(handle))
+      .map((handle) => ({
+        id: submission.id,
+        handle,
+        contestId,
+        index,
+        creationTimeSeconds: submission.creationTimeSeconds,
+      }));
   }
 
   private mapProfileRow(row: {
@@ -574,6 +641,183 @@ export class StoreService {
         return { submissions: submissions.slice(0, limit), source: "cache", isStale: true };
       }
       return null;
+    }
+  }
+
+  async getContestSolvesResult(
+    contestId: number,
+    ttlMs = CONTEST_SUBMISSIONS_TTL_MS
+  ): Promise<ContestSolvesResult | null> {
+    let cached:
+      | {
+          submissions: string;
+          last_submission_id: number | null;
+          updated_at: string;
+        }
+      | undefined;
+
+    try {
+      cached = await this.db
+        .selectFrom("cf_contest_submissions")
+        .select(["submissions", "last_submission_id", "updated_at"])
+        .where("contest_id", "=", contestId)
+        .executeTakeFirst();
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
+    }
+
+    const cachedSolves = cached ? parseJsonArray<ContestSolve>(cached.submissions, []) : null;
+    if (cached && isCacheFresh(cached.updated_at, ttlMs) && cachedSolves) {
+      return { solves: cachedSolves, source: "cache", isStale: false };
+    }
+
+    try {
+      if (cached) {
+        logInfo("Contest submissions incremental refresh.", { contestId });
+        const incremental = await this.fetchContestSolvesIncremental(
+          contestId,
+          cached.last_submission_id
+        );
+        let updatedSolves: ContestSolve[];
+        let newLast = cached.last_submission_id;
+
+        if (incremental.foundMarker) {
+          updatedSolves = this.mergeContestSolves(cachedSolves ?? [], incremental.solves);
+          if (incremental.latestSubmissionId !== null) {
+            newLast = incremental.latestSubmissionId;
+          }
+        } else {
+          logInfo("Contest submissions incremental refresh fell back to full sync.", { contestId });
+          const full = await this.fetchContestSolvesFull(contestId);
+          updatedSolves = full.solves;
+          newLast = full.latestSubmissionId;
+        }
+
+        const uniqueSolves = this.mergeContestSolves([], updatedSolves);
+        await this.saveContestSolves(contestId, uniqueSolves, newLast ?? null);
+        return { solves: uniqueSolves, source: "api", isStale: false };
+      }
+
+      logInfo("Contest submissions full refresh.", { contestId });
+      const full = await this.fetchContestSolvesFull(contestId);
+      const uniqueSolves = this.mergeContestSolves([], full.solves);
+      await this.saveContestSolves(contestId, uniqueSolves, full.latestSubmissionId ?? null);
+      return { solves: uniqueSolves, source: "api", isStale: false };
+    } catch (error) {
+      logError(`Request error: ${String(error)}`);
+      if (cachedSolves) {
+        return { solves: cachedSolves, source: "cache", isStale: true };
+      }
+      return null;
+    }
+  }
+
+  private async fetchContestSolvesIncremental(
+    contestId: number,
+    lastSubmissionId: number | null
+  ): Promise<{ solves: ContestSolve[]; latestSubmissionId: number | null; foundMarker: boolean }> {
+    if (lastSubmissionId === null) {
+      return { solves: [], latestSubmissionId: null, foundMarker: false };
+    }
+
+    const solves: ContestSolve[] = [];
+    let latestSubmissionId: number | null = null;
+    let foundMarker = false;
+    let from = 1;
+    let page = 0;
+
+    while (page < CONTEST_SUBMISSIONS_RECENT_MAX_PAGES) {
+      const response = await this.cfClient.request<ContestStatusResponse>("contest.status", {
+        contestId,
+        from,
+        count: CONTEST_SUBMISSIONS_RECENT_FETCH_COUNT,
+      });
+
+      if (response.length === 0) {
+        foundMarker = true;
+        break;
+      }
+      if (latestSubmissionId === null && response[0]) {
+        latestSubmissionId = response[0].id;
+      }
+
+      for (const submission of response) {
+        if (submission.id === lastSubmissionId) {
+          foundMarker = true;
+          break;
+        }
+        solves.push(...this.mapContestStatusSubmission(submission));
+      }
+
+      if (foundMarker) {
+        break;
+      }
+      if (response.length < CONTEST_SUBMISSIONS_RECENT_FETCH_COUNT) {
+        break;
+      }
+      from += CONTEST_SUBMISSIONS_RECENT_FETCH_COUNT;
+      page += 1;
+    }
+
+    return { solves, latestSubmissionId, foundMarker };
+  }
+
+  private async fetchContestSolvesFull(
+    contestId: number
+  ): Promise<{ solves: ContestSolve[]; latestSubmissionId: number | null }> {
+    const solves: ContestSolve[] = [];
+    let latestSubmissionId: number | null = null;
+    let from = 1;
+
+    while (true) {
+      const response = await this.cfClient.request<ContestStatusResponse>("contest.status", {
+        contestId,
+        from,
+        count: CONTEST_SUBMISSIONS_FULL_FETCH_COUNT,
+      });
+      if (response.length === 0) {
+        break;
+      }
+      if (from === 1 && response[0]) {
+        latestSubmissionId = response[0].id;
+      }
+      for (const submission of response) {
+        solves.push(...this.mapContestStatusSubmission(submission));
+      }
+      if (response.length < CONTEST_SUBMISSIONS_FULL_FETCH_COUNT) {
+        break;
+      }
+      from += CONTEST_SUBMISSIONS_FULL_FETCH_COUNT;
+    }
+
+    return { solves, latestSubmissionId };
+  }
+
+  private async saveContestSolves(
+    contestId: number,
+    solves: ContestSolve[],
+    lastSubmissionId: number | null
+  ): Promise<void> {
+    const nowIso = new Date().toISOString();
+    try {
+      await this.db
+        .insertInto("cf_contest_submissions")
+        .values({
+          contest_id: contestId,
+          submissions: JSON.stringify(solves),
+          last_submission_id: lastSubmissionId,
+          updated_at: nowIso,
+        })
+        .onConflict((oc) =>
+          oc.column("contest_id").doUpdateSet({
+            submissions: JSON.stringify(solves),
+            last_submission_id: lastSubmissionId,
+            updated_at: nowIso,
+          })
+        )
+        .execute();
+    } catch (error) {
+      logError(`Database error: ${String(error)}`);
     }
   }
 
