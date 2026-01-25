@@ -3,8 +3,8 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolveTargetLabels } from "../utils/interaction.js";
 import { resolveHandleTarget } from "../utils/handles.js";
+import { resolveTargetLabels } from "../utils/interaction.js";
 import { formatSubmissionLine } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
