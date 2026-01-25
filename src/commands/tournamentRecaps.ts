@@ -56,6 +56,10 @@ export const tournamentRecapsCommand: Command = {
       recap_missing: "Unable to build a recap for the latest tournament.",
     };
 
+    const replyWithContent = async (content: string) => {
+      await interaction.reply({ content });
+    };
+
     const buildStatusEmbed = (subscription: { channelId: string; roleId: string | null }) =>
       new EmbedBuilder()
         .setTitle("Tournament recap auto-posts")
@@ -68,67 +72,64 @@ export const tournamentRecapsCommand: Command = {
         );
 
     try {
-      if (subcommand === "status") {
-        const subscription = await context.services.tournamentRecaps.getSubscription(guildId);
-        if (!subscription) {
-          await interaction.reply({
-            content: noSubscriptionMessage,
-          });
+      switch (subcommand) {
+        case "status": {
+          const subscription = await context.services.tournamentRecaps.getSubscription(guildId);
+          if (!subscription) {
+            await replyWithContent(noSubscriptionMessage);
+            return;
+          }
+
+          const embed = buildStatusEmbed(subscription);
+          await interaction.reply({ embeds: [embed] });
           return;
         }
-
-        const embed = buildStatusEmbed(subscription);
-
-        await interaction.reply({ embeds: [embed] });
-        return;
-      }
-
-      if (subcommand === "clear") {
-        const removed = await context.services.tournamentRecaps.clearSubscription(guildId);
-        await interaction.reply({
-          content: removed
-            ? "Tournament recap auto-posts disabled for this server."
-            : "No tournament recap auto-posts were configured for this server.",
-        });
-        return;
-      }
-
-      if (subcommand === "set") {
-        const channel = interaction.options.getChannel("channel", true);
-        if (
-          channel.type !== ChannelType.GuildText &&
-          channel.type !== ChannelType.GuildAnnouncement
-        ) {
-          await interaction.reply({
-            content: "Pick a text channel for tournament recaps.",
-          });
+        case "clear": {
+          const removed = await context.services.tournamentRecaps.clearSubscription(guildId);
+          await replyWithContent(
+            removed
+              ? "Tournament recap auto-posts disabled for this server."
+              : "No tournament recap auto-posts were configured for this server."
+          );
           return;
         }
-        const role = interaction.options.getRole("role");
-        const roleId = role?.id ?? null;
-        await context.services.tournamentRecaps.setSubscription(guildId, channel.id, roleId);
-        const roleLabel = roleId ? ` (mentioning <@&${roleId}>)` : "";
-        await interaction.reply({
-          content: `Tournament recaps will auto-post in <#${channel.id}>${roleLabel}.`,
-        });
-        return;
-      }
-
-      if (subcommand === "post") {
-        await interaction.deferReply();
-        const result = await context.services.tournamentRecaps.postLatestCompletedRecap(
-          guildId,
-          context.client
-        );
-        if (result.status === "error") {
-          await interaction.editReply(`Failed to post recap: ${result.message}`);
+        case "set": {
+          const channel = interaction.options.getChannel("channel", true);
+          if (
+            channel.type !== ChannelType.GuildText &&
+            channel.type !== ChannelType.GuildAnnouncement
+          ) {
+            await replyWithContent("Pick a text channel for tournament recaps.");
+            return;
+          }
+          const role = interaction.options.getRole("role");
+          const roleId = role?.id ?? null;
+          await context.services.tournamentRecaps.setSubscription(guildId, channel.id, roleId);
+          const roleLabel = roleId ? ` (mentioning <@&${roleId}>)` : "";
+          await replyWithContent(
+            `Tournament recaps will auto-post in <#${channel.id}>${roleLabel}.`
+          );
           return;
         }
-        if (result.status !== "sent") {
-          await interaction.editReply(postResponses[result.status]);
+        case "post": {
+          await interaction.deferReply();
+          const result = await context.services.tournamentRecaps.postLatestCompletedRecap(
+            guildId,
+            context.client
+          );
+          if (result.status === "error") {
+            await interaction.editReply(`Failed to post recap: ${result.message}`);
+            return;
+          }
+          if (result.status !== "sent") {
+            await interaction.editReply(postResponses[result.status]);
+            return;
+          }
+          await interaction.editReply(`Tournament recap posted in <#${result.channelId}>.`);
           return;
         }
-        await interaction.editReply(`Tournament recap posted in <#${result.channelId}>.`);
+        default:
+          return;
       }
     } catch (error) {
       logCommandError(
