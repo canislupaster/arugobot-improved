@@ -16,7 +16,7 @@ describe("validateConfig", () => {
       instanceLockTtlSeconds: 0,
       instanceLockHeartbeatSeconds: 0,
       webHost: "",
-      webPort: 0,
+      webPort: -1,
       webPublicUrl: "not-a-url",
     });
     expect(errors).toContain("DISCORD_TOKEN is missing.");
@@ -31,7 +31,7 @@ describe("validateConfig", () => {
     expect(errors).toContain("INSTANCE_LOCK_TTL_SECONDS must be greater than 0.");
     expect(errors).toContain("INSTANCE_LOCK_HEARTBEAT_SECONDS must be greater than 0.");
     expect(errors).toContain("WEB_HOST is missing.");
-    expect(errors).toContain("WEB_PORT must be a valid port number (1-65535).");
+    expect(errors).toContain("WEB_PORT must be a valid port number (0-65535).");
     expect(errors).toContain("WEB_PUBLIC_URL must be a valid http(s) URL.");
   });
 
@@ -50,10 +50,11 @@ describe("validateConfig", () => {
       instanceLockTtlSeconds: 120,
       instanceLockHeartbeatSeconds: 30,
       webHost: "0.0.0.0",
-      webPort: 8787,
+      webPort: 0,
       webPublicUrl: "https://example.com",
     });
     expect(errors).toContain("DATABASE_URL must start with sqlite: (e.g. sqlite:./bot_data.db).");
     expect(errors).toContain("NODE_ENV must be one of development, production, or test.");
+    expect(errors).not.toContain("WEB_PORT must be a valid port number (0-65535).");
   });
 });

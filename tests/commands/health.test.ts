@@ -13,6 +13,13 @@ describe("healthCommand", () => {
   it("renders command usage metrics", async () => {
     const interaction = createInteraction();
     const context = {
+      webStatus: {
+        status: "listening",
+        host: "0.0.0.0",
+        requestedPort: 8787,
+        actualPort: 8787,
+        lastError: null,
+      },
       services: {
         metrics: {
           getCommandCount: jest.fn().mockResolvedValue(2),

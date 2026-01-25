@@ -41,6 +41,7 @@ import { WebsiteService } from "./services/website.js";
 import { WeeklyDigestService, weeklyDigestIntervalMs } from "./services/weeklyDigest.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo, logWarn, setLogSink } from "./utils/logger.js";
+import type { WebServerStatus } from "./types/webStatus.js";
 import { startWebServer } from "./web/server.js";
 
 type ContestListResponse = Array<{ id: number }>;
@@ -136,6 +137,13 @@ async function main() {
   });
 
   const cooldowns = new CooldownManager(3, 1);
+  const webStatus: WebServerStatus = {
+    status: "starting",
+    host: config.webHost,
+    requestedPort: config.webPort,
+    actualPort: null,
+    lastError: null,
+  };
   let parseInterval: NodeJS.Timeout | null = null;
   let challengeInterval: NodeJS.Timeout | null = null;
   let contestReminderInterval: NodeJS.Timeout | null = null;
@@ -344,6 +352,7 @@ async function main() {
       config,
       commandSummaries,
       correlationId,
+      webStatus,
       services: {
         challenges,
         contests,
@@ -440,9 +449,17 @@ async function main() {
 
   webServer = await startWebServer(
     { host: config.webHost, port: config.webPort },
-    { website, client }
+    { website, client },
+    webStatus
   );
   if (!webServer) {
+    if (webStatus.status === "starting") {
+      webStatus.status = "failed";
+      webStatus.lastError = {
+        message: "Web server failed to start.",
+        timestamp: new Date().toISOString(),
+      };
+    }
     logWarn("Web server failed to start; continuing without dashboard.");
   }
 

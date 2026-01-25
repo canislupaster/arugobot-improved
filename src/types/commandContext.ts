@@ -21,12 +21,14 @@ import type { StoreService } from "../services/store.js";
 import type { TournamentRecapService } from "../services/tournamentRecaps.js";
 import type { TournamentService } from "../services/tournaments.js";
 import type { WeeklyDigestService } from "../services/weeklyDigest.js";
+import type { WebServerStatus } from "./webStatus.js";
 
 export type CommandContext = {
   client: Client;
   config: AppConfig;
   commandSummaries: Array<{ name: string; description: string }>;
   correlationId: string;
+  webStatus: WebServerStatus;
   services: {
     challenges: ChallengeService;
     contests: ContestService;

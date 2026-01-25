@@ -86,8 +86,8 @@ export function validateConfig(config: AppConfig): string[] {
   if (!config.webHost) {
     errors.push("WEB_HOST is missing.");
   }
-  if (!Number.isFinite(config.webPort) || config.webPort <= 0 || config.webPort > 65535) {
-    errors.push("WEB_PORT must be a valid port number (1-65535).");
+  if (!Number.isFinite(config.webPort) || config.webPort < 0 || config.webPort > 65535) {
+    errors.push("WEB_PORT must be a valid port number (0-65535).");
   }
   if (config.webPublicUrl && !isValidUrl(config.webPublicUrl)) {
     errors.push("WEB_PUBLIC_URL must be a valid http(s) URL.");

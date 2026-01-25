@@ -38,6 +38,15 @@ export const healthCommand: Command = {
     const contestLastError = context.services.contests.getLastError();
     const contestRatingChangesLastError = context.services.contestRatingChanges.getLastError();
     const ratingChangesLastError = context.services.ratingChanges.getLastError();
+    const webStatus = context.webStatus;
+    const webPort =
+      webStatus.actualPort ?? (webStatus.requestedPort === 0 ? null : webStatus.requestedPort);
+    const webLabel =
+      webStatus.status === "listening"
+        ? `Listening on ${webStatus.host}:${webPort ?? "unknown"}`
+        : webStatus.status === "starting"
+          ? "Starting"
+          : "Disabled";
     const [
       reminderCount,
       ratingAlertCount,
@@ -88,6 +97,7 @@ export const healthCommand: Command = {
         { name: "Uptime", value: `${uptimeSeconds}s`, inline: true },
         { name: "Memory", value: `${Math.round(memory.rss / 1024 / 1024)} MB`, inline: true },
         { name: "DB", value: dbOk ? "OK" : "Failed", inline: true },
+        { name: "Web dashboard", value: webLabel, inline: true },
         {
           name: "DB backups",
           value: backupDir ? (backupLastAt ?? "Pending") : "Disabled",
@@ -135,6 +145,13 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Last error",
         value: `${lastError.timestamp} - ${lastError.message}`,
+        inline: false,
+      });
+    }
+    if (webStatus.lastError) {
+      embed.addFields({
+        name: "Web server last error",
+        value: `${webStatus.lastError.timestamp} - ${webStatus.lastError.message}`,
         inline: false,
       });
     }
