@@ -135,4 +135,15 @@ describe("ContestStandingsService", () => {
       showUnofficial: true,
     });
   });
+
+  it("skips requests when no valid handles are provided", async () => {
+    const service = new ContestStandingsService(db, client);
+
+    const result = await service.getStandings(111, [" ", ""], "CODING");
+
+    expect(client.request).not.toHaveBeenCalled();
+    expect(result.entries).toHaveLength(0);
+    expect(result.source).toBe("cache");
+    expect(result.isStale).toBe(false);
+  });
 });

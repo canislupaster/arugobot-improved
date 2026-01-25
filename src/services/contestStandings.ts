@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { isCacheFresh } from "../utils/cache.js";
+import { normalizeHandleKey } from "../utils/handles.js";
 import { logError, logWarn } from "../utils/logger.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
@@ -49,7 +50,10 @@ function getCacheTtl(phase?: Contest["phase"]): number {
 }
 
 export function hashHandles(handles: string[]): string {
-  const normalized = handles.map((handle) => handle.toLowerCase()).sort();
+  const normalized = handles
+    .map((handle) => normalizeHandleKey(handle))
+    .filter(Boolean)
+    .sort();
   return createHash("sha1").update(normalized.join("|")).digest("hex");
 }
 
@@ -61,7 +65,10 @@ function dedupeHandles(handles: string[]): string[] {
     if (!trimmed) {
       continue;
     }
-    const key = trimmed.toLowerCase();
+    const key = normalizeHandleKey(trimmed);
+    if (!key) {
+      continue;
+    }
     if (seen.has(key)) {
       continue;
     }
