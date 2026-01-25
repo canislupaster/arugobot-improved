@@ -30,6 +30,10 @@ export type GlobalOverview = {
     contestCount: number;
     participantCount: number;
     lastContestAt: number | null;
+    byScope: {
+      official: { contestCount: number; participantCount: number; lastContestAt: number | null };
+      gym: { contestCount: number; participantCount: number; lastContestAt: number | null };
+    };
   };
 };
 
@@ -59,7 +63,12 @@ export type ContestActivitySummary = {
     contestId: number;
     contestName: string;
     ratingUpdateTimeSeconds: number;
+    scope: "official" | "gym";
   }>;
+  byScope: {
+    official: { contestCount: number; participantCount: number; lastContestAt: number | null };
+    gym: { contestCount: number; participantCount: number; lastContestAt: number | null };
+  };
 };
 
 export type GuildOverview = {
@@ -138,6 +147,10 @@ export class WebsiteService {
             contestCount: 0,
             participantCount: 0,
             lastContestAt: null,
+            byScope: {
+              official: { contestCount: 0, participantCount: 0, lastContestAt: null },
+              gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
+            },
           },
         };
       }
@@ -234,6 +247,10 @@ export class WebsiteService {
           contestCount: 0,
           participantCount: 0,
           lastContestAt: null,
+          byScope: {
+            official: { contestCount: 0, participantCount: 0, lastContestAt: null },
+            gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
+          },
         },
       };
     }

@@ -17,7 +17,7 @@ import {
   formatDuration,
 } from "../utils/time.js";
 
-import type { Contest, ContestService } from "./contests.js";
+import type { Contest, ContestScope, ContestScopeFilter, ContestService } from "./contests.js";
 
 const NOTIFICATION_RETENTION_DAYS = 14;
 
@@ -29,6 +29,7 @@ export type ContestReminder = {
   roleId: string | null;
   includeKeywords: string[];
   excludeKeywords: string[];
+  scope: ContestScopeFilter;
 };
 
 export type ManualContestReminderResult =
@@ -46,6 +47,28 @@ export type ManualContestReminderResult =
   | { status: "error"; message: string };
 
 type ContestProvider = Pick<ContestService, "refresh" | "getUpcomingContests">;
+
+const DEFAULT_SCOPE: ContestScopeFilter = "official";
+
+function normalizeScope(raw: string | null | undefined): ContestScopeFilter {
+  if (raw === "official" || raw === "gym" || raw === "all") {
+    return raw;
+  }
+  return DEFAULT_SCOPE;
+}
+
+function getRefreshScopes(subscriptions: ContestReminder[]): ContestScope[] {
+  const scopes = new Set<ContestScope>();
+  for (const subscription of subscriptions) {
+    if (subscription.scope === "official" || subscription.scope === "all") {
+      scopes.add("official");
+    }
+    if (subscription.scope === "gym" || subscription.scope === "all") {
+      scopes.add("gym");
+    }
+  }
+  return Array.from(scopes);
+}
 
 export class ContestReminderService {
   private lastTickAt: string | null = null;
@@ -79,6 +102,7 @@ export class ContestReminderService {
         "role_id",
         "include_keywords",
         "exclude_keywords",
+        "scope",
       ])
       .where("guild_id", "=", guildId)
       .where("id", "=", subscriptionId)
@@ -95,6 +119,7 @@ export class ContestReminderService {
       roleId: row.role_id ?? null,
       includeKeywords: filters.includeKeywords,
       excludeKeywords: filters.excludeKeywords,
+      scope: normalizeScope(row.scope),
     };
   }
 
@@ -109,6 +134,7 @@ export class ContestReminderService {
         "role_id",
         "include_keywords",
         "exclude_keywords",
+        "scope",
       ])
       .orderBy("created_at");
     if (guildId) {
@@ -122,6 +148,7 @@ export class ContestReminderService {
       minutesBefore: row.minutes_before,
       roleId: row.role_id ?? null,
       ...parseKeywordFilters(row.include_keywords, row.exclude_keywords),
+      scope: normalizeScope(row.scope),
     }));
   }
 
@@ -139,7 +166,8 @@ export class ContestReminderService {
     minutesBefore: number,
     roleId: string | null,
     includeKeywords: string[],
-    excludeKeywords: string[]
+    excludeKeywords: string[],
+    scope: ContestScopeFilter
   ): Promise<ContestReminder> {
     const id = randomUUID();
     const timestamp = new Date().toISOString();
@@ -153,6 +181,7 @@ export class ContestReminderService {
         role_id: roleId,
         include_keywords: serializeKeywords(includeKeywords),
         exclude_keywords: serializeKeywords(excludeKeywords),
+        scope,
         created_at: timestamp,
         updated_at: timestamp,
       })
@@ -165,6 +194,7 @@ export class ContestReminderService {
       roleId,
       includeKeywords,
       excludeKeywords,
+      scope,
     };
   }
 
@@ -221,7 +251,14 @@ export class ContestReminderService {
 
     let isStale = false;
     try {
-      await this.contests.refresh();
+      if (subscription.scope === "all") {
+        await Promise.all([
+          this.contests.refresh(false, "official"),
+          this.contests.refresh(false, "gym"),
+        ]);
+      } else {
+        await this.contests.refresh(false, subscription.scope);
+      }
     } catch (error) {
       isStale = true;
       const message = error instanceof Error ? error.message : String(error);
@@ -229,7 +266,7 @@ export class ContestReminderService {
       logWarn("Contest reminder refresh failed; using cached contests.", { error: message });
     }
 
-    const upcoming = this.contests.getUpcomingContests();
+    const upcoming = this.contests.getUpcomingContests(subscription.scope);
     const filtered = filterContestsByKeywords(upcoming, {
       includeKeywords: subscription.includeKeywords,
       excludeKeywords: subscription.excludeKeywords,
@@ -269,6 +306,7 @@ export class ContestReminderService {
         channelId: subscription.channelId,
         contestId: contest.id,
         minutesBefore: subscription.minutesBefore,
+        scope: subscription.scope,
         isStale,
       });
       return {
@@ -287,6 +325,7 @@ export class ContestReminderService {
         subscriptionId: subscription.id,
         channelId: subscription.channelId,
         contestId: contest.id,
+        scope: subscription.scope,
         error: message,
       });
       return { status: "error", message };
@@ -316,7 +355,20 @@ export class ContestReminderService {
 
       let refreshFailed = false;
       try {
-        await this.contests.refresh();
+        const refreshScopes = getRefreshScopes(subscriptions);
+        const results = await Promise.allSettled(
+          refreshScopes.map((scope) => this.contests.refresh(false, scope))
+        );
+        const rejected = results.filter(
+          (result): result is PromiseRejectedResult => result.status === "rejected"
+        );
+        if (rejected.length > 0) {
+          refreshFailed = true;
+          const reason = rejected[0]?.reason;
+          const message = reason instanceof Error ? reason.message : String(reason);
+          this.lastError = { message, timestamp: new Date().toISOString() };
+          logWarn("Contest reminder refresh failed; using cached contests.", { error: message });
+        }
       } catch (error) {
         refreshFailed = true;
         const message = error instanceof Error ? error.message : String(error);
@@ -324,8 +376,23 @@ export class ContestReminderService {
         logWarn("Contest reminder refresh failed; using cached contests.", { error: message });
       }
 
-      const upcoming = this.contests.getUpcomingContests();
-      if (upcoming.length === 0) {
+      const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
+      const requestedScopes = new Set(subscriptions.map((subscription) => subscription.scope));
+      if (requestedScopes.has("official")) {
+        upcomingByScope.set("official", this.contests.getUpcomingContests("official"));
+      }
+      if (requestedScopes.has("gym")) {
+        upcomingByScope.set("gym", this.contests.getUpcomingContests("gym"));
+      }
+      if (requestedScopes.has("all")) {
+        upcomingByScope.set("all", this.contests.getUpcomingContests("all"));
+      }
+
+      const totalUpcoming = Array.from(upcomingByScope.values()).reduce(
+        (count, entries) => count + entries.length,
+        0
+      );
+      if (totalUpcoming === 0) {
         if (refreshFailed) {
           logWarn("Contest reminders skipped: no cached contests available.");
         }
@@ -357,7 +424,8 @@ export class ContestReminderService {
         }
 
         const textChannel = channel;
-        const filtered = filterContestsByKeywords(upcoming, {
+        const scopedUpcoming = upcomingByScope.get(subscription.scope) ?? [];
+        const filtered = filterContestsByKeywords(scopedUpcoming, {
           includeKeywords: subscription.includeKeywords,
           excludeKeywords: subscription.excludeKeywords,
         });
@@ -383,6 +451,7 @@ export class ContestReminderService {
               channelId: subscription.channelId,
               contestId: contest.id,
               minutesBefore: subscription.minutesBefore,
+              scope: subscription.scope,
             });
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -390,6 +459,7 @@ export class ContestReminderService {
               guildId: subscription.guildId,
               channelId: subscription.channelId,
               contestId: contest.id,
+              scope: subscription.scope,
               error: message,
             });
           }

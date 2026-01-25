@@ -46,6 +46,22 @@ describe("ContestActivityService", () => {
 
     const nowSeconds = Math.floor(Date.now() / 1000);
     await db
+      .insertInto("cf_cache")
+      .values([
+        {
+          key: "contest_list",
+          payload: JSON.stringify([{ id: 1000, isGym: false }]),
+          last_fetched: new Date().toISOString(),
+        },
+        {
+          key: "contest_list_gym",
+          payload: JSON.stringify([{ id: 1001, isGym: true }]),
+          last_fetched: new Date().toISOString(),
+        },
+      ])
+      .execute();
+
+    await db
       .insertInto("cf_rating_changes")
       .values([
         {
@@ -72,6 +88,8 @@ describe("ContestActivityService", () => {
 
     expect(activity.contestCount).toBe(2);
     expect(activity.participantCount).toBe(2);
+    expect(activity.byScope.official.contestCount).toBe(1);
+    expect(activity.byScope.gym.contestCount).toBe(1);
     expect(activity.participants[0]?.handle).toBe("Alice");
     expect(activity.participants[0]?.contestCount).toBe(2);
     expect(activity.recentContests.length).toBeGreaterThan(0);
@@ -88,6 +106,8 @@ describe("ContestActivityService", () => {
     const activity = await service.getGuildContestActivity("guild-1");
     expect(activity.contestCount).toBe(0);
     expect(activity.participantCount).toBe(0);
+    expect(activity.byScope.official.contestCount).toBe(0);
+    expect(activity.byScope.gym.contestCount).toBe(0);
     expect(activity.participants).toEqual([]);
 
     await db.destroy();
@@ -123,6 +143,22 @@ describe("ContestActivityService", () => {
 
     const nowSeconds = Math.floor(Date.now() / 1000);
     await db
+      .insertInto("cf_cache")
+      .values([
+        {
+          key: "contest_list",
+          payload: JSON.stringify([{ id: 999, isGym: false }]),
+          last_fetched: new Date().toISOString(),
+        },
+        {
+          key: "contest_list_gym",
+          payload: JSON.stringify([{ id: 998, isGym: true }]),
+          last_fetched: new Date().toISOString(),
+        },
+      ])
+      .execute();
+
+    await db
       .insertInto("cf_rating_changes")
       .values([
         {
@@ -139,6 +175,8 @@ describe("ContestActivityService", () => {
     const activity = await service.getGlobalContestActivity(["guild-1", "guild-2"], 90);
     expect(activity.contestCount).toBe(2);
     expect(activity.participantCount).toBe(2);
+    expect(activity.byScope.official.contestCount).toBe(1);
+    expect(activity.byScope.gym.contestCount).toBe(1);
     expect(activity.lastContestAt).not.toBeNull();
 
     await db.destroy();

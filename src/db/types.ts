@@ -92,6 +92,7 @@ export type ContestRemindersTable = {
   role_id: string | null;
   include_keywords: string | null;
   exclude_keywords: string | null;
+  scope: string;
   created_at: Generated<string>;
   updated_at: Generated<string>;
 };

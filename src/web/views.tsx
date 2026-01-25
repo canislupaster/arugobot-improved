@@ -39,7 +39,12 @@ type ContestActivityView = {
     contestId: number;
     contestName: string;
     ratingUpdateTimeSeconds: number;
+    scope: "official" | "gym";
   }>;
+  byScope: {
+    official: { contestCount: number; participantCount: number; lastContestAt: number | null };
+    gym: { contestCount: number; participantCount: number; lastContestAt: number | null };
+  };
 };
 
 type GuildView = {
@@ -300,16 +305,28 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
           value={formatTimestamp(model.global.lastTournamentAt)}
         />
         <StatCard
-          label={`Contests (last ${model.global.contestActivity.lookbackDays}d)`}
-          value={formatNumber(model.global.contestActivity.contestCount)}
+          label={`Official contests (last ${model.global.contestActivity.lookbackDays}d)`}
+          value={formatNumber(model.global.contestActivity.byScope.official.contestCount)}
         />
         <StatCard
-          label="Contest participants"
-          value={formatNumber(model.global.contestActivity.participantCount)}
+          label="Official participants"
+          value={formatNumber(model.global.contestActivity.byScope.official.participantCount)}
         />
         <StatCard
-          label="Last contest update"
-          value={formatUnixTimestamp(model.global.contestActivity.lastContestAt)}
+          label="Last official contest update"
+          value={formatUnixTimestamp(model.global.contestActivity.byScope.official.lastContestAt)}
+        />
+        <StatCard
+          label={`Gym contests (last ${model.global.contestActivity.lookbackDays}d)`}
+          value={formatNumber(model.global.contestActivity.byScope.gym.contestCount)}
+        />
+        <StatCard
+          label="Gym participants"
+          value={formatNumber(model.global.contestActivity.byScope.gym.participantCount)}
+        />
+        <StatCard
+          label="Last gym contest update"
+          value={formatUnixTimestamp(model.global.contestActivity.byScope.gym.lastContestAt)}
         />
       </section>
 
@@ -379,7 +396,6 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
 
 export function renderGuildPage(model: GuildViewModel): ViewResult {
   const guild = model.guild;
-  const latestContest = guild.contestActivity.recentContests[0];
   return (
     <Layout
       title={`ArugoBot | ${guild.name}`}
@@ -518,20 +534,44 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
         <div class="card">
           <SectionHeader
             title="Contest activity"
-            subtitle={`Rating changes recorded in the last ${guild.contestActivity.lookbackDays} days.`}
+            subtitle={`Rating changes recorded in the last ${guild.contestActivity.lookbackDays} days, split by scope.`}
           />
           <div class="metrics">
             <div>
-              <div class="label">Contests</div>
-              <div class="value">{formatNumber(guild.contestActivity.contestCount)}</div>
+              <div class="label">Official contests</div>
+              <div class="value">
+                {formatNumber(guild.contestActivity.byScope.official.contestCount)}
+              </div>
             </div>
             <div>
-              <div class="label">Participants</div>
-              <div class="value">{formatNumber(guild.contestActivity.participantCount)}</div>
+              <div class="label">Official participants</div>
+              <div class="value">
+                {formatNumber(guild.contestActivity.byScope.official.participantCount)}
+              </div>
             </div>
             <div>
-              <div class="label">Last contest</div>
-              <div class="value">{formatUnixTimestamp(latestContest?.ratingUpdateTimeSeconds)}</div>
+              <div class="label">Last official contest</div>
+              <div class="value">
+                {formatUnixTimestamp(guild.contestActivity.byScope.official.lastContestAt)}
+              </div>
+            </div>
+            <div>
+              <div class="label">Gym contests</div>
+              <div class="value">
+                {formatNumber(guild.contestActivity.byScope.gym.contestCount)}
+              </div>
+            </div>
+            <div>
+              <div class="label">Gym participants</div>
+              <div class="value">
+                {formatNumber(guild.contestActivity.byScope.gym.participantCount)}
+              </div>
+            </div>
+            <div>
+              <div class="label">Last gym contest</div>
+              <div class="value">
+                {formatUnixTimestamp(guild.contestActivity.byScope.gym.lastContestAt)}
+              </div>
             </div>
           </div>
           <div class="subheader">Recent contests</div>
@@ -542,7 +582,15 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
               guild.contestActivity.recentContests.map((contest) => (
                 <li>
                   <div>
-                    <div>{contest.contestName}</div>
+                    <div>
+                      {contest.contestName}
+                      {contest.scope === "gym" ? (
+                        <>
+                          {" "}
+                          <span class="tag">Gym</span>
+                        </>
+                      ) : null}
+                    </div>
                     <div class="muted">#{contest.contestId}</div>
                   </div>
                   <span class="pill">{formatUnixTimestamp(contest.ratingUpdateTimeSeconds)}</span>

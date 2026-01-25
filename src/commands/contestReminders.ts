@@ -1,5 +1,6 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
+import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   filterContestsByKeywords,
@@ -17,6 +18,18 @@ import type { Command } from "./types.js";
 const DEFAULT_MINUTES = 30;
 const MIN_MINUTES = 5;
 const MAX_MINUTES = 24 * 60;
+const DEFAULT_SCOPE: ContestScopeFilter = "official";
+
+function normalizeScope(raw: string | null): ContestScopeFilter {
+  if (raw === "official" || raw === "gym" || raw === "all") {
+    return raw;
+  }
+  return DEFAULT_SCOPE;
+}
+
+function formatScope(scope: ContestScopeFilter): string {
+  return scope === "official" ? "Official" : scope === "gym" ? "Gym" : "All";
+}
 
 function formatKeywordList(keywords: string[]): string {
   return keywords.length > 0 ? keywords.join(", ") : "None";
@@ -29,13 +42,14 @@ function formatSubscriptionSummary(subscription: {
   roleId: string | null;
   includeKeywords: string[];
   excludeKeywords: string[];
+  scope: ContestScopeFilter;
 }): string {
   const include = formatKeywordList(subscription.includeKeywords);
   const exclude = formatKeywordList(subscription.excludeKeywords);
   const role = subscription.roleId ? `<@&${subscription.roleId}>` : "None";
   return `Channel: <#${subscription.channelId}>\nLead time: ${
     subscription.minutesBefore
-  } minutes\nRole: ${role}\nInclude: ${include}\nExclude: ${exclude}\nID: \`${subscription.id}\``;
+  } minutes\nScope: ${formatScope(subscription.scope)}\nRole: ${role}\nInclude: ${include}\nExclude: ${exclude}\nID: \`${subscription.id}\``;
 }
 
 function resolveSubscriptionId(
@@ -92,6 +106,16 @@ export const contestRemindersCommand: Command = {
             .setName("exclude")
             .setDescription("Skip contests matching keywords (comma-separated)")
         )
+        .addStringOption((option) =>
+          option
+            .setName("scope")
+            .setDescription("Which contests to include")
+            .addChoices(
+              { name: "Official", value: "official" },
+              { name: "Gym", value: "gym" },
+              { name: "All", value: "all" }
+            )
+        )
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -123,6 +147,16 @@ export const contestRemindersCommand: Command = {
           option
             .setName("exclude")
             .setDescription("Skip contests matching keywords (comma-separated)")
+        )
+        .addStringOption((option) =>
+          option
+            .setName("scope")
+            .setDescription("Which contests to include")
+            .addChoices(
+              { name: "Official", value: "official" },
+              { name: "Gym", value: "gym" },
+              { name: "All", value: "all" }
+            )
         )
     )
     .addSubcommand((subcommand) =>
@@ -161,6 +195,16 @@ export const contestRemindersCommand: Command = {
             .setDescription(`Minutes before start to notify (${MIN_MINUTES}-${MAX_MINUTES})`)
             .setMinValue(MIN_MINUTES)
             .setMaxValue(MAX_MINUTES)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("scope")
+            .setDescription("Which contests to include")
+            .addChoices(
+              { name: "Official", value: "official" },
+              { name: "Gym", value: "gym" },
+              { name: "All", value: "all" }
+            )
         )
     )
     .addSubcommand((subcommand) =>
@@ -261,6 +305,7 @@ export const contestRemindersCommand: Command = {
         const includeRaw = interaction.options.getString("include");
         const excludeRaw = interaction.options.getString("exclude");
         const filters = parseKeywordFilters(includeRaw, excludeRaw);
+        const scope = normalizeScope(interaction.options.getString("scope"));
 
         const subscription = await context.services.contestReminders.createSubscription(
           guildId,
@@ -268,7 +313,8 @@ export const contestRemindersCommand: Command = {
           minutesBefore,
           roleId,
           filters.includeKeywords,
-          filters.excludeKeywords
+          filters.excludeKeywords,
+          scope
         );
         const filterLabel =
           filters.includeKeywords.length > 0 || filters.excludeKeywords.length > 0
@@ -278,7 +324,9 @@ export const contestRemindersCommand: Command = {
             : "";
         const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
         await interaction.reply({
-          content: `Contest reminders enabled in <#${channel.id}> (${minutesBefore} minutes before)${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
+          content: `Contest reminders enabled in <#${channel.id}> (${minutesBefore} minutes before, ${formatScope(
+            scope
+          )})${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
           ...ephemeralFlags,
         });
         return;
@@ -301,13 +349,15 @@ export const contestRemindersCommand: Command = {
         const minutesBefore = interaction.options.getInteger("minutes_before") ?? DEFAULT_MINUTES;
         const role = interaction.options.getRole("role");
         const roleId = role?.id ?? null;
+        const scope = normalizeScope(interaction.options.getString("scope"));
         const subscription = await context.services.contestReminders.createSubscription(
           guildId,
           channel.id,
           minutesBefore,
           roleId,
           preset.includeKeywords,
-          preset.excludeKeywords
+          preset.excludeKeywords,
+          scope
         );
         const filterLabel =
           preset.includeKeywords.length > 0 || preset.excludeKeywords.length > 0
@@ -317,7 +367,9 @@ export const contestRemindersCommand: Command = {
             : "";
         const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
         await interaction.reply({
-          content: `Contest reminder preset "${preset.label}" enabled in <#${channel.id}> (${minutesBefore} minutes before)${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
+          content: `Contest reminder preset "${preset.label}" enabled in <#${channel.id}> (${minutesBefore} minutes before, ${formatScope(
+            scope
+          )})${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
           ...ephemeralFlags,
         });
         return;
@@ -404,9 +456,23 @@ export const contestRemindersCommand: Command = {
 
         let stale = false;
         try {
-          await context.services.contests.refresh();
+          if (subscription.scope === "all") {
+            const results = await Promise.allSettled([
+              context.services.contests.refresh(false, "official"),
+              context.services.contests.refresh(false, "gym"),
+            ]);
+            if (results.some((result) => result.status === "rejected")) {
+              stale = true;
+            }
+          } else {
+            await context.services.contests.refresh(false, subscription.scope);
+          }
         } catch {
-          if (context.services.contests.getLastRefreshAt() > 0) {
+          const lastRefresh =
+            subscription.scope === "all"
+              ? context.services.contests.getLastRefreshAt("all")
+              : context.services.contests.getLastRefreshAt(subscription.scope);
+          if (lastRefresh > 0) {
             stale = true;
           } else {
             await interaction.reply({
@@ -417,7 +483,7 @@ export const contestRemindersCommand: Command = {
           }
         }
 
-        const upcoming = context.services.contests.getUpcoming(10);
+        const upcoming = context.services.contests.getUpcoming(10, subscription.scope);
         const filtered = filterContestsByKeywords(upcoming, {
           includeKeywords: subscription.includeKeywords,
           excludeKeywords: subscription.excludeKeywords,
@@ -446,6 +512,7 @@ export const contestRemindersCommand: Command = {
               value: `${subscription.minutesBefore} minutes`,
               inline: true,
             },
+            { name: "Scope", value: formatScope(subscription.scope), inline: true },
             {
               name: "Contest start",
               value: `${formatDiscordTimestamp(contest.startTimeSeconds)} (${formatDiscordRelativeTime(

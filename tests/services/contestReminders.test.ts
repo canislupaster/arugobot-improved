@@ -62,7 +62,8 @@ describe("ContestReminderService", () => {
       15,
       "role-1",
       [],
-      []
+      [],
+      "official"
     );
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
@@ -96,7 +97,15 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    const subscription = await service.createSubscription("guild-1", "channel-1", 10, null, [], []);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      10,
+      null,
+      [],
+      [],
+      "official"
+    );
 
     await db
       .insertInto("contest_notifications")
@@ -141,7 +150,8 @@ describe("ContestReminderService", () => {
       10,
       null,
       ["div. 2"],
-      ["kotlin"]
+      ["kotlin"],
+      "official"
     );
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
@@ -152,6 +162,54 @@ describe("ContestReminderService", () => {
     const notifications = await db.selectFrom("contest_notifications").selectAll().execute();
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.contest_id).toBe(401);
+    expect(notifications[0]?.subscription_id).toBe(subscription.id);
+  });
+
+  it("scopes reminders to gym contests", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.getUpcomingContests.mockImplementation((scope) => {
+      if (scope === "gym") {
+        return [
+          {
+            id: 501,
+            name: "Gym Round",
+            phase: "BEFORE",
+            startTimeSeconds: nowSeconds + 10 * 60,
+            durationSeconds: 7200,
+          },
+        ];
+      }
+      return [
+        {
+          id: 502,
+          name: "Official Round",
+          phase: "BEFORE",
+          startTimeSeconds: nowSeconds + 10 * 60,
+          durationSeconds: 7200,
+        },
+      ];
+    });
+
+    const service = new ContestReminderService(db, contestService);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      15,
+      null,
+      [],
+      [],
+      "gym"
+    );
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "gym");
+    expect(send).toHaveBeenCalledTimes(1);
+    const notifications = await db.selectFrom("contest_notifications").selectAll().execute();
+    expect(notifications[0]?.contest_id).toBe(501);
     expect(notifications[0]?.subscription_id).toBe(subscription.id);
   });
 
@@ -171,7 +229,7 @@ describe("ContestReminderService", () => {
     contestService.getUpcomingContests.mockReturnValue([]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.createSubscription("guild-1", "channel-1", 10, null, [], []);
+    await service.createSubscription("guild-1", "channel-1", 10, null, [], [], "official");
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -196,7 +254,7 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.createSubscription("guild-1", "channel-1", 15, null, [], []);
+    await service.createSubscription("guild-1", "channel-1", 15, null, [], [], "official");
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -217,7 +275,7 @@ describe("ContestReminderService", () => {
     contestService.getUpcomingContests.mockReturnValue([]);
 
     const service = new ContestReminderService(db, contestService);
-    await service.createSubscription("guild-1", "channel-1", 10, null, [], []);
+    await service.createSubscription("guild-1", "channel-1", 10, null, [], [], "official");
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -245,7 +303,15 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    const subscription = await service.createSubscription("guild-1", "channel-1", 30, null, [], []);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      30,
+      null,
+      [],
+      [],
+      "official"
+    );
     const send = jest.fn().mockResolvedValue(undefined);
     const client = createMockClient(send);
 
@@ -273,7 +339,15 @@ describe("ContestReminderService", () => {
     ]);
 
     const service = new ContestReminderService(db, contestService);
-    const subscription = await service.createSubscription("guild-1", "channel-1", 30, null, [], []);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      30,
+      null,
+      [],
+      [],
+      "official"
+    );
 
     await db
       .insertInto("contest_notifications")

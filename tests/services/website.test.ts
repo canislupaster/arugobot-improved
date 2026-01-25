@@ -293,6 +293,8 @@ describe("WebsiteService", () => {
     expect(overview.contestActivity.contestCount).toBe(0);
     expect(overview.contestActivity.participantCount).toBe(0);
     expect(overview.contestActivity.lastContestAt).toBeNull();
+    expect(overview.contestActivity.byScope.official.contestCount).toBe(0);
+    expect(overview.contestActivity.byScope.gym.contestCount).toBe(0);
   });
 
   it("lists guild summaries", async () => {
@@ -330,6 +332,14 @@ describe("WebsiteService", () => {
   it("summarizes recent contest activity from cached rating changes", async () => {
     const nowSeconds = Math.floor(Date.now() / 1000);
     await db
+      .insertInto("cf_cache")
+      .values({
+        key: "contest_list",
+        payload: JSON.stringify([{ id: 101, isGym: false }]),
+        last_fetched: new Date().toISOString(),
+      })
+      .execute();
+    await db
       .insertInto("cf_rating_changes")
       .values({
         handle: "alice",
@@ -351,10 +361,26 @@ describe("WebsiteService", () => {
     expect(overview?.contestActivity.contestCount).toBe(1);
     expect(overview?.contestActivity.participantCount).toBe(1);
     expect(overview?.contestActivity.recentContests[0]?.contestName).toBe("Codeforces Round 101");
+    expect(overview?.contestActivity.byScope.official.contestCount).toBe(1);
   });
 
   it("summarizes global contest activity for public guilds", async () => {
     const nowSeconds = Math.floor(Date.now() / 1000);
+    await db
+      .insertInto("cf_cache")
+      .values([
+        {
+          key: "contest_list",
+          payload: JSON.stringify([{ id: 111, isGym: false }]),
+          last_fetched: new Date().toISOString(),
+        },
+        {
+          key: "contest_list_gym",
+          payload: JSON.stringify([{ id: 222, isGym: true }]),
+          last_fetched: new Date().toISOString(),
+        },
+      ])
+      .execute();
     await db
       .insertInto("cf_rating_changes")
       .values([
@@ -393,6 +419,8 @@ describe("WebsiteService", () => {
     expect(overview.contestActivity.contestCount).toBe(2);
     expect(overview.contestActivity.participantCount).toBe(2);
     expect(overview.contestActivity.lastContestAt).toBe(nowSeconds - 200);
+    expect(overview.contestActivity.byScope.official.contestCount).toBe(1);
+    expect(overview.contestActivity.byScope.gym.contestCount).toBe(1);
   });
 
   it("returns null for unknown guilds", async () => {

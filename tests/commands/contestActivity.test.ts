@@ -30,8 +30,13 @@ describe("contestActivityCommand", () => {
                 contestId: 1000,
                 contestName: "Contest A",
                 ratingUpdateTimeSeconds: Math.floor(Date.now() / 1000),
+                scope: "official",
               },
             ],
+            byScope: {
+              official: { contestCount: 2, participantCount: 2, lastContestAt: 1 },
+              gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
+            },
             participants: [
               { userId: "user-1", handle: "Alice", contestCount: 2, lastContestAt: 1 },
               { userId: "user-2", handle: "Bob", contestCount: 1, lastContestAt: 2 },
@@ -62,6 +67,10 @@ describe("contestActivityCommand", () => {
             contestCount: 0,
             participantCount: 0,
             recentContests: [],
+            byScope: {
+              official: { contestCount: 0, participantCount: 0, lastContestAt: null },
+              gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
+            },
             participants: [],
           }),
         },

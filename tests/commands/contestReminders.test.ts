@@ -61,7 +61,11 @@ describe("contestRemindersCommand", () => {
         getChannel: jest.fn().mockReturnValue(channel),
         getInteger: jest.fn().mockReturnValue(null),
         getRole: jest.fn().mockReturnValue({ id: "role-1" }),
-        getString: jest.fn().mockReturnValueOnce("div. 2").mockReturnValueOnce("kotlin"),
+        getString: jest
+          .fn()
+          .mockReturnValueOnce("div. 2")
+          .mockReturnValueOnce("kotlin")
+          .mockReturnValueOnce(null),
       },
     });
     const context = {
@@ -76,6 +80,7 @@ describe("contestRemindersCommand", () => {
             roleId: "role-1",
             includeKeywords: ["div. 2"],
             excludeKeywords: ["kotlin"],
+            scope: "official",
           }),
         },
       },
@@ -89,11 +94,12 @@ describe("contestRemindersCommand", () => {
       30,
       "role-1",
       ["div. 2"],
-      ["kotlin"]
+      ["kotlin"],
+      "official"
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
-        "Contest reminders enabled in <#channel-1> (30 minutes before) (mentioning <@&role-1>) (include: div. 2, exclude: kotlin). Subscription id: `sub-1`.",
+        "Contest reminders enabled in <#channel-1> (30 minutes before, Official) (mentioning <@&role-1>) (include: div. 2, exclude: kotlin). Subscription id: `sub-1`.",
       ...publicFlags,
     });
   });
@@ -134,7 +140,7 @@ describe("contestRemindersCommand", () => {
         getChannel: jest.fn().mockReturnValue(channel),
         getInteger: jest.fn().mockReturnValue(45),
         getRole: jest.fn().mockReturnValue(null),
-        getString: jest.fn().mockReturnValue("div2"),
+        getString: jest.fn().mockReturnValueOnce("div2").mockReturnValueOnce(null),
       },
     });
     const context = {
@@ -149,6 +155,7 @@ describe("contestRemindersCommand", () => {
             roleId: null,
             includeKeywords: ["div. 2", "div.2", "div 2"],
             excludeKeywords: [],
+            scope: "official",
           }),
         },
       },
@@ -162,11 +169,12 @@ describe("contestRemindersCommand", () => {
       45,
       null,
       ["div. 2", "div.2", "div 2"],
-      []
+      [],
+      "official"
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
-        'Contest reminder preset "Div 2" enabled in <#channel-2> (45 minutes before) (include: div. 2, div.2, div 2, exclude: none). Subscription id: `sub-10`.',
+        'Contest reminder preset "Div 2" enabled in <#channel-2> (45 minutes before, Official) (include: div. 2, div.2, div 2, exclude: none). Subscription id: `sub-10`.',
       ...publicFlags,
     });
   });
@@ -191,6 +199,7 @@ describe("contestRemindersCommand", () => {
               roleId: null,
               includeKeywords: [],
               excludeKeywords: [],
+              scope: "official",
             },
           ]),
           removeSubscription: jest.fn().mockResolvedValue(true),
@@ -228,6 +237,7 @@ describe("contestRemindersCommand", () => {
               roleId: null,
               includeKeywords: [],
               excludeKeywords: [],
+              scope: "official",
             },
           ]),
         },
@@ -307,6 +317,7 @@ describe("contestRemindersCommand", () => {
               roleId: null,
               includeKeywords: [],
               excludeKeywords: [],
+              scope: "official",
             },
           ]),
           sendManualReminder: jest.fn().mockResolvedValue({
