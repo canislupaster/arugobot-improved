@@ -62,13 +62,9 @@ export class ProblemService {
     }
     try {
       const result = await this.client.request<ProblemsetResponse>("problemset.problems");
-      const filtered = result.problems.filter(
-        (problem) => problem.rating !== undefined && !problem.tags.includes("*special")
-      );
+      const filtered = filterProblems(result.problems);
       this.problems = filtered;
-      this.problemDict = new Map(
-        filtered.map((problem) => [`${problem.contestId}${problem.index}`, problem])
-      );
+      this.problemDict = buildProblemDict(filtered);
       this.lastRefresh = now;
       this.lastError = null;
       await this.cache.set("problemset", filtered);
@@ -86,19 +82,25 @@ export class ProblemService {
     if (!cached || !Array.isArray(cached.value)) {
       return false;
     }
-    const filtered = cached.value.filter(
-      (problem) => problem.rating !== undefined && !problem.tags.includes("*special")
-    );
+    const filtered = filterProblems(cached.value);
     if (filtered.length === 0) {
       return false;
     }
     this.problems = filtered;
-    this.problemDict = new Map(
-      filtered.map((problem) => [`${problem.contestId}${problem.index}`, problem])
-    );
+    this.problemDict = buildProblemDict(filtered);
     const timestamp = Date.parse(cached.lastFetched);
     this.lastRefresh = Number.isFinite(timestamp) ? timestamp : 0;
     logInfo(`Loaded ${filtered.length} problems from cache.`);
     return true;
   }
+}
+
+function filterProblems(problems: Problem[]): Problem[] {
+  return problems.filter(
+    (problem) => problem.rating !== undefined && !problem.tags.includes("*special")
+  );
+}
+
+function buildProblemDict(problems: Problem[]): Map<string, Problem> {
+  return new Map(problems.map((problem) => [`${problem.contestId}${problem.index}`, problem]));
 }
