@@ -39,6 +39,10 @@ export async function startWebServer(
   const app = createWebApp(deps);
   const maxAttempts = config.port === 0 ? 1 : 3;
   const retryDelayMs = 500;
+  const portsToTry =
+    config.port === 0
+      ? [0]
+      : Array.from({ length: maxAttempts }, (_, index) => config.port + index);
 
   const updateFailure = (port: number, err: NodeJS.ErrnoException) => {
     const message = formatWebServerErrorMessage(config.host, port, err);
@@ -55,93 +59,92 @@ export async function startWebServer(
     }
   };
 
-  const tryListen = async (port: number, attempts: number): Promise<ListenResult> => {
-    let lastError: NodeJS.ErrnoException | null = null;
-    for (let attempt = 1; attempt <= attempts; attempt += 1) {
-      const { server, actualPort, error } = await new Promise<{
+  const listenOnce = async (port: number): Promise<ListenResult> => {
+    const { server, actualPort, error } = await new Promise<{
+      server: ServerType | null;
+      actualPort: number | null;
+      error: NodeJS.ErrnoException | null;
+    }>((resolve) => {
+      const server = createAdaptorServer({
+        fetch: app.fetch,
+        hostname: config.host,
+      });
+      let resolved = false;
+      const finalize = (value: {
         server: ServerType | null;
         actualPort: number | null;
         error: NodeJS.ErrnoException | null;
-      }>((resolve) => {
-        const server = createAdaptorServer({
-          fetch: app.fetch,
-          hostname: config.host,
-        });
-        let resolved = false;
-        const finalize = (value: {
-          server: ServerType | null;
-          actualPort: number | null;
-          error: NodeJS.ErrnoException | null;
-        }) => {
-          if (resolved) {
-            return;
-          }
-          resolved = true;
-          resolve(value);
-        };
-
-        const handleListenError = (error: NodeJS.ErrnoException) => {
-          logError("Web server error.", {
-            host: config.host,
-            port,
-            code: error.code ?? "unknown",
-            message: formatWebServerErrorMessage(config.host, port, error),
-          });
-          finalize({ server: null, actualPort: null, error });
-        };
-
-        server.on("error", (error) => {
-          handleListenError(error as NodeJS.ErrnoException);
-        });
-
-        try {
-          server.listen(port, config.host, () => {
-            const address = server.address();
-            const actualPort =
-              typeof address === "object" && address ? Number(address.port) : port;
-            logInfo("Web server started.", { host: config.host, port: actualPort });
-            finalize({ server, actualPort, error: null });
-          });
-        } catch (error) {
-          handleListenError(error as NodeJS.ErrnoException);
+      }) => {
+        if (resolved) {
+          return;
         }
-      });
+        resolved = true;
+        resolve(value);
+      };
 
-      if (server) {
-        return { server, actualPort, error: null, port };
-      }
-
-      if (error && error.code === "EADDRINUSE" && attempt < attempts) {
-        logWarn("Web server port already in use; retrying.", {
+      const handleListenError = (error: NodeJS.ErrnoException) => {
+        logError("Web server error.", {
           host: config.host,
           port,
-          attempt,
-          remainingAttempts: attempts - attempt,
+          code: error.code ?? "unknown",
+          message: formatWebServerErrorMessage(config.host, port, error),
+        });
+        finalize({ server: null, actualPort: null, error });
+      };
+
+      server.on("error", (error) => {
+        handleListenError(error as NodeJS.ErrnoException);
+      });
+
+      try {
+        server.listen(port, config.host, () => {
+          const address = server.address();
+          const actualPort = typeof address === "object" && address ? Number(address.port) : port;
+          logInfo("Web server started.", { host: config.host, port: actualPort });
+          finalize({ server, actualPort, error: null });
+        });
+      } catch (error) {
+        handleListenError(error as NodeJS.ErrnoException);
+      }
+    });
+
+    return { server, actualPort, error, port };
+  };
+
+  let lastError: NodeJS.ErrnoException | null = null;
+  let lastPort = portsToTry[0];
+  for (let index = 0; index < portsToTry.length; index += 1) {
+    const port = portsToTry[index];
+    const result = await listenOnce(port);
+    lastPort = port;
+    if (result.server) {
+      if (status) {
+        status.status = "listening";
+        status.actualPort = result.actualPort;
+        status.lastError = null;
+      }
+      return result.server;
+    }
+
+    lastError = result.error;
+    if (lastError?.code === "EADDRINUSE") {
+      if (index < portsToTry.length - 1) {
+        logWarn("Web server port already in use; trying next.", {
+          host: config.host,
+          port,
+          nextPort: portsToTry[index + 1],
         });
         await sleep(retryDelayMs);
         continue;
       }
-
-      lastError = error;
+    }
+    if (lastError) {
       break;
     }
-
-    return { server: null, actualPort: null, error: lastError, port };
-  };
-
-  const result = await tryListen(config.port, maxAttempts);
-
-  if (result.server) {
-    if (status) {
-      status.status = "listening";
-      status.actualPort = result.actualPort;
-      status.lastError = null;
-    }
-    return result.server;
   }
 
-  if (result.error) {
-    updateFailure(result.port, result.error);
+  if (lastError) {
+    updateFailure(lastPort, lastError);
   }
 
   return null;
