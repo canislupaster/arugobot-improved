@@ -20,6 +20,25 @@ const DEFAULT_RECENT_LIMIT = 5;
 const MAX_LIMIT = 10;
 const SELECT_TIMEOUT_MS = 30_000;
 
+type ChallengeProblem = {
+  contestId: number;
+  index: string;
+  name: string;
+};
+
+type ActiveChallengeSummary = {
+  channelId: string;
+  hostUserId: string;
+  endsAt: number;
+  problem: ChallengeProblem;
+};
+
+type RecentChallengeSummary = ActiveChallengeSummary & {
+  startedAt: number;
+  completedAt?: number | null;
+  participants: Array<{ userId: string; solvedAt: number | null }>;
+};
+
 function truncateLabel(value: string, maxLength: number): string {
   if (value.length <= maxLength) {
     return value;
@@ -29,6 +48,44 @@ function truncateLabel(value: string, maxLength: number): string {
 
 function buildProblemLink(contestId: number, index: string, name: string): string {
   return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
+}
+
+function formatActiveChallengeLine(
+  challenge: ActiveChallengeSummary,
+  nowSeconds: number
+): string {
+  const timeLeft = Math.max(0, challenge.endsAt - nowSeconds);
+  const link = buildProblemLink(
+    challenge.problem.contestId,
+    challenge.problem.index,
+    challenge.problem.name
+  );
+  return `- <#${challenge.channelId}> • ${link} • host <@${challenge.hostUserId}> • ${formatTime(
+    timeLeft
+  )} left`;
+}
+
+function getFirstSolveSummary(challenge: RecentChallengeSummary): string {
+  const solved = challenge.participants.filter((participant) => participant.solvedAt !== null);
+  if (solved.length === 0) {
+    return "No solves";
+  }
+
+  let firstSolvedAt = Number.POSITIVE_INFINITY;
+  let firstSolverId: string | null = null;
+  for (const participant of solved) {
+    if (participant.solvedAt !== null && participant.solvedAt < firstSolvedAt) {
+      firstSolvedAt = participant.solvedAt;
+      firstSolverId = participant.userId;
+    }
+  }
+
+  if (!firstSolverId || !Number.isFinite(firstSolvedAt)) {
+    return "No solves";
+  }
+
+  const duration = formatTime(Math.max(0, firstSolvedAt - challenge.startedAt));
+  return `<@${firstSolverId}> in ${duration}`;
 }
 
 export const challengesCommand: Command = {
@@ -78,7 +135,8 @@ export const challengesCommand: Command = {
 
     try {
       if (subcommand === "list") {
-        const challenges = await context.services.challenges.listActiveChallenges(guildId);
+        const challenges =
+          await context.services.challenges.listActiveChallenges(guildId);
         if (challenges.length === 0) {
           await interaction.reply({
             content: "No active challenges right now.",
@@ -88,17 +146,9 @@ export const challengesCommand: Command = {
 
         const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
         const nowSeconds = Math.floor(Date.now() / 1000);
-        const lines = challenges.slice(0, limit).map((challenge) => {
-          const timeLeft = Math.max(0, challenge.endsAt - nowSeconds);
-          const link = buildProblemLink(
-            challenge.problem.contestId,
-            challenge.problem.index,
-            challenge.problem.name
-          );
-          return `- <#${challenge.channelId}> • ${link} • host <@${challenge.hostUserId}> • ${formatTime(
-            timeLeft
-          )} left`;
-        });
+        const lines = challenges
+          .slice(0, limit)
+          .map((challenge) => formatActiveChallengeLine(challenge, nowSeconds));
 
         const embed = new EmbedBuilder()
           .setTitle("Active challenges")
@@ -126,17 +176,9 @@ export const challengesCommand: Command = {
         }
 
         const nowSeconds = Math.floor(Date.now() / 1000);
-        const lines = challenges.map((challenge) => {
-          const timeLeft = Math.max(0, challenge.endsAt - nowSeconds);
-          const link = buildProblemLink(
-            challenge.problem.contestId,
-            challenge.problem.index,
-            challenge.problem.name
-          );
-          return `- <#${challenge.channelId}> • ${link} • host <@${challenge.hostUserId}> • ${formatTime(
-            timeLeft
-          )} left`;
-        });
+        const lines = challenges.map((challenge) =>
+          formatActiveChallengeLine(challenge, nowSeconds)
+        );
 
         const embed = new EmbedBuilder()
           .setTitle("Your active challenges")
@@ -167,19 +209,7 @@ export const challengesCommand: Command = {
             (participant) => participant.solvedAt !== null
           );
           const total = challenge.participants.length;
-          let firstSolve = "No solves";
-          let firstSolvedAt = Number.POSITIVE_INFINITY;
-          let firstSolverId: string | null = null;
-          for (const participant of solved) {
-            if (participant.solvedAt !== null && participant.solvedAt < firstSolvedAt) {
-              firstSolvedAt = participant.solvedAt;
-              firstSolverId = participant.userId;
-            }
-          }
-          if (firstSolverId && Number.isFinite(firstSolvedAt)) {
-            const duration = formatTime(Math.max(0, firstSolvedAt - challenge.startedAt));
-            firstSolve = `<@${firstSolverId}> in ${duration}`;
-          }
+          const firstSolve = getFirstSolveSummary(challenge);
 
           const completedAt = challenge.completedAt ?? challenge.endsAt;
           const link = buildProblemLink(
