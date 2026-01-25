@@ -18,7 +18,11 @@ export const statsCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const stats = await context.services.store.getServerStats(interaction.guild.id);
+      const [stats, activeChallenges, activeTournaments] = await Promise.all([
+        context.services.store.getServerStats(interaction.guild.id),
+        context.services.challenges.getActiveCountForServer(interaction.guild.id),
+        context.services.tournaments.getActiveCountForGuild(interaction.guild.id),
+      ]);
       if (stats.userCount === 0) {
         await interaction.editReply("No linked users yet.");
         return;
@@ -30,6 +34,8 @@ export const statsCommand: Command = {
         .addFields(
           { name: "Linked users", value: String(stats.userCount), inline: true },
           { name: "Total challenges", value: String(stats.totalChallenges), inline: true },
+          { name: "Active challenges", value: String(activeChallenges), inline: true },
+          { name: "Active tournaments", value: String(activeTournaments), inline: true },
           {
             name: "Average rating",
             value: stats.avgRating === null ? "N/A" : String(stats.avgRating),

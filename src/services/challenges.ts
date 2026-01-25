@@ -172,6 +172,16 @@ export class ChallengeService {
     return row?.count ?? 0;
   }
 
+  async getActiveCountForServer(serverId: string): Promise<number> {
+    const row = await this.db
+      .selectFrom("challenges")
+      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .where("server_id", "=", serverId)
+      .where("status", "=", "active")
+      .executeTakeFirst();
+    return row?.count ?? 0;
+  }
+
   async getActiveChallengesForUsers(
     serverId: string,
     userIds: string[]

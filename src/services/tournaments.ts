@@ -219,6 +219,16 @@ export class TournamentService implements ChallengeCompletionNotifier {
     return row?.count ?? 0;
   }
 
+  async getActiveCountForGuild(guildId: string): Promise<number> {
+    const row = await this.db
+      .selectFrom("tournaments")
+      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .where("guild_id", "=", guildId)
+      .where("status", "=", "active")
+      .executeTakeFirst();
+    return row?.count ?? 0;
+  }
+
   async getActiveTournament(guildId: string): Promise<Tournament | null> {
     const row = await this.db
       .selectFrom("tournaments")
