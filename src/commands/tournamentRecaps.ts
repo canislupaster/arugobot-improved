@@ -45,26 +45,39 @@ export const tournamentRecapsCommand: Command = {
 
     const guildId = interaction.guild.id;
     const subcommand = interaction.options.getSubcommand();
+    const noSubscriptionMessage = "No tournament recap auto-posts configured for this server.";
+    const postResponses: Record<
+      "no_subscription" | "no_completed" | "channel_missing" | "recap_missing",
+      string
+    > = {
+      no_subscription: noSubscriptionMessage,
+      no_completed: "No completed tournaments to recap.",
+      channel_missing: "Recap channel is missing; use /tournamentrecaps set to update the channel.",
+      recap_missing: "Unable to build a recap for the latest tournament.",
+    };
+
+    const buildStatusEmbed = (subscription: { channelId: string; roleId: string | null }) =>
+      new EmbedBuilder()
+        .setTitle("Tournament recap auto-posts")
+        .setColor(EMBED_COLORS.info)
+        .addFields(
+          { name: "Channel", value: `<#${subscription.channelId}>`, inline: true },
+          ...(subscription.roleId
+            ? [{ name: "Role", value: `<@&${subscription.roleId}>`, inline: true }]
+            : [])
+        );
 
     try {
       if (subcommand === "status") {
         const subscription = await context.services.tournamentRecaps.getSubscription(guildId);
         if (!subscription) {
           await interaction.reply({
-            content: "No tournament recap auto-posts configured for this server.",
+            content: noSubscriptionMessage,
           });
           return;
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle("Tournament recap auto-posts")
-          .setColor(EMBED_COLORS.info)
-          .addFields(
-            { name: "Channel", value: `<#${subscription.channelId}>`, inline: true },
-            ...(subscription.roleId
-              ? [{ name: "Role", value: `<@&${subscription.roleId}>`, inline: true }]
-              : [])
-          );
+        const embed = buildStatusEmbed(subscription);
 
         await interaction.reply({ embeds: [embed] });
         return;
@@ -107,26 +120,12 @@ export const tournamentRecapsCommand: Command = {
           guildId,
           context.client
         );
-        if (result.status === "no_subscription") {
-          await interaction.editReply("No tournament recap auto-posts configured for this server.");
-          return;
-        }
-        if (result.status === "no_completed") {
-          await interaction.editReply("No completed tournaments to recap.");
-          return;
-        }
-        if (result.status === "channel_missing") {
-          await interaction.editReply(
-            "Recap channel is missing; use /tournamentrecaps set to update the channel."
-          );
-          return;
-        }
-        if (result.status === "recap_missing") {
-          await interaction.editReply("Unable to build a recap for the latest tournament.");
-          return;
-        }
         if (result.status === "error") {
           await interaction.editReply(`Failed to post recap: ${result.message}`);
+          return;
+        }
+        if (result.status !== "sent") {
+          await interaction.editReply(postResponses[result.status]);
           return;
         }
         await interaction.editReply(`Tournament recap posted in <#${result.channelId}>.`);
