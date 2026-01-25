@@ -103,6 +103,19 @@ function parseIsoToSeconds(value: string | null | undefined): number | null {
   return Math.floor(timestamp / 1000);
 }
 
+function groupChallengeParticipants<Row extends { challenge_id: string }, Participant>(
+  rows: Row[],
+  build: (row: Row) => Participant
+): Map<string, Participant[]> {
+  const grouped = new Map<string, Participant[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.challenge_id) ?? [];
+    list.push(build(row));
+    grouped.set(row.challenge_id, list);
+  }
+  return grouped;
+}
+
 function pickNextUnsolved(
   participants: ChallengeParticipant[],
   startIndex: number
@@ -278,16 +291,11 @@ export class ChallengeService {
       )
       .execute();
 
-    const grouped = new Map<string, CompletedChallengeParticipant[]>();
-    for (const participant of participants) {
-      const list = grouped.get(participant.challenge_id) ?? [];
-      list.push({
-        userId: participant.user_id,
-        solvedAt: participant.solved_at ?? null,
-        ratingDelta: participant.rating_delta ?? null,
-      });
-      grouped.set(participant.challenge_id, list);
-    }
+    const grouped = groupChallengeParticipants(participants, (participant) => ({
+      userId: participant.user_id,
+      solvedAt: participant.solved_at ?? null,
+      ratingDelta: participant.rating_delta ?? null,
+    }));
 
     return rows.map((row) => ({
       id: row.id,
@@ -568,18 +576,13 @@ export class ChallengeService {
       )
       .execute();
 
-    const grouped = new Map<string, ChallengeParticipant[]>();
-    for (const participant of participants) {
-      const list = grouped.get(participant.challenge_id) ?? [];
-      list.push({
-        userId: participant.user_id,
-        position: participant.position,
-        solvedAt: participant.solved_at ?? null,
-        ratingBefore: participant.rating_before ?? null,
-        ratingDelta: participant.rating_delta ?? null,
-      });
-      grouped.set(participant.challenge_id, list);
-    }
+    const grouped = groupChallengeParticipants(participants, (participant) => ({
+      userId: participant.user_id,
+      position: participant.position,
+      solvedAt: participant.solved_at ?? null,
+      ratingBefore: participant.rating_before ?? null,
+      ratingDelta: participant.rating_delta ?? null,
+    }));
 
     return rows.map((row) => ({
       id: row.id,
