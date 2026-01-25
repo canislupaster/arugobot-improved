@@ -122,11 +122,22 @@ function formatTimestamp(iso: string | null): string {
   return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
 }
 
-function formatUnixTimestamp(seconds: number | null | undefined): string {
-  if (!seconds || !Number.isFinite(seconds)) {
-    return "N/A";
+function renderLocalTime(iso: string | null): ViewResult {
+  if (!iso) {
+    return <span>N/A</span>;
   }
-  return formatTimestamp(new Date(seconds * 1000).toISOString());
+  return (
+    <span class="js-local-time" data-iso={iso}>
+      {formatTimestamp(iso)}
+    </span>
+  );
+}
+
+function renderLocalTimeFromUnix(seconds: number | null | undefined): ViewResult {
+  if (!seconds || !Number.isFinite(seconds)) {
+    return <span>N/A</span>;
+  }
+  return renderLocalTime(new Date(seconds * 1000).toISOString());
 }
 
 function formatTournamentCount(tournament: TournamentSummary): string {
@@ -137,7 +148,7 @@ function formatTournamentCount(tournament: TournamentSummary): string {
   return `${formatNumber(tournament.roundCount)} rounds`;
 }
 
-function formatArenaEndsAt(tournament: TournamentSummary): string | null {
+function formatArenaEndsAt(tournament: TournamentSummary): ViewResult | null {
   if (tournament.format !== "arena") {
     return null;
   }
@@ -145,7 +156,11 @@ function formatArenaEndsAt(tournament: TournamentSummary): string | null {
     return null;
   }
   const label = tournament.status === "active" ? "Ends" : "Ended";
-  return `${label} ${formatUnixTimestamp(tournament.arenaEndsAt)}`;
+  return (
+    <>
+      {label} {renderLocalTimeFromUnix(tournament.arenaEndsAt)}
+    </>
+  );
 }
 
 function formatAgeSeconds(seconds: number | null): string {
@@ -167,7 +182,7 @@ function formatAgeSeconds(seconds: number | null): string {
   return `${hours}h ${minutes % 60}m`;
 }
 
-function StatCard(props: { label: string; value: string; hint?: string }): ViewResult {
+function StatCard(props: { label: string; value: ViewResult; hint?: string }): ViewResult {
   return (
     <div class="card stat">
       <div class="label">{props.label}</div>
@@ -231,6 +246,26 @@ function Layout(props: {
             <span>ArugoBot web console</span>
           </footer>
         </div>
+        <script>{`(() => {
+  const formatter = new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  document.querySelectorAll(".js-local-time").forEach((node) => {
+    const raw = node.getAttribute("data-iso") ?? node.textContent ?? "";
+    if (!raw) {
+      return;
+    }
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) {
+      return;
+    }
+    node.textContent = formatter.format(date);
+  });
+})();`}</script>
       </body>
     </html>
   );
@@ -247,7 +282,7 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
           <h1>Global snapshot</h1>
           <p>
             Live stats from active guilds, challenges, and tournaments. Last refresh:{" "}
-            {formatTimestamp(model.generatedAt)}
+            {renderLocalTime(model.generatedAt)}
           </p>
         </div>
         <div class="hero-glow" aria-hidden="true" />
@@ -310,51 +345,73 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
       </section>
 
       <section class="grid stats-grid">
-        <StatCard label="Guilds with linked users" value={formatNumber(model.global.guildCount)} />
-        <StatCard label="Linked users" value={formatNumber(model.global.linkedUsers)} />
-        <StatCard label="Active challenges" value={formatNumber(model.global.activeChallenges)} />
+        <StatCard
+          label="Guilds with linked users"
+          value={<span>{formatNumber(model.global.guildCount)}</span>}
+        />
+        <StatCard
+          label="Linked users"
+          value={<span>{formatNumber(model.global.linkedUsers)}</span>}
+        />
+        <StatCard
+          label="Active challenges"
+          value={<span>{formatNumber(model.global.activeChallenges)}</span>}
+        />
         <StatCard
           label="Completed challenges"
-          value={formatNumber(model.global.completedChallenges)}
+          value={<span>{formatNumber(model.global.completedChallenges)}</span>}
           hint={`Total: ${formatNumber(model.global.totalChallenges)}`}
         />
-        <StatCard label="Active tournaments" value={formatNumber(model.global.activeTournaments)} />
+        <StatCard
+          label="Active tournaments"
+          value={<span>{formatNumber(model.global.activeTournaments)}</span>}
+        />
         <StatCard
           label="Completed tournaments"
-          value={formatNumber(model.global.completedTournaments)}
+          value={<span>{formatNumber(model.global.completedTournaments)}</span>}
           hint={`Total: ${formatNumber(model.global.totalTournaments)}`}
         />
         <StatCard
           label="Last challenge activity"
-          value={formatTimestamp(model.global.lastChallengeAt)}
+          value={renderLocalTime(model.global.lastChallengeAt)}
         />
         <StatCard
           label="Last tournament activity"
-          value={formatTimestamp(model.global.lastTournamentAt)}
+          value={renderLocalTime(model.global.lastTournamentAt)}
         />
         <StatCard
           label={`Official contests (last ${model.global.contestActivity.lookbackDays}d)`}
-          value={formatNumber(model.global.contestActivity.byScope.official.contestCount)}
+          value={
+            <span>{formatNumber(model.global.contestActivity.byScope.official.contestCount)}</span>
+          }
         />
         <StatCard
           label="Official participants"
-          value={formatNumber(model.global.contestActivity.byScope.official.participantCount)}
+          value={
+            <span>
+              {formatNumber(model.global.contestActivity.byScope.official.participantCount)}
+            </span>
+          }
         />
         <StatCard
           label="Last official contest update"
-          value={formatUnixTimestamp(model.global.contestActivity.byScope.official.lastContestAt)}
+          value={renderLocalTimeFromUnix(
+            model.global.contestActivity.byScope.official.lastContestAt
+          )}
         />
         <StatCard
           label={`Gym contests (last ${model.global.contestActivity.lookbackDays}d)`}
-          value={formatNumber(model.global.contestActivity.byScope.gym.contestCount)}
+          value={<span>{formatNumber(model.global.contestActivity.byScope.gym.contestCount)}</span>}
         />
         <StatCard
           label="Gym participants"
-          value={formatNumber(model.global.contestActivity.byScope.gym.participantCount)}
+          value={
+            <span>{formatNumber(model.global.contestActivity.byScope.gym.participantCount)}</span>
+          }
         />
         <StatCard
           label="Last gym contest update"
-          value={formatUnixTimestamp(model.global.contestActivity.byScope.gym.lastContestAt)}
+          value={renderLocalTimeFromUnix(model.global.contestActivity.byScope.gym.lastContestAt)}
         />
       </section>
 
@@ -410,7 +467,7 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
                     <td>{formatNumber(guild.linkedUsers)}</td>
                     <td>{formatNumber(guild.activeChallenges)}</td>
                     <td>{formatNumber(guild.completedChallenges)}</td>
-                    <td>{formatTimestamp(guild.lastChallengeAt)}</td>
+                    <td>{renderLocalTime(guild.lastChallengeAt)}</td>
                   </tr>
                 ))
               )}
@@ -433,21 +490,27 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
         <div>
           <h1>{guild.name}</h1>
           <p>
-            Guild ID: {guild.id} • Snapshot generated {formatTimestamp(model.generatedAt)}
+            Guild ID: {guild.id} • Snapshot generated {renderLocalTime(model.generatedAt)}
           </p>
         </div>
         <div class="hero-glow" aria-hidden="true" />
       </section>
 
       <section class="grid stats-grid">
-        <StatCard label="Linked users" value={formatNumber(guild.stats.userCount)} />
-        <StatCard label="Total challenges" value={formatNumber(guild.stats.totalChallenges)} />
-        <StatCard label="Average rating" value={formatNumber(guild.stats.avgRating)} />
-        <StatCard label="Top rating" value={formatNumber(guild.stats.topRating)} />
-        <StatCard label="Activity window" value={guild.activity.windowLabel} />
+        <StatCard label="Linked users" value={<span>{formatNumber(guild.stats.userCount)}</span>} />
+        <StatCard
+          label="Total challenges"
+          value={<span>{formatNumber(guild.stats.totalChallenges)}</span>}
+        />
+        <StatCard
+          label="Average rating"
+          value={<span>{formatNumber(guild.stats.avgRating)}</span>}
+        />
+        <StatCard label="Top rating" value={<span>{formatNumber(guild.stats.topRating)}</span>} />
+        <StatCard label="Activity window" value={<span>{guild.activity.windowLabel}</span>} />
         <StatCard
           label="Completed in window"
-          value={formatNumber(guild.activity.completedChallenges)}
+          value={<span>{formatNumber(guild.activity.completedChallenges)}</span>}
         />
       </section>
 
@@ -587,7 +650,7 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
                         {arenaEndsAt ? <> • {arenaEndsAt}</> : null}
                       </div>
                     </div>
-                    <div class="pill">{formatTimestamp(tournament.updatedAt)}</div>
+                    <div class="pill">{renderLocalTime(tournament.updatedAt)}</div>
                   </div>
                 );
               })
@@ -618,7 +681,7 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
             <div>
               <div class="label">Last official contest</div>
               <div class="value">
-                {formatUnixTimestamp(guild.contestActivity.byScope.official.lastContestAt)}
+                {renderLocalTimeFromUnix(guild.contestActivity.byScope.official.lastContestAt)}
               </div>
             </div>
             <div>
@@ -636,7 +699,7 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
             <div>
               <div class="label">Last gym contest</div>
               <div class="value">
-                {formatUnixTimestamp(guild.contestActivity.byScope.gym.lastContestAt)}
+                {renderLocalTimeFromUnix(guild.contestActivity.byScope.gym.lastContestAt)}
               </div>
             </div>
           </div>
@@ -659,7 +722,9 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
                     </div>
                     <div class="muted">#{contest.contestId}</div>
                   </div>
-                  <span class="pill">{formatUnixTimestamp(contest.ratingUpdateTimeSeconds)}</span>
+                  <span class="pill">
+                    {renderLocalTimeFromUnix(contest.ratingUpdateTimeSeconds)}
+                  </span>
                 </li>
               ))
             )}
@@ -706,7 +771,7 @@ export function renderStatusPage(model: StatusViewModel): ViewResult {
       <section class="hero compact">
         <div>
           <h1>Cache status</h1>
-          <p>Last refresh: {formatTimestamp(model.generatedAt)}</p>
+          <p>Last refresh: {renderLocalTime(model.generatedAt)}</p>
         </div>
         <div class="hero-glow" aria-hidden="true" />
       </section>
@@ -730,7 +795,7 @@ export function renderStatusPage(model: StatusViewModel): ViewResult {
                 model.cacheEntries.map((entry) => (
                   <tr>
                     <td>{entry.label}</td>
-                    <td>{formatTimestamp(entry.lastFetched)}</td>
+                    <td>{renderLocalTime(entry.lastFetched)}</td>
                     <td>{formatAgeSeconds(entry.ageSeconds)}</td>
                   </tr>
                 ))
