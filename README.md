@@ -184,6 +184,11 @@ Most command responses are public; handle-linking and admin diagnostics remain e
   Shows which contest problems linked users have solved and highlights unsolved problems.
   Use `latest` to target the most recent finished contest.
 
+- **/contestupsolve** `query` `[user]` `[handle]` `[limit]` `[scope]`
+
+  Shows unsolved contest problems for a linked user or a Codeforces handle.
+  Use `latest` to target the most recent finished contest.
+
 - **/contesthistory** `[user]` `[handle]` `[limit]`
 
   Shows recent Codeforces contest rating changes for a linked user or handle.

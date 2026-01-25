@@ -12,7 +12,8 @@ import {
   resolveContestLookup,
 } from "../utils/contestLookup.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
-import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { resolveHandleTarget } from "../utils/handles.js";
+import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -20,12 +21,16 @@ const MAX_MATCHES = 5;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
 
-export const contestSolvesCommand: Command = {
+export const contestUpsolveCommand: Command = {
   data: new SlashCommandBuilder()
-    .setName("contestsolves")
-    .setDescription("Shows which contest problems linked users have solved")
+    .setName("contestupsolve")
+    .setDescription("Shows unsolved contest problems for a user or handle")
     .addStringOption((option) =>
       option.setName("query").setDescription("Contest id, URL, or name").setRequired(true)
+    )
+    .addUserOption((option) => option.setName("user").setDescription("User to target"))
+    .addStringOption((option) =>
+      option.setName("handle").setDescription("Codeforces handle to target")
     )
     .addStringOption((option) =>
       option
@@ -40,7 +45,7 @@ export const contestSolvesCommand: Command = {
     .addIntegerOption((option) =>
       option
         .setName("limit")
-        .setDescription(`Max problems per list (1-${MAX_LIMIT})`)
+        .setDescription(`Max problems to list (1-${MAX_LIMIT})`)
         .setMinValue(1)
         .setMaxValue(MAX_LIMIT)
     ),
@@ -49,6 +54,17 @@ export const contestSolvesCommand: Command = {
       await interaction.reply({ content: "This command can only be used in a server." });
       return;
     }
+
+    const handleResolution = resolveHandleUserOptions(interaction);
+    if (handleResolution.error) {
+      await interaction.reply({ content: handleResolution.error });
+      return;
+    }
+
+    const { handleInput, userOption, member } = handleResolution;
+    const user = userOption ?? interaction.user;
+    const { mention, displayName } = resolveTargetLabels(user, member);
+    const targetId = user.id;
 
     const queryRaw = interaction.options.getString("query", true).trim();
     const scope = parseContestScope(interaction.options.getString("scope"));
@@ -89,7 +105,7 @@ export const contestSolvesCommand: Command = {
               query: queryRaw,
               matches: lookup.matches,
               scope,
-              footerText: "Use /contestsolves with the contest ID to see solve counts.",
+              footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
             });
             if (refreshResult.stale) {
               embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
@@ -99,6 +115,17 @@ export const contestSolvesCommand: Command = {
           }
         }
       }
+
+      const handleTarget = await resolveHandleTarget(context.services.store, {
+        guildId: interaction.guild.id,
+        targetId,
+        handleInput,
+      });
+      if ("error" in handleTarget) {
+        await interaction.editReply(handleTarget.error);
+        return;
+      }
+      const handle = handleTarget.handle;
 
       const contest = lookup.contest;
       const problems = await context.services.problems.ensureProblemsLoaded();
@@ -110,52 +137,41 @@ export const contestSolvesCommand: Command = {
         return;
       }
 
-      const linkedUsers = await context.services.store.getLinkedUsers(interaction.guild.id);
-      const filteredUsers = await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
-        correlationId: context.correlationId,
-        command: interaction.commandName,
-        guildId: interaction.guild.id,
-        userId: interaction.user.id,
-      });
-      if (filteredUsers.length === 0) {
-        await interaction.editReply("No linked handles found in this server yet.");
-        return;
-      }
-
       const contestSolves = await context.services.store.getContestSolvesResult(contest.id);
       if (!contestSolves) {
         await interaction.editReply("Contest submissions cache not ready yet. Try again soon.");
         return;
       }
 
-      const handleToUserId = new Map(
-        filteredUsers.map((user) => [user.handle, user.userId])
-      );
       const summaries = summarizeContestSolves(
         contestProblems,
         contestSolves.solves,
-        handleToUserId
+        new Map([[handle, handle]])
       );
       const solved = summaries.filter((entry) => entry.solvedBy.size > 0);
       const unsolved = summaries.filter((entry) => entry.solvedBy.size === 0);
       const solvedCount = solved.length;
       const unsolvedCount = unsolved.length;
+      const targetLabel = handleInput ? handle : `${mention} (${handle})`;
+      const titleTarget = handleInput ? handle : displayName;
 
       const embed = buildContestEmbed({
         contest,
-        title: `Contest solves: ${contest.name}`,
+        title: `Contest upsolve: ${titleTarget}`,
         scope,
         includeScope: true,
       });
-      embed.addFields({
-        name: "Summary",
-        value: [
-          `Linked handles: ${filteredUsers.length}`,
-          `Solved problems: ${solvedCount}/${summaries.length}`,
-          `Unsolved problems: ${unsolvedCount}`,
-        ].join("\n"),
-        inline: false,
-      });
+      embed.addFields(
+        { name: "Target", value: targetLabel, inline: false },
+        {
+          name: "Summary",
+          value: [
+            `Solved problems: ${solvedCount}/${summaries.length}`,
+            `Unsolved problems: ${unsolvedCount}`,
+          ].join("\n"),
+          inline: false,
+        }
+      );
 
       if (unsolved.length > 0) {
         const lines = unsolved
@@ -166,20 +182,9 @@ export const contestSolvesCommand: Command = {
       } else {
         embed.addFields({
           name: "Unsolved problems",
-          value: "All contest problems were solved by linked users.",
+          value: "All contest problems were solved by this handle.",
           inline: false,
         });
-      }
-
-      if (solved.length > 0) {
-        const lines = solved
-          .sort(
-            (a, b) => b.solvedBy.size - a.solvedBy.size || compareProblemIndex(a.problem, b.problem)
-          )
-          .slice(0, limit)
-          .map((entry) => formatContestProblemLine(entry.problem, entry.solvedBy.size))
-          .join("\n");
-        embed.addFields({ name: "Solved problems", value: lines, inline: false });
       }
 
       const showStale = refreshResult.stale || contestSolves.isStale;
@@ -189,7 +194,7 @@ export const contestSolvesCommand: Command = {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      logCommandError(`Error in contest solves: ${String(error)}`, interaction, context.correlationId);
+      logCommandError(`Error in contest upsolve: ${String(error)}`, interaction, context.correlationId);
       await interaction.editReply("Something went wrong.");
     }
   },
