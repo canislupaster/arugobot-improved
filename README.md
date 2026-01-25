@@ -235,7 +235,7 @@ Optional environment variables:
 - `DATABASE_BACKUP` (directory for automated backups, disabled if unset)
 - `DATABASE_BACKUP_RETENTION_DAYS` (default `7`, set `0` to keep all backups)
 - `WEB_HOST` (default `0.0.0.0`)
-- `WEB_PORT` (default `8787`, set `0` to bind a random open port)
+- `WEB_PORT` (default `8787`, set `0` to bind a random open port; if the port is busy, the bot will fall back to a random open port and log the actual port)
 - `WEB_PUBLIC_URL` (optional, e.g. `https://bot.example.com`, used for `/dashboard` links)
 
 ```bash
