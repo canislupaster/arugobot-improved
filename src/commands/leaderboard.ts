@@ -55,6 +55,23 @@ export const leaderboardCommand: Command = {
         userId: interaction.user.id,
       });
 
+    const ensureRows = async (
+      rows: Array<{ userId: string; value: number }>,
+      emptyMessage: string,
+      emptyFilteredMessage: string
+    ) => {
+      if (!rows.length) {
+        await interaction.editReply(emptyMessage);
+        return null;
+      }
+      const filtered = await filterRows(rows);
+      if (!filtered.length) {
+        await interaction.editReply(emptyFilteredMessage);
+        return null;
+      }
+      return filtered;
+    };
+
     const renderLeaderboard = async (
       rows: Array<{ userId: string; value: number }>,
       title: string,
@@ -63,6 +80,7 @@ export const leaderboardCommand: Command = {
     ) => {
       const totalPages = Math.max(1, Math.ceil(rows.length / 10));
       const paginationIds = buildPaginationIds("leaderboard", interaction.id);
+      const medals = [":first_place:", ":second_place:", ":third_place:"];
       let currentPage = page;
 
       const renderPage = async (pageNumber: number) => {
@@ -79,16 +97,8 @@ export const leaderboardCommand: Command = {
           const entry = rows[index];
           const member = await guild.members.fetch(entry.userId).catch(() => null);
           const mention = member ? member.toString() : `<@${entry.userId}>`;
-          content += `${index + 1}. ${mention} (${formatValue(entry.value)})`;
-          if (index === 0) {
-            content += " :first_place:\n";
-          } else if (index === 1) {
-            content += " :second_place:\n";
-          } else if (index === 2) {
-            content += " :third_place:\n";
-          } else {
-            content += "\n";
-          }
+          const medal = medals[i] ? ` ${medals[i]}` : "";
+          content += `${index + 1}. ${mention} (${formatValue(entry.value)})${medal}\n`;
         }
 
         const embed = new EmbedBuilder()
@@ -148,38 +158,31 @@ export const leaderboardCommand: Command = {
     try {
       if (metric === "solves") {
         const leaderboard = await context.services.store.getSolveLeaderboard(interaction.guild.id);
-        if (!leaderboard || leaderboard.length === 0) {
-          await interaction.editReply("No solves recorded yet.");
+        const rows = await ensureRows(
+          leaderboard?.map((entry) => ({ userId: entry.userId, value: entry.solvedCount })) ?? [],
+          "No solves recorded yet.",
+          "No solves recorded for current members."
+        );
+        if (!rows) {
           return;
         }
-        const rows = await filterRows(
-          leaderboard.map((entry) => ({ userId: entry.userId, value: entry.solvedCount }))
-        );
-        if (rows.length === 0) {
-          await interaction.editReply("No solves recorded for current members.");
-          return;
-        }
-        await renderLeaderboard(
-          rows,
-          "Solve leaderboard",
-          "Solves"
-        );
+        await renderLeaderboard(rows, "Solve leaderboard", "Solves");
         return;
       }
 
       if (metric === "streak" || metric === "longest_streak") {
         const leaderboard = await context.services.store.getStreakLeaderboard(interaction.guild.id);
-        if (!leaderboard || leaderboard.length === 0) {
-          await interaction.editReply("No streaks recorded yet.");
-          return;
-        }
-        const entries = leaderboard.map((entry) => ({
-          userId: entry.userId,
-          value: metric === "streak" ? entry.currentStreak : entry.longestStreak,
-        }));
-        const filtered = await filterRows(entries);
-        if (filtered.length === 0) {
-          await interaction.editReply("No streaks recorded for current members.");
+        const entries =
+          leaderboard?.map((entry) => ({
+            userId: entry.userId,
+            value: metric === "streak" ? entry.currentStreak : entry.longestStreak,
+          })) ?? [];
+        const rows = await ensureRows(
+          entries,
+          "No streaks recorded yet.",
+          "No streaks recorded for current members."
+        );
+        if (!rows) {
           return;
         }
         const formatValue = (value: number) => {
@@ -187,7 +190,7 @@ export const leaderboardCommand: Command = {
           return emojis ? `${value} ${emojis}` : String(value);
         };
         await renderLeaderboard(
-          filtered,
+          rows,
           metric === "streak" ? "Current streak leaderboard" : "Longest streak leaderboard",
           metric === "streak" ? "Current streak (days)" : "Longest streak (days)",
           formatValue
@@ -196,22 +199,15 @@ export const leaderboardCommand: Command = {
       }
 
       const leaderboard = await context.services.store.getLeaderboard(interaction.guild.id);
-      if (!leaderboard || leaderboard.length === 0) {
-        await interaction.editReply("No leaderboard entries yet.");
+      const rows = await ensureRows(
+        leaderboard?.map((entry) => ({ userId: entry.userId, value: entry.rating })) ?? [],
+        "No leaderboard entries yet.",
+        "No leaderboard entries for current members."
+      );
+      if (!rows) {
         return;
       }
-      const filtered = await filterRows(
-        leaderboard.map((entry) => ({ userId: entry.userId, value: entry.rating }))
-      );
-      if (filtered.length === 0) {
-        await interaction.editReply("No leaderboard entries for current members.");
-        return;
-      }
-      await renderLeaderboard(
-        filtered,
-        "Leaderboard",
-        "Users"
-      );
+      await renderLeaderboard(rows, "Leaderboard", "Users");
     } catch (error) {
       logCommandError(
         `Error during leaderboard command: ${String(error)}`,
