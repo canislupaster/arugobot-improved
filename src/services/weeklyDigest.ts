@@ -422,10 +422,8 @@ export class WeeklyDigestService {
       }
     );
 
-    const embed = new EmbedBuilder()
-      .setTitle("Weekly digest")
-      .setColor(0x3498db)
-      .setDescription(`Highlights from the last ${lookbackDays} days.`);
+    const baseDescription = `Highlights from the last ${lookbackDays} days.`;
+    const embed = new EmbedBuilder().setTitle("Weekly digest").setColor(0x3498db);
 
     const challengeLines = [
       `Completed challenges: ${challengeActivity.completedChallenges}`,
@@ -540,9 +538,11 @@ export class WeeklyDigestService {
       subscription.minuteUtc,
       subscription.utcOffsetMinutes
     );
-    embed.setFooter({
-      text: `Next digest: ${formatDiscordTimestamp(Math.floor(nextScheduledAt / 1000))}`,
-    });
+    embed.setDescription(
+      `${baseDescription}\nNext digest: ${formatDiscordTimestamp(
+        Math.floor(nextScheduledAt / 1000)
+      )}`
+    );
     return embed;
   }
 }
