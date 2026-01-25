@@ -1,6 +1,7 @@
 import { logError, logInfo } from "../utils/logger.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
+import type { CacheKey } from "./codeforcesCache.js";
 import { type CodeforcesCache, NoopCodeforcesCache } from "./codeforcesCache.js";
 
 export type ContestScope = "official" | "gym";
@@ -20,6 +21,10 @@ type ContestListResponse = Contest[];
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_SCOPE: ContestScope = "official";
+const CACHE_KEY_BY_SCOPE: Record<ContestScope, CacheKey> = {
+  official: "contest_list",
+  gym: "contest_list_gym",
+};
 
 type ContestStore = {
   contests: Contest[];
@@ -37,6 +42,13 @@ export class ContestService {
     private client: CodeforcesClient,
     private cache: CodeforcesCache = new NoopCodeforcesCache()
   ) {}
+
+  private normalizeContests(contests: Contest[], scope: ContestScope): Contest[] {
+    return contests.map((contest) => ({
+      ...contest,
+      isGym: contest.isGym ?? scope === "gym",
+    }));
+  }
 
   getLastRefreshAt(scope: ContestScopeFilter = DEFAULT_SCOPE): number {
     if (scope === "all") {
@@ -65,14 +77,11 @@ export class ContestService {
       const result = await this.client.request<ContestListResponse>("contest.list", {
         gym: scope === "gym",
       });
-      const normalized = result.map((contest) => ({
-        ...contest,
-        isGym: contest.isGym ?? scope === "gym",
-      }));
+      const normalized = this.normalizeContests(result, scope);
       store.contests = normalized;
       store.lastRefresh = now;
       store.lastError = null;
-      await this.cache.set(scope === "gym" ? "contest_list_gym" : "contest_list", normalized);
+      await this.cache.set(CACHE_KEY_BY_SCOPE[scope], normalized);
       logInfo("Loaded contests from Codeforces.", { contestCount: result.length, scope });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -161,17 +170,11 @@ export class ContestService {
   }
 
   private async loadFromCache(scope: ContestScope): Promise<boolean> {
-    const cached = await this.cache.get<Contest[]>(
-      scope === "gym" ? "contest_list_gym" : "contest_list"
-    );
+    const cached = await this.cache.get<Contest[]>(CACHE_KEY_BY_SCOPE[scope]);
     if (!cached || !Array.isArray(cached.value) || cached.value.length === 0) {
       return false;
     }
-    const normalized = cached.value.map((contest) => ({
-      ...contest,
-      isGym: contest.isGym ?? scope === "gym",
-    }));
-    this.store[scope].contests = normalized;
+    this.store[scope].contests = this.normalizeContests(cached.value, scope);
     const timestamp = Date.parse(cached.lastFetched);
     this.store[scope].lastRefresh = Number.isFinite(timestamp) ? timestamp : 0;
     logInfo("Loaded contests from cache.", { contestCount: cached.value.length, scope });
