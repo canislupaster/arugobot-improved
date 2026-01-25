@@ -21,6 +21,36 @@ const mockRatingChanges = {
   getRatingChanges: jest.fn().mockResolvedValue(null),
 } as unknown as RatingChangesService;
 
+const mockContestService = {
+  refresh: jest.fn().mockResolvedValue(undefined),
+  getUpcoming: jest
+    .fn()
+    .mockImplementation((_limit: number, scope: "official" | "gym") =>
+      scope === "official"
+        ? [
+            {
+              id: 1000,
+              name: "Official Contest",
+              phase: "BEFORE",
+              startTimeSeconds: 1_700_000_000,
+              durationSeconds: 7200,
+              isGym: false,
+            },
+          ]
+        : [
+            {
+              id: 2000,
+              name: "Gym Contest",
+              phase: "BEFORE",
+              startTimeSeconds: 1_700_000_500,
+              durationSeconds: 5400,
+              isGym: true,
+            },
+          ]
+    ),
+  getLastRefreshAt: jest.fn().mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z")),
+};
+
 describe("web app", () => {
   let db: Kysely<Database>;
   let website: WebsiteService;
@@ -31,7 +61,10 @@ describe("web app", () => {
     const store = new StoreService(db, mockCodeforces);
     const settings = new GuildSettingsService(db);
     const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
-    website = new WebsiteService(db, store, settings, contestActivity, mockCodeforces);
+    website = new WebsiteService(db, store, settings, contestActivity, {
+      codeforces: mockCodeforces,
+      contests: mockContestService as never,
+    });
 
     await db
       .insertInto("users")
@@ -67,6 +100,8 @@ describe("web app", () => {
     const body = await response.text();
     expect(body).toContain("Global snapshot");
     expect(body).toContain("Guild One");
+    expect(body).toContain("Upcoming official contests");
+    expect(body).toContain("Official Contest");
     expect(body).toContain("og:image");
     expect(body).toContain("/static/local-time.js");
   });

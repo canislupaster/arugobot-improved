@@ -270,10 +270,11 @@ If the configured port is busy, the bot will retry a couple of nearby ports and 
 open port, logging the chosen port on startup.
 Only guilds that opt in via `/dashboard set public:true` appear on the public pages.
 If `WEB_PUBLIC_URL` is set, `/dashboard` responses include direct links to your guild page.
-The overview highlights core bot features alongside global contest participation cards sourced from
-cached rating changes, split by official vs gym activity, plus contest rating alert coverage and
-rating-change cache freshness. Per-guild pages include CSV/Markdown exports for rating/solve
-leaderboards, and `/status` shows cache ages for key Codeforces syncs including the gym contest list.
+The overview highlights core bot features alongside upcoming contest cards, plus global contest
+participation snapshots sourced from cached rating changes (split by official vs gym activity),
+contest rating alert coverage, and rating-change cache freshness. Per-guild pages include
+CSV/Markdown exports for rating/solve leaderboards, and `/status` shows cache ages for key
+Codeforces syncs including the gym contest list.
 `/status.json` returns the same cache status in JSON for external monitoring.
 `/healthz` returns JSON with a quick DB + Codeforces check plus cache status (useful for uptime monitors).
 

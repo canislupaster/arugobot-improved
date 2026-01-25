@@ -1,6 +1,10 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 
-import type { GlobalOverview, TournamentSummary } from "../services/website.js";
+import type {
+  GlobalOverview,
+  TournamentSummary,
+  UpcomingContestsOverview,
+} from "../services/website.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 import { capitalize } from "../utils/text.js";
 
@@ -73,6 +77,7 @@ type GuildView = {
 export type HomeViewModel = {
   generatedAt: string;
   global: GlobalOverview;
+  upcomingContests: UpcomingContestsOverview;
   guilds: GuildCard[];
 };
 
@@ -203,6 +208,22 @@ function formatAgeSeconds(seconds: number | null): string {
     return `${days}d ${hours % 24}h`;
   }
   return `${hours}h ${minutes % 60}m`;
+}
+
+function formatDurationSeconds(seconds: number | null | undefined): string {
+  if (!seconds || !Number.isFinite(seconds)) {
+    return "N/A";
+  }
+  const totalMinutes = Math.max(0, Math.round(seconds / 60));
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
 }
 
 function StatCard(props: { label: string; value: ViewResult; hint?: string }): ViewResult {
@@ -435,6 +456,65 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
             model.global.contestRatingAlerts.cacheLastFetched
           )}`}
         />
+      </section>
+
+      <section class="section split">
+        <div class="card">
+          <SectionHeader
+            title="Upcoming official contests"
+            subtitle={
+              model.upcomingContests.lastRefreshAt
+                ? `Last refresh ${formatTimestamp(model.upcomingContests.lastRefreshAt)}`
+                : "Upcoming contests from the cached contest list."
+            }
+          />
+          <div class="stack">
+            {model.upcomingContests.official.length === 0 ? (
+              <div class="muted">No upcoming official contests cached.</div>
+            ) : (
+              model.upcomingContests.official.map((contest) => (
+                <div class="tournament-row">
+                  <div>
+                    <div class="title">{contest.name}</div>
+                    <div class="muted">
+                      Starts {renderLocalTimeFromUnix(contest.startTimeSeconds)} •{" "}
+                      {formatDurationSeconds(contest.durationSeconds)}
+                    </div>
+                  </div>
+                  <div class="pill">#{contest.id}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        <div class="card">
+          <SectionHeader
+            title="Upcoming gym contests"
+            subtitle={
+              model.upcomingContests.lastRefreshAt
+                ? `Last refresh ${formatTimestamp(model.upcomingContests.lastRefreshAt)}`
+                : "Upcoming contests from the cached contest list."
+            }
+          />
+          <div class="stack">
+            {model.upcomingContests.gym.length === 0 ? (
+              <div class="muted">No upcoming gym contests cached.</div>
+            ) : (
+              model.upcomingContests.gym.map((contest) => (
+                <div class="tournament-row">
+                  <div>
+                    <div class="title">{contest.name}</div>
+                    <div class="muted">
+                      Starts {renderLocalTimeFromUnix(contest.startTimeSeconds)} •{" "}
+                      {formatDurationSeconds(contest.durationSeconds)}
+                    </div>
+                  </div>
+                  <div class="pill">#{contest.id}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </section>
 
       <section class="section">

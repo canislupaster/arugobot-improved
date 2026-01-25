@@ -124,13 +124,15 @@ export function createWebApp({ website, client }: WebAppContext) {
   });
 
   app.get("/", async (c) => {
-    const [global, guilds] = await Promise.all([
+    const [global, guilds, upcomingContests] = await Promise.all([
       website.getGlobalOverview(),
       website.listGuildSummaries(20),
+      website.getUpcomingContests(5),
     ]);
     const viewModel: HomeViewModel = {
       generatedAt: new Date().toISOString(),
       global,
+      upcomingContests,
       guilds: guilds.map((guild) => ({
         id: guild.guildId,
         name: resolveGuildName(client, guild.guildId),

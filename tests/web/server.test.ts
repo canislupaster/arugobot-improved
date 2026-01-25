@@ -24,13 +24,22 @@ const mockRatingChanges = {
   getRatingChanges: jest.fn().mockResolvedValue(null),
 } as unknown as RatingChangesService;
 
+const mockContestService = {
+  refresh: jest.fn().mockResolvedValue(undefined),
+  getUpcoming: jest.fn().mockReturnValue([]),
+  getLastRefreshAt: jest.fn().mockReturnValue(0),
+};
+
 async function createWebsite(): Promise<{ db: Kysely<Database>; website: WebsiteService }> {
   const db = createDb(":memory:");
   await migrateToLatest(db);
   const store = new StoreService(db, mockCodeforces);
   const settings = new GuildSettingsService(db);
   const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
-  const website = new WebsiteService(db, store, settings, contestActivity, mockCodeforces);
+  const website = new WebsiteService(db, store, settings, contestActivity, {
+    codeforces: mockCodeforces,
+    contests: mockContestService as never,
+  });
   return { db, website };
 }
 

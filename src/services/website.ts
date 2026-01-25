@@ -1,11 +1,12 @@
 import { sql, type Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
-import { logError } from "../utils/logger.js";
+import { logError, logWarn } from "../utils/logger.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
 import type { CacheKey } from "./codeforcesCache.js";
 import type { ContestActivityService } from "./contestActivity.js";
+import type { Contest, ContestService } from "./contests.js";
 import type { GuildSettingsService } from "./guildSettings.js";
 import type { StoreService } from "./store.js";
 
@@ -96,6 +97,12 @@ export type GuildOverview = {
   hasData: boolean;
 };
 
+export type UpcomingContestsOverview = {
+  lastRefreshAt: string | null;
+  official: Contest[];
+  gym: Contest[];
+};
+
 export type CacheStatusEntry = {
   key: CacheKey;
   label: string;
@@ -174,13 +181,19 @@ function buildEmptyGlobalOverview(): GlobalOverview {
 }
 
 export class WebsiteService {
+  private readonly contests: ContestService | null;
+  private readonly codeforces: CodeforcesClient | null;
+
   constructor(
     private readonly db: Kysely<Database>,
     private readonly store: StoreService,
     private readonly settings: GuildSettingsService,
     private readonly contestActivity: ContestActivityService,
-    private readonly codeforces: CodeforcesClient | null = null
-  ) {}
+    options: { codeforces?: CodeforcesClient | null; contests?: ContestService | null } = {}
+  ) {
+    this.codeforces = options.codeforces ?? null;
+    this.contests = options.contests ?? null;
+  }
 
   private async getPublicGuildStatus(
     guildId: string
@@ -198,6 +211,34 @@ export class WebsiteService {
     const totalChallenges = Number(totalChallengesRow?.count ?? 0);
     const hasData = stats.userCount > 0 || totalChallenges > 0;
     return { stats, hasData };
+  }
+
+  async getUpcomingContests(limit = 5): Promise<UpcomingContestsOverview> {
+    if (!this.contests) {
+      return { lastRefreshAt: null, official: [], gym: [] };
+    }
+    const refreshResults = await Promise.allSettled([
+      this.contests.refresh(false, "official"),
+      this.contests.refresh(false, "gym"),
+    ]);
+    const failures = refreshResults.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    );
+    for (const failure of failures) {
+      logWarn("Contest refresh failed for web overview; using cached contests.", {
+        error: failure.reason instanceof Error ? failure.reason.message : String(failure.reason),
+      });
+    }
+    const lastRefresh = this.contests.getLastRefreshAt("all");
+    const lastRefreshAt =
+      Number.isFinite(lastRefresh) && lastRefresh > 0
+        ? new Date(lastRefresh).toISOString()
+        : null;
+    return {
+      lastRefreshAt,
+      official: this.contests.getUpcoming(limit, "official"),
+      gym: this.contests.getUpcoming(limit, "gym"),
+    };
   }
 
   async getGlobalOverview(): Promise<GlobalOverview> {

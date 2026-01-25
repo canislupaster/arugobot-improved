@@ -32,7 +32,9 @@ describe("WebsiteService", () => {
     store = new StoreService(db, mockCodeforces);
     settings = new GuildSettingsService(db);
     const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
-    website = new WebsiteService(db, store, settings, contestActivity, mockCodeforces);
+    website = new WebsiteService(db, store, settings, contestActivity, {
+      codeforces: mockCodeforces,
+    });
 
     await db
       .insertInto("users")
@@ -561,5 +563,51 @@ describe("WebsiteService", () => {
   it("returns null for unknown guilds", async () => {
     const overview = await website.getGuildOverview("missing");
     expect(overview).toBeNull();
+  });
+
+  it("returns upcoming contests when contest service is available", async () => {
+    const contestService = {
+      refresh: jest.fn().mockResolvedValue(undefined),
+      getUpcoming: jest
+        .fn()
+        .mockImplementation((_limit: number, scope: "official" | "gym") =>
+          scope === "official"
+            ? [
+                {
+                  id: 1000,
+                  name: "Official Contest",
+                  phase: "BEFORE",
+                  startTimeSeconds: 1_700_000_000,
+                  durationSeconds: 7200,
+                  isGym: false,
+                },
+              ]
+            : [
+                {
+                  id: 2000,
+                  name: "Gym Contest",
+                  phase: "BEFORE",
+                  startTimeSeconds: 1_700_000_500,
+                  durationSeconds: 5400,
+                  isGym: true,
+                },
+              ]
+        ),
+      getLastRefreshAt: jest.fn().mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z")),
+    };
+
+    const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
+    const websiteWithContests = new WebsiteService(db, store, settings, contestActivity, {
+      codeforces: mockCodeforces,
+      contests: contestService as never,
+    });
+
+    const upcoming = await websiteWithContests.getUpcomingContests(3);
+
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "official");
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "gym");
+    expect(upcoming.lastRefreshAt).toBe("2024-02-01T00:00:00.000Z");
+    expect(upcoming.official[0]?.name).toBe("Official Contest");
+    expect(upcoming.gym[0]?.name).toBe("Gym Contest");
   });
 });
