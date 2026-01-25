@@ -17,6 +17,13 @@ const createMockClient = (send: jest.Mock) =>
     },
   }) as unknown as Client;
 
+const createMissingChannelClient = () =>
+  ({
+    channels: {
+      fetch: jest.fn().mockResolvedValue(null),
+    },
+  }) as unknown as Client;
+
 describe("ContestReminderService", () => {
   let db: Kysely<Database>;
   let contestService: jest.Mocked<Pick<ContestService, "refresh" | "getUpcomingContests">>;
@@ -370,6 +377,27 @@ describe("ContestReminderService", () => {
     expect(contestService.refresh).toHaveBeenCalledWith(false, "official");
     expect(contestService.refresh).toHaveBeenCalledWith(false, "gym");
     expect(result.status).toBe("sent");
+  });
+
+  it("returns channel_missing when the manual reminder channel is unavailable", async () => {
+    contestService.getUpcomingContests.mockReturnValue([]);
+
+    const service = new ContestReminderService(db, contestService);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "missing-channel",
+      30,
+      null,
+      [],
+      [],
+      "official"
+    );
+    const client = createMissingChannelClient();
+
+    const result = await service.sendManualReminder(subscription, client, false);
+
+    expect(result).toEqual({ status: "channel_missing", channelId: "missing-channel" });
+    expect(contestService.refresh).not.toHaveBeenCalled();
   });
 
   it("reports already-notified contests when posting manually", async () => {

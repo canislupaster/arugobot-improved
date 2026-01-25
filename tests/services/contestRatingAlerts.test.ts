@@ -19,6 +19,13 @@ const createMockClient = (send: jest.Mock) =>
     },
   }) as unknown as Client;
 
+const createMissingChannelClient = () =>
+  ({
+    channels: {
+      fetch: jest.fn().mockResolvedValue(null),
+    },
+  }) as unknown as Client;
+
 describe("ContestRatingAlertService", () => {
   let db: Kysely<Database>;
   let contestService: jest.Mocked<Pick<ContestService, "refresh" | "getFinished">>;
@@ -213,5 +220,20 @@ describe("ContestRatingAlertService", () => {
     const preview = await service.getPreview(subscription);
 
     expect(preview.status).toBe("no_matching_handles");
+  });
+
+  it("returns channel_missing when the manual alert channel is unavailable", async () => {
+    const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "missing-channel",
+      null
+    );
+    const client = createMissingChannelClient();
+
+    const result = await service.sendManualAlert(subscription, client, false);
+
+    expect(result).toEqual({ status: "channel_missing", channelId: "missing-channel" });
+    expect(contestService.refresh).not.toHaveBeenCalled();
   });
 });
