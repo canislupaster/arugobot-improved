@@ -15,12 +15,12 @@ import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../service
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatTime } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
+import { capitalize } from "../utils/text.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 import {
   formatTournamentRecapCsv,
   formatTournamentRecapMarkdown,
 } from "../utils/tournamentRecap.js";
-import { capitalize } from "../utils/text.js";
 
 import type { Command } from "./types.js";
 
