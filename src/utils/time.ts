@@ -49,6 +49,31 @@ export function toLocalTime(hour: number, minute: number, offsetMinutes: number)
   return { hour: Math.floor(totalMinutes / 60), minute: totalMinutes % 60 };
 }
 
+export function wasSentSince(lastSentAt: string | null, cutoffUtcMs: number): boolean {
+  if (!lastSentAt) {
+    return false;
+  }
+  const parsed = Date.parse(lastSentAt);
+  return Number.isFinite(parsed) && parsed >= cutoffUtcMs;
+}
+
+export function getLocalDayForUtcMs(utcMs: number, offsetMinutes: number): number {
+  const adjusted = new Date(utcMs + offsetMinutes * 60 * 1000);
+  return adjusted.getUTCDay();
+}
+
+export function getUtcScheduleMs(now: Date, hourUtc: number, minuteUtc: number): number {
+  return Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    hourUtc,
+    minuteUtc,
+    0,
+    0
+  );
+}
+
 export function parseUtcOffset(raw: string): { minutes: number } | { error: string } {
   const trimmed = raw.trim().toUpperCase();
   if (trimmed === "Z" || trimmed === "UTC") {

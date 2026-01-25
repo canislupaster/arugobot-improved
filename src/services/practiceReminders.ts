@@ -14,6 +14,7 @@ import {
   selectRandomProblem,
 } from "../utils/problemSelection.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
+import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
 import type { StoreService } from "./store.js";
@@ -148,11 +149,6 @@ function mapPracticeReminderRow(row: PracticeReminderRow): PracticeReminder {
     roleId: row.role_id ?? null,
     lastSentAt: row.last_sent_at ?? null,
   };
-}
-
-function getLocalDayForUtcMs(utcMs: number, offsetMinutes: number): number {
-  const adjusted = new Date(utcMs + offsetMinutes * 60 * 1000);
-  return adjusted.getUTCDay();
 }
 
 function getLocalDayStartUtcMs(now: Date, offsetMinutes: number): number {
@@ -367,8 +363,7 @@ export class PracticeReminderService {
 
     const now = new Date();
     const todayStart = getLocalDayStartUtcMs(now, subscription.utcOffsetMinutes);
-    const lastSentAt = subscription.lastSentAt ? Date.parse(subscription.lastSentAt) : 0;
-    if (!force && Number.isFinite(lastSentAt) && lastSentAt >= todayStart) {
+    if (!force && wasSentSince(subscription.lastSentAt, todayStart)) {
       return {
         status: "already_sent",
         lastSentAt: subscription.lastSentAt ?? new Date().toISOString(),
@@ -430,15 +425,7 @@ export class PracticeReminderService {
 
       for (const subscription of subscriptions) {
         const todayStart = getLocalDayStartUtcMs(now, subscription.utcOffsetMinutes);
-        const scheduleMs = Date.UTC(
-          now.getUTCFullYear(),
-          now.getUTCMonth(),
-          now.getUTCDate(),
-          subscription.hourUtc,
-          subscription.minuteUtc,
-          0,
-          0
-        );
+        const scheduleMs = getUtcScheduleMs(now, subscription.hourUtc, subscription.minuteUtc);
         const scheduleDay = getLocalDayForUtcMs(scheduleMs, subscription.utcOffsetMinutes);
         if (!subscription.daysOfWeek.includes(scheduleDay)) {
           continue;
@@ -446,8 +433,7 @@ export class PracticeReminderService {
         if (now.getTime() < scheduleMs) {
           continue;
         }
-        const lastSentAt = subscription.lastSentAt ? Date.parse(subscription.lastSentAt) : 0;
-        if (Number.isFinite(lastSentAt) && lastSentAt >= todayStart) {
+        if (wasSentSince(subscription.lastSentAt, todayStart)) {
           continue;
         }
 

@@ -7,7 +7,13 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getErrorMessage } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
-import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
+import {
+  formatDiscordRelativeTime,
+  formatDiscordTimestamp,
+  getLocalDayForUtcMs,
+  getUtcScheduleMs,
+  wasSentSince,
+} from "../utils/time.js";
 
 import type { ContestActivityService } from "./contestActivity.js";
 import type { StoreService } from "./store.js";
@@ -71,10 +77,6 @@ function getLocalWeekStartUtcMs(now: Date, offsetMinutes: number, dayOfWeek: num
   return localStart - offsetMinutes * 60 * 1000;
 }
 
-function getLocalDayForUtcMs(utcMs: number, offsetMinutes: number): number {
-  return new Date(utcMs + offsetMinutes * 60 * 1000).getUTCDay();
-}
-
 export function getNextWeeklyScheduledUtcMs(
   now: Date,
   dayOfWeek: number,
@@ -97,7 +99,7 @@ export function getNextWeeklyScheduledUtcMs(
     if (candidateUtc < nowMs) {
       continue;
     }
-    const localDay = new Date(candidateUtc + utcOffsetMinutes * 60 * 1000).getUTCDay();
+    const localDay = getLocalDayForUtcMs(candidateUtc, utcOffsetMinutes);
     if (localDay === normalizedDay) {
       return candidateUtc;
     }
@@ -280,8 +282,7 @@ export class WeeklyDigestService {
       subscription.utcOffsetMinutes,
       subscription.dayOfWeek
     );
-    const lastSentAt = subscription.lastSentAt ? Date.parse(subscription.lastSentAt) : 0;
-    if (!force && Number.isFinite(lastSentAt) && lastSentAt >= weekStart) {
+    if (!force && wasSentSince(subscription.lastSentAt, weekStart)) {
       return {
         status: "already_sent",
         lastSentAt: subscription.lastSentAt ?? new Date().toISOString(),
@@ -293,18 +294,11 @@ export class WeeklyDigestService {
       return { status: "channel_missing", channelId: subscription.channelId };
     }
 
-    try {
-      await this.sendDigestMessage(subscription, channel, "manual");
-      return { status: "sent", channelId: subscription.channelId };
-    } catch (error) {
-      const message = this.recordError(error);
-      logWarn("Manual weekly digest failed.", {
-        guildId: subscription.guildId,
-        channelId: subscription.channelId,
-        error: message,
-      });
-      return { status: "error", message };
+    const sendResult = await this.trySendDigest(subscription, channel, "manual");
+    if (!sendResult.ok) {
+      return { status: "error", message: sendResult.message };
     }
+    return { status: "sent", channelId: subscription.channelId };
   }
 
   async runTick(client: Client): Promise<void> {
@@ -320,15 +314,7 @@ export class WeeklyDigestService {
         return;
       }
       for (const subscription of subscriptions) {
-        const scheduleMs = Date.UTC(
-          now.getUTCFullYear(),
-          now.getUTCMonth(),
-          now.getUTCDate(),
-          subscription.hourUtc,
-          subscription.minuteUtc,
-          0,
-          0
-        );
+        const scheduleMs = getUtcScheduleMs(now, subscription.hourUtc, subscription.minuteUtc);
         const scheduleDay = getLocalDayForUtcMs(scheduleMs, subscription.utcOffsetMinutes);
         if (scheduleDay !== subscription.dayOfWeek) {
           continue;
@@ -341,8 +327,7 @@ export class WeeklyDigestService {
           subscription.utcOffsetMinutes,
           subscription.dayOfWeek
         );
-        const lastSentAt = subscription.lastSentAt ? Date.parse(subscription.lastSentAt) : 0;
-        if (Number.isFinite(lastSentAt) && lastSentAt >= weekStart) {
+        if (wasSentSince(subscription.lastSentAt, weekStart)) {
           continue;
         }
 
@@ -355,7 +340,7 @@ export class WeeklyDigestService {
           continue;
         }
 
-        await this.sendDigestMessage(subscription, channel, "scheduled");
+        await this.trySendDigest(subscription, channel, "scheduled");
       }
     } catch (error) {
       const message = this.recordError(error);
@@ -369,6 +354,25 @@ export class WeeklyDigestService {
     const message = getErrorMessage(error) || String(error);
     this.lastError = { message, timestamp: new Date().toISOString() };
     return message;
+  }
+
+  private async trySendDigest(
+    subscription: WeeklyDigestSubscription,
+    channel: Awaited<ReturnType<typeof resolveSendableChannel>>,
+    source: "manual" | "scheduled"
+  ): Promise<{ ok: boolean; message: string }> {
+    try {
+      await this.sendDigestMessage(subscription, channel, source);
+      return { ok: true, message: "" };
+    } catch (error) {
+      const message = this.recordError(error);
+      logWarn(source === "manual" ? "Manual weekly digest failed." : "Weekly digest send failed.", {
+        guildId: subscription.guildId,
+        channelId: subscription.channelId,
+        error: message,
+      });
+      return { ok: false, message };
+    }
   }
 
   private async sendDigestMessage(

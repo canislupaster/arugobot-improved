@@ -1,9 +1,12 @@
 import {
   formatHourMinute,
   formatUtcOffset,
+  getLocalDayForUtcMs,
+  getUtcScheduleMs,
   parseUtcOffset,
   toLocalTime,
   toUtcTime,
+  wasSentSince,
 } from "../../src/utils/time.js";
 
 describe("time utils", () => {
@@ -35,5 +38,25 @@ describe("time utils", () => {
   it("converts between local and UTC time using offsets", () => {
     expect(toUtcTime(9, 0, 150)).toEqual({ hour: 6, minute: 30 });
     expect(toLocalTime(6, 30, 150)).toEqual({ hour: 9, minute: 0 });
+  });
+
+  it("checks whether a timestamp is after a cutoff", () => {
+    const cutoff = Date.UTC(2024, 0, 1, 0, 0, 0, 0);
+    expect(wasSentSince(null, cutoff)).toBe(false);
+    expect(wasSentSince("invalid", cutoff)).toBe(false);
+    expect(wasSentSince(new Date(cutoff - 1000).toISOString(), cutoff)).toBe(false);
+    expect(wasSentSince(new Date(cutoff).toISOString(), cutoff)).toBe(true);
+  });
+
+  it("computes the local day for a UTC timestamp and offset", () => {
+    const mondayUtc = Date.UTC(2024, 6, 1, 0, 0, 0, 0);
+    expect(getLocalDayForUtcMs(mondayUtc, 0)).toBe(1);
+    expect(getLocalDayForUtcMs(mondayUtc, 60)).toBe(1);
+    expect(getLocalDayForUtcMs(mondayUtc, -60)).toBe(0);
+  });
+
+  it("computes the UTC schedule time for a date and time", () => {
+    const now = new Date(Date.UTC(2024, 1, 20, 12, 34, 56, 0));
+    expect(getUtcScheduleMs(now, 9, 15)).toBe(Date.UTC(2024, 1, 20, 9, 15, 0, 0));
   });
 });
