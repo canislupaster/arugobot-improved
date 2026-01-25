@@ -90,7 +90,7 @@ export const healthCommand: Command = {
         { name: "DB", value: dbOk ? "OK" : "Failed", inline: true },
         {
           name: "DB backups",
-          value: backupDir ? backupLastAt ?? "Pending" : "Disabled",
+          value: backupDir ? (backupLastAt ?? "Pending") : "Disabled",
           inline: true,
         },
         {
