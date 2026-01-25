@@ -247,6 +247,19 @@ export type CommandMetricsTable = {
   updated_at: Generated<string>;
 };
 
+export type LogEntriesTable = {
+  id: Generated<number>;
+  timestamp: string;
+  level: string;
+  message: string;
+  correlation_id: string | null;
+  command: string | null;
+  guild_id: string | null;
+  user_id: string | null;
+  latency_ms: number | null;
+  context_json: string | null;
+};
+
 export type GuildSettingsTable = {
   guild_id: string;
   dashboard_public: number;
@@ -280,5 +293,6 @@ export type Database = {
   tournament_matches: TournamentMatchesTable;
   tournament_recap_settings: TournamentRecapSettingsTable;
   command_metrics: CommandMetricsTable;
+  log_entries: LogEntriesTable;
   guild_settings: GuildSettingsTable;
 };

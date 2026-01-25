@@ -6,20 +6,55 @@ export type LogContext = Record<string, unknown> & {
   latencyMs?: number;
 };
 
-type LogLevel = "info" | "warn" | "error";
+export type LogLevel = "info" | "warn" | "error";
+
+export type LogEntry = {
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  context?: LogContext;
+};
+
+export type LogSink = {
+  write(entry: LogEntry): Promise<void>;
+};
 
 let lastError: { message: string; context?: LogContext; timestamp: string } | null = null;
+let logSink: LogSink | null = null;
+
+export function setLogSink(sink: LogSink | null) {
+  logSink = sink;
+}
 
 function write(level: LogLevel, message: string, context?: LogContext) {
+  const timestamp = new Date().toISOString();
   const entry = {
-    timestamp: new Date().toISOString(),
+    timestamp,
     level,
     message,
     ...(context ?? {}),
   };
 
   if (level === "error") {
-    lastError = { message, context, timestamp: entry.timestamp };
+    lastError = { message, context, timestamp };
+  }
+
+  if (logSink) {
+    const sinkEntry: LogEntry = {
+      timestamp,
+      level,
+      message,
+      context,
+    };
+    void logSink.write(sinkEntry).catch((error) => {
+      const fallback = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "error",
+        message: "Log sink failed.",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      console.error(fallback);
+    });
   }
 
   const line = JSON.stringify(entry);

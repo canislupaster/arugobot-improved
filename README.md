@@ -211,6 +211,7 @@ Optional environment variables:
 - `CODEFORCES_REQUEST_DELAY_MS` (default `2000`)
 - `CODEFORCES_TIMEOUT_MS` (default `10000`)
 - `CODEFORCES_SOLVED_MAX_PAGES` (default `10`, set `0` for unlimited)
+- `LOG_RETENTION_DAYS` (default `30`, set `0` to disable log cleanup)
 - `WEB_HOST` (default `0.0.0.0`)
 - `WEB_PORT` (default `8787`)
 
@@ -222,6 +223,8 @@ pnpm run dev
 
 The bot runs database migrations on startup.
 Problem and contest caches are persisted in the database to keep basic functionality available during Codeforces outages.
+Structured logs are appended to the database (`log_entries`) and cleaned up automatically based on
+`LOG_RETENTION_DAYS`.
 
 ## Web dashboard
 

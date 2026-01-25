@@ -22,6 +22,7 @@ import { ContestReminderService, contestReminderIntervalMs } from "./services/co
 import { ContestService } from "./services/contests.js";
 import { ContestStandingsService } from "./services/contestStandings.js";
 import { GuildSettingsService } from "./services/guildSettings.js";
+import { LogsService, logCleanupIntervalMs } from "./services/logs.js";
 import { MetricsService } from "./services/metrics.js";
 import {
   PracticeReminderService,
@@ -35,7 +36,7 @@ import { TournamentRecapService } from "./services/tournamentRecaps.js";
 import { TournamentService } from "./services/tournaments.js";
 import { WebsiteService } from "./services/website.js";
 import { CooldownManager } from "./utils/cooldown.js";
-import { logError, logInfo, logWarn } from "./utils/logger.js";
+import { logError, logInfo, logWarn, setLogSink } from "./utils/logger.js";
 import { startWebServer } from "./web/server.js";
 
 type ContestListResponse = Array<{ id: number }>;
@@ -49,9 +50,11 @@ async function main() {
     }
     throw new Error("Configuration validation failed.");
   }
-  logInfo("Configuration loaded.", { environment: config.environment });
   const db = initDb(config.databaseUrl);
   await migrateToLatest(db);
+  const logs = new LogsService(db, config.logRetentionDays);
+  setLogSink(logs);
+  logInfo("Configuration loaded.", { environment: config.environment });
 
   const codeforces = new CodeforcesClient({
     baseUrl: config.codeforcesApiBaseUrl,
@@ -100,6 +103,7 @@ async function main() {
   let contestReminderInterval: NodeJS.Timeout | null = null;
   let practiceReminderInterval: NodeJS.Timeout | null = null;
   let contestRatingAlertInterval: NodeJS.Timeout | null = null;
+  let logCleanupInterval: NodeJS.Timeout | null = null;
   let webServer: ServerType | null = null;
   let shuttingDown = false;
   let isChallengeTicking = false;
@@ -147,6 +151,22 @@ async function main() {
       isParsing = false;
     }
   }
+
+  const runLogCleanup = async () => {
+    if (shuttingDown) {
+      return;
+    }
+    try {
+      const deleted = await logs.cleanupOldEntries();
+      if (deleted > 0) {
+        logInfo("Log cleanup complete.", { deleted });
+      }
+    } catch (error) {
+      logWarn("Log cleanup failed.", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
 
   client.once(Events.ClientReady, async () => {
     logInfo(`Logged in as ${client.user?.tag ?? "unknown"}`);
@@ -267,6 +287,9 @@ async function main() {
     if (contestRatingAlertInterval) {
       clearInterval(contestRatingAlertInterval);
     }
+    if (logCleanupInterval) {
+      clearInterval(logCleanupInterval);
+    }
     if (webServer) {
       await new Promise<void>((resolve) => {
         webServer?.close(() => resolve());
@@ -291,6 +314,11 @@ async function main() {
     { host: config.webHost, port: config.webPort },
     { website, client }
   );
+
+  if (config.logRetentionDays > 0) {
+    await runLogCleanup();
+    logCleanupInterval = setInterval(runLogCleanup, logCleanupIntervalMs);
+  }
 
   await validateConnectivity();
   await client.login(config.discordToken);
