@@ -90,10 +90,13 @@ export const healthCommand: Command = {
     const contestCacheAgeSeconds =
       contestRefreshAt > 0 ? Math.floor((Date.now() - contestRefreshAt) / 1000) : null;
 
+    const formatError = (entry: { timestamp: string; message: string }) =>
+      `${entry.timestamp} - ${entry.message}`;
+
     const embed = new EmbedBuilder()
       .setTitle("ArugoBot Health")
       .setColor(0x3498db)
-      .addFields(
+      .addFields([
         { name: "Uptime", value: `${uptimeSeconds}s`, inline: true },
         { name: "Memory", value: `${Math.round(memory.rss / 1024 / 1024)} MB`, inline: true },
         { name: "DB", value: dbOk ? "OK" : "Failed", inline: true },
@@ -124,8 +127,8 @@ export const healthCommand: Command = {
         { name: "Unique commands", value: String(uniqueCommandCount), inline: true },
         { name: "Node", value: process.version, inline: true },
         { name: "discord.js", value: discordJsVersion, inline: true },
-        { name: "Bot version", value: process.env.npm_package_version ?? "unknown", inline: true }
-      );
+        { name: "Bot version", value: process.env.npm_package_version ?? "unknown", inline: true },
+      ]);
 
     if (lastCommandAt) {
       embed.addFields({ name: "Last command", value: lastCommandAt, inline: true });
@@ -141,108 +144,31 @@ export const healthCommand: Command = {
       embed.addFields({ name: "Top commands", value: lines, inline: false });
     }
 
-    if (lastError) {
+    const errorFields = [
+      { name: "Last error", value: lastError },
+      { name: "Web server last error", value: webStatus.lastError },
+      { name: "Problem cache last error", value: problemLastError },
+      { name: "Codeforces last error", value: cfLastError },
+      { name: "Contest cache last error", value: contestLastError },
+      { name: "Contest rating changes last error", value: contestRatingChangesLastError },
+      { name: "Rating changes last error", value: ratingChangesLastError },
+      { name: "Contest reminders last error", value: reminderLastError },
+      { name: "Contest rating alerts last error", value: ratingAlertLastError },
+      { name: "Practice reminders last error", value: practiceReminderLastError },
+      { name: "Weekly digest last error", value: digestLastError },
+      { name: "Challenge loop last error", value: challengeLastError },
+      { name: "Tournament last error", value: tournamentLastError },
+      { name: "Tournament recaps last error", value: recapLastError },
+      { name: "DB backups last error", value: backupLastError },
+    ];
+
+    for (const entry of errorFields) {
+      if (!entry.value) {
+        continue;
+      }
       embed.addFields({
-        name: "Last error",
-        value: `${lastError.timestamp} - ${lastError.message}`,
-        inline: false,
-      });
-    }
-    if (webStatus.lastError) {
-      embed.addFields({
-        name: "Web server last error",
-        value: `${webStatus.lastError.timestamp} - ${webStatus.lastError.message}`,
-        inline: false,
-      });
-    }
-    if (problemLastError) {
-      embed.addFields({
-        name: "Problem cache last error",
-        value: `${problemLastError.timestamp} - ${problemLastError.message}`,
-        inline: false,
-      });
-    }
-    if (cfLastError) {
-      embed.addFields({
-        name: "Codeforces last error",
-        value: `${cfLastError.timestamp} - ${cfLastError.message}`,
-        inline: false,
-      });
-    }
-    if (contestLastError) {
-      embed.addFields({
-        name: "Contest cache last error",
-        value: `${contestLastError.timestamp} - ${contestLastError.message}`,
-        inline: false,
-      });
-    }
-    if (contestRatingChangesLastError) {
-      embed.addFields({
-        name: "Contest rating changes last error",
-        value: `${contestRatingChangesLastError.timestamp} - ${contestRatingChangesLastError.message}`,
-        inline: false,
-      });
-    }
-    if (ratingChangesLastError) {
-      embed.addFields({
-        name: "Rating changes last error",
-        value: `${ratingChangesLastError.timestamp} - ${ratingChangesLastError.message}`,
-        inline: false,
-      });
-    }
-    if (reminderLastError) {
-      embed.addFields({
-        name: "Contest reminders last error",
-        value: `${reminderLastError.timestamp} - ${reminderLastError.message}`,
-        inline: false,
-      });
-    }
-    if (ratingAlertLastError) {
-      embed.addFields({
-        name: "Contest rating alerts last error",
-        value: `${ratingAlertLastError.timestamp} - ${ratingAlertLastError.message}`,
-        inline: false,
-      });
-    }
-    if (practiceReminderLastError) {
-      embed.addFields({
-        name: "Practice reminders last error",
-        value: `${practiceReminderLastError.timestamp} - ${practiceReminderLastError.message}`,
-        inline: false,
-      });
-    }
-    if (digestLastError) {
-      embed.addFields({
-        name: "Weekly digest last error",
-        value: `${digestLastError.timestamp} - ${digestLastError.message}`,
-        inline: false,
-      });
-    }
-    if (challengeLastError) {
-      embed.addFields({
-        name: "Challenge loop last error",
-        value: `${challengeLastError.timestamp} - ${challengeLastError.message}`,
-        inline: false,
-      });
-    }
-    if (tournamentLastError) {
-      embed.addFields({
-        name: "Tournament last error",
-        value: `${tournamentLastError.timestamp} - ${tournamentLastError.message}`,
-        inline: false,
-      });
-    }
-    if (recapLastError) {
-      embed.addFields({
-        name: "Tournament recaps last error",
-        value: `${recapLastError.timestamp} - ${recapLastError.message}`,
-        inline: false,
-      });
-    }
-    if (backupLastError) {
-      embed.addFields({
-        name: "DB backups last error",
-        value: `${backupLastError.timestamp} - ${backupLastError.message}`,
+        name: entry.name,
+        value: formatError(entry.value),
         inline: false,
       });
     }
@@ -253,38 +179,22 @@ export const healthCommand: Command = {
         inline: false,
       });
     }
-    if (challengeLastTick) {
+
+    const tickFields = [
+      { name: "Challenge loop last tick", value: challengeLastTick },
+      { name: "Contest reminders last tick", value: reminderLastTick },
+      { name: "Contest rating alerts last tick", value: ratingAlertLastTick },
+      { name: "Practice reminders last tick", value: practiceReminderLastTick },
+      { name: "Weekly digests last tick", value: digestLastTick },
+    ];
+
+    for (const entry of tickFields) {
+      if (!entry.value) {
+        continue;
+      }
       embed.addFields({
-        name: "Challenge loop last tick",
-        value: challengeLastTick,
-        inline: false,
-      });
-    }
-    if (reminderLastTick) {
-      embed.addFields({
-        name: "Contest reminders last tick",
-        value: reminderLastTick,
-        inline: false,
-      });
-    }
-    if (ratingAlertLastTick) {
-      embed.addFields({
-        name: "Contest rating alerts last tick",
-        value: ratingAlertLastTick,
-        inline: false,
-      });
-    }
-    if (practiceReminderLastTick) {
-      embed.addFields({
-        name: "Practice reminders last tick",
-        value: practiceReminderLastTick,
-        inline: false,
-      });
-    }
-    if (digestLastTick) {
-      embed.addFields({
-        name: "Weekly digests last tick",
-        value: digestLastTick,
+        name: entry.name,
+        value: entry.value,
         inline: false,
       });
     }
