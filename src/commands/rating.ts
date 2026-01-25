@@ -1,5 +1,13 @@
-import type { Chart, ChartConfiguration, ChartOptions, Plugin } from "chart.js";
+import {
+  Chart,
+  type ChartConfiguration,
+  type ChartItem,
+  type ChartOptions,
+  type Plugin,
+  registerables,
+} from "chart.js";
 import { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { Canvas } from "skia-canvas";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { ephemeralFlags } from "../utils/discordFlags.js";
@@ -8,20 +16,13 @@ import type { Command } from "./types.js";
 
 const width = 900;
 const height = 450;
-let chartCanvas: import("chartjs-node-canvas").ChartJSNodeCanvas | null = null;
 let chartRegistered = false;
 
-async function getChartCanvas() {
-  const chartJs = await import("chart.js");
-  const { ChartJSNodeCanvas } = await import("chartjs-node-canvas");
+function ensureChartRegistered() {
   if (!chartRegistered) {
-    chartJs.Chart.register(...chartJs.registerables);
+    Chart.register(...registerables);
     chartRegistered = true;
   }
-  if (!chartCanvas) {
-    chartCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: "white" });
-  }
-  return chartCanvas;
 }
 
 const ratingBands = [
@@ -56,7 +57,8 @@ const bandPlugin: Plugin<"line"> = {
 };
 
 async function renderRatingChart(name: string, ratings: number[]): Promise<Buffer> {
-  const canvas = await getChartCanvas();
+  ensureChartRegistered();
+  const canvas = new Canvas(width, height);
   const labels = ratings.map((_, index) => String(index + 1));
   const min = Math.min(...ratings) - 100;
   const max = Math.max(...ratings) + 100;
@@ -108,7 +110,11 @@ async function renderRatingChart(name: string, ratings: number[]): Promise<Buffe
     plugins: [bandPlugin],
   };
 
-  return canvas.renderToBuffer(config);
+  const chart = new Chart(canvas as unknown as ChartItem, config);
+  chart.update();
+  const buffer = await canvas.toBuffer("png", { matte: "white" });
+  chart.destroy();
+  return buffer;
 }
 
 export const ratingCommand: Command = {
