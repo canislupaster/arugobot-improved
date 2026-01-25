@@ -7,6 +7,7 @@ import {
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
+import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
@@ -15,7 +16,6 @@ import {
   formatDiscordTimestamp,
   formatDuration,
 } from "../utils/time.js";
-import type { CommandContext } from "../types/commandContext.js";
 
 import type { Command } from "./types.js";
 
