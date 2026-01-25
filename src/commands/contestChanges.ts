@@ -10,6 +10,7 @@ import type { RatingChange } from "../services/ratingChanges.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
@@ -24,8 +25,6 @@ const MAX_MATCHES = 5;
 const MAX_HANDLES = 50;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
-const DEFAULT_SCOPE: ContestScopeFilter = "official";
-
 type TargetHandle = {
   handle: string;
   label: string;
@@ -146,13 +145,6 @@ function buildContestStatusEmbed(
   const embed = applyContestSection(buildContestEmbed(contest), contest, scope);
   embed.addFields({ name: "Rating changes", value: message, inline: false });
   return embed;
-}
-
-function parseScope(raw: string | null): ContestScopeFilter {
-  if (raw === "gym" || raw === "all" || raw === "official") {
-    return raw;
-  }
-  return DEFAULT_SCOPE;
 }
 
 function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, label: string) {
@@ -276,7 +268,7 @@ export const contestChangesCommand: Command = {
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
-    const scope = parseScope(interaction.options.getString("scope"));
+    const scope = parseContestScope(interaction.options.getString("scope"));
     const handleInputs = parseHandleList(handlesRaw);
     const userOptions = getUserOptions([
       interaction.options.getUser("user1"),
@@ -301,35 +293,12 @@ export const contestChangesCommand: Command = {
 
     await interaction.deferReply();
 
-    let stale = false;
-    if (scope === "all") {
-      const results = await Promise.allSettled([
-        context.services.contests.refresh(false, "official"),
-        context.services.contests.refresh(false, "gym"),
-      ]);
-      if (results.some((result) => result.status === "rejected")) {
-        stale = true;
-      }
-      if (context.services.contests.getLastRefreshAt("all") <= 0) {
-        await interaction.editReply(
-          "Unable to reach Codeforces right now. Try again in a few minutes."
-        );
-        return;
-      }
-    } else {
-      try {
-        await context.services.contests.refresh(false, scope);
-      } catch {
-        if (context.services.contests.getLastRefreshAt(scope) > 0) {
-          stale = true;
-        } else {
-          await interaction.editReply(
-            "Unable to reach Codeforces right now. Try again in a few minutes."
-          );
-          return;
-        }
-      }
+    const refreshResult = await refreshContestData(context.services.contests, scope);
+    if ("error" in refreshResult) {
+      await interaction.editReply(refreshResult.error);
+      return;
     }
+    const stale = refreshResult.stale;
 
     try {
       const wantsLatest = isLatestQuery(queryRaw);

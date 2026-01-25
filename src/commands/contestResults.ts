@@ -1,8 +1,9 @@
 import { EmbedBuilder, SlashCommandBuilder, type Guild, type User } from "discord.js";
 
-import type { Contest, ContestScope, ContestScopeFilter } from "../services/contests.js";
+import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
@@ -17,8 +18,6 @@ const MAX_MATCHES = 5;
 const MAX_HANDLES = 50;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
-const DEFAULT_SCOPE: ContestScopeFilter = "official";
-
 type TargetHandle = {
   handle: string;
   label: string;
@@ -157,13 +156,6 @@ function buildContestEmbed(contest: Contest): EmbedBuilder {
   return embed;
 }
 
-function parseScope(raw: string | null): ContestScopeFilter {
-  if (raw === "gym" || raw === "all" || raw === "official") {
-    return raw;
-  }
-  return DEFAULT_SCOPE;
-}
-
 function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, label: string) {
   const key = handle.toLowerCase();
   if (existing.has(key)) {
@@ -209,36 +201,6 @@ function lookupContest(
     return { status: "ambiguous", matches };
   }
   return { status: "ok", contest: matches[0] };
-}
-
-async function refreshContestData(
-  scope: ContestScopeFilter,
-  contests: {
-    refresh: (force?: boolean, scopeFilter?: ContestScope) => Promise<void>;
-    getLastRefreshAt: (scopeFilter: ContestScopeFilter) => number;
-  }
-): Promise<{ stale: boolean } | { error: string }> {
-  if (scope === "all") {
-    const results = await Promise.allSettled([
-      contests.refresh(false, "official"),
-      contests.refresh(false, "gym"),
-    ]);
-    const stale = results.some((result) => result.status === "rejected");
-    if (contests.getLastRefreshAt("all") <= 0) {
-      return { error: "Unable to reach Codeforces right now. Try again in a few minutes." };
-    }
-    return { stale };
-  }
-
-  try {
-    await contests.refresh(false, scope);
-    return { stale: false };
-  } catch {
-    if (contests.getLastRefreshAt(scope) > 0) {
-      return { stale: true };
-    }
-    return { error: "Unable to reach Codeforces right now. Try again in a few minutes." };
-  }
 }
 
 async function buildTargets(
@@ -341,7 +303,7 @@ export const contestResultsCommand: Command = {
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
-    const scope = parseScope(interaction.options.getString("scope"));
+    const scope = parseContestScope(interaction.options.getString("scope"));
     const handleInputs = parseHandleList(handlesRaw);
     const userOptions = getUserOptions([
       interaction.options.getUser("user1"),
@@ -366,7 +328,7 @@ export const contestResultsCommand: Command = {
 
     await interaction.deferReply();
 
-    const refreshResult = await refreshContestData(scope, context.services.contests);
+    const refreshResult = await refreshContestData(context.services.contests, scope);
     if ("error" in refreshResult) {
       await interaction.editReply(refreshResult.error);
       return;

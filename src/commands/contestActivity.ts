@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { parseContestScope } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -14,13 +15,6 @@ const MAX_DAYS = 365;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 const DEFAULT_SCOPE: ContestScopeFilter = "all";
-
-function parseScope(raw: string | null): ContestScopeFilter {
-  if (raw === "official" || raw === "gym" || raw === "all") {
-    return raw;
-  }
-  return DEFAULT_SCOPE;
-}
 
 function formatScope(scope: ContestScopeFilter): string {
   return scope === "official" ? "Official" : scope === "gym" ? "Gym" : "All";
@@ -142,7 +136,7 @@ export const contestActivityCommand: Command = {
 
     const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
     const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-    const scope = parseScope(interaction.options.getString("scope"));
+    const scope = parseContestScope(interaction.options.getString("scope"), DEFAULT_SCOPE);
     if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
       await interaction.reply({ content: "Invalid lookback window." });
       return;

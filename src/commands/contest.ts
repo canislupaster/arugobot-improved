@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   formatDiscordRelativeTime,
@@ -13,8 +14,6 @@ import {
 import type { Command } from "./types.js";
 
 const MAX_MATCHES = 5;
-const DEFAULT_SCOPE: ContestScopeFilter = "official";
-
 function parseContestId(raw: string): number | null {
   const trimmed = raw.trim();
   const urlMatch = trimmed.match(/\bcontests?\/(\d+)/i);
@@ -51,13 +50,6 @@ function formatContestTag(contest: Contest, scope: ContestScopeFilter): string {
     return "";
   }
   return contest.isGym ? "Gym" : "Official";
-}
-
-function parseScope(raw: string | null): ContestScopeFilter {
-  if (raw === "gym" || raw === "all" || raw === "official") {
-    return raw;
-  }
-  return DEFAULT_SCOPE;
 }
 
 function buildContestEmbed(contest: Contest): EmbedBuilder {
@@ -153,39 +145,15 @@ export const contestCommand: Command = {
     ),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
-    const scope = parseScope(interaction.options.getString("scope"));
+    const scope = parseContestScope(interaction.options.getString("scope"));
     await interaction.deferReply();
 
-    let stale = false;
-    if (scope === "all") {
-      const results = await Promise.allSettled([
-        context.services.contests.refresh(false, "official"),
-        context.services.contests.refresh(false, "gym"),
-      ]);
-      if (results.some((result) => result.status === "rejected")) {
-        stale = true;
-      }
-      const lastRefresh = context.services.contests.getLastRefreshAt("all");
-      if (lastRefresh <= 0) {
-        await interaction.editReply(
-          "Unable to reach Codeforces right now. Try again in a few minutes."
-        );
-        return;
-      }
-    } else {
-      try {
-        await context.services.contests.refresh(false, scope);
-      } catch {
-        if (context.services.contests.getLastRefreshAt(scope) > 0) {
-          stale = true;
-        } else {
-          await interaction.editReply(
-            "Unable to reach Codeforces right now. Try again in a few minutes."
-          );
-          return;
-        }
-      }
+    const refreshResult = await refreshContestData(context.services.contests, scope);
+    if ("error" in refreshResult) {
+      await interaction.editReply(refreshResult.error);
+      return;
     }
+    const stale = refreshResult.stale;
 
     try {
       const contestId = parseContestId(queryRaw);
