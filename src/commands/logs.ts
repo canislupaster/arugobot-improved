@@ -55,9 +55,7 @@ export const logsCommand: Command = {
           { name: "Error", value: "error" }
         )
     )
-    .addStringOption((option) =>
-      option.setName("command").setDescription("Filter by command name")
-    )
+    .addStringOption((option) => option.setName("command").setDescription("Filter by command name"))
     .addUserOption((option) => option.setName("user").setDescription("Filter by user")),
   adminOnly: true,
   async execute(interaction, context) {

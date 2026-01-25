@@ -13,7 +13,7 @@ const createInteraction = (options: {
     options: {
       getInteger: jest.fn(() => options.limit ?? null),
       getString: jest.fn((name: string) =>
-        name === "level" ? options.level ?? null : options.command ?? null
+        name === "level" ? (options.level ?? null) : (options.command ?? null)
       ),
       getUser: jest.fn().mockReturnValue(null),
     },

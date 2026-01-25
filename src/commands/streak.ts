@@ -26,10 +26,7 @@ export const streakCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const streak = await context.services.store.getChallengeStreak(
-        interaction.guild.id,
-        user.id
-      );
+      const streak = await context.services.store.getChallengeStreak(interaction.guild.id, user.id);
       if (streak.totalSolvedDays === 0) {
         await interaction.editReply(`No completed challenges yet for ${targetMention}.`);
         return;

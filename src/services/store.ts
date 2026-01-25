@@ -1491,8 +1491,10 @@ export class StoreService {
         if (row.solved_at === null) {
           continue;
         }
-        const entry =
-          byUser.get(row.user_id) ?? { days: new Set<number>(), lastSolvedSeconds: null };
+        const entry = byUser.get(row.user_id) ?? {
+          days: new Set<number>(),
+          lastSolvedSeconds: null,
+        };
         entry.days.add(toUtcDayNumber(row.solved_at));
         entry.lastSolvedSeconds = entry.lastSolvedSeconds
           ? Math.max(entry.lastSolvedSeconds, row.solved_at)
@@ -1502,11 +1504,7 @@ export class StoreService {
 
       const results: ChallengeStreakEntry[] = [];
       for (const [userId, data] of byUser.entries()) {
-        const stats = computeStreakStats(
-          Array.from(data.days),
-          data.lastSolvedSeconds,
-          nowMs
-        );
+        const stats = computeStreakStats(Array.from(data.days), data.lastSolvedSeconds, nowMs);
         results.push({ userId, ...stats });
       }
 
