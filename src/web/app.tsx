@@ -31,9 +31,30 @@ type LeaderboardRow = {
   value: number;
 };
 
+type LabeledValue = {
+  label: string;
+  value: number;
+};
+
 function resolveGuildName(client: Client, guildId: string): string {
   const cached = client.guilds.cache.get(guildId);
   return cached?.name ?? "Unknown server";
+}
+
+function resolveRosterLabel(rosterMap: Map<string, string>, userId: string): string {
+  return rosterMap.get(userId) ?? userId;
+}
+
+function mapRosterLeaderboard<T extends { userId: string }>(
+  rows: T[],
+  rosterMap: Map<string, string>,
+  getValue: (row: T) => number,
+  limit: number
+): LabeledValue[] {
+  return rows.slice(0, limit).map((row) => ({
+    label: resolveRosterLabel(rosterMap, row.userId),
+    value: getValue(row),
+  }));
 }
 
 function escapeCsv(value: string | number): string {
@@ -130,26 +151,36 @@ export function createWebApp({ website, client }: WebAppContext) {
       return c.html(renderNotFoundPage("Guild not found or no data available."), 404);
     }
     const rosterMap = new Map(overview.roster.map((row) => [row.userId, row.handle]));
-    const ratingLeaderboard = overview.ratingLeaderboard.slice(0, 10).map((row) => ({
-      label: rosterMap.get(row.userId) ?? row.userId,
-      value: row.rating,
-    }));
-    const solveLeaderboard = overview.solveLeaderboard.slice(0, 10).map((row) => ({
-      label: rosterMap.get(row.userId) ?? row.userId,
-      value: row.solvedCount,
-    }));
-    const currentStreakLeaderboard = overview.currentStreakLeaderboard.slice(0, 10).map((row) => ({
-      label: rosterMap.get(row.userId) ?? row.userId,
-      value: row.currentStreak,
-    }));
-    const longestStreakLeaderboard = overview.longestStreakLeaderboard.slice(0, 10).map((row) => ({
-      label: rosterMap.get(row.userId) ?? row.userId,
-      value: row.longestStreak,
-    }));
-    const topSolvers = overview.activity.topSolvers.map((row) => ({
-      label: rosterMap.get(row.userId) ?? row.userId,
-      value: row.solvedCount,
-    }));
+    const ratingLeaderboard = mapRosterLeaderboard(
+      overview.ratingLeaderboard,
+      rosterMap,
+      (row) => row.rating,
+      10
+    );
+    const solveLeaderboard = mapRosterLeaderboard(
+      overview.solveLeaderboard,
+      rosterMap,
+      (row) => row.solvedCount,
+      10
+    );
+    const currentStreakLeaderboard = mapRosterLeaderboard(
+      overview.currentStreakLeaderboard,
+      rosterMap,
+      (row) => row.currentStreak,
+      10
+    );
+    const longestStreakLeaderboard = mapRosterLeaderboard(
+      overview.longestStreakLeaderboard,
+      rosterMap,
+      (row) => row.longestStreak,
+      10
+    );
+    const topSolvers = mapRosterLeaderboard(
+      overview.activity.topSolvers,
+      rosterMap,
+      (row) => row.solvedCount,
+      overview.activity.topSolvers.length
+    );
 
     const viewModel: GuildViewModel = {
       generatedAt: new Date().toISOString(),
