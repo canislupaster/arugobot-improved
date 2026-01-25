@@ -3,6 +3,10 @@ import type { Dispatcher } from "undici";
 import { CodeforcesClient } from "../../src/services/codeforces.js";
 import type { RequestScheduler } from "../../src/services/requestPool.js";
 
+const immediateScheduler: RequestScheduler = {
+  schedule: (task) => task(undefined),
+};
+
 describe("CodeforcesClient", () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -19,6 +23,7 @@ describe("CodeforcesClient", () => {
       baseUrl: "https://codeforces.com/api",
       requestDelayMs: 0,
       timeoutMs: 1000,
+      scheduler: immediateScheduler,
     });
 
     const result = await client.request<{ hello: string }>("user.info", { handles: "tourist" });
@@ -36,6 +41,7 @@ describe("CodeforcesClient", () => {
       baseUrl: "https://codeforces.com/api",
       requestDelayMs: 0,
       timeoutMs: 1000,
+      scheduler: immediateScheduler,
     });
 
     await expect(client.request("user.info", { handles: "tourist" })).rejects.toThrow(
@@ -102,6 +108,7 @@ describe("CodeforcesClient", () => {
       baseUrl: "https://codeforces.com/api",
       requestDelayMs: 0,
       timeoutMs: 1000,
+      scheduler: immediateScheduler,
     });
 
     await expect(client.request("contest.list")).rejects.toThrow("HTTP 404");
@@ -126,6 +133,7 @@ describe("CodeforcesClient", () => {
       baseUrl: "https://codeforces.com/api",
       requestDelayMs: 0,
       timeoutMs: 1000,
+      scheduler: immediateScheduler,
     });
 
     const result = await client.request<{ ok: boolean }>("contest.list");
