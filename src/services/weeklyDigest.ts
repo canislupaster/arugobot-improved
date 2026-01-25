@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { resolveSendableChannel } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { getErrorMessage } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
@@ -293,22 +294,10 @@ export class WeeklyDigestService {
     }
 
     try {
-      const embed = await this.buildDigestEmbed(subscription);
-      const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
-      await channel.send({
-        content: mention,
-        allowedMentions,
-        embeds: [embed],
-      });
-      await this.updateLastSent(subscription.guildId);
-      logInfo("Weekly digest sent (manual).", {
-        guildId: subscription.guildId,
-        channelId: subscription.channelId,
-      });
+      await this.sendDigestMessage(subscription, channel, "manual");
       return { status: "sent", channelId: subscription.channelId };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
+      const message = this.recordError(error);
       logWarn("Manual weekly digest failed.", {
         guildId: subscription.guildId,
         channelId: subscription.channelId,
@@ -366,26 +355,42 @@ export class WeeklyDigestService {
           continue;
         }
 
-        const embed = await this.buildDigestEmbed(subscription);
-        const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
-        await channel.send({
-          content: mention,
-          allowedMentions,
-          embeds: [embed],
-        });
-        await this.updateLastSent(subscription.guildId);
-        logInfo("Weekly digest sent.", {
-          guildId: subscription.guildId,
-          channelId: subscription.channelId,
-        });
+        await this.sendDigestMessage(subscription, channel, "scheduled");
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
+      const message = this.recordError(error);
       logError(`Weekly digest tick failed: ${message}`);
     } finally {
       this.isTicking = false;
     }
+  }
+
+  private recordError(error: unknown): string {
+    const message = getErrorMessage(error) || String(error);
+    this.lastError = { message, timestamp: new Date().toISOString() };
+    return message;
+  }
+
+  private async sendDigestMessage(
+    subscription: WeeklyDigestSubscription,
+    channel: Awaited<ReturnType<typeof resolveSendableChannel>>,
+    source: "manual" | "scheduled"
+  ): Promise<void> {
+    if (!channel) {
+      return;
+    }
+    const embed = await this.buildDigestEmbed(subscription);
+    const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
+    await channel.send({
+      content: mention,
+      allowedMentions,
+      embeds: [embed],
+    });
+    await this.updateLastSent(subscription.guildId);
+    logInfo(source === "manual" ? "Weekly digest sent (manual)." : "Weekly digest sent.", {
+      guildId: subscription.guildId,
+      channelId: subscription.channelId,
+    });
   }
 
   private async updateLastSent(guildId: string): Promise<void> {
