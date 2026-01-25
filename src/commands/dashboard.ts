@@ -1,4 +1,9 @@
-import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import {
+  MessageFlags,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+  type ChatInputCommandInteraction,
+} from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
@@ -18,6 +23,28 @@ function buildDashboardUrl(baseUrl: string | undefined, guildId: string): string
     return null;
   }
   return `${baseUrl}/guilds/${guildId}`;
+}
+
+function buildDashboardUrlLine(
+  baseUrl: string | undefined,
+  guildId: string,
+  isPublic: boolean
+): string {
+  if (!isPublic) {
+    return "";
+  }
+  const dashboardUrl = buildDashboardUrl(baseUrl, guildId);
+  return dashboardUrl ? ` Dashboard URL: ${dashboardUrl}.` : "";
+}
+
+async function replyEphemeral(
+  interaction: ChatInputCommandInteraction,
+  content: string
+): Promise<void> {
+  await interaction.reply({
+    content,
+    flags: MessageFlags.Ephemeral,
+  });
 }
 
 export const dashboardCommand: Command = {
@@ -45,10 +72,7 @@ export const dashboardCommand: Command = {
   adminOnly: true,
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(interaction, "This command can only be used in a server.");
       return;
     }
 
@@ -59,53 +83,45 @@ export const dashboardCommand: Command = {
       if (subcommand === "status") {
         const settings = await context.services.guildSettings.getDashboardSettings(guildId);
         if (!settings) {
-          await interaction.reply({
-            content:
-              "Dashboard visibility is private by default. Use `/dashboard set public:true` to opt in.",
-            flags: MessageFlags.Ephemeral,
-          });
+          await replyEphemeral(
+            interaction,
+            "Dashboard visibility is private by default. Use `/dashboard set public:true` to opt in."
+          );
           return;
         }
-        const dashboardUrl = settings.isPublic
-          ? buildDashboardUrl(context.config.webPublicUrl, guildId)
-          : null;
-        const urlLine = dashboardUrl ? ` Dashboard URL: ${dashboardUrl}.` : "";
-        await interaction.reply({
-          content: `Dashboard visibility is ${settings.isPublic ? "public" : "private"}. Last updated ${formatUpdatedAt(
+        const urlLine = buildDashboardUrlLine(
+          context.config.webPublicUrl,
+          guildId,
+          settings.isPublic
+        );
+        const visibility = settings.isPublic ? "public" : "private";
+        await replyEphemeral(
+          interaction,
+          `Dashboard visibility is ${visibility}. Last updated ${formatUpdatedAt(
             settings.updatedAt
-          )}.${urlLine}`,
-          flags: MessageFlags.Ephemeral,
-        });
+          )}.${urlLine}`
+        );
         return;
       }
 
       if (subcommand === "clear") {
         await context.services.guildSettings.clearDashboardSettings(guildId);
-        await interaction.reply({
-          content: "Dashboard visibility reset to private.",
-          flags: MessageFlags.Ephemeral,
-        });
+        await replyEphemeral(interaction, "Dashboard visibility reset to private.");
         return;
       }
 
       const isPublic = interaction.options.getBoolean("public", true);
       await context.services.guildSettings.setDashboardPublic(guildId, isPublic);
-      const dashboardUrl = isPublic
-        ? buildDashboardUrl(context.config.webPublicUrl, guildId)
-        : null;
-      const urlLine = dashboardUrl ? ` Dashboard URL: ${dashboardUrl}.` : "";
-      await interaction.reply({
-        content: `Dashboard visibility updated: ${isPublic ? "public" : "private"}.${urlLine}`,
-        flags: MessageFlags.Ephemeral,
-      });
+      const urlLine = buildDashboardUrlLine(context.config.webPublicUrl, guildId, isPublic);
+      await replyEphemeral(
+        interaction,
+        `Dashboard visibility updated: ${isPublic ? "public" : "private"}.${urlLine}`
+      );
     } catch (error) {
       logCommandError("Dashboard command failed.", interaction, context.correlationId, {
         error: error instanceof Error ? error.message : String(error),
       });
-      await interaction.reply({
-        content: "Failed to update dashboard settings.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(interaction, "Failed to update dashboard settings.");
     }
   },
 };

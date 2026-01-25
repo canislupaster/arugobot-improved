@@ -15,6 +15,28 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
   }) as unknown as ChatInputCommandInteraction;
 
 describe("dashboardCommand", () => {
+  it("rejects DM usage", async () => {
+    const interaction = createInteraction({ guild: null });
+    const context = {
+      config: { webPublicUrl: "https://example.com" },
+      services: {
+        guildSettings: {
+          getDashboardSettings: jest.fn(),
+          clearDashboardSettings: jest.fn(),
+          setDashboardPublic: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await dashboardCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.stringContaining("only be used in a server"),
+      })
+    );
+  });
+
   it("shows default private status when unset", async () => {
     const interaction = createInteraction();
     const context = {
