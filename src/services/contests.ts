@@ -94,6 +94,15 @@ export class ContestService {
     return latest;
   }
 
+  getFinished(limit = 10, sinceSeconds?: number): Contest[] {
+    const filtered = this.contests.filter((contest) => contest.phase === "FINISHED");
+    const since = Number.isFinite(sinceSeconds) ? (sinceSeconds as number) : null;
+    const matches = since
+      ? filtered.filter((contest) => contest.startTimeSeconds >= since)
+      : filtered;
+    return matches.sort((a, b) => b.startTimeSeconds - a.startTimeSeconds).slice(0, limit);
+  }
+
   searchContests(query: string, limit = 5): Contest[] {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {

@@ -13,6 +13,10 @@ import { ChallengeService, challengeUpdateIntervalMs } from "./services/challeng
 import { CodeforcesClient } from "./services/codeforces.js";
 import { CodeforcesCacheService } from "./services/codeforcesCache.js";
 import { ContestActivityService } from "./services/contestActivity.js";
+import {
+  ContestRatingAlertService,
+  contestRatingAlertIntervalMs,
+} from "./services/contestRatingAlerts.js";
 import { ContestRatingChangesService } from "./services/contestRatingChanges.js";
 import { ContestReminderService, contestReminderIntervalMs } from "./services/contestReminders.js";
 import { ContestService } from "./services/contests.js";
@@ -66,6 +70,12 @@ async function main() {
   const store = new StoreService(db, codeforces, {
     maxSolvedPages: config.codeforcesSolvedMaxPages,
   });
+  const contestRatingAlerts = new ContestRatingAlertService(
+    db,
+    contests,
+    contestRatingChanges,
+    store
+  );
   const contestActivity = new ContestActivityService(db, store);
   const challenges = new ChallengeService(db, store, codeforces);
   const tournaments = new TournamentService(db, problems, store, challenges);
@@ -89,6 +99,7 @@ async function main() {
   let challengeInterval: NodeJS.Timeout | null = null;
   let contestReminderInterval: NodeJS.Timeout | null = null;
   let practiceReminderInterval: NodeJS.Timeout | null = null;
+  let contestRatingAlertInterval: NodeJS.Timeout | null = null;
   let webServer: ServerType | null = null;
   let shuttingDown = false;
   let isChallengeTicking = false;
@@ -194,6 +205,15 @@ async function main() {
     };
     await tickPracticeReminders();
     practiceReminderInterval = setInterval(tickPracticeReminders, practiceReminderIntervalMs);
+
+    const tickContestRatingAlerts = async () => {
+      if (shuttingDown) {
+        return;
+      }
+      await contestRatingAlerts.runTick(client);
+    };
+    await tickContestRatingAlerts();
+    contestRatingAlertInterval = setInterval(tickContestRatingAlerts, contestRatingAlertIntervalMs);
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
@@ -211,6 +231,7 @@ async function main() {
         contests,
         contestReminders,
         contestRatingChanges,
+        contestRatingAlerts,
         contestStandings,
         contestActivity,
         guildSettings,
@@ -242,6 +263,9 @@ async function main() {
     }
     if (practiceReminderInterval) {
       clearInterval(practiceReminderInterval);
+    }
+    if (contestRatingAlertInterval) {
+      clearInterval(contestRatingAlertInterval);
     }
     if (webServer) {
       await new Promise<void>((resolve) => {

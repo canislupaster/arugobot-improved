@@ -156,4 +156,36 @@ describe("ContestService", () => {
 
     expect(service.getLatestFinished()?.id).toBe(2);
   });
+
+  it("returns finished contests filtered by recency", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: "Old Round",
+        phase: "FINISHED",
+        startTimeSeconds: 1_500_000_000,
+        durationSeconds: 7200,
+      },
+      {
+        id: 2,
+        name: "Recent Round",
+        phase: "FINISHED",
+        startTimeSeconds: 1_700_000_000,
+        durationSeconds: 7200,
+      },
+      {
+        id: 3,
+        name: "Upcoming",
+        phase: "BEFORE",
+        startTimeSeconds: 1_800_000_000,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestService(mockClient as never, cache);
+    await service.refresh(true);
+
+    const finished = service.getFinished(5, 1_650_000_000);
+    expect(finished.map((contest) => contest.id)).toEqual([2]);
+  });
 });

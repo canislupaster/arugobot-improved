@@ -5,6 +5,7 @@ module.exports = {
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
+  maxWorkers: 1,
   testMatch: ["**/tests/**/*.test.ts"],
   transform: {
     "^.+\\.tsx?$": ["ts-jest", { useESM: true, tsconfig: "tsconfig.json" }],

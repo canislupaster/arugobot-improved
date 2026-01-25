@@ -102,6 +102,21 @@ export type ContestNotificationsTable = {
   notified_at: Generated<string>;
 };
 
+export type ContestRatingAlertSubscriptionsTable = {
+  id: string;
+  guild_id: string;
+  channel_id: string;
+  role_id: string | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
+export type ContestRatingAlertNotificationsTable = {
+  subscription_id: string;
+  contest_id: number;
+  notified_at: Generated<string>;
+};
+
 export type ContestStandingsCacheTable = {
   contest_id: number;
   handles_hash: string;
@@ -248,6 +263,8 @@ export type Database = {
   challenge_participants: ChallengeParticipantsTable;
   contest_reminders: ContestRemindersTable;
   contest_notifications: ContestNotificationsTable;
+  contest_rating_alert_subscriptions: ContestRatingAlertSubscriptionsTable;
+  contest_rating_alert_notifications: ContestRatingAlertNotificationsTable;
   contest_standings_cache: ContestStandingsCacheTable;
   contest_rating_changes: ContestRatingChangesTable;
   practice_reminders: PracticeRemindersTable;

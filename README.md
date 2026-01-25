@@ -179,6 +179,12 @@ Most command responses are public; handle-linking and admin diagnostics remain e
   multiple are configured. `post` can `force` a reminder even if one was already posted.
   `preset` adds a curated subscription (Div 2 or Educational) with sensible keyword filters.
 
+- **/contestratingalerts** `set|status|list|remove|clear|preview|post`
+
+  Configure rating change alerts for finished contests (admin only). Use `set` to choose a channel
+  and optional role mention. `preview` shows the next alert for linked handles, and `post` sends
+  the latest rating change summary immediately (optionally `force` to resend).
+
 - **/practicereminders** `set|status|clear|preview|post`
 
   Configure practice problem reminders (admin only). Use `set` to choose a channel, time, optional `utc_offset` (e.g. `+02:00`, `-05:30`, `Z`), optional `days` (e.g. `mon,wed,fri`, `weekdays`, `weekends`), rating ranges, optional tags, and an optional role mention. If `utc_offset` is omitted the time is interpreted as UTC.
@@ -281,6 +287,6 @@ pnpm start
 
 ## Future TODOs
 
-- Add CSV exports for guild leaderboards in the web dashboard.
-- Add per-guild contest reminder presets for common series (Div 2, Educational).
-- Add a lightweight status page that reports last Codeforces sync and cache age.
+- Add optional filters for contest rating alerts (minimum delta, specific handles).
+- Add gym contest support for `/contests` and reminders.
+- Add a weekly digest post for guild activity and contest participation.

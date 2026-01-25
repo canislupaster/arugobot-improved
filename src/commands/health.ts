@@ -38,6 +38,7 @@ export const healthCommand: Command = {
     const ratingChangesLastError = context.services.ratingChanges.getLastError();
     const [
       reminderCount,
+      ratingAlertCount,
       practiceReminderCount,
       activeChallenges,
       activeTournaments,
@@ -48,6 +49,7 @@ export const healthCommand: Command = {
       topCommands,
     ] = await Promise.all([
       context.services.contestReminders.getSubscriptionCount(),
+      context.services.contestRatingAlerts.getSubscriptionCount(),
       context.services.practiceReminders.getSubscriptionCount(),
       context.services.challenges.getActiveCount(),
       context.services.tournaments.getActiveCount(),
@@ -60,6 +62,8 @@ export const healthCommand: Command = {
 
     const reminderLastTick = context.services.contestReminders.getLastTickAt();
     const reminderLastError = context.services.contestReminders.getLastError();
+    const ratingAlertLastTick = context.services.contestRatingAlerts.getLastTickAt();
+    const ratingAlertLastError = context.services.contestRatingAlerts.getLastError();
     const practiceReminderLastTick = context.services.practiceReminders.getLastTickAt();
     const practiceReminderLastError = context.services.practiceReminders.getLastError();
     const challengeLastTick = context.services.challenges.getLastTickAt();
@@ -89,6 +93,7 @@ export const healthCommand: Command = {
           inline: true,
         },
         { name: "Contest reminders", value: String(reminderCount), inline: true },
+        { name: "Contest rating alerts", value: String(ratingAlertCount), inline: true },
         { name: "Practice reminders", value: String(practiceReminderCount), inline: true },
         { name: "Active challenges", value: String(activeChallenges), inline: true },
         { name: "Active tournaments", value: String(activeTournaments), inline: true },
@@ -163,6 +168,13 @@ export const healthCommand: Command = {
         inline: false,
       });
     }
+    if (ratingAlertLastError) {
+      embed.addFields({
+        name: "Contest rating alerts last error",
+        value: `${ratingAlertLastError.timestamp} - ${ratingAlertLastError.message}`,
+        inline: false,
+      });
+    }
     if (practiceReminderLastError) {
       embed.addFields({
         name: "Practice reminders last error",
@@ -209,6 +221,13 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Contest reminders last tick",
         value: reminderLastTick,
+        inline: false,
+      });
+    }
+    if (ratingAlertLastTick) {
+      embed.addFields({
+        name: "Contest rating alerts last tick",
+        value: ratingAlertLastTick,
         inline: false,
       });
     }

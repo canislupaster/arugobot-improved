@@ -50,7 +50,10 @@ export function getContestReminderPreset(
   return CONTEST_REMINDER_PRESETS[preset];
 }
 
-export function listContestReminderPresets(): Array<{ name: string; value: ContestReminderPreset }> {
+export function listContestReminderPresets(): Array<{
+  name: string;
+  value: ContestReminderPreset;
+}> {
   return Object.entries(CONTEST_REMINDER_PRESETS).map(([key, config]) => ({
     name: config.label,
     value: key as ContestReminderPreset,

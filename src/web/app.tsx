@@ -58,26 +58,17 @@ function escapeMarkdown(value: string | number): string {
   return String(value).replaceAll("|", "\\|");
 }
 
-function formatLeaderboardCsv(
-  rows: LeaderboardRow[],
-  valueLabel: string
-): string {
+function formatLeaderboardCsv(rows: LeaderboardRow[], valueLabel: string): string {
   const header = ["Rank", "Handle", "User ID", valueLabel].join(",");
   const body = rows.map((row, index) =>
-    [
-      escapeCsv(index + 1),
-      escapeCsv(row.handle),
-      escapeCsv(row.userId),
-      escapeCsv(row.value),
-    ].join(",")
+    [escapeCsv(index + 1), escapeCsv(row.handle), escapeCsv(row.userId), escapeCsv(row.value)].join(
+      ","
+    )
   );
   return [header, ...body].join("\n");
 }
 
-function formatLeaderboardMarkdown(
-  rows: LeaderboardRow[],
-  valueLabel: string
-): string {
+function formatLeaderboardMarkdown(rows: LeaderboardRow[], valueLabel: string): string {
   const header = `| Rank | Handle | User ID | ${valueLabel} |`;
   const divider = "| --- | --- | --- | --- |";
   const body = rows.map(
@@ -227,9 +218,7 @@ export function createWebApp({ website, client }: WebAppContext) {
 
   app.get("/status", async (c) => {
     const cacheEntries = await website.getCacheStatus();
-    return c.html(
-      renderStatusPage({ generatedAt: new Date().toISOString(), cacheEntries })
-    );
+    return c.html(renderStatusPage({ generatedAt: new Date().toISOString(), cacheEntries }));
   });
 
   app.notFound((c) => c.html(renderNotFoundPage("Page not found."), 404));
