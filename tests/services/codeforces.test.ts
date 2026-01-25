@@ -66,4 +66,27 @@ describe("CodeforcesClient", () => {
     const options = fetchMock.mock.calls[0]?.[1] as { dispatcher?: unknown } | undefined;
     expect(options?.dispatcher).toBe(dispatcher);
   });
+
+  it("uses extended timeout for status endpoints", async () => {
+    jest.useFakeTimers();
+    const setTimeoutSpy = jest.spyOn(global, "setTimeout");
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: "OK", result: { ok: true } }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const client = new CodeforcesClient({
+      baseUrl: "https://codeforces.com/api",
+      requestDelayMs: 0,
+      timeoutMs: 1000,
+      statusTimeoutMs: 5000,
+    });
+
+    await client.request("contest.status", { contestId: 1, handle: "tourist" });
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
+    jest.useRealTimers();
+    setTimeoutSpy.mockRestore();
+  });
 });

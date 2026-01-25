@@ -92,6 +92,7 @@ async function main() {
     baseUrl: config.codeforcesApiBaseUrl,
     requestDelayMs: config.codeforcesRequestDelayMs,
     timeoutMs: config.codeforcesTimeoutMs,
+    statusTimeoutMs: config.codeforcesStatusTimeoutMs,
     scheduler: requestPool,
   });
   const cache = new CodeforcesCacheService(db);

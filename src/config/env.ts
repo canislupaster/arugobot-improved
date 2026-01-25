@@ -10,6 +10,7 @@ export type AppConfig = {
   codeforcesApiBaseUrl: string;
   codeforcesRequestDelayMs: number;
   codeforcesTimeoutMs: number;
+  codeforcesStatusTimeoutMs: number;
   codeforcesSolvedMaxPages: number;
   proxyFetchUrl?: string;
   logRetentionDays: number;
@@ -55,6 +56,9 @@ export function validateConfig(config: AppConfig): string[] {
   }
   if (config.codeforcesTimeoutMs <= 0) {
     errors.push("CODEFORCES_TIMEOUT_MS must be greater than 0.");
+  }
+  if (config.codeforcesStatusTimeoutMs <= 0) {
+    errors.push("CODEFORCES_STATUS_TIMEOUT_MS must be greater than 0.");
   }
   if (config.codeforcesSolvedMaxPages < 0) {
     errors.push("CODEFORCES_SOLVED_MAX_PAGES must be 0 or greater.");
@@ -107,6 +111,10 @@ export function loadConfig(): AppConfig {
     2000
   );
   const codeforcesTimeoutMs = parseNumber(process.env.CODEFORCES_TIMEOUT_MS ?? "10000", 10000);
+  const codeforcesStatusTimeoutMs = parseNumber(
+    process.env.CODEFORCES_STATUS_TIMEOUT_MS ?? "20000",
+    20000
+  );
   const codeforcesSolvedMaxPages = parseNumber(process.env.CODEFORCES_SOLVED_MAX_PAGES ?? "10", 10);
   const proxyFetchUrl = process.env.PROXY_FETCH_URL?.trim() || undefined;
   const logRetentionDays = parseNumber(process.env.LOG_RETENTION_DAYS ?? "30", 30);
@@ -133,6 +141,7 @@ export function loadConfig(): AppConfig {
     codeforcesApiBaseUrl,
     codeforcesRequestDelayMs,
     codeforcesTimeoutMs,
+    codeforcesStatusTimeoutMs,
     codeforcesSolvedMaxPages,
     proxyFetchUrl,
     logRetentionDays,

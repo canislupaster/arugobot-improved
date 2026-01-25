@@ -1,6 +1,6 @@
 # For AI agents:
 
-Edit this file to document project structure and any features you have added. The Github issue list should be used to document all in-progress work.
+Edit this file to document project structure and any features you have added. The Github issue list should be used to document all in-progress work. Do not add ANYTHING resembling instance locks, or overcomplicate infrastructure. Keep it simple, stupid. If you find yourself incapable of keeping track of the service, it's not because you didn't implement dumb useless features like picking arbitrary ports or global locks. Just use supervisorctl the way god intended.
 
 # ArugoBot
 
@@ -228,6 +228,7 @@ Optional environment variables:
 - `CODEFORCES_API_BASE_URL` (default `https://codeforces.com/api`)
 - `CODEFORCES_REQUEST_DELAY_MS` (default `2000`)
 - `CODEFORCES_TIMEOUT_MS` (default `10000`)
+- `CODEFORCES_STATUS_TIMEOUT_MS` (default `20000`, used for `contest.status`/`user.status`)
 - `CODEFORCES_SOLVED_MAX_PAGES` (default `10`, set `0` for unlimited)
 - `PROXY_FETCH_URL` (optional proxy list URL; one proxy per line as `host:port` or `host:port:user:pass`)
 - `LOG_RETENTION_DAYS` (default `30`, set `0` to disable log cleanup)

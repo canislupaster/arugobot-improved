@@ -9,6 +9,7 @@ describe("validateConfig", () => {
       codeforcesApiBaseUrl: "not-a-url",
       codeforcesRequestDelayMs: 0,
       codeforcesTimeoutMs: -5,
+      codeforcesStatusTimeoutMs: 0,
       codeforcesSolvedMaxPages: -1,
       proxyFetchUrl: "not-a-url",
       logRetentionDays: -1,
@@ -24,6 +25,7 @@ describe("validateConfig", () => {
     expect(errors).toContain("CODEFORCES_API_BASE_URL must be a valid http(s) URL.");
     expect(errors).toContain("CODEFORCES_REQUEST_DELAY_MS must be greater than 0.");
     expect(errors).toContain("CODEFORCES_TIMEOUT_MS must be greater than 0.");
+    expect(errors).toContain("CODEFORCES_STATUS_TIMEOUT_MS must be greater than 0.");
     expect(errors).toContain("CODEFORCES_SOLVED_MAX_PAGES must be 0 or greater.");
     expect(errors).toContain("PROXY_FETCH_URL must be a valid http(s) URL.");
     expect(errors).toContain("LOG_RETENTION_DAYS must be 0 or greater.");
@@ -43,6 +45,7 @@ describe("validateConfig", () => {
       codeforcesApiBaseUrl: "https://codeforces.com/api",
       codeforcesRequestDelayMs: 1000,
       codeforcesTimeoutMs: 1000,
+      codeforcesStatusTimeoutMs: 1000,
       codeforcesSolvedMaxPages: 10,
       proxyFetchUrl: "https://example.com/proxies.txt",
       logRetentionDays: 30,

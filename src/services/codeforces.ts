@@ -16,6 +16,7 @@ type RequestOptions = {
   baseUrl: string;
   requestDelayMs: number;
   timeoutMs: number;
+  statusTimeoutMs?: number;
   scheduler?: RequestScheduler;
 };
 
@@ -45,9 +46,15 @@ export class CodeforcesClient {
       url.searchParams.set(key, String(value));
     }
 
+    const shouldUseExtendedTimeout =
+      endpoint === "contest.status" || endpoint === "user.status";
+    const timeoutMs = shouldUseExtendedTimeout
+      ? this.options.statusTimeoutMs ?? this.options.timeoutMs
+      : this.options.timeoutMs;
+
     const attempt = async (dispatcher?: Dispatcher) => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.options.timeoutMs);
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const response = await fetch(url.toString(), {
           signal: controller.signal,
