@@ -197,18 +197,18 @@ function Layout(props: {
         <meta name="theme-color" content="#0b1b24" />
         <title>{props.title}</title>
         <link rel="stylesheet" href="/static/styles.css" />
-        <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/static/brand-icon.png" type="image/png" />
       </head>
       <body>
         <div class="page">
           <header class="site-header">
-            <div class="brand">
+            <a class="brand" href="/">
               <div class="mark" aria-hidden="true" />
               <div>
                 <div class="brand-title">ArugoBot</div>
                 <div class="brand-subtitle">Codeforces practice HQ</div>
               </div>
-            </div>
+            </a>
             <nav class="nav">
               <a href="/">Overview</a>
               <a href="/status">Status</a>

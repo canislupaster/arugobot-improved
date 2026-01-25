@@ -91,7 +91,7 @@ export function createWebApp({ website, client }: WebAppContext) {
     })
   );
 
-  app.get("/favicon.ico", (c) => c.redirect("/static/favicon.svg", 302));
+  app.get("/favicon.ico", (c) => c.redirect("/static/brand-icon.png", 302));
 
   app.use("*", async (c, next) => {
     const requestId = randomUUID();

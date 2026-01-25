@@ -269,6 +269,6 @@ describe("web app", () => {
 
     const faviconResponse = await app.request("http://localhost/favicon.ico");
     expect(faviconResponse.status).toBe(302);
-    expect(faviconResponse.headers.get("location")).toBe("/static/favicon.svg");
+    expect(faviconResponse.headers.get("location")).toBe("/static/brand-icon.png");
   });
 });

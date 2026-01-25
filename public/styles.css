@@ -55,6 +55,7 @@
   --text: #f5f2ea;
   --text-muted: #b6b1a7;
   --accent: #d1a756;
+  --accent-dark: #b28a3f;
   --accent-2: #888f98;
   --accent-3: #e6c47d;
   --shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
@@ -115,8 +116,8 @@ a:hover {
   width: 46px;
   height: 46px;
   border-radius: 14px;
-  background: var(--accent);
-  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
+  background: url("/static/brand-icon.png") center/cover no-repeat;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
 
 .brand-title {
@@ -397,6 +398,7 @@ tbody tr:hover {
 }
 
 .button:hover {
+  background: var(--accent-dark);
   transform: translateY(-2px);
   box-shadow: 0 12px 24px rgba(15, 24, 31, 0.35);
 }
