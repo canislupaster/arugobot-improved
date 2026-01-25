@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatTime } from "../utils/rating.js";
 import { capitalize } from "../utils/text.js";
 import { formatTournamentRecapMarkdown } from "../utils/tournamentRecap.js";
@@ -226,12 +227,12 @@ export class TournamentRecapService {
     const markdown = formatTournamentRecapMarkdown(recap);
     const filename = `tournament-recap-${tournamentId.slice(0, 8)}.md`;
     const file = new AttachmentBuilder(Buffer.from(markdown, "utf8"), { name: filename });
-    const mention = subscription.roleId ? `<@&${subscription.roleId}>` : undefined;
+    const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
 
     try {
       await channel.send({
         content: mention,
-        allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+        allowedMentions,
         embeds: [embed],
         files: [file],
       });

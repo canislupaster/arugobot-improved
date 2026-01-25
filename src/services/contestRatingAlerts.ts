@@ -7,6 +7,7 @@ import type { Database } from "../db/types.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { ContestRatingChangesService } from "./contestRatingChanges.js";
@@ -354,10 +355,10 @@ export class ContestRatingAlertService {
 
     const embed = buildContestRatingAlertEmbed(candidate.preview);
     try {
-      const mention = subscription.roleId ? `<@&${subscription.roleId}>` : undefined;
+      const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
       await channel.send({
         content: mention,
-        allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+        allowedMentions,
         embeds: [embed],
       });
       await this.markNotified(subscription.id, candidate.preview.contest.id);
@@ -455,10 +456,10 @@ export class ContestRatingAlertService {
 
         const embed = buildContestRatingAlertEmbed(candidate.preview);
         try {
-          const mention = subscription.roleId ? `<@&${subscription.roleId}>` : undefined;
+          const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
           await channel.send({
             content: mention,
-            allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+            allowedMentions,
             embeds: [embed],
           });
           await this.markNotified(subscription.id, candidate.preview.contest.id);

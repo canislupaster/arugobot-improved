@@ -12,6 +12,7 @@ import {
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -294,10 +295,10 @@ export class ContestReminderService {
     const secondsUntil = Math.max(0, contest.startTimeSeconds - nowSeconds);
     const embed = buildReminderEmbed(contest, secondsUntil);
     try {
-      const mention = subscription.roleId ? `<@&${subscription.roleId}>` : undefined;
+      const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
       await channel.send({
         content: mention,
-        allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+        allowedMentions,
         embeds: [embed],
       });
       await this.markNotified(subscription.id, contest.id);
@@ -439,10 +440,10 @@ export class ContestReminderService {
           const secondsUntil = contest.startTimeSeconds - nowSeconds;
           const embed = buildReminderEmbed(contest, secondsUntil);
           try {
-            const mention = subscription.roleId ? `<@&${subscription.roleId}>` : undefined;
+            const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
             await textChannel.send({
               content: mention,
-              allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+              allowedMentions,
               embeds: [embed],
             });
             await this.markNotified(subscription.id, contest.id);

@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { ContestActivityService } from "./contestActivity.js";
@@ -112,10 +113,6 @@ export function getNextWeeklyScheduledUtcMs(
 
 function formatUserLine(userId: string, count: number, label: string): string {
   return `${label} <@${userId}> • ${count}`;
-}
-
-function buildRoleMention(roleId: string | null): string | undefined {
-  return roleId ? `<@&${roleId}>` : undefined;
 }
 
 function formatDelta(delta: number): string {
@@ -299,10 +296,10 @@ export class WeeklyDigestService {
 
     try {
       const embed = await this.buildDigestEmbed(subscription);
-      const mention = buildRoleMention(subscription.roleId);
+      const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
       await channel.send({
         content: mention,
-        allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+        allowedMentions,
         embeds: [embed],
       });
       await this.updateLastSent(subscription.guildId);
@@ -375,10 +372,10 @@ export class WeeklyDigestService {
         }
 
         const embed = await this.buildDigestEmbed(subscription);
-        const mention = buildRoleMention(subscription.roleId);
+        const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
         await channel.send({
           content: mention,
-          allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+          allowedMentions,
           embeds: [embed],
         });
         await this.updateLastSent(subscription.guildId);

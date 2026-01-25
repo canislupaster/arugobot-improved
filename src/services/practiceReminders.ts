@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
   filterProblemsByRatingRanges,
   filterProblemsByTags,
@@ -172,10 +173,6 @@ function formatRatingRanges(ranges: RatingRange[]): string {
   return ranges
     .map((range) => (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`))
     .join(", ");
-}
-
-function buildRoleMention(roleId: string | null): string | undefined {
-  return roleId ? `<@&${roleId}>` : undefined;
 }
 
 export class PracticeReminderService {
@@ -396,10 +393,10 @@ export class PracticeReminderService {
       }
 
       const embed = this.buildPracticeEmbed(subscription, selection.problem, selection);
-      const mention = buildRoleMention(subscription.roleId);
+      const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
       await channel.send({
         content: mention,
-        allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+        allowedMentions,
         embeds: [embed],
       });
       await this.markPosted(subscription.guildId, selection.problem);
@@ -496,10 +493,10 @@ export class PracticeReminderService {
 
         const embed = this.buildPracticeEmbed(subscription, selection.problem, selection);
         try {
-          const mention = buildRoleMention(subscription.roleId);
+          const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
           await channel.send({
             content: mention,
-            allowedMentions: mention ? { roles: [subscription.roleId!] } : { parse: [] },
+            allowedMentions,
             embeds: [embed],
           });
           await this.markPosted(subscription.guildId, selection.problem);
