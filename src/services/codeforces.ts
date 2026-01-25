@@ -26,9 +26,11 @@ class RateLimiter {
       if (waitMs > 0) {
         await sleep(waitMs);
       }
-      const result = await task();
-      this.lastRequestAt = Date.now();
-      return result;
+      try {
+        return await task();
+      } finally {
+        this.lastRequestAt = Date.now();
+      }
     });
     this.queue = run.then(
       () => undefined,
