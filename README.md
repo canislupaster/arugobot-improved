@@ -192,6 +192,10 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Shows recent contest participation for the server's linked handles, including top participants and recent contests.
 
+- **/contestdeltas** `[days]` `[limit]`
+
+  Shows recent contest rating deltas for the server's linked handles, including top gainers/losers.
+
 - **/contestreminders** `add|set|list|status|preset|remove|clear|preview|post`
 
   Configure contest reminders for the server (admin only). Use `add` (or legacy `set`) to create
