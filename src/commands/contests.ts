@@ -65,6 +65,10 @@ function buildFooterText(stale: boolean, filters: ReturnType<typeof parseKeyword
   return parts.join(" ");
 }
 
+function hasKeywordFilters(filters: ReturnType<typeof parseKeywordFilters>): boolean {
+  return filters.includeKeywords.length > 0 || filters.excludeKeywords.length > 0;
+}
+
 export const contestsCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contests")
@@ -110,14 +114,17 @@ export const contestsCommand: Command = {
     }
     const stale = refreshResult.stale;
 
-    const ongoing = filterContestsByKeywords(context.services.contests.getOngoing(scope), filters);
-    const upcoming = filterContestsByKeywords(
-      context.services.contests.getUpcoming(limit, scope),
-      filters
-    );
+    const rawOngoing = context.services.contests.getOngoing(scope);
+    const rawUpcoming = context.services.contests.getUpcoming(limit, scope);
+    const ongoing = filterContestsByKeywords(rawOngoing, filters);
+    const upcoming = filterContestsByKeywords(rawUpcoming, filters);
 
     if (ongoing.length === 0 && upcoming.length === 0) {
-      await interaction.editReply("No Codeforces contests found.");
+      if (hasKeywordFilters(filters) && (rawOngoing.length > 0 || rawUpcoming.length > 0)) {
+        await interaction.editReply("No contests match the selected filters.");
+      } else {
+        await interaction.editReply("No Codeforces contests found.");
+      }
       return;
     }
 

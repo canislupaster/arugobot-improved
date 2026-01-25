@@ -64,6 +64,32 @@ describe("contestsCommand", () => {
     expect(fieldText).not.toContain("Kotlin Heroes");
   });
 
+  it("explains when filters remove all contests", async () => {
+    const interaction = createInteraction();
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getOngoing: jest.fn().mockReturnValue([]),
+          getUpcoming: jest.fn().mockReturnValue([
+            {
+              id: 102,
+              name: "Kotlin Heroes: Practice",
+              phase: "BEFORE",
+              startTimeSeconds: 1_700_000_600,
+              durationSeconds: 7200,
+            },
+          ]),
+          getLastRefreshAt: jest.fn().mockReturnValue(1_700_000_000),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestsCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith("No contests match the selected filters.");
+  });
+
   it("uses the gym scope when requested", async () => {
     const interaction = createInteraction({ scope: "gym" });
     const context = {
