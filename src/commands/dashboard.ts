@@ -13,6 +13,13 @@ function formatUpdatedAt(updatedAt: string): string {
   return formatDiscordTimestamp(Math.floor(parsed / 1000));
 }
 
+function buildDashboardUrl(baseUrl: string | undefined, guildId: string): string | null {
+  if (!baseUrl) {
+    return null;
+  }
+  return `${baseUrl}/guilds/${guildId}`;
+}
+
 export const dashboardCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("dashboard")
@@ -59,10 +66,14 @@ export const dashboardCommand: Command = {
           });
           return;
         }
+        const dashboardUrl = settings.isPublic
+          ? buildDashboardUrl(context.config.webPublicUrl, guildId)
+          : null;
+        const urlLine = dashboardUrl ? ` Dashboard URL: ${dashboardUrl}.` : "";
         await interaction.reply({
           content: `Dashboard visibility is ${settings.isPublic ? "public" : "private"}. Last updated ${formatUpdatedAt(
             settings.updatedAt
-          )}.`,
+          )}.${urlLine}`,
           ephemeral: true,
         });
         return;
@@ -79,8 +90,12 @@ export const dashboardCommand: Command = {
 
       const isPublic = interaction.options.getBoolean("public", true);
       await context.services.guildSettings.setDashboardPublic(guildId, isPublic);
+      const dashboardUrl = isPublic
+        ? buildDashboardUrl(context.config.webPublicUrl, guildId)
+        : null;
+      const urlLine = dashboardUrl ? ` Dashboard URL: ${dashboardUrl}.` : "";
       await interaction.reply({
-        content: `Dashboard visibility updated: ${isPublic ? "public" : "private"}.`,
+        content: `Dashboard visibility updated: ${isPublic ? "public" : "private"}.${urlLine}`,
         ephemeral: true,
       });
     } catch (error) {

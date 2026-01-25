@@ -18,6 +18,7 @@ describe("dashboardCommand", () => {
   it("shows default private status when unset", async () => {
     const interaction = createInteraction();
     const context = {
+      config: { webPublicUrl: "https://example.com" },
       services: {
         guildSettings: {
           getDashboardSettings: jest.fn().mockResolvedValue(null),
@@ -45,6 +46,7 @@ describe("dashboardCommand", () => {
     });
     const setDashboardPublic = jest.fn().mockResolvedValue(undefined);
     const context = {
+      config: { webPublicUrl: "https://example.com" },
       services: {
         guildSettings: {
           getDashboardSettings: jest.fn(),
@@ -57,6 +59,11 @@ describe("dashboardCommand", () => {
     await dashboardCommand.execute(interaction, context);
 
     expect(setDashboardPublic).toHaveBeenCalledWith("guild-1", true);
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.stringContaining("https://example.com/guilds/guild-1"),
+      })
+    );
   });
 
   it("clears visibility on clear", async () => {
@@ -68,6 +75,7 @@ describe("dashboardCommand", () => {
     });
     const clearDashboardSettings = jest.fn().mockResolvedValue(undefined);
     const context = {
+      config: { webPublicUrl: "https://example.com" },
       services: {
         guildSettings: {
           getDashboardSettings: jest.fn(),
@@ -80,5 +88,30 @@ describe("dashboardCommand", () => {
     await dashboardCommand.execute(interaction, context);
 
     expect(clearDashboardSettings).toHaveBeenCalledWith("guild-1");
+  });
+
+  it("includes dashboard URL in status when public", async () => {
+    const interaction = createInteraction();
+    const context = {
+      config: { webPublicUrl: "https://example.com" },
+      services: {
+        guildSettings: {
+          getDashboardSettings: jest.fn().mockResolvedValue({
+            isPublic: true,
+            updatedAt: "2024-01-01T00:00:00.000Z",
+          }),
+          clearDashboardSettings: jest.fn(),
+          setDashboardPublic: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await dashboardCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.stringContaining("https://example.com/guilds/guild-1"),
+      })
+    );
   });
 });

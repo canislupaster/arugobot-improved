@@ -231,6 +231,7 @@ Optional environment variables:
 - `LOG_RETENTION_DAYS` (default `30`, set `0` to disable log cleanup)
 - `WEB_HOST` (default `0.0.0.0`)
 - `WEB_PORT` (default `8787`)
+- `WEB_PUBLIC_URL` (optional, e.g. `https://bot.example.com`, used for `/dashboard` links)
 
 ```bash
 pnpm install
@@ -248,6 +249,7 @@ Structured logs are appended to the database (`log_entries`) and cleaned up auto
 The bot serves a Hono-powered dashboard for global stats and per-guild leaderboards.
 By default it listens on `http://localhost:8787` (override with `WEB_HOST`/`WEB_PORT`).
 Only guilds that opt in via `/dashboard set public:true` appear on the public pages.
+If `WEB_PUBLIC_URL` is set, `/dashboard` responses include direct links to your guild page.
 The overview highlights core bot features alongside global contest participation cards sourced from
 cached rating changes, split by official vs gym activity. Per-guild pages include CSV/Markdown
 exports for rating/solve leaderboards, and `/status` shows cache ages for key Codeforces syncs.
@@ -311,5 +313,5 @@ pnpm start
 
 ## Future TODOs
 
-- Add gym contest support for `/contests` and reminders.
-- Add a weekly digest analytics card to the web dashboard.
+- Expand the weekly digest with more contest analytics (rating change deltas, contest counts).
+- Add a dashboard card for contest rating alerts coverage and cache freshness.

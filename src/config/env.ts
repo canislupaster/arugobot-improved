@@ -14,6 +14,7 @@ export type AppConfig = {
   logRetentionDays: number;
   webHost: string;
   webPort: number;
+  webPublicUrl?: string;
 };
 
 function parseNumber(value: string, fallback: number): number {
@@ -65,6 +66,9 @@ export function validateConfig(config: AppConfig): string[] {
   if (!Number.isFinite(config.webPort) || config.webPort <= 0 || config.webPort > 65535) {
     errors.push("WEB_PORT must be a valid port number (1-65535).");
   }
+  if (config.webPublicUrl && !isValidUrl(config.webPublicUrl)) {
+    errors.push("WEB_PUBLIC_URL must be a valid http(s) URL.");
+  }
   return errors;
 }
 
@@ -84,6 +88,8 @@ export function loadConfig(): AppConfig {
   const logRetentionDays = parseNumber(process.env.LOG_RETENTION_DAYS ?? "30", 30);
   const webHost = process.env.WEB_HOST?.trim() || "0.0.0.0";
   const webPort = parseNumber(process.env.WEB_PORT ?? "8787", 8787);
+  const webPublicUrlRaw = process.env.WEB_PUBLIC_URL?.trim();
+  const webPublicUrl = webPublicUrlRaw ? webPublicUrlRaw.replace(/\/+$/, "") : undefined;
 
   return {
     discordToken,
@@ -97,5 +103,6 @@ export function loadConfig(): AppConfig {
     logRetentionDays,
     webHost,
     webPort,
+    webPublicUrl,
   };
 }
