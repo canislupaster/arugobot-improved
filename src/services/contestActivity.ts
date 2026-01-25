@@ -2,9 +2,10 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { logError, logWarn } from "../utils/logger.js";
+import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
 import type { ContestScope } from "./contests.js";
-import type { RatingChange, RatingChangesService } from "./ratingChanges.js";
+import type { RatingChangesService } from "./ratingChanges.js";
 import type { StoreService } from "./store.js";
 
 type RosterEntry = { userId: string; handle: string };
@@ -79,25 +80,6 @@ const MAX_REFRESH_HANDLES = 500;
 
 function normalizeHandle(handle: string): string {
   return handle.trim().toLowerCase();
-}
-
-function parseRatingChangesPayload(payload: string): RatingChange[] {
-  try {
-    const parsed = JSON.parse(payload) as RatingChange[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.filter(
-      (entry) =>
-        Number.isFinite(entry.contestId) &&
-        Number.isFinite(entry.rank) &&
-        Number.isFinite(entry.oldRating) &&
-        Number.isFinite(entry.newRating) &&
-        Number.isFinite(entry.ratingUpdateTimeSeconds)
-    );
-  } catch {
-    return [];
-  }
 }
 
 function createEmptyScopeSummary(): ContestScopeSummary {

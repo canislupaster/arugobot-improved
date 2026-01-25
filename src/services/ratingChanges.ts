@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { isCacheFresh } from "../utils/cache.js";
 import { logError, logWarn } from "../utils/logger.js";
+import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
 
@@ -35,25 +36,6 @@ function normalizeHandle(handle: string): string {
   return handle.trim().toLowerCase();
 }
 
-function parseChanges(payload: string): RatingChange[] {
-  try {
-    const parsed = JSON.parse(payload) as RatingChange[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.filter(
-      (entry) =>
-        Number.isFinite(entry.contestId) &&
-        Number.isFinite(entry.rank) &&
-        Number.isFinite(entry.oldRating) &&
-        Number.isFinite(entry.newRating) &&
-        Number.isFinite(entry.ratingUpdateTimeSeconds)
-    );
-  } catch {
-    return [];
-  }
-}
-
 export class RatingChangesService {
   private lastError: { message: string; timestamp: string } | null = null;
 
@@ -84,7 +66,11 @@ export class RatingChangesService {
     }
 
     if (cached && isCacheFresh(cached.last_fetched, ttlMs)) {
-      return { changes: parseChanges(cached.payload), source: "cache", isStale: false };
+      return {
+        changes: parseRatingChangesPayload(cached.payload),
+        source: "cache",
+        isStale: false,
+      };
     }
 
     try {
@@ -117,7 +103,11 @@ export class RatingChangesService {
         error: message,
       });
       if (cached) {
-        return { changes: parseChanges(cached.payload), source: "cache", isStale: true };
+        return {
+          changes: parseRatingChangesPayload(cached.payload),
+          source: "cache",
+          isStale: true,
+        };
       }
       return null;
     }
