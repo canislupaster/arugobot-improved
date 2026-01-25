@@ -1,8 +1,65 @@
+import type { ChatInputCommandInteraction } from "discord.js";
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
+import type { CommandContext } from "../types/commandContext.js";
+
+type StoreService = CommandContext["services"]["store"];
+type HandleInsertResult = "ok" | "handle_exists" | "already_linked" | "error";
+type HandleUpdateResult = "ok" | "not_linked" | "handle_exists" | "error";
+
+const formatNoHandleMessage = (userId: string) => `No handle linked for <@${userId}>.`;
+
+const resolveCanonicalHandle = async (
+  interaction: ChatInputCommandInteraction,
+  store: StoreService
+): Promise<string | null> => {
+  const handleInput = interaction.options.getString("handle", true).trim();
+  const handleInfo = await store.resolveHandle(handleInput);
+  if (!handleInfo.exists) {
+    await interaction.editReply("Invalid handle.");
+    return null;
+  }
+  return handleInfo.canonicalHandle ?? handleInput;
+};
+
+const replyForInsertResult = (
+  interaction: ChatInputCommandInteraction,
+  userId: string,
+  handle: string,
+  result: HandleInsertResult
+) => {
+  if (result === "ok") {
+    return interaction.editReply(`Linked handle for <@${userId}> set to ${handle}.`);
+  }
+  if (result === "handle_exists") {
+    return interaction.editReply("Handle taken in this server.");
+  }
+  if (result === "already_linked") {
+    return interaction.editReply("That user already linked a handle.");
+  }
+  return interaction.editReply("Unable to link handle right now.");
+};
+
+const replyForUpdateResult = (
+  interaction: ChatInputCommandInteraction,
+  userId: string,
+  handle: string,
+  result: HandleUpdateResult
+) => {
+  if (result === "ok") {
+    return interaction.editReply(`Updated handle for <@${userId}> to ${handle}.`);
+  }
+  if (result === "handle_exists") {
+    return interaction.editReply("Handle taken in this server.");
+  }
+  if (result === "not_linked") {
+    return interaction.editReply(formatNoHandleMessage(userId));
+  }
+  return interaction.editReply("Unable to update handle right now.");
+};
 
 export const handleAdminCommand: Command = {
   data: new SlashCommandBuilder()
@@ -48,14 +105,14 @@ export const handleAdminCommand: Command = {
 
     const guildId = interaction.guild.id;
     const subcommand = interaction.options.getSubcommand();
+    const user = interaction.options.getUser("user", true);
     await interaction.deferReply({ ephemeral: true });
 
     try {
       if (subcommand === "status") {
-        const user = interaction.options.getUser("user", true);
         const handle = await context.services.store.getHandle(guildId, user.id);
         if (!handle) {
-          await interaction.editReply(`No handle linked for <@${user.id}>.`);
+          await interaction.editReply(formatNoHandleMessage(user.id));
           return;
         }
         await interaction.editReply(`Handle for <@${user.id}> is ${handle}.`);
@@ -63,10 +120,9 @@ export const handleAdminCommand: Command = {
       }
 
       if (subcommand === "unlink") {
-        const user = interaction.options.getUser("user", true);
         const handle = await context.services.store.getHandle(guildId, user.id);
         if (!handle) {
-          await interaction.editReply(`No handle linked for <@${user.id}>.`);
+          await interaction.editReply(formatNoHandleMessage(user.id));
           return;
         }
         await context.services.store.unlinkUser(guildId, user.id);
@@ -75,14 +131,10 @@ export const handleAdminCommand: Command = {
       }
 
       if (subcommand === "set") {
-        const user = interaction.options.getUser("user", true);
-        const handleInput = interaction.options.getString("handle", true).trim();
-        const handleInfo = await context.services.store.resolveHandle(handleInput);
-        if (!handleInfo.exists) {
-          await interaction.editReply("Invalid handle.");
+        const resolvedHandle = await resolveCanonicalHandle(interaction, context.services.store);
+        if (!resolvedHandle) {
           return;
         }
-        const resolvedHandle = handleInfo.canonicalHandle ?? handleInput;
         const currentHandle = await context.services.store.getHandle(guildId, user.id);
         if (currentHandle) {
           if (currentHandle.toLowerCase() === resolvedHandle.toLowerCase()) {
@@ -94,15 +146,7 @@ export const handleAdminCommand: Command = {
             user.id,
             resolvedHandle
           );
-          if (updateResult === "ok") {
-            await interaction.editReply(`Updated handle for <@${user.id}> to ${resolvedHandle}.`);
-            return;
-          }
-          if (updateResult === "handle_exists") {
-            await interaction.editReply("Handle taken in this server.");
-            return;
-          }
-          await interaction.editReply("Unable to update handle right now.");
+          await replyForUpdateResult(interaction, user.id, resolvedHandle, updateResult);
           return;
         }
 
@@ -111,19 +155,7 @@ export const handleAdminCommand: Command = {
           user.id,
           resolvedHandle
         );
-        if (insertResult === "ok") {
-          await interaction.editReply(`Linked handle for <@${user.id}> set to ${resolvedHandle}.`);
-          return;
-        }
-        if (insertResult === "handle_exists") {
-          await interaction.editReply("Handle taken in this server.");
-          return;
-        }
-        if (insertResult === "already_linked") {
-          await interaction.editReply("That user already linked a handle.");
-          return;
-        }
-        await interaction.editReply("Unable to link handle right now.");
+        await replyForInsertResult(interaction, user.id, resolvedHandle, insertResult);
         return;
       }
     } catch (error) {
