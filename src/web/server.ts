@@ -13,6 +13,13 @@ export type WebServerConfig = {
   port: number;
 };
 
+function formatWebServerErrorMessage(config: WebServerConfig, error: NodeJS.ErrnoException): string {
+  if (error.code === "EADDRINUSE") {
+    return `Web server port ${config.port} is already in use on ${config.host}. Set WEB_PORT=0 or choose another port.`;
+  }
+  return error.message ?? "Unknown web server error.";
+}
+
 export async function startWebServer(
   config: WebServerConfig,
   deps: { website: WebsiteService; client: Client },
@@ -23,12 +30,13 @@ export async function startWebServer(
   const retryDelayMs = 500;
 
   const updateFailure = (err: NodeJS.ErrnoException) => {
+    const message = formatWebServerErrorMessage(config, err);
     status &&
       Object.assign(status, {
         status: "failed",
         actualPort: null,
         lastError: {
-          message: err.message ?? "Unknown error",
+          message,
           code: err.code,
           timestamp: new Date().toISOString(),
         },
@@ -64,7 +72,7 @@ export async function startWebServer(
           host: config.host,
           port: config.port,
           code: err.code ?? "unknown",
-          message: err.message,
+          message: formatWebServerErrorMessage(config, err),
         });
         finalize({ server: null, actualPort: null, error: err });
       });
@@ -83,7 +91,7 @@ export async function startWebServer(
           host: config.host,
           port: config.port,
           code: err.code ?? "unknown",
-          message: err.message ?? String(error),
+          message: formatWebServerErrorMessage(config, err),
         });
         finalize({ server: null, actualPort: null, error: err });
       }
