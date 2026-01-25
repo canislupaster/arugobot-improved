@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { normalizeHandleKey } from "../utils/handles.js";
 import { logError, logWarn } from "../utils/logger.js";
 import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
@@ -77,10 +78,6 @@ const DEFAULT_LOOKBACK_DAYS = 90;
 const DEFAULT_RECENT_LIMIT = 4;
 const DEFAULT_DELTA_LIMIT = 3;
 const MAX_REFRESH_HANDLES = 500;
-
-function normalizeHandle(handle: string): string {
-  return handle.trim().toLowerCase();
-}
 
 function createEmptyScopeSummary(): ContestScopeSummary {
   return { contestCount: 0, participantCount: 0, lastContestAt: null };
@@ -433,9 +430,12 @@ export class ContestActivityService {
   }
 
   private buildRosterLookup(roster: RosterEntry[]) {
-    const handles = roster.map((row) => normalizeHandle(row.handle)).filter(Boolean);
+    const handles = roster.map((row) => normalizeHandleKey(row.handle)).filter(Boolean);
     const rosterMap = new Map(
-      roster.map((row) => [normalizeHandle(row.handle), { userId: row.userId, handle: row.handle }])
+      roster.map((row) => [
+        normalizeHandleKey(row.handle),
+        { userId: row.userId, handle: row.handle },
+      ])
     );
     return { handles, rosterMap };
   }
@@ -461,7 +461,7 @@ export class ContestActivityService {
         .where("server_id", "in", guildIds)
         .execute();
       const handles = Array.from(
-        new Set(handleRows.map((row) => normalizeHandle(row.handle)).filter(Boolean))
+        new Set(handleRows.map((row) => normalizeHandleKey(row.handle)).filter(Boolean))
       );
       if (handles.length === 0) {
         return {
@@ -473,7 +473,7 @@ export class ContestActivityService {
         };
       }
 
-      const handleMap = new Map(handles.map((handle) => [normalizeHandle(handle), { handle }]));
+      const handleMap = new Map(handles.map((handle) => [normalizeHandleKey(handle), { handle }]));
       const rows = await this.loadRatingChangeRows(handles, handleMap);
 
       const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
@@ -605,7 +605,7 @@ export class ContestActivityService {
     handles: string[],
     handleMap: Map<string, { handle: string }>
   ): Promise<void> {
-    const normalized = handles.map((handle) => normalizeHandle(handle)).filter(Boolean);
+    const normalized = handles.map((handle) => normalizeHandleKey(handle)).filter(Boolean);
     if (normalized.length === 0) {
       return;
     }
@@ -615,7 +615,7 @@ export class ContestActivityService {
       .select("handle")
       .where("handle", "in", uniqueHandles)
       .execute();
-    const cachedSet = new Set(cached.map((row) => normalizeHandle(row.handle)));
+    const cachedSet = new Set(cached.map((row) => normalizeHandleKey(row.handle)));
     const missing = uniqueHandles.filter((handle) => !cachedSet.has(handle));
     if (missing.length === 0) {
       return;

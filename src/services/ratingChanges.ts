@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { normalizeHandleKey } from "../utils/handles.js";
 import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
@@ -26,10 +27,6 @@ export type RatingChangesResult = {
 
 const DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000;
 
-function normalizeHandle(handle: string): string {
-  return handle.trim().toLowerCase();
-}
-
 export class RatingChangesService {
   private lastError: { message: string; timestamp: string } | null = null;
 
@@ -46,7 +43,7 @@ export class RatingChangesService {
     handle: string,
     ttlMs = DEFAULT_CACHE_TTL_MS
   ): Promise<RatingChangesResult | null> {
-    const key = normalizeHandle(handle);
+    const key = normalizeHandleKey(handle);
     const { result, lastError } = await fetchRatingChangesWithTracking(
       this.db,
       { type: "handle", handle: key },

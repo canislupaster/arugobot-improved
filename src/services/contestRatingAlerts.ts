@@ -5,8 +5,9 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
-import { resolveSendableChannel } from "../utils/discordChannels.js";
+import { resolveSendableChannel, type SendableChannel } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
@@ -79,17 +80,13 @@ type AlertCandidateOptions = {
   maxContests?: number;
 };
 
-function normalizeHandle(handle: string): string {
-  return handle.trim().toLowerCase();
-}
-
 function parseHandleFilter(value: string | null): string[] {
   if (!value) {
     return [];
   }
   const entries = value
     .split(",")
-    .map((handle) => normalizeHandle(handle))
+    .map((handle) => normalizeHandleKey(handle))
     .filter((handle) => handle.length > 0);
   return Array.from(new Set(entries));
 }
@@ -98,7 +95,7 @@ function serializeHandleFilter(handles: string[]): string | null {
   if (handles.length === 0) {
     return null;
   }
-  return Array.from(new Set(handles.map((handle) => normalizeHandle(handle)))).join(",");
+  return Array.from(new Set(handles.map((handle) => normalizeHandleKey(handle)))).join(",");
 }
 
 function formatDelta(delta: number): string {
@@ -351,43 +348,23 @@ export class ContestRatingAlertService {
       return { status: "error", message: candidate.message };
     }
 
-    const embed = buildContestRatingAlertEmbed(candidate.preview);
-    try {
-      const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
-      await channel.send({
-        content: mention,
-        allowedMentions,
-        embeds: [embed],
-      });
-      await this.markNotified(subscription.id, candidate.preview.contest.id);
-      logInfo("Contest rating alert sent (manual).", {
-        guildId: subscription.guildId,
-        subscriptionId: subscription.id,
-        channelId: subscription.channelId,
-        contestId: candidate.preview.contest.id,
-        entryCount: candidate.preview.totalEntries,
-        isStale: candidate.preview.isStale,
-      });
-      return {
-        status: "sent",
-        contestId: candidate.preview.contest.id,
-        contestName: candidate.preview.contest.name,
-        channelId: subscription.channelId,
-        entryCount: candidate.preview.totalEntries,
-        isStale: candidate.preview.isStale,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logWarn("Contest rating alert send failed (manual).", {
-        guildId: subscription.guildId,
-        subscriptionId: subscription.id,
-        channelId: subscription.channelId,
-        contestId: candidate.preview.contest.id,
-        error: message,
-      });
-      return { status: "error", message };
+    const sendResult = await this.sendAlert(
+      subscription,
+      channel,
+      candidate.preview,
+      "manual"
+    );
+    if (sendResult.status === "error") {
+      return sendResult;
     }
+    return {
+      status: "sent",
+      contestId: candidate.preview.contest.id,
+      contestName: candidate.preview.contest.name,
+      channelId: subscription.channelId,
+      entryCount: candidate.preview.totalEntries,
+      isStale: candidate.preview.isStale,
+    };
   }
 
   async runTick(client: Client): Promise<void> {
@@ -449,32 +426,7 @@ export class ContestRatingAlertService {
           continue;
         }
 
-        const embed = buildContestRatingAlertEmbed(candidate.preview);
-        try {
-          const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
-          await channel.send({
-            content: mention,
-            allowedMentions,
-            embeds: [embed],
-          });
-          await this.markNotified(subscription.id, candidate.preview.contest.id);
-          logInfo("Contest rating alert sent.", {
-            guildId: subscription.guildId,
-            subscriptionId: subscription.id,
-            channelId: subscription.channelId,
-            contestId: candidate.preview.contest.id,
-            entryCount: candidate.preview.totalEntries,
-            isStale: candidate.preview.isStale,
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          logWarn("Contest rating alert send failed.", {
-            guildId: subscription.guildId,
-            channelId: subscription.channelId,
-            contestId: candidate.preview.contest.id,
-            error: message,
-          });
-        }
+        await this.sendAlert(subscription, channel, candidate.preview, "scheduled");
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -512,6 +464,53 @@ export class ContestRatingAlertService {
     return { contests, isStale, error: undefined };
   }
 
+  private async sendAlert(
+    subscription: ContestRatingAlertSubscription,
+    channel: SendableChannel,
+    preview: ContestRatingAlertPreview,
+    mode: "manual" | "scheduled"
+  ): Promise<{ status: "sent" } | { status: "error"; message: string }> {
+    const embed = buildContestRatingAlertEmbed(preview);
+    const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
+    const logContext = {
+      guildId: subscription.guildId,
+      subscriptionId: subscription.id,
+      channelId: subscription.channelId,
+      contestId: preview.contest.id,
+      entryCount: preview.totalEntries,
+      isStale: preview.isStale,
+    };
+    const logLabel =
+      mode === "manual" ? "Contest rating alert sent (manual)." : "Contest rating alert sent.";
+    const logErrorLabel =
+      mode === "manual"
+        ? "Contest rating alert send failed (manual)."
+        : "Contest rating alert send failed.";
+    try {
+      await channel.send({
+        content: mention,
+        allowedMentions,
+        embeds: [embed],
+      });
+      await this.markNotified(subscription.id, preview.contest.id);
+      logInfo(logLabel, logContext);
+      return { status: "sent" };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (mode === "manual") {
+        this.lastError = { message, timestamp: new Date().toISOString() };
+      }
+      logWarn(logErrorLabel, {
+        guildId: subscription.guildId,
+        channelId: subscription.channelId,
+        contestId: preview.contest.id,
+        ...(mode === "manual" ? { subscriptionId: subscription.id } : {}),
+        error: message,
+      });
+      return { status: "error", message };
+    }
+  }
+
   private async findCandidate(
     subscription: ContestRatingAlertSubscription,
     contests: Contest[],
@@ -530,11 +529,11 @@ export class ContestRatingAlertService {
     }
 
     let handleMap = new Map(
-      linkedUsers.map((entry) => [normalizeHandle(entry.handle), entry.userId])
+      linkedUsers.map((entry) => [normalizeHandleKey(entry.handle), entry.userId])
     );
     if (subscription.includeHandles.length > 0) {
       const allowedHandles = new Set(
-        subscription.includeHandles.map((handle) => normalizeHandle(handle))
+        subscription.includeHandles.map((handle) => normalizeHandleKey(handle))
       );
       handleMap = new Map(
         Array.from(handleMap.entries()).filter(([handle]) => allowedHandles.has(handle))
@@ -566,12 +565,12 @@ export class ContestRatingAlertService {
       }
 
       const entries = changesResult.changes
-        .filter((change) => change.handle && handleMap.has(normalizeHandle(change.handle)))
+        .filter((change) => change.handle && handleMap.has(normalizeHandleKey(change.handle)))
         .map((change) => {
           const handle = change.handle ?? "unknown";
           return {
             handle,
-            userId: handleMap.get(normalizeHandle(handle)),
+            userId: handleMap.get(normalizeHandleKey(handle)),
             change,
           };
         });

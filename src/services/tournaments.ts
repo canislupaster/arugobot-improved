@@ -4,6 +4,7 @@ import { ChannelType, type Client, type GuildTextBasedChannel } from "discord.js
 import { type ExpressionBuilder, type Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import { normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo } from "../utils/logger.js";
 import {
   filterProblemsByRatingRanges,
@@ -191,10 +192,6 @@ export type ArenaCompletion = {
   tournamentId: string;
   guildId: string;
 };
-
-function normalizeHandle(handle: string): string {
-  return handle.trim().toLowerCase();
-}
 
 export class TournamentService implements ChallengeCompletionNotifier {
   private lastError: { message: string; timestamp: string } | null = null;
@@ -1443,7 +1440,7 @@ export class TournamentService implements ChallengeCompletionNotifier {
     const handleMap = new Map<string, string>();
     for (const entry of linked) {
       if (participantIds.has(entry.userId)) {
-        handleMap.set(normalizeHandle(entry.handle), entry.userId);
+        handleMap.set(normalizeHandleKey(entry.handle), entry.userId);
       }
     }
 
@@ -1466,7 +1463,7 @@ export class TournamentService implements ChallengeCompletionNotifier {
         if (!contestProblems.has(problemId) || !problemSet.has(problemId)) {
           continue;
         }
-        const userId = handleMap.get(normalizeHandle(solve.handle));
+        const userId = handleMap.get(normalizeHandleKey(solve.handle));
         if (!userId) {
           continue;
         }

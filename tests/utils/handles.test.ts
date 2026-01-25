@@ -1,4 +1,8 @@
-import { normalizeHandleInput, resolveHandleTarget } from "../../src/utils/handles.js";
+import {
+  normalizeHandleInput,
+  normalizeHandleKey,
+  resolveHandleTarget,
+} from "../../src/utils/handles.js";
 
 describe("normalizeHandleInput", () => {
   it("extracts a handle from a profile URL", () => {
@@ -15,6 +19,16 @@ describe("normalizeHandleInput", () => {
 
   it("leaves plain handles unchanged", () => {
     expect(normalizeHandleInput("  jiangly  ")).toBe("jiangly");
+  });
+});
+
+describe("normalizeHandleKey", () => {
+  it("trims and lowercases handles", () => {
+    expect(normalizeHandleKey("  ToURiSt ")).toBe("tourist");
+  });
+
+  it("returns an empty string for whitespace", () => {
+    expect(normalizeHandleKey("   ")).toBe("");
   });
 });
 

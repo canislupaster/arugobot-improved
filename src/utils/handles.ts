@@ -39,6 +39,10 @@ export function normalizeHandleInput(raw: string): string {
   }
 }
 
+export function normalizeHandleKey(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
 export async function resolveHandleTarget(
   store: HandleTargetStore,
   options: HandleTargetOptions
