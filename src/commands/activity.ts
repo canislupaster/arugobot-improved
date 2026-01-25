@@ -26,6 +26,83 @@ function formatSolveRate(solved: number, total: number): string {
   return `${rate}% (${solved}/${total})`;
 }
 
+function addLastCompletedField(embed: EmbedBuilder, lastCompletedAt?: string | null): void {
+  if (!lastCompletedAt) {
+    return;
+  }
+  const timestampSeconds = Math.floor(Date.parse(lastCompletedAt) / 1000);
+  if (!Number.isFinite(timestampSeconds)) {
+    return;
+  }
+  embed.addFields({
+    name: "Last completed",
+    value: formatDiscordRelativeTime(timestampSeconds),
+    inline: false,
+  });
+}
+
+function buildUserEmbed(
+  userId: string,
+  sinceLabel: string,
+  summary: {
+    participations: number;
+    solvedCount: number;
+    lastCompletedAt?: string | null;
+  }
+): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle("User activity")
+    .setColor(EMBED_COLORS.info)
+    .setDescription(`Last ${sinceLabel} for <@${userId}>`)
+    .addFields(
+      { name: "Participations", value: String(summary.participations), inline: true },
+      { name: "Solved", value: String(summary.solvedCount), inline: true },
+      {
+        name: "Solve rate",
+        value: formatSolveRate(summary.solvedCount, summary.participations),
+        inline: true,
+      }
+    );
+
+  addLastCompletedField(embed, summary.lastCompletedAt);
+  return embed;
+}
+
+function buildServerEmbed(
+  sinceLabel: string,
+  summary: {
+    completedChallenges: number;
+    participantCount: number;
+    uniqueParticipants: number;
+    solvedCount: number;
+  }
+): EmbedBuilder {
+  return new EmbedBuilder()
+    .setTitle("Server activity")
+    .setColor(EMBED_COLORS.info)
+    .setDescription(`Last ${sinceLabel}`)
+    .addFields(
+      {
+        name: "Completed challenges",
+        value: String(summary.completedChallenges),
+        inline: true,
+      },
+      { name: "Participants", value: String(summary.participantCount), inline: true },
+      { name: "Unique users", value: String(summary.uniqueParticipants), inline: true },
+      {
+        name: "Solve rate",
+        value: formatSolveRate(summary.solvedCount, summary.participantCount),
+        inline: true,
+      }
+    );
+}
+
+function formatTopSolvers(entries: Array<{ userId: string; solvedCount: number }>): string {
+  return entries
+    .map((entry, index) => `${index + 1}. <@${entry.userId}> - ${entry.solvedCount}`)
+    .join("\n");
+}
+
 export const activityCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("activity")
@@ -70,31 +147,7 @@ export const activityCommand: Command = {
           return;
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle("User activity")
-          .setColor(EMBED_COLORS.info)
-          .setDescription(`Last ${sinceLabel} for <@${user.id}>`)
-          .addFields(
-            { name: "Participations", value: String(summary.participations), inline: true },
-            { name: "Solved", value: String(summary.solvedCount), inline: true },
-            {
-              name: "Solve rate",
-              value: formatSolveRate(summary.solvedCount, summary.participations),
-              inline: true,
-            }
-          );
-
-        if (summary.lastCompletedAt) {
-          const timestampSeconds = Math.floor(Date.parse(summary.lastCompletedAt) / 1000);
-          if (Number.isFinite(timestampSeconds)) {
-            embed.addFields({
-              name: "Last completed",
-              value: formatDiscordRelativeTime(timestampSeconds),
-              inline: false,
-            });
-          }
-        }
-
+        const embed = buildUserEmbed(user.id, sinceLabel, summary);
         await interaction.editReply({ embeds: [embed] });
         return;
       }
@@ -109,24 +162,7 @@ export const activityCommand: Command = {
         return;
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle("Server activity")
-        .setColor(EMBED_COLORS.info)
-        .setDescription(`Last ${sinceLabel}`)
-        .addFields(
-          {
-            name: "Completed challenges",
-            value: String(summary.completedChallenges),
-            inline: true,
-          },
-          { name: "Participants", value: String(summary.participantCount), inline: true },
-          { name: "Unique users", value: String(summary.uniqueParticipants), inline: true },
-          {
-            name: "Solve rate",
-            value: formatSolveRate(summary.solvedCount, summary.participantCount),
-            inline: true,
-          }
-        );
+      const embed = buildServerEmbed(sinceLabel, summary);
 
       if (summary.topSolvers.length > 0) {
         const filtered = await filterEntriesByGuildMembers(interaction.guild, summary.topSolvers, {
@@ -136,10 +172,11 @@ export const activityCommand: Command = {
           userId: interaction.user.id,
         });
         if (filtered.length > 0) {
-          const lines = filtered
-            .map((entry, index) => `${index + 1}. <@${entry.userId}> - ${entry.solvedCount}`)
-            .join("\n");
-          embed.addFields({ name: "Top solvers", value: lines, inline: false });
+          embed.addFields({
+            name: "Top solvers",
+            value: formatTopSolvers(filtered),
+            inline: false,
+          });
         }
       }
 
