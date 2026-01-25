@@ -141,6 +141,72 @@ describe("ContestActivityService", () => {
     await db.destroy();
   });
 
+  it("summarizes rating change deltas for a guild", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const store = new StoreService(db, mockCodeforces);
+    const service = new ContestActivityService(db, store, mockRatingChanges);
+
+    await db
+      .insertInto("users")
+      .values([
+        {
+          server_id: "guild-1",
+          user_id: "user-1",
+          handle: "Alice",
+          rating: 1500,
+          history: "[]",
+          rating_history: "[]",
+        },
+        {
+          server_id: "guild-1",
+          user_id: "user-2",
+          handle: "Bob",
+          rating: 1400,
+          history: "[]",
+          rating_history: "[]",
+        },
+      ])
+      .execute();
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    await db
+      .insertInto("cf_rating_changes")
+      .values([
+        {
+          handle: "alice",
+          payload: JSON.stringify([
+            createChangeWithDelta(2000, "Contest A", nowSeconds - 3600, 100),
+            createChangeWithDelta(2001, "Contest B", nowSeconds - 7200, -50),
+          ]),
+        },
+        {
+          handle: "bob",
+          payload: JSON.stringify([
+            createChangeWithDelta(2002, "Contest C", nowSeconds - 1800, -25),
+            createChangeWithDelta(2003, "Old Contest", nowSeconds - 200 * 24 * 60 * 60, 200),
+          ]),
+        },
+      ])
+      .execute();
+
+    const summary = await service.getGuildRatingChangeSummary("guild-1", {
+      lookbackDays: 90,
+      limit: 5,
+    });
+
+    expect(summary.contestCount).toBe(3);
+    expect(summary.participantCount).toBe(2);
+    expect(summary.totalDelta).toBe(25);
+    expect(summary.lastContestAt).toBe(nowSeconds - 1800);
+    expect(summary.topGainers[0]?.handle).toBe("Alice");
+    expect(summary.topGainers[0]?.delta).toBe(50);
+    expect(summary.topLosers[0]?.handle).toBe("Bob");
+    expect(summary.topLosers[0]?.delta).toBe(-25);
+
+    await db.destroy();
+  });
+
   it("summarizes global contest activity", async () => {
     const db = createDb(":memory:");
     await migrateToLatest(db);

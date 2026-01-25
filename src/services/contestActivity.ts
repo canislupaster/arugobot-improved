@@ -227,12 +227,7 @@ export class ContestActivityService {
     );
 
     try {
-      await this.refreshMissingRatingChanges(handles, rosterMap);
-      const rows = await this.db
-        .selectFrom("cf_rating_changes")
-        .select(["handle", "payload"])
-        .where("handle", "in", handles)
-        .execute();
+      const rows = await this.loadRatingChangeRows(handles, rosterMap);
 
       const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
       const contestScopes = await this.loadContestScopeMap();
@@ -360,12 +355,7 @@ export class ContestActivityService {
     );
 
     try {
-      await this.refreshMissingRatingChanges(handles, rosterMap);
-      const rows = await this.db
-        .selectFrom("cf_rating_changes")
-        .select(["handle", "payload"])
-        .where("handle", "in", handles)
-        .execute();
+      const rows = await this.loadRatingChangeRows(handles, rosterMap);
 
       const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
       const contestMap = new Map<number, number>();
@@ -484,12 +474,7 @@ export class ContestActivityService {
       }
 
       const handleMap = new Map(handles.map((handle) => [normalizeHandle(handle), { handle }]));
-      await this.refreshMissingRatingChanges(handles, handleMap);
-      const rows = await this.db
-        .selectFrom("cf_rating_changes")
-        .select(["handle", "payload"])
-        .where("handle", "in", handles)
-        .execute();
+      const rows = await this.loadRatingChangeRows(handles, handleMap);
 
       const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
       const contestScopes = await this.loadContestScopeMap();
@@ -602,6 +587,18 @@ export class ContestActivityService {
       });
     }
     return map;
+  }
+
+  private async loadRatingChangeRows(
+    handles: string[],
+    handleMap: Map<string, { handle: string }>
+  ): Promise<Array<{ handle: string; payload: string }>> {
+    await this.refreshMissingRatingChanges(handles, handleMap);
+    return this.db
+      .selectFrom("cf_rating_changes")
+      .select(["handle", "payload"])
+      .where("handle", "in", handles)
+      .execute();
   }
 
   private async refreshMissingRatingChanges(
