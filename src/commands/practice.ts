@@ -1,4 +1,4 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { EmbedBuilder, SlashCommandBuilder, type User } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -6,14 +6,109 @@ import { getProblemId } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
 
+import type { CommandContext } from "../types/commandContext.js";
 import type { Command } from "./types.js";
 
 const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
 const PRACTICE_SUGGESTION_RETENTION_DAYS = 14;
 
+type PracticeTarget =
+  | {
+      status: "ok";
+      handle: string;
+      historyUserId: string | null;
+      displayName: string;
+    }
+  | { status: "invalid_handle" | "missing_handle" };
+
 function buildProblemLink(contestId: number, index: string, name: string): string {
   return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
+}
+
+function applyPreferenceFilters(
+  ratingRanges: Array<{ min: number; max: number }>,
+  tags: string,
+  ratingInputProvided: boolean,
+  preferences: { ratingRanges: Array<{ min: number; max: number }>; tags: string } | null
+) {
+  const nextRanges =
+    !ratingInputProvided && preferences?.ratingRanges.length
+      ? preferences.ratingRanges
+      : ratingRanges;
+  const nextTags = !tags && preferences?.tags ? preferences.tags : tags;
+  return { ratingRanges: nextRanges, tags: nextTags };
+}
+
+async function resolvePracticeTarget(
+  handleInput: string,
+  targetUser: User,
+  guildId: string | null,
+  store: CommandContext["services"]["store"]
+): Promise<PracticeTarget> {
+  if (handleInput) {
+    const handleInfo = await store.resolveHandle(handleInput);
+    if (!handleInfo.exists) {
+      return { status: "invalid_handle" };
+    }
+    const canonicalHandle = handleInfo.canonicalHandle ?? handleInput;
+    const historyUserId = guildId
+      ? await store.getUserIdByHandle(guildId, canonicalHandle)
+      : null;
+    return {
+      status: "ok",
+      handle: canonicalHandle,
+      historyUserId,
+      displayName: canonicalHandle,
+    };
+  }
+
+  if (!guildId) {
+    return { status: "missing_handle" };
+  }
+
+  const linkedHandle = await store.getHandle(guildId, targetUser.id);
+  if (!linkedHandle) {
+    return { status: "missing_handle" };
+  }
+
+  return {
+    status: "ok",
+    handle: linkedHandle,
+    historyUserId: targetUser.id,
+    displayName: targetUser.username,
+  };
+}
+
+async function collectExcludedProblemIds(
+  guildId: string | null,
+  historyUserId: string | null,
+  store: CommandContext["services"]["store"]
+) {
+  const excludedIds = new Set<string>();
+  if (!guildId || !historyUserId) {
+    return excludedIds;
+  }
+
+  const history = await store.getHistoryList(guildId, historyUserId);
+  for (const problemId of history) {
+    excludedIds.add(problemId);
+  }
+
+  const cutoffIso = new Date(
+    Date.now() - PRACTICE_SUGGESTION_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+  await store.cleanupPracticeSuggestions(cutoffIso);
+  const recentSuggestions = await store.getRecentPracticeSuggestions(
+    guildId,
+    historyUserId,
+    cutoffIso
+  );
+  for (const problemId of recentSuggestions) {
+    excludedIds.add(problemId);
+  }
+
+  return excludedIds;
 }
 
 export const practiceCommand: Command = {
@@ -89,63 +184,34 @@ export const practiceCommand: Command = {
           interaction.guild.id,
           targetUser.id
         );
-        if (!ratingInputProvided && preferences?.ratingRanges.length) {
-          ratingRanges = preferences.ratingRanges;
-        }
-        if (!tags && preferences?.tags) {
-          tags = preferences.tags;
-        }
-      }
-      let handle = "";
-      let historyUserId: string | null = null;
-
-      if (handleInput) {
-        const handleInfo = await context.services.store.resolveHandle(handleInput);
-        if (!handleInfo.exists) {
-          await interaction.editReply("Invalid handle.");
-          return;
-        }
-        handle = handleInfo.canonicalHandle ?? handleInput;
-        if (interaction.guild) {
-          historyUserId = await context.services.store.getUserIdByHandle(
-            interaction.guild.id,
-            handle
-          );
-        }
-      } else {
-        const guildId = interaction.guild?.id ?? "";
-        const linkedHandle = await context.services.store.getHandle(guildId, targetUser.id);
-        if (!linkedHandle) {
-          await interaction.editReply("Handle not linked.");
-          return;
-        }
-        handle = linkedHandle;
-        historyUserId = targetUser.id;
+        ({ ratingRanges, tags } = applyPreferenceFilters(
+          ratingRanges,
+          tags,
+          ratingInputProvided,
+          preferences
+        ));
       }
 
-      const excludedIds = new Set<string>();
-      if (interaction.guild && historyUserId) {
-        const guildId = interaction.guild.id;
-        const history = await context.services.store.getHistoryList(guildId, historyUserId);
-        for (const problemId of history) {
-          excludedIds.add(problemId);
-        }
-
-        const cutoffIso = new Date(
-          Date.now() - PRACTICE_SUGGESTION_RETENTION_DAYS * 24 * 60 * 60 * 1000
-        ).toISOString();
-        await context.services.store.cleanupPracticeSuggestions(cutoffIso);
-        const recentSuggestions = await context.services.store.getRecentPracticeSuggestions(
-          guildId,
-          historyUserId,
-          cutoffIso
+      const target = await resolvePracticeTarget(
+        handleInput,
+        targetUser,
+        interaction.guild?.id ?? null,
+        context.services.store
+      );
+      if (target.status !== "ok") {
+        await interaction.editReply(
+          target.status === "invalid_handle" ? "Invalid handle." : "Handle not linked."
         );
-        for (const problemId of recentSuggestions) {
-          excludedIds.add(problemId);
-        }
+        return;
       }
 
-      const suggestion = await context.services.practiceSuggestions.suggestProblem(handle, {
+      const excludedIds = await collectExcludedProblemIds(
+        interaction.guild?.id ?? null,
+        target.historyUserId,
+        context.services.store
+      );
+
+      const suggestion = await context.services.practiceSuggestions.suggestProblem(target.handle, {
         ratingRanges,
         tags,
         excludedIds,
@@ -167,15 +233,15 @@ export const practiceCommand: Command = {
       }
 
       const problem = suggestion.problem;
-      if (interaction.guild && historyUserId) {
+      if (interaction.guild && target.historyUserId) {
         await context.services.store.recordPracticeSuggestion(
           interaction.guild.id,
-          historyUserId,
+          target.historyUserId,
           getProblemId(problem)
         );
       }
       const embed = new EmbedBuilder()
-        .setTitle(`Practice suggestion for ${handleInput ? handle : targetUser.username}`)
+        .setTitle(`Practice suggestion for ${target.displayName}`)
         .setColor(problem.rating ? getColor(problem.rating) : EMBED_COLORS.info)
         .addFields(
           {
@@ -188,7 +254,7 @@ export const practiceCommand: Command = {
             value: problem.rating ? String(problem.rating) : "Unrated",
             inline: true,
           },
-          { name: "Handle", value: handle, inline: true },
+          { name: "Handle", value: target.handle, inline: true },
           {
             name: "Tags",
             value: problem.tags.length > 0 ? problem.tags.join(", ") : "None",
