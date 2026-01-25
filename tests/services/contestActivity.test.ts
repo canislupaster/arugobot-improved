@@ -125,6 +125,71 @@ describe("ContestActivityService", () => {
     await db.destroy();
   });
 
+  it("applies participant limit without changing totals", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const store = new StoreService(db, mockCodeforces);
+    const service = new ContestActivityService(db, store, mockRatingChanges);
+
+    await db
+      .insertInto("users")
+      .values([
+        {
+          server_id: "guild-1",
+          user_id: "user-1",
+          handle: "Alice",
+          rating: 1500,
+          history: "[]",
+          rating_history: "[]",
+        },
+        {
+          server_id: "guild-1",
+          user_id: "user-2",
+          handle: "Bob",
+          rating: 1400,
+          history: "[]",
+          rating_history: "[]",
+        },
+      ])
+      .execute();
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    await db
+      .insertInto("cf_cache")
+      .values([
+        {
+          key: "contest_list",
+          payload: JSON.stringify([{ id: 1000, isGym: false }]),
+          last_fetched: new Date().toISOString(),
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("cf_rating_changes")
+      .values([
+        {
+          handle: "alice",
+          payload: JSON.stringify([createChange(1000, "Contest A", nowSeconds - 3600)]),
+        },
+        {
+          handle: "bob",
+          payload: JSON.stringify([createChange(1000, "Contest A", nowSeconds - 1800)]),
+        },
+      ])
+      .execute();
+
+    const activity = await service.getGuildContestActivity("guild-1", {
+      lookbackDays: 90,
+      participantLimit: 1,
+    });
+
+    expect(activity.participantCount).toBe(2);
+    expect(activity.participants).toHaveLength(1);
+
+    await db.destroy();
+  });
+
   it("returns empty results for empty guilds", async () => {
     const db = createDb(":memory:");
     await migrateToLatest(db);

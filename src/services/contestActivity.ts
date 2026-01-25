@@ -210,7 +210,7 @@ export class ContestActivityService {
     const lookbackDays = options?.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
     const recentLimit = Math.max(1, options?.recentLimit ?? DEFAULT_RECENT_LIMIT);
     const participantLimit = options?.participantLimit ?? null;
-    const handles = roster.map((row) => normalizeHandle(row.handle)).filter(Boolean);
+    const { handles, rosterMap } = this.buildRosterLookup(roster);
     if (handles.length === 0) {
       return {
         lookbackDays,
@@ -221,10 +221,6 @@ export class ContestActivityService {
         participants: [],
       };
     }
-
-    const rosterMap = new Map(
-      roster.map((row) => [normalizeHandle(row.handle), { userId: row.userId, handle: row.handle }])
-    );
 
     try {
       const rows = await this.loadRatingChangeRows(handles, rosterMap);
@@ -337,7 +333,7 @@ export class ContestActivityService {
   ): Promise<GuildRatingChangeSummary> {
     const lookbackDays = options?.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
     const limit = options?.limit ?? DEFAULT_DELTA_LIMIT;
-    const handles = roster.map((row) => normalizeHandle(row.handle)).filter(Boolean);
+    const { handles, rosterMap } = this.buildRosterLookup(roster);
     if (handles.length === 0) {
       return {
         lookbackDays,
@@ -349,10 +345,6 @@ export class ContestActivityService {
         topLosers: [],
       };
     }
-
-    const rosterMap = new Map(
-      roster.map((row) => [normalizeHandle(row.handle), { userId: row.userId, handle: row.handle }])
-    );
 
     try {
       const rows = await this.loadRatingChangeRows(handles, rosterMap);
@@ -438,6 +430,14 @@ export class ContestActivityService {
         topLosers: [],
       };
     }
+  }
+
+  private buildRosterLookup(roster: RosterEntry[]) {
+    const handles = roster.map((row) => normalizeHandle(row.handle)).filter(Boolean);
+    const rosterMap = new Map(
+      roster.map((row) => [normalizeHandle(row.handle), { userId: row.userId, handle: row.handle }])
+    );
+    return { handles, rosterMap };
   }
 
   async getGlobalContestActivity(
