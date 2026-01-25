@@ -72,7 +72,7 @@ async function reserveConsecutivePorts(
         servers.push(server);
       }
       return { basePort, servers };
-    } catch (error) {
+    } catch {
       await Promise.all(servers.map((server) => closeServer(server)));
     }
   }
