@@ -105,7 +105,9 @@ export class CodeforcesClient {
           waitMs,
           error: error instanceof Error ? error.message : String(error),
         });
-        await sleep(waitMs);
+        if (waitMs > 0) {
+          await sleep(waitMs);
+        }
       }
     }
 
