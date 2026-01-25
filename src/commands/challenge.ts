@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  type ChatInputCommandInteraction,
   ComponentType,
   EmbedBuilder,
   MessageFlags,
@@ -32,6 +33,17 @@ const DEFAULT_MAX_PARTICIPANTS = 5;
 const MAX_PARTICIPANTS = 10;
 const MIN_PARTICIPANTS = 2;
 const OPEN_LOBBY_TIMEOUT_MS = 5 * 60 * 1000;
+const PARTICIPANT_OPTION_NAMES = [
+  "user1",
+  "user2",
+  "user3",
+  "user4",
+  "user5",
+  "user6",
+  "user7",
+  "user8",
+  "user9",
+] as const;
 
 function addLengthOption(subcommand: SlashCommandSubcommandBuilder) {
   return subcommand.addIntegerOption((option) =>
@@ -83,6 +95,13 @@ function uniqueUsers(users: User[]): User[] {
     seen.add(user.id);
     return true;
   });
+}
+
+function collectParticipantUsers(interaction: ChatInputCommandInteraction): User[] {
+  const optionUsers = PARTICIPANT_OPTION_NAMES.map((name) =>
+    interaction.options.getUser(name)
+  ).filter(Boolean) as User[];
+  return uniqueUsers([interaction.user, ...optionUsers]);
 }
 
 export const challengeCommand: Command = {
@@ -187,29 +206,57 @@ export const challengeCommand: Command = {
 
     await interaction.deferReply();
 
-    let participantUsers = uniqueUsers(
-      [
-        interaction.user,
-        interaction.options.getUser("user1"),
-        interaction.options.getUser("user2"),
-        interaction.options.getUser("user3"),
-        interaction.options.getUser("user4"),
-        interaction.options.getUser("user5"),
-        interaction.options.getUser("user6"),
-        interaction.options.getUser("user7"),
-        interaction.options.getUser("user8"),
-        interaction.options.getUser("user9"),
-      ].filter(Boolean) as User[]
-    );
+    let participantUsers = collectParticipantUsers(interaction);
 
     if (participantUsers.length > maxParticipants) {
       await interaction.editReply(`Too many users (limit is ${maxParticipants}).`);
       return;
     }
 
+    const replyMissingHandle = async () => {
+      await interaction.editReply("One or more users have not linked a handle.");
+    };
+    const editReply = async (content: string) => {
+      await interaction.editReply(content);
+    };
+    const getHandleOrReply = async (
+      userId: string,
+      reply: (content: string) => Promise<void>
+    ) => {
+      const handle = await context.services.store.getHandle(guildId, userId);
+      if (!handle) {
+        await reply("Missing handle data. Try again in a bit.");
+        return null;
+      }
+      return handle;
+    };
+    const getSolvedOrReply = async (
+      handle: string,
+      reply: (content: string) => Promise<void>,
+      message: string
+    ) => {
+      const solved = await context.services.store.getSolvedProblems(handle);
+      if (!solved) {
+        await reply(message);
+        return null;
+      }
+      return solved;
+    };
+    const getSolvedForUser = async (
+      userId: string,
+      reply: (content: string) => Promise<void>,
+      message: string
+    ) => {
+      const handle = await getHandleOrReply(userId, reply);
+      if (!handle) {
+        return null;
+      }
+      return getSolvedOrReply(handle, reply, message);
+    };
+
     for (const user of participantUsers) {
       if (!(await context.services.store.handleLinked(guildId, user.id))) {
-        await interaction.editReply("One or more users have not linked a handle.");
+        await replyMissingHandle();
         return;
       }
     }
@@ -275,16 +322,12 @@ export const challengeCommand: Command = {
       }
 
       for (const user of participantUsers) {
-        const handle = await context.services.store.getHandle(guildId, user.id);
-        if (!handle) {
-          await interaction.editReply("Missing handle data. Try again in a bit.");
-          return;
-        }
-        const solved = await context.services.store.getSolvedProblems(handle);
+        const solved = await getSolvedForUser(
+          user.id,
+          editReply,
+          "Unable to fetch solved problems right now. Try again later."
+        );
         if (!solved) {
-          await interaction.editReply(
-            "Unable to fetch solved problems right now. Try again later."
-          );
           return;
         }
         for (const solvedId of solved) {
@@ -318,16 +361,12 @@ export const challengeCommand: Command = {
     if (problemIdRaw) {
       const solvedUsers: User[] = [];
       for (const user of participantUsers) {
-        const handle = await context.services.store.getHandle(guildId, user.id);
-        if (!handle) {
-          await interaction.editReply("Missing handle data. Try again in a bit.");
-          return;
-        }
-        const solved = await context.services.store.getSolvedProblems(handle);
+        const solved = await getSolvedForUser(
+          user.id,
+          editReply,
+          "Unable to fetch solved problems right now. Try again later."
+        );
         if (!solved) {
-          await interaction.editReply(
-            "Unable to fetch solved problems right now. Try again later."
-          );
           return;
         }
         if (solved.includes(problemId)) {
@@ -359,6 +398,13 @@ export const challengeCommand: Command = {
         value += `- ${user} (${rating}) (don't solve: ${down}, solve: ${up})\n`;
       }
       return value || "No participants yet.";
+    };
+    const updateUsersField = async (
+      embed: EmbedBuilder,
+      index: number,
+      users: User[]
+    ): Promise<void> => {
+      embed.spliceFields(index, 1, { name: "Users", value: await buildUsersValue(users), inline: false });
     };
 
     const confirmParticipants = async (): Promise<boolean> => {
@@ -531,20 +577,14 @@ export const challengeCommand: Command = {
             });
             return;
           }
-          const handle = await context.services.store.getHandle(guildId, button.user.id);
-          if (!handle) {
-            await button.reply({
-              content: "Missing handle data. Try again in a bit.",
-              flags: MessageFlags.Ephemeral,
-            });
-            return;
-          }
-          const solved = await context.services.store.getSolvedProblems(handle);
+          const solved = await getSolvedForUser(
+            button.user.id,
+            async (content) => {
+              await button.reply({ content, flags: MessageFlags.Ephemeral });
+            },
+            "Unable to verify solved problems right now. Try again later."
+          );
           if (!solved) {
-            await button.reply({
-              content: "Unable to verify solved problems right now. Try again later.",
-              flags: MessageFlags.Ephemeral,
-            });
             return;
           }
           if (solved.includes(problemId)) {
@@ -555,11 +595,7 @@ export const challengeCommand: Command = {
             return;
           }
           participants.set(button.user.id, button.user);
-          lobbyEmbed.spliceFields(3, 1, {
-            name: "Users",
-            value: await buildUsersValue([...participants.values()]),
-            inline: false,
-          });
+          await updateUsersField(lobbyEmbed, 3, [...participants.values()]);
           await button.update({ embeds: [lobbyEmbed], components: [row] });
           return;
         }
@@ -577,11 +613,7 @@ export const challengeCommand: Command = {
             return;
           }
           participants.delete(button.user.id);
-          lobbyEmbed.spliceFields(3, 1, {
-            name: "Users",
-            value: await buildUsersValue([...participants.values()]),
-            inline: false,
-          });
+          await updateUsersField(lobbyEmbed, 3, [...participants.values()]);
           await button.update({ embeds: [lobbyEmbed], components: [row] });
           return;
         }
