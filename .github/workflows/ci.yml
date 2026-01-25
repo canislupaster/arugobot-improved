@@ -1,34 +1,32 @@
-name: ci
+name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: ["**"]
   pull_request:
+    branches: ["**"]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-    env:
-      NODE_ENV: test
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y fontconfig
-      - name: Install dependencies
+      - name: Install
         run: pnpm install --frozen-lockfile
       - name: Lint
-        run: pnpm run lint
-      - name: Format
-        run: pnpm run format
+        run: pnpm lint
       - name: Test
-        run: pnpm run test
-      - name: Build
-        run: pnpm run build
+        run: pnpm test
+      - name: Typecheck
+        run: pnpm build

@@ -268,6 +268,8 @@ exports for rating/solve leaderboards, and `/status` shows cache ages for key Co
 ## Deployment (Supervisor + Caddy)
 
 Sample configs live in `deploy/` and assume you are running on a Linux host with `systemd`.
+Use `supervisorctl` for start/stop to avoid running multiple instances (which can cause the dashboard
+port to be in use).
 
 1. Install dependencies and allow native build scripts:
 
@@ -283,6 +285,14 @@ sudo cp deploy/supervisor.conf /etc/supervisor/conf.d/arugobot.conf
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl status
+```
+
+To restart or inspect logs:
+
+```bash
+sudo supervisorctl stop arugobot
+sudo supervisorctl start arugobot
+sudo supervisorctl tail -f arugobot
 ```
 
 3. Configure Caddy (update the domain name):
