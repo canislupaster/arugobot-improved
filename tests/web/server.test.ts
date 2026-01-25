@@ -57,7 +57,7 @@ describe("startWebServer", () => {
     await db.destroy();
   });
 
-  it("falls back to a random port when the port is already in use", async () => {
+  it("fails when the port is already in use", async () => {
     const { db, website } = await createWebsite();
     const status: WebServerStatus = {
       status: "starting",
@@ -88,13 +88,12 @@ describe("startWebServer", () => {
       secondStatus
     );
 
-    expect(secondServer).not.toBeNull();
-    expect(secondStatus.status).toBe("listening");
-    expect(secondStatus.actualPort).not.toBeNull();
-    expect(secondStatus.actualPort).not.toBe(occupiedPort);
+    expect(secondServer).toBeNull();
+    expect(secondStatus.status).toBe("failed");
+    expect(secondStatus.actualPort).toBeNull();
+    expect(secondStatus.lastError?.code).toBe("EADDRINUSE");
 
     await new Promise<void>((resolve) => server?.close(() => resolve()));
-    await new Promise<void>((resolve) => secondServer?.close(() => resolve()));
     await db.destroy();
   });
 });

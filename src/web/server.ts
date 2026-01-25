@@ -26,7 +26,7 @@ function formatWebServerErrorMessage(
   error: NodeJS.ErrnoException
 ): string {
   if (error.code === "EADDRINUSE") {
-    return `Web server port ${port} is already in use on ${host}. Set WEB_PORT=0 or choose another port.`;
+    return `Web server port ${port} is already in use on ${host}. Choose another port.`;
   }
   return error.message ?? "Unknown web server error.";
 }
@@ -133,14 +133,7 @@ export async function startWebServer(
     return { server: null, actualPort: null, error: lastError, port };
   };
 
-  let result = await tryListen(config.port, maxAttempts);
-  if (!result.server && result.error?.code === "EADDRINUSE" && config.port !== 0) {
-    logWarn("Web server port in use; falling back to random port.", {
-      host: config.host,
-      port: config.port,
-    });
-    result = await tryListen(0, 1);
-  }
+  const result = await tryListen(config.port, maxAttempts);
 
   if (result.server) {
     if (status) {
