@@ -17,6 +17,10 @@ export function compareProblemIndex(a: Problem, b: Problem): number {
   return a.index.localeCompare(b.index, "en", { numeric: true });
 }
 
+export function getContestProblems(problems: Problem[], contestId: number): Problem[] {
+  return problems.filter((problem) => problem.contestId === contestId).sort(compareProblemIndex);
+}
+
 export function buildProblemLink(problem: Problem): string {
   return `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
 }

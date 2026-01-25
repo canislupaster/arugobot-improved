@@ -9,6 +9,7 @@ import {
 import {
   compareProblemIndex,
   formatContestProblemLine,
+  getContestProblems,
   summarizeContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
@@ -102,9 +103,7 @@ export const contestSolvesCommand: Command = {
 
       const contest = lookup.contest;
       const problems = await context.services.problems.ensureProblemsLoaded();
-      const contestProblems = problems
-        .filter((problem) => problem.contestId === contest.id)
-        .sort(compareProblemIndex);
+      const contestProblems = getContestProblems(problems, contest.id);
       if (contestProblems.length === 0) {
         await interaction.editReply("No contest problems found in the cache yet.");
         return;
