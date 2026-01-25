@@ -29,6 +29,41 @@ function normalizeHandle(handle: string): string {
   return handle.trim().toLowerCase();
 }
 
+function buildSolvedByField(summary: SolvedSummary): { name: string; value: string } | null {
+  if (summary.totalLinked === 0) {
+    return null;
+  }
+  let solvedValue = "No linked users have solved this yet.";
+  if (summary.checkedHandles === 0) {
+    solvedValue = "No solved data available.";
+  } else if (summary.solvedBy.length > 0) {
+    const displayed = summary.solvedBy.slice(0, MAX_SOLVED_DISPLAY);
+    const extra = summary.solvedBy.length - displayed.length;
+    solvedValue = displayed.join(", ");
+    if (extra > 0) {
+      solvedValue += ` and ${extra} more`;
+    }
+  }
+  return {
+    name: `Solved by (${summary.solvedBy.length}/${summary.checkedHandles} checked)`,
+    value: solvedValue,
+  };
+}
+
+function buildSolvedNotes(summary: SolvedSummary): string | null {
+  const notes = [];
+  if (summary.skippedHandles > 0) {
+    notes.push(`${summary.skippedHandles} handle(s) skipped`);
+  }
+  if (summary.staleHandles > 0) {
+    notes.push(`${summary.staleHandles} handle(s) stale`);
+  }
+  if (summary.unavailableHandles > 0) {
+    notes.push(`${summary.unavailableHandles} handle(s) unavailable`);
+  }
+  return notes.length > 0 ? notes.join(" • ") : null;
+}
+
 async function getSolvedSummary(
   store: StoreService,
   linkedUsers: Array<{ userId: string; handle: string }>,
@@ -149,45 +184,20 @@ export const problemCommand: Command = {
         );
 
       if (interaction.guild) {
-      const linkedUsers = await context.services.store.getLinkedUsers(interaction.guild.id);
-      const filteredUsers = await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
-        correlationId: context.correlationId,
-        command: interaction.commandName,
-        guildId: interaction.guild.id,
-        userId: interaction.user.id,
-      });
-      const summary = await getSolvedSummary(context.services.store, filteredUsers, problem);
-        if (summary.totalLinked > 0) {
-          let solvedValue = "No linked users have solved this yet.";
-          if (summary.checkedHandles === 0) {
-            solvedValue = "No solved data available.";
-          } else if (summary.solvedBy.length > 0) {
-            const displayed = summary.solvedBy.slice(0, MAX_SOLVED_DISPLAY);
-            const extra = summary.solvedBy.length - displayed.length;
-            solvedValue = displayed.join(", ");
-            if (extra > 0) {
-              solvedValue += ` and ${extra} more`;
-            }
-          }
-
-          embed.addFields({
-            name: `Solved by (${summary.solvedBy.length}/${summary.checkedHandles} checked)`,
-            value: solvedValue,
-            inline: false,
-          });
-
-          const notes = [];
-          if (summary.skippedHandles > 0) {
-            notes.push(`${summary.skippedHandles} handle(s) skipped`);
-          }
-          if (summary.staleHandles > 0) {
-            notes.push(`${summary.staleHandles} handle(s) stale`);
-          }
-          if (summary.unavailableHandles > 0) {
-            notes.push(`${summary.unavailableHandles} handle(s) unavailable`);
-          }
-          if (notes.length > 0) {
-            embed.setFooter({ text: notes.join(" • ") });
+        const linkedUsers = await context.services.store.getLinkedUsers(interaction.guild.id);
+        const filteredUsers = await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
+          correlationId: context.correlationId,
+          command: interaction.commandName,
+          guildId: interaction.guild.id,
+          userId: interaction.user.id,
+        });
+        const summary = await getSolvedSummary(context.services.store, filteredUsers, problem);
+        const solvedField = buildSolvedByField(summary);
+        if (solvedField) {
+          embed.addFields({ ...solvedField, inline: false });
+          const notes = buildSolvedNotes(summary);
+          if (notes) {
+            embed.setFooter({ text: notes });
           }
         }
       }
