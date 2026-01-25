@@ -1,7 +1,7 @@
 import { EmbedBuilder, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
-import { logCommandError } from "../utils/commandLogging.js";
 import { LOG_ENTRY_LIMIT } from "../services/logs.js";
+import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import type { LogLevel } from "../utils/logger.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
