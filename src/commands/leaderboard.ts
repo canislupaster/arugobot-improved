@@ -1,8 +1,4 @@
-import {
-  ComponentType,
-  EmbedBuilder,
-  SlashCommandBuilder,
-} from "discord.js";
+import { ComponentType, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import {
@@ -121,8 +117,7 @@ export const leaderboardCommand: Command = {
           return;
         }
         await button.deferUpdate();
-        currentPage =
-          button.customId === paginationIds.prev ? currentPage - 1 : currentPage + 1;
+        currentPage = button.customId === paginationIds.prev ? currentPage - 1 : currentPage + 1;
         const updated = await renderPage(currentPage);
         if (!updated) {
           return;

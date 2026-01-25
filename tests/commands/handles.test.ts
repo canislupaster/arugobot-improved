@@ -25,9 +25,9 @@ describe("handlesCommand", () => {
     const context = {
       services: {
         store: {
-          getServerRoster: jest.fn().mockResolvedValue([
-            { userId: "user-1", handle: "tourist", rating: 3500 },
-          ]),
+          getServerRoster: jest
+            .fn()
+            .mockResolvedValue([{ userId: "user-1", handle: "tourist", rating: 3500 }]),
         },
       },
     } as unknown as CommandContext;
