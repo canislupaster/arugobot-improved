@@ -1,7 +1,6 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { privateFlags } from "../utils/discordFlags.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -41,7 +40,7 @@ export const dashboardCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...privateFlags,
+        ephemeral: true,
       });
       return;
     }
@@ -56,7 +55,7 @@ export const dashboardCommand: Command = {
           await interaction.reply({
             content:
               "Dashboard visibility is private by default. Use `/dashboard set public:true` to opt in.",
-            ...privateFlags,
+            ephemeral: true,
           });
           return;
         }
@@ -64,7 +63,7 @@ export const dashboardCommand: Command = {
           content: `Dashboard visibility is ${settings.isPublic ? "public" : "private"}. Last updated ${formatUpdatedAt(
             settings.updatedAt
           )}.`,
-          ...privateFlags,
+          ephemeral: true,
         });
         return;
       }
@@ -73,7 +72,7 @@ export const dashboardCommand: Command = {
         await context.services.guildSettings.clearDashboardSettings(guildId);
         await interaction.reply({
           content: "Dashboard visibility reset to private.",
-          ...privateFlags,
+          ephemeral: true,
         });
         return;
       }
@@ -82,7 +81,7 @@ export const dashboardCommand: Command = {
       await context.services.guildSettings.setDashboardPublic(guildId, isPublic);
       await interaction.reply({
         content: `Dashboard visibility updated: ${isPublic ? "public" : "private"}.`,
-        ...privateFlags,
+        ephemeral: true,
       });
     } catch (error) {
       logCommandError("Dashboard command failed.", interaction, context.correlationId, {
@@ -90,7 +89,7 @@ export const dashboardCommand: Command = {
       });
       await interaction.reply({
         content: "Failed to update dashboard settings.",
-        ...privateFlags,
+        ephemeral: true,
       });
     }
   },

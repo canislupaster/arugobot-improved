@@ -1,6 +1,5 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import {
   filterProblemsByRatingRanges,
   filterProblemsByTags,
@@ -75,7 +74,7 @@ export const suggestCommand: Command = {
       defaultMax: DEFAULT_MAX_RATING,
     });
     if (rangeResult.error) {
-      await interaction.reply({ content: rangeResult.error, ...ephemeralFlags });
+      await interaction.reply({ content: rangeResult.error });
       return;
     }
     const ranges = rangeResult.ranges;
@@ -87,7 +86,6 @@ export const suggestCommand: Command = {
     if (handles.length === 0) {
       await interaction.reply({
         content: "Provide handles or run this command in a server with linked users.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -95,7 +93,6 @@ export const suggestCommand: Command = {
     if (handles.length > MAX_HANDLES) {
       await interaction.reply({
         content: `Too many people (limit is ${MAX_HANDLES}).`,
-        ...ephemeralFlags,
       });
       return;
     }
@@ -175,7 +172,6 @@ export const suggestCommand: Command = {
     if (badHandles.length > 0) {
       await interaction.followUp({
         content: `Invalid handle(s) (ignored): ${badHandles.join(", ")}.`,
-        ...ephemeralFlags,
       });
     }
   },

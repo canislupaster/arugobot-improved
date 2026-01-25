@@ -2,7 +2,6 @@ import { ChannelType, type ChatInputCommandInteraction } from "discord.js";
 
 import { tournamentRecapsCommand } from "../../src/commands/tournamentRecaps.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -40,7 +39,6 @@ describe("tournamentRecapsCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No tournament recap auto-posts configured for this server.",
-      ...publicFlags,
     });
   });
 
@@ -74,7 +72,6 @@ describe("tournamentRecapsCommand", () => {
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Tournament recaps will auto-post in <#channel-1> (mentioning <@&role-1>).",
-      ...publicFlags,
     });
   });
 

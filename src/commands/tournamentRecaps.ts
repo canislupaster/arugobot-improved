@@ -1,7 +1,6 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 
 import type { Command } from "./types.js";
 
@@ -39,7 +38,6 @@ export const tournamentRecapsCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -53,7 +51,6 @@ export const tournamentRecapsCommand: Command = {
         if (!subscription) {
           await interaction.reply({
             content: "No tournament recap auto-posts configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -68,7 +65,7 @@ export const tournamentRecapsCommand: Command = {
               : [])
           );
 
-        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -78,7 +75,6 @@ export const tournamentRecapsCommand: Command = {
           content: removed
             ? "Tournament recap auto-posts disabled for this server."
             : "No tournament recap auto-posts were configured for this server.",
-          ...ephemeralFlags,
         });
         return;
       }
@@ -91,7 +87,6 @@ export const tournamentRecapsCommand: Command = {
         ) {
           await interaction.reply({
             content: "Pick a text channel for tournament recaps.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -101,13 +96,12 @@ export const tournamentRecapsCommand: Command = {
         const roleLabel = roleId ? ` (mentioning <@&${roleId}>)` : "";
         await interaction.reply({
           content: `Tournament recaps will auto-post in <#${channel.id}>${roleLabel}.`,
-          ...ephemeralFlags,
         });
         return;
       }
 
       if (subcommand === "post") {
-        await interaction.deferReply({ ...ephemeralFlags });
+        await interaction.deferReply();
         const result = await context.services.tournamentRecaps.postLatestCompletedRecap(
           guildId,
           context.client
@@ -143,9 +137,9 @@ export const tournamentRecapsCommand: Command = {
         context.correlationId
       );
       if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: "Something went wrong.", ...ephemeralFlags });
+        await interaction.followUp({ content: "Something went wrong." });
       } else {
-        await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
+        await interaction.reply({ content: "Something went wrong." });
       }
     }
   },

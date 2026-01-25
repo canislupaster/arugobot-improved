@@ -2,7 +2,6 @@ import { ChannelType, type ChatInputCommandInteraction } from "discord.js";
 
 import { practiceRemindersCommand } from "../../src/commands/practiceReminders.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
@@ -50,7 +49,6 @@ describe("practiceRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No practice reminders configured for this server.",
-      ...publicFlags,
     });
   });
 
@@ -93,7 +91,6 @@ describe("practiceRemindersCommand", () => {
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Practice reminders enabled in <#channel-1> (daily at 09:00 UTC).",
-      ...publicFlags,
     });
   });
 
@@ -141,7 +138,6 @@ describe("practiceRemindersCommand", () => {
     );
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Practice reminders enabled in <#channel-1> (mon, wed, fri at 09:00 UTC).",
-      ...publicFlags,
     });
   });
 
@@ -169,7 +165,6 @@ describe("practiceRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Practice reminders disabled for this server.",
-      ...publicFlags,
     });
   });
 
@@ -222,7 +217,6 @@ describe("practiceRemindersCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         "Practice reminders enabled in <#channel-2> (daily at 10:00 UTC) (mentioning <@&role-1>).",
-      ...publicFlags,
     });
   });
 
@@ -279,7 +273,6 @@ describe("practiceRemindersCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         "Practice reminders enabled in <#channel-3> (daily at 09:00 (UTC+02:30); 06:30 UTC).",
-      ...publicFlags,
     });
   });
 
@@ -317,7 +310,6 @@ describe("practiceRemindersCommand", () => {
     expect(context.services.practiceReminders.setSubscription).not.toHaveBeenCalled();
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "UTC offset must be between -12:00 and +14:00.",
-      ...publicFlags,
     });
   });
 

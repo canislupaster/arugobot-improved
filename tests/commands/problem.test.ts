@@ -2,7 +2,6 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { problemCommand } from "../../src/commands/problem.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -27,7 +26,6 @@ describe("problemCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Invalid problem reference. Use an id like 1000A or a Codeforces URL.",
-      ...publicFlags,
     });
   });
 

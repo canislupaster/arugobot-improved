@@ -2,7 +2,6 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { relinkCommand } from "../../src/commands/register.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { privateFlags } from "../../src/utils/discordFlags.js";
 
 type MockInteraction = ChatInputCommandInteraction & {
   deferReply: jest.Mock;
@@ -68,7 +67,7 @@ describe("relinkCommand", () => {
 
     await relinkCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ...privateFlags });
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(context.services.store.updateUserHandle).toHaveBeenCalledWith(
       "guild-1",
       "user-1",
@@ -92,7 +91,7 @@ describe("relinkCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "You do not have a linked handle yet. Use /register first.",
-      ...privateFlags,
+      ephemeral: true,
     });
   });
 });

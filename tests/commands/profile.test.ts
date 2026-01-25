@@ -2,7 +2,6 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { profileCommand } from "../../src/commands/profile.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -90,7 +89,7 @@ describe("profileCommand", () => {
 
     await profileCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ...publicFlags });
+    expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: expect.any(Array) })
     );
@@ -149,7 +148,7 @@ describe("profileCommand", () => {
 
     await profileCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ...publicFlags });
+    expect(interaction.deferReply).toHaveBeenCalled();
     expect(context.services.store.getRecentSubmissions).toHaveBeenCalledWith("Tourist", 5);
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: expect.any(Array) })
@@ -179,7 +178,7 @@ describe("profileCommand", () => {
 
     await profileCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ...publicFlags });
+    expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith("Invalid handle.");
   });
 });

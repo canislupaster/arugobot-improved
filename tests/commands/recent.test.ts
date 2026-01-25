@@ -2,7 +2,6 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { recentCommand } from "../../src/commands/recent.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -53,7 +52,6 @@ describe("recentCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Provide either a handle or a user, not both.",
-      ...publicFlags,
     });
   });
 

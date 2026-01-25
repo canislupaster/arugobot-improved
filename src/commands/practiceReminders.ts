@@ -2,7 +2,6 @@ import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } f
 
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import { resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -253,7 +252,6 @@ export const practiceRemindersCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -267,7 +265,6 @@ export const practiceRemindersCommand: Command = {
         if (!subscription) {
           await interaction.reply({
             content: "No practice reminders configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -336,7 +333,7 @@ export const practiceRemindersCommand: Command = {
           embed.addFields({ name: "Role", value: `<@&${subscription.roleId}>`, inline: true });
         }
 
-        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -346,7 +343,6 @@ export const practiceRemindersCommand: Command = {
           content: removed
             ? "Practice reminders disabled for this server."
             : "No practice reminders were configured for this server.",
-          ...ephemeralFlags,
         });
         return;
       }
@@ -359,7 +355,6 @@ export const practiceRemindersCommand: Command = {
         ) {
           await interaction.reply({
             content: "Pick a text channel for practice reminders.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -379,7 +374,7 @@ export const practiceRemindersCommand: Command = {
         if (utcOffsetRaw) {
           const parsedOffset = parseUtcOffset(utcOffsetRaw);
           if ("error" in parsedOffset) {
-            await interaction.reply({ content: parsedOffset.error, ...ephemeralFlags });
+            await interaction.reply({ content: parsedOffset.error });
             return;
           }
           utcOffsetMinutes = parsedOffset.minutes;
@@ -394,13 +389,13 @@ export const practiceRemindersCommand: Command = {
           defaultMax: DEFAULT_MAX_RATING,
         });
         if (rangeResult.error) {
-          await interaction.reply({ content: rangeResult.error, ...ephemeralFlags });
+          await interaction.reply({ content: rangeResult.error });
           return;
         }
 
         const parsedDays = parseDaysInput(daysRaw);
         if ("error" in parsedDays) {
-          await interaction.reply({ content: parsedDays.error, ...ephemeralFlags });
+          await interaction.reply({ content: parsedDays.error });
           return;
         }
 
@@ -428,7 +423,6 @@ export const practiceRemindersCommand: Command = {
             utcOffsetMinutes === 0
               ? `Practice reminders enabled in <#${channel.id}> (${dayLabel.toLowerCase()} at ${utcLabel})${roleMention}.`
               : `Practice reminders enabled in <#${channel.id}> (${dayLabel.toLowerCase()} at ${localLabel}; ${utcLabel})${roleMention}.`,
-          ...ephemeralFlags,
         });
         return;
       }
@@ -438,7 +432,6 @@ export const practiceRemindersCommand: Command = {
         if (!preview) {
           await interaction.reply({
             content: "No practice reminders configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -525,13 +518,13 @@ export const practiceRemindersCommand: Command = {
           embed.setFooter({ text: notes.join(" • ") });
         }
 
-        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
       if (subcommand === "post") {
         const force = interaction.options.getBoolean("force") ?? false;
-        await interaction.deferReply({ ...ephemeralFlags });
+        await interaction.deferReply();
         const result = await context.services.practiceReminders.sendManualReminder(
           guildId,
           context.client,
@@ -580,7 +573,7 @@ export const practiceRemindersCommand: Command = {
         interaction,
         context.correlationId
       );
-      await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
+      await interaction.reply({ content: "Something went wrong." });
     }
   },
 };

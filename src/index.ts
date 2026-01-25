@@ -301,6 +301,9 @@ async function main() {
   });
 
   const shutdown = async (signal: string) => {
+    if (shuttingDown) {
+      return;
+    }
     shuttingDown = true;
     logInfo(`Shutting down (${signal})...`);
     if (parseInterval) {
@@ -331,6 +334,7 @@ async function main() {
       webServer = null;
     }
     await client.destroy();
+    setLogSink(null);
     await destroyDb();
     logInfo("Shutdown complete.");
   };

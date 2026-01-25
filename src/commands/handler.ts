@@ -2,7 +2,6 @@ import { PermissionFlagsBits, type ChatInputCommandInteraction } from "discord.j
 
 import type { CommandContext } from "../types/commandContext.js";
 import type { CooldownManager } from "../utils/cooldown.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
@@ -33,7 +32,7 @@ export async function handleCommandInteraction(
   const command = commands.get(interaction.commandName);
   if (!command) {
     logWarn("Unknown command.", buildLogContext(interaction, correlationId, getLatencyMs()));
-    await interaction.reply({ content: "Unknown command.", ...ephemeralFlags });
+    await interaction.reply({ content: "Unknown command." });
     return;
   }
 
@@ -46,7 +45,6 @@ export async function handleCommandInteraction(
       );
       await interaction.reply({
         content: "You do not have permission to use this command.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -60,7 +58,6 @@ export async function handleCommandInteraction(
     });
     await interaction.reply({
       content: `Too many requests. Try again in ${cooldown.retryAfterSeconds}s.`,
-      ...ephemeralFlags,
     });
     return;
   }
@@ -78,9 +75,9 @@ export async function handleCommandInteraction(
       error: error instanceof Error ? error.message : String(error),
     });
     if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content: "Something went wrong.", ...ephemeralFlags });
+      await interaction.followUp({ content: "Something went wrong." });
     } else {
-      await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
+      await interaction.reply({ content: "Something went wrong." });
     }
   } finally {
     await context.services.metrics.recordCommandResult(

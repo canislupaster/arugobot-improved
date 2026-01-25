@@ -2,7 +2,6 @@ import { ChannelType, type ChatInputCommandInteraction } from "discord.js";
 
 import { contestRemindersCommand } from "../../src/commands/contestReminders.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -46,7 +45,6 @@ describe("contestRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No contest reminders configured for this server.",
-      ...publicFlags,
     });
   });
 
@@ -100,7 +98,6 @@ describe("contestRemindersCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         "Contest reminders enabled in <#channel-1> (30 minutes before, Official) (mentioning <@&role-1>) (include: div. 2, exclude: kotlin). Subscription id: `sub-1`.",
-      ...publicFlags,
     });
   });
 
@@ -125,7 +122,6 @@ describe("contestRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Removed 2 contest reminder subscriptions.",
-      ...publicFlags,
     });
   });
 
@@ -175,7 +171,6 @@ describe("contestRemindersCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         'Contest reminder preset "Div 2" enabled in <#channel-2> (45 minutes before, Official) (include: div. 2, div.2, div 2, exclude: none). Subscription id: `sub-10`.',
-      ...publicFlags,
     });
   });
 
@@ -211,7 +206,6 @@ describe("contestRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Removed contest reminder subscription `sub-1`.",
-      ...publicFlags,
     });
   });
 
@@ -341,7 +335,6 @@ describe("contestRemindersCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No contest reminders configured for this server.",
-      ...publicFlags,
     });
   });
 
@@ -384,7 +377,7 @@ describe("contestRemindersCommand", () => {
 
     await contestRemindersCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ...publicFlags });
+    expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(
       "Posted a reminder for CF Round in <#channel-1>."
     );

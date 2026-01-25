@@ -10,7 +10,6 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -242,7 +241,6 @@ export const contestRemindersCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -256,7 +254,6 @@ export const contestRemindersCommand: Command = {
         if (subscriptions.length === 0) {
           await interaction.reply({
             content: "No contest reminders configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -272,7 +269,7 @@ export const contestRemindersCommand: Command = {
             }))
           );
 
-        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -282,7 +279,6 @@ export const contestRemindersCommand: Command = {
           content: removed
             ? `Removed ${removed} contest reminder subscription${removed === 1 ? "" : "s"}.`
             : "No contest reminders were configured for this server.",
-          ...ephemeralFlags,
         });
         return;
       }
@@ -295,7 +291,6 @@ export const contestRemindersCommand: Command = {
         ) {
           await interaction.reply({
             content: "Pick a text channel for contest reminders.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -327,7 +322,6 @@ export const contestRemindersCommand: Command = {
           content: `Contest reminders enabled in <#${channel.id}> (${minutesBefore} minutes before, ${formatScope(
             scope
           )})${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
-          ...ephemeralFlags,
         });
         return;
       }
@@ -340,7 +334,6 @@ export const contestRemindersCommand: Command = {
         ) {
           await interaction.reply({
             content: "Pick a text channel for contest reminders.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -370,7 +363,6 @@ export const contestRemindersCommand: Command = {
           content: `Contest reminder preset "${preset.label}" enabled in <#${channel.id}> (${minutesBefore} minutes before, ${formatScope(
             scope
           )})${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
-          ...ephemeralFlags,
         });
         return;
       }
@@ -381,7 +373,6 @@ export const contestRemindersCommand: Command = {
         if (subscriptions.length === 0) {
           await interaction.reply({
             content: "No contest reminders configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -389,7 +380,6 @@ export const contestRemindersCommand: Command = {
         if (resolution.status === "not_found") {
           await interaction.reply({
             content: "Subscription id not found. Use /contestreminders list to see current ids.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -398,7 +388,6 @@ export const contestRemindersCommand: Command = {
             content: `Subscription id matches multiple entries. Use the full id. Matches: ${resolution.matches.join(
               ", "
             )}`,
-            ...ephemeralFlags,
           });
           return;
         }
@@ -410,7 +399,6 @@ export const contestRemindersCommand: Command = {
           content: removed
             ? `Removed contest reminder subscription \`${resolution.id}\`.`
             : "Subscription not found.",
-          ...ephemeralFlags,
         });
         return;
       }
@@ -421,7 +409,6 @@ export const contestRemindersCommand: Command = {
         if (subscriptions.length === 0) {
           await interaction.reply({
             content: "No contest reminders configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -431,7 +418,6 @@ export const contestRemindersCommand: Command = {
           if (resolution.status === "not_found") {
             await interaction.reply({
               content: "Subscription id not found. Use /contestreminders list to see current ids.",
-              ...ephemeralFlags,
             });
             return;
           }
@@ -440,7 +426,6 @@ export const contestRemindersCommand: Command = {
               content: `Subscription id matches multiple entries. Use the full id. Matches: ${resolution.matches.join(
                 ", "
               )}`,
-              ...ephemeralFlags,
             });
             return;
           }
@@ -449,7 +434,6 @@ export const contestRemindersCommand: Command = {
           await interaction.reply({
             content:
               "Multiple contest reminder subscriptions are configured. Provide an id from /contestreminders list.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -477,7 +461,6 @@ export const contestRemindersCommand: Command = {
           } else {
             await interaction.reply({
               content: "Unable to reach Codeforces right now. Try again in a few minutes.",
-              ...ephemeralFlags,
             });
             return;
           }
@@ -489,7 +472,7 @@ export const contestRemindersCommand: Command = {
           excludeKeywords: subscription.excludeKeywords,
         });
         if (filtered.length === 0) {
-          await interaction.reply({ content: "No upcoming contests found.", ...ephemeralFlags });
+          await interaction.reply({ content: "No upcoming contests found." });
           return;
         }
 
@@ -551,7 +534,7 @@ export const contestRemindersCommand: Command = {
           inline: false,
         });
 
-        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -562,7 +545,6 @@ export const contestRemindersCommand: Command = {
         if (subscriptions.length === 0) {
           await interaction.reply({
             content: "No contest reminders configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -572,7 +554,6 @@ export const contestRemindersCommand: Command = {
           if (resolution.status === "not_found") {
             await interaction.reply({
               content: "Subscription id not found. Use /contestreminders list to see current ids.",
-              ...ephemeralFlags,
             });
             return;
           }
@@ -581,7 +562,6 @@ export const contestRemindersCommand: Command = {
               content: `Subscription id matches multiple entries. Use the full id. Matches: ${resolution.matches.join(
                 ", "
               )}`,
-              ...ephemeralFlags,
             });
             return;
           }
@@ -590,11 +570,10 @@ export const contestRemindersCommand: Command = {
           await interaction.reply({
             content:
               "Multiple contest reminder subscriptions are configured. Provide an id from /contestreminders list.",
-            ...ephemeralFlags,
           });
           return;
         }
-        await interaction.deferReply({ ...ephemeralFlags });
+        await interaction.deferReply();
         const result = await context.services.contestReminders.sendManualReminder(
           subscription,
           context.client,
@@ -639,7 +618,7 @@ export const contestRemindersCommand: Command = {
         interaction,
         context.correlationId
       );
-      await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
+      await interaction.reply({ content: "Something went wrong." });
     }
   },
 };

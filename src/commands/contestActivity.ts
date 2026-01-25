@@ -1,7 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -44,7 +43,6 @@ export const contestActivityCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -52,11 +50,11 @@ export const contestActivityCommand: Command = {
     const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
     const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
     if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
-      await interaction.reply({ content: "Invalid lookback window.", ...ephemeralFlags });
+      await interaction.reply({ content: "Invalid lookback window." });
       return;
     }
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-      await interaction.reply({ content: "Invalid participant limit.", ...ephemeralFlags });
+      await interaction.reply({ content: "Invalid participant limit." });
       return;
     }
 

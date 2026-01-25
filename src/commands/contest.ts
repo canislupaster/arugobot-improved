@@ -3,7 +3,6 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -131,7 +130,7 @@ export const contestCommand: Command = {
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
     const scope = parseScope(interaction.options.getString("scope"));
-    await interaction.deferReply({ ...ephemeralFlags });
+    await interaction.deferReply();
 
     let stale = false;
     if (scope === "all") {

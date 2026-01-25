@@ -1,7 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import { getProblemId } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
@@ -54,7 +53,6 @@ export const practiceCommand: Command = {
     if (handleInput && userOption) {
       await interaction.reply({
         content: "Provide either a handle or a user, not both.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -62,7 +60,6 @@ export const practiceCommand: Command = {
     if (!interaction.guild && !handleInput) {
       await interaction.reply({
         content: "Run this command in a server or provide a handle.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -76,11 +73,11 @@ export const practiceCommand: Command = {
       defaultMax: DEFAULT_MAX_RATING,
     });
     if (rangeResult.error) {
-      await interaction.reply({ content: rangeResult.error, ...ephemeralFlags });
+      await interaction.reply({ content: rangeResult.error });
       return;
     }
 
-    await interaction.deferReply({ ...ephemeralFlags });
+    await interaction.deferReply();
 
     try {
       const targetUser = userOption ?? interaction.user;

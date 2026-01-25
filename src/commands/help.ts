@@ -1,7 +1,5 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
-import { ephemeralFlags } from "../utils/discordFlags.js";
-
 import type { Command } from "./types.js";
 
 export const helpCommand: Command = {
@@ -18,6 +16,6 @@ export const helpCommand: Command = {
       .setDescription(description)
       .setColor(0x3498db);
 
-    await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+    await interaction.reply({ embeds: [embed] });
   },
 };

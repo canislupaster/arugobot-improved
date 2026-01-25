@@ -10,7 +10,6 @@ import {
 } from "discord.js";
 
 import { waitForCompilationError } from "../services/verification.js";
-import { privateFlags } from "../utils/discordFlags.js";
 import { logError, type LogContext } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
@@ -153,7 +152,7 @@ export const registerCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...privateFlags,
+        ephemeral: true,
       });
       return;
     }
@@ -166,7 +165,7 @@ export const registerCommand: Command = {
       userId: interaction.user.id,
     };
 
-    await interaction.deferReply({ ...privateFlags });
+    await interaction.deferReply({ ephemeral: true });
 
     const handleInfo = await context.services.store.resolveHandle(handle);
     if (!handleInfo.exists) {
@@ -240,7 +239,7 @@ export const relinkCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...privateFlags,
+        ephemeral: true,
       });
       return;
     }
@@ -257,12 +256,12 @@ export const relinkCommand: Command = {
     if (!currentHandle) {
       await interaction.reply({
         content: "You do not have a linked handle yet. Use /register first.",
-        ...privateFlags,
+        ephemeral: true,
       });
       return;
     }
 
-    await interaction.deferReply({ ...privateFlags });
+    await interaction.deferReply({ ephemeral: true });
 
     const handleInfo = await context.services.store.resolveHandle(newHandle);
     if (!handleInfo.exists) {
@@ -326,13 +325,13 @@ export const unlinkCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...privateFlags,
+        ephemeral: true,
       });
       return;
     }
     const guildId = interaction.guild.id;
     if (!(await context.services.store.handleLinked(guildId, interaction.user.id))) {
-      await interaction.reply({ content: "You have not linked a handle.", ...privateFlags });
+      await interaction.reply({ content: "You have not linked a handle.", ephemeral: true });
       return;
     }
 
@@ -351,7 +350,7 @@ export const unlinkCommand: Command = {
     const response = await interaction.reply({
       embeds: [embed],
       components: [row],
-      ...privateFlags,
+      ephemeral: true,
       fetchReply: true,
     });
 
@@ -362,7 +361,7 @@ export const unlinkCommand: Command = {
 
     collector.on("collect", async (button) => {
       if (button.user.id !== interaction.user.id) {
-        await button.reply({ content: "This confirmation isn't for you.", ...privateFlags });
+        await button.reply({ content: "This confirmation isn't for you.", ephemeral: true });
         return;
       }
 

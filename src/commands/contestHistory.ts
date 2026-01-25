@@ -1,7 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -36,7 +35,6 @@ export const contestHistoryCommand: Command = {
     if (handleInput && userOption) {
       await interaction.reply({
         content: "Provide either a handle or a user, not both.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -44,12 +42,11 @@ export const contestHistoryCommand: Command = {
     if (!interaction.guild && !handleInput) {
       await interaction.reply({
         content: "Run this command in a server or provide a handle.",
-        ...ephemeralFlags,
       });
       return;
     }
 
-    await interaction.deferReply({ ...ephemeralFlags });
+    await interaction.deferReply();
 
     try {
       let handle = "";

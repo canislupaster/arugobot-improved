@@ -5,7 +5,6 @@ import {
   version as discordJsVersion,
 } from "discord.js";
 
-import { privateFlags } from "../utils/discordFlags.js";
 import { getLastError } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
@@ -20,7 +19,7 @@ export const healthCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...privateFlags,
+        ephemeral: true,
       });
       return;
     }
@@ -239,6 +238,6 @@ export const healthCommand: Command = {
       });
     }
 
-    await interaction.reply({ embeds: [embed], ...privateFlags });
+    await interaction.reply({ embeds: [embed], ephemeral: true });
   },
 };

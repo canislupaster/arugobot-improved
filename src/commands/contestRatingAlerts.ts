@@ -5,7 +5,6 @@ import {
   type ContestRatingAlertSubscription,
 } from "../services/contestRatingAlerts.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 
 import type { Command } from "./types.js";
 
@@ -120,7 +119,6 @@ export const contestRatingAlertsCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -134,7 +132,6 @@ export const contestRatingAlertsCommand: Command = {
         if (subscriptions.length === 0) {
           await interaction.reply({
             content: "No contest rating alerts configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -150,7 +147,7 @@ export const contestRatingAlertsCommand: Command = {
             }))
           );
 
-        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -160,7 +157,6 @@ export const contestRatingAlertsCommand: Command = {
           content: removed
             ? `Removed ${removed} contest rating alert subscription${removed === 1 ? "" : "s"}.`
             : "No contest rating alerts were configured for this server.",
-          ...ephemeralFlags,
         });
         return;
       }
@@ -173,7 +169,6 @@ export const contestRatingAlertsCommand: Command = {
         ) {
           await interaction.reply({
             content: "Pick a text channel for contest rating alerts.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -199,7 +194,6 @@ export const contestRatingAlertsCommand: Command = {
         const filterNote = filterParts.length > 0 ? ` Filters: ${filterParts.join("; ")}.` : "";
         await interaction.reply({
           content: `Contest rating alerts enabled in <#${channel.id}>${roleMention}. Subscription id: \`${subscription.id}\`.${filterNote}`,
-          ...ephemeralFlags,
         });
         return;
       }
@@ -210,7 +204,6 @@ export const contestRatingAlertsCommand: Command = {
         if (subscriptions.length === 0) {
           await interaction.reply({
             content: "No contest rating alerts configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -218,7 +211,6 @@ export const contestRatingAlertsCommand: Command = {
         if (resolution.status === "not_found") {
           await interaction.reply({
             content: "Subscription id not found. Use /contestratingalerts list to see current ids.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -227,7 +219,6 @@ export const contestRatingAlertsCommand: Command = {
             content: `Subscription id matches multiple entries. Use the full id. Matches: ${resolution.matches.join(
               ", "
             )}`,
-            ...ephemeralFlags,
           });
           return;
         }
@@ -239,7 +230,6 @@ export const contestRatingAlertsCommand: Command = {
           content: removed
             ? `Removed contest rating alert subscription \`${resolution.id}\`.`
             : "Subscription not found.",
-          ...ephemeralFlags,
         });
         return;
       }
@@ -250,7 +240,6 @@ export const contestRatingAlertsCommand: Command = {
         if (subscriptions.length === 0) {
           await interaction.reply({
             content: "No contest rating alerts configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -261,7 +250,6 @@ export const contestRatingAlertsCommand: Command = {
             await interaction.reply({
               content:
                 "Subscription id not found. Use /contestratingalerts list to see current ids.",
-              ...ephemeralFlags,
             });
             return;
           }
@@ -270,7 +258,6 @@ export const contestRatingAlertsCommand: Command = {
               content: `Subscription id matches multiple entries. Use the full id. Matches: ${resolution.matches.join(
                 ", "
               )}`,
-              ...ephemeralFlags,
             });
             return;
           }
@@ -279,7 +266,6 @@ export const contestRatingAlertsCommand: Command = {
           await interaction.reply({
             content:
               "Multiple contest rating alerts are configured. Provide an id from /contestratingalerts list.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -288,42 +274,36 @@ export const contestRatingAlertsCommand: Command = {
         if (preview.status === "no_handles") {
           await interaction.reply({
             content: "No linked handles found in this server yet.",
-            ...ephemeralFlags,
           });
           return;
         }
         if (preview.status === "no_matching_handles") {
           await interaction.reply({
             content: "No linked handles match the alert filters.",
-            ...ephemeralFlags,
           });
           return;
         }
         if (preview.status === "no_contest") {
           await interaction.reply({
             content: "No finished contests found yet.",
-            ...ephemeralFlags,
           });
           return;
         }
         if (preview.status === "no_changes") {
           await interaction.reply({
             content: `No rating changes found for ${preview.contest.name} yet.`,
-            ...ephemeralFlags,
           });
           return;
         }
         if (preview.status === "already_notified") {
           await interaction.reply({
             content: `Rating changes for ${preview.contest.name} were already posted at ${preview.notifiedAt}. Use /contestratingalerts post force:true to send another.`,
-            ...ephemeralFlags,
           });
           return;
         }
         if (preview.status === "error") {
           await interaction.reply({
             content: "Unable to load contest data right now. Try again later.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -334,7 +314,7 @@ export const contestRatingAlertsCommand: Command = {
           value: `\`${subscription.id}\``,
           inline: false,
         });
-        await interaction.reply({ embeds: [embed], ...ephemeralFlags });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -345,7 +325,6 @@ export const contestRatingAlertsCommand: Command = {
         if (subscriptions.length === 0) {
           await interaction.reply({
             content: "No contest rating alerts configured for this server.",
-            ...ephemeralFlags,
           });
           return;
         }
@@ -356,7 +335,6 @@ export const contestRatingAlertsCommand: Command = {
             await interaction.reply({
               content:
                 "Subscription id not found. Use /contestratingalerts list to see current ids.",
-              ...ephemeralFlags,
             });
             return;
           }
@@ -365,7 +343,6 @@ export const contestRatingAlertsCommand: Command = {
               content: `Subscription id matches multiple entries. Use the full id. Matches: ${resolution.matches.join(
                 ", "
               )}`,
-              ...ephemeralFlags,
             });
             return;
           }
@@ -374,12 +351,11 @@ export const contestRatingAlertsCommand: Command = {
           await interaction.reply({
             content:
               "Multiple contest rating alerts are configured. Provide an id from /contestratingalerts list.",
-            ...ephemeralFlags,
           });
           return;
         }
 
-        await interaction.deferReply({ ...ephemeralFlags });
+        await interaction.deferReply();
         const result = await context.services.contestRatingAlerts.sendManualAlert(
           subscription,
           context.client,
@@ -433,7 +409,7 @@ export const contestRatingAlertsCommand: Command = {
         interaction,
         context.correlationId
       );
-      await interaction.reply({ content: "Something went wrong.", ...ephemeralFlags });
+      await interaction.reply({ content: "Something went wrong." });
     }
   },
 };

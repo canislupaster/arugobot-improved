@@ -1,7 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 
 import type { Command } from "./types.js";
 
@@ -22,7 +21,6 @@ export const leaderboardCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -30,7 +28,7 @@ export const leaderboardCommand: Command = {
     const page = interaction.options.getInteger("page") ?? 1;
     const metric = interaction.options.getString("metric") ?? "rating";
     if (!Number.isInteger(page) || page < 1) {
-      await interaction.reply({ content: "Invalid page.", ...ephemeralFlags });
+      await interaction.reply({ content: "Invalid page." });
       return;
     }
 

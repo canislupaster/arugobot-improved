@@ -2,7 +2,6 @@ import { ChannelType, type ChatInputCommandInteraction } from "discord.js";
 
 import { contestRatingAlertsCommand } from "../../src/commands/contestRatingAlerts.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -46,7 +45,6 @@ describe("contestRatingAlertsCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "No contest rating alerts configured for this server.",
-      ...publicFlags,
     });
   });
 
@@ -91,7 +89,6 @@ describe("contestRatingAlertsCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         "Contest rating alerts enabled in <#channel-1> (mentioning <@&role-1>). Subscription id: `sub-1`.",
-      ...publicFlags,
     });
   });
 

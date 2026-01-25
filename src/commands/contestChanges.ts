@@ -4,7 +4,6 @@ import type { Contest } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -166,7 +165,6 @@ export const contestChangesCommand: Command = {
     if (!interaction.guild && userOptions.length > 0) {
       await interaction.reply({
         content: "Specify handles directly when using this command outside a server.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -174,12 +172,11 @@ export const contestChangesCommand: Command = {
     if (!interaction.guild && handleInputs.length === 0) {
       await interaction.reply({
         content: "Provide at least one handle or run this command in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
 
-    await interaction.deferReply({ ...ephemeralFlags });
+    await interaction.deferReply();
 
     let stale = false;
     try {

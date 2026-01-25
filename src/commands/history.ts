@@ -1,7 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatTime } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
@@ -17,17 +16,16 @@ export const historyCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
     const page = interaction.options.getInteger("page") ?? 1;
     if (!Number.isInteger(page) || page < 1) {
-      await interaction.reply({ content: "Invalid page.", ...ephemeralFlags });
+      await interaction.reply({ content: "Invalid page." });
       return;
     }
 
-    await interaction.deferReply({ ...ephemeralFlags });
+    await interaction.deferReply();
 
     try {
       const historyPage = await context.services.store.getChallengeHistoryPage(

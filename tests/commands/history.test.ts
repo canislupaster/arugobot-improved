@@ -2,7 +2,6 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { historyCommand } from "../../src/commands/history.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -48,7 +47,7 @@ describe("historyCommand", () => {
 
     await historyCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ...publicFlags });
+    expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: expect.any(Array) })
     );
@@ -83,7 +82,7 @@ describe("historyCommand", () => {
 
     await historyCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ...publicFlags });
+    expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: expect.any(Array) })
     );

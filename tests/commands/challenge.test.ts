@@ -2,7 +2,6 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import { challengeCommand } from "../../src/commands/challenge.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
-import { publicFlags } from "../../src/utils/discordFlags.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -49,7 +48,6 @@ describe("challengeCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Invalid max participants. Choose 2-10.",
-      ...publicFlags,
     });
   });
 
@@ -78,7 +76,7 @@ describe("challengeCommand", () => {
 
     await challengeCommand.execute(interaction, context);
 
-    expect(interaction.deferReply).toHaveBeenCalledWith({ ...publicFlags });
+    expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith("Too many users (limit is 5).");
   });
 

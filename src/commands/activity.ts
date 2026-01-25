@@ -1,7 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { ephemeralFlags } from "../utils/discordFlags.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -41,7 +40,6 @@ export const activityCommand: Command = {
     if (!interaction.guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ...ephemeralFlags,
       });
       return;
     }
@@ -49,7 +47,7 @@ export const activityCommand: Command = {
     const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
     const user = interaction.options.getUser("user");
     if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
-      await interaction.reply({ content: "Invalid lookback window.", ...ephemeralFlags });
+      await interaction.reply({ content: "Invalid lookback window." });
       return;
     }
 
