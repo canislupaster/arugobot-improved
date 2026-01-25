@@ -18,6 +18,7 @@ import {
 } from "../utils/time.js";
 
 import type { Contest, ContestScope, ContestScopeFilter, ContestService } from "./contests.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const NOTIFICATION_RETENTION_DAYS = 14;
 
@@ -527,7 +528,7 @@ function getUpcomingWithinWindow(
 function buildReminderEmbed(contest: Contest, secondsUntil: number): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle("Contest reminder")
-    .setColor(0x3498db)
+    .setColor(EMBED_COLORS.info)
     .setDescription(
       `[${contest.name}](${buildContestUrl(contest)}) starts ${formatDiscordRelativeTime(
         contest.startTimeSeconds

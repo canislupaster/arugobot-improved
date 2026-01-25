@@ -8,6 +8,7 @@ import { parseProblemReference } from "../utils/problemReference.js";
 import { getColor } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_HANDLES_CHECK = 10;
 const MAX_SOLVED_DISPLAY = 10;
@@ -168,7 +169,7 @@ export const problemCommand: Command = {
       const embed = new EmbedBuilder()
         .setTitle(`${problem.index}. ${problem.name}`)
         .setDescription(`[Open on Codeforces](${buildProblemLink(problem)})`)
-        .setColor(problem.rating ? getColor(problem.rating) : 0x3498db)
+        .setColor(problem.rating ? getColor(problem.rating) : EMBED_COLORS.info)
         .addFields(
           { name: "Problem id", value: `${problem.contestId}${problem.index}`, inline: true },
           {

@@ -5,6 +5,7 @@ import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_DAYS = 30;
 const MAX_DAYS = 90;
@@ -71,7 +72,7 @@ export const activityCommand: Command = {
 
         const embed = new EmbedBuilder()
           .setTitle("User activity")
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .setDescription(`Last ${sinceLabel} for <@${user.id}>`)
           .addFields(
             { name: "Participations", value: String(summary.participations), inline: true },
@@ -110,7 +111,7 @@ export const activityCommand: Command = {
 
       const embed = new EmbedBuilder()
         .setTitle("Server activity")
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .setDescription(`Last ${sinceLabel}`)
         .addFields(
           {

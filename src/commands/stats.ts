@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export const statsCommand: Command = {
   data: new SlashCommandBuilder().setName("stats").setDescription("Shows server challenge stats"),
@@ -25,7 +26,7 @@ export const statsCommand: Command = {
 
       const embed = new EmbedBuilder()
         .setTitle("Server stats")
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .addFields(
           { name: "Linked users", value: String(stats.userCount), inline: true },
           { name: "Total challenges", value: String(stats.totalChallenges), inline: true },

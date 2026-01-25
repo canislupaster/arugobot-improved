@@ -8,6 +8,7 @@ import {
 import { getLastError } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export const healthCommand: Command = {
   data: new SlashCommandBuilder()
@@ -95,7 +96,7 @@ export const healthCommand: Command = {
 
     const embed = new EmbedBuilder()
       .setTitle("ArugoBot Health")
-      .setColor(0x3498db)
+      .setColor(EMBED_COLORS.info)
       .addFields([
         { name: "Uptime", value: `${uptimeSeconds}s`, inline: true },
         { name: "Memory", value: `${Math.round(memory.rss / 1024 / 1024)} MB`, inline: true },

@@ -4,6 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export const streakCommand: Command = {
   data: new SlashCommandBuilder()
@@ -34,7 +35,7 @@ export const streakCommand: Command = {
 
       const embed = new EmbedBuilder()
         .setTitle(`Challenge streak: ${targetName}`)
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .setDescription(`Counts UTC days with at least one solved challenge for ${targetMention}.`)
         .addFields(
           { name: "Current streak", value: `${streak.currentStreak} days`, inline: true },

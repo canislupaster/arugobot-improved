@@ -1,6 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export const helpCommand: Command = {
   data: new SlashCommandBuilder()
@@ -14,7 +15,7 @@ export const helpCommand: Command = {
     const embed = new EmbedBuilder()
       .setTitle("ArugoBot Commands")
       .setDescription(description)
-      .setColor(0x3498db);
+      .setColor(EMBED_COLORS.info);
 
     await interaction.reply({ embeds: [embed] });
   },

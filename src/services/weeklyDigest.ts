@@ -7,6 +7,7 @@ import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time
 
 import type { ContestActivityService } from "./contestActivity.js";
 import type { StoreService } from "./store.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export type WeeklyDigestSubscription = {
   guildId: string;
@@ -423,7 +424,7 @@ export class WeeklyDigestService {
     );
 
     const baseDescription = `Highlights from the last ${lookbackDays} days.`;
-    const embed = new EmbedBuilder().setTitle("Weekly digest").setColor(0x3498db);
+    const embed = new EmbedBuilder().setTitle("Weekly digest").setColor(EMBED_COLORS.info);
 
     const challengeLines = [
       `Completed challenges: ${challengeActivity.completedChallenges}`,

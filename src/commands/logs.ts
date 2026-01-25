@@ -5,6 +5,7 @@ import type { LogLevel } from "../utils/logger.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_LIMIT = 20;
 const DEFAULT_LIMIT = 6;
@@ -90,7 +91,7 @@ export const logsCommand: Command = {
 
       const embed = new EmbedBuilder()
         .setTitle("Recent logs")
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .setDescription(entries.map(formatEntryLine).join("\n"));
 
       const filters: string[] = [];

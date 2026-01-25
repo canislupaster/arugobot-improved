@@ -4,6 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_TARGETS = 5;
 
@@ -106,7 +107,7 @@ export const compareCommand: Command = {
         return;
       }
 
-      const embed = new EmbedBuilder().setTitle("Codeforces comparison").setColor(0x3498db);
+      const embed = new EmbedBuilder().setTitle("Codeforces comparison").setColor(EMBED_COLORS.info);
 
       let stale = false;
       for (const target of targets) {

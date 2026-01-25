@@ -6,6 +6,7 @@ import { getColor } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
@@ -175,7 +176,7 @@ export const practiceCommand: Command = {
       }
       const embed = new EmbedBuilder()
         .setTitle(`Practice suggestion for ${handleInput ? handle : targetUser.username}`)
-        .setColor(problem.rating ? getColor(problem.rating) : 0x3498db)
+        .setColor(problem.rating ? getColor(problem.rating) : EMBED_COLORS.info)
         .addFields(
           {
             name: "Problem",

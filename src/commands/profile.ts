@@ -4,6 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_RECENT = 5;
 
@@ -165,7 +166,7 @@ export const profileCommand: Command = {
       const title = handleInput ? `Profile: ${displayHandle}` : `Profile: ${targetName}`;
       const embed = new EmbedBuilder()
         .setTitle(title)
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .addFields(
           { name: "Handle", value: displayHandle, inline: true },
           ...(linkedUserId

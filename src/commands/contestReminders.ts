@@ -14,6 +14,7 @@ import {
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_MINUTES = 30;
 const MIN_MINUTES = 5;
@@ -312,7 +313,7 @@ export const contestRemindersCommand: Command = {
 
         const embed = new EmbedBuilder()
           .setTitle("Contest reminder subscriptions")
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .addFields(
             subscriptions.map((subscription, index) => ({
               name: `Subscription ${index + 1}`,
@@ -513,7 +514,7 @@ export const contestRemindersCommand: Command = {
 
         const embed = new EmbedBuilder()
           .setTitle("Contest reminder preview")
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .addFields(
             { name: "Contest", value: contest.name, inline: false },
             { name: "Channel", value: `<#${subscription.channelId}>`, inline: true },

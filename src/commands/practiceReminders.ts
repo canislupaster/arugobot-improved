@@ -6,6 +6,7 @@ import { resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js"
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
@@ -284,7 +285,7 @@ export const practiceRemindersCommand: Command = {
         const nextScheduledSeconds = Math.floor(nextScheduledMs / 1000);
         const embed = new EmbedBuilder()
           .setTitle("Practice reminders")
-          .setColor(0x2ecc71)
+          .setColor(EMBED_COLORS.success)
           .addFields(
             { name: "Channel", value: `<#${subscription.channelId}>`, inline: true },
             {
@@ -444,7 +445,7 @@ export const practiceRemindersCommand: Command = {
         );
         const embed = new EmbedBuilder()
           .setTitle("Practice reminder preview")
-          .setColor(0x2ecc71)
+          .setColor(EMBED_COLORS.success)
           .addFields(
             { name: "Channel", value: `<#${preview.subscription.channelId}>`, inline: true },
             {

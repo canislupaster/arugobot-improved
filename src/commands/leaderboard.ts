@@ -10,6 +10,7 @@ import {
 import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export const leaderboardCommand: Command = {
   data: new SlashCommandBuilder()
@@ -93,7 +94,7 @@ export const leaderboardCommand: Command = {
         const embed = new EmbedBuilder()
           .setTitle(title)
           .setDescription(`Page ${pageNumber} of ${totalPages}`)
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .addFields({ name: fieldName, value: content || "No entries.", inline: false });
         const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
         return { embed, row };

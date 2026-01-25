@@ -14,6 +14,7 @@ import type { RatingRange } from "../utils/ratingRanges.js";
 
 import type { Problem, ProblemService } from "./problems.js";
 import type { StoreService } from "./store.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_RATING_RANGES: RatingRange[] = [{ min: 800, max: 3500 }];
 const MAX_HANDLES_FOR_SOLVED = 10;
@@ -622,7 +623,7 @@ export class PracticeReminderService {
   ): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setTitle("Daily practice problem")
-      .setColor(0x2ecc71)
+      .setColor(EMBED_COLORS.success)
       .addFields(
         { name: "Problem", value: formatProblemLink(problem), inline: false },
         { name: "Rating", value: String(problem.rating ?? "N/A"), inline: true },

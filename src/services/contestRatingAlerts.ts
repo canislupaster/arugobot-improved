@@ -12,6 +12,7 @@ import type { ContestRatingChangesService } from "./contestRatingChanges.js";
 import type { Contest, ContestService } from "./contests.js";
 import type { RatingChange } from "./ratingChanges.js";
 import type { StoreService } from "./store.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const ALERT_LOOKBACK_DAYS = 14;
 const ALERT_RETENTION_DAYS = 90;
@@ -125,7 +126,7 @@ export function buildContestRatingAlertEmbed(preview: ContestRatingAlertPreview)
 
   const embed = new EmbedBuilder()
     .setTitle("Contest rating changes published")
-    .setColor(0x3498db)
+    .setColor(EMBED_COLORS.info)
     .setDescription(`[${preview.contest.name}](${buildContestUrl(preview.contest)})`)
     .addFields(
       {

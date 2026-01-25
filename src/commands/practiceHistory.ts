@@ -11,6 +11,7 @@ import { parseProblemReference } from "../utils/problemReference.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
@@ -133,7 +134,7 @@ export const practiceHistoryCommand: Command = {
           .join("\n");
         const embed = new EmbedBuilder()
           .setTitle("Practice suggestions")
-          .setColor(0x2ecc71)
+          .setColor(EMBED_COLORS.success)
           .setDescription(lines)
           .addFields({ name: "User", value: `<@${user.id}>`, inline: true });
 
@@ -159,7 +160,7 @@ export const practiceHistoryCommand: Command = {
         .join("\n");
       const embed = new EmbedBuilder()
         .setTitle("Practice reminders")
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .setDescription(lines);
 
       if (!cacheLoaded) {

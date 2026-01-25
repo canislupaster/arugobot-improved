@@ -6,6 +6,7 @@ import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_DAYS = 90;
 const MIN_DAYS = 1;
@@ -178,7 +179,7 @@ export const contestActivityCommand: Command = {
 
       const embed = new EmbedBuilder()
         .setTitle("Contest activity")
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .setDescription(`Last ${days} days • Scope: ${formatScope(scope)}`)
         .addFields(
           { name: "Contests", value: String(scopeSummary.contestCount), inline: true },

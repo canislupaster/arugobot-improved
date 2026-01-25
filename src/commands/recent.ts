@@ -4,6 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_RECENT = 10;
 
@@ -97,7 +98,7 @@ export const recentCommand: Command = {
       const lines = result.submissions.map(formatSubmissionLine).join("\n");
       const embed = new EmbedBuilder()
         .setTitle(`Recent submissions: ${targetName}`)
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .addFields(
           { name: "Handle", value: handle, inline: true },
           { name: "Submissions", value: lines, inline: false }

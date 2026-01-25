@@ -8,6 +8,7 @@ import { capitalize } from "../utils/text.js";
 import { formatTournamentRecapMarkdown } from "../utils/tournamentRecap.js";
 
 import type { TournamentRecap, TournamentService } from "./tournaments.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const STANDINGS_PREVIEW_LIMIT = 5;
 
@@ -48,7 +49,7 @@ function buildRecapEmbed(recap: TournamentRecap): EmbedBuilder {
   const updatedLabel = recap.entry.updatedAt;
   const embed = new EmbedBuilder()
     .setTitle("Tournament recap")
-    .setColor(0x3498db)
+    .setColor(EMBED_COLORS.info)
     .setDescription(`${statusLabel} • ${formatLabel} • ${recap.entry.lengthMinutes}m`)
     .addFields(
       { name: "Participants", value: String(recap.entry.participantCount), inline: true },

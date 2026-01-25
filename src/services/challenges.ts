@@ -10,6 +10,7 @@ import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
 import type { StoreService } from "./store.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 export type ChallengeStatus = "active" | "completed" | "cancelled";
 
@@ -432,7 +433,7 @@ export class ChallengeService {
   }): Promise<EmbedBuilder> {
     const embed = new EmbedBuilder()
       .setTitle("Challenge")
-      .setColor(0x3498db)
+      .setColor(EMBED_COLORS.info)
       .addFields(
         { name: "Time", value: formatTime(Math.max(0, timeLeftSeconds)), inline: false },
         { name: "Problem", value: buildProblemLink(problem), inline: false }
@@ -472,7 +473,7 @@ export class ChallengeService {
   }): Promise<EmbedBuilder> {
     const embed = new EmbedBuilder()
       .setTitle("Challenge results")
-      .setColor(0x3498db)
+      .setColor(EMBED_COLORS.info)
       .addFields({ name: "Problem", value: buildProblemLink(problem), inline: false });
 
     const ratings = await this.getRatings(serverId, participants);
@@ -794,7 +795,7 @@ export class ChallengeService {
   }): Promise<EmbedBuilder> {
     const embed = new EmbedBuilder()
       .setTitle("Challenge cancelled")
-      .setColor(0xe67e22)
+      .setColor(EMBED_COLORS.warning)
       .addFields(
         { name: "Problem", value: buildProblemLink(problem), inline: false },
         { name: "Cancelled by", value: `<@${cancelledBy}>`, inline: true }

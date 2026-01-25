@@ -9,6 +9,7 @@ import {
 import { formatTime } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const PAGE_SIZE = 10;
 
@@ -80,7 +81,7 @@ export const historyCommand: Command = {
           const embed = new EmbedBuilder()
             .setTitle("History")
             .setDescription(`Page ${pageNumber} of ${totalPages}`)
-            .setColor(0x3498db)
+            .setColor(EMBED_COLORS.info)
             .addFields({ name: "Challenges", value: lines.join("\n"), inline: false });
 
           const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
@@ -183,7 +184,7 @@ export const historyCommand: Command = {
         const embed = new EmbedBuilder()
           .setTitle("History")
           .setDescription(`Page ${pageNumber} of ${totalPages}`)
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .addFields({ name: "Problems", value: content || "No entries.", inline: false });
         const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
         return { embed, row };

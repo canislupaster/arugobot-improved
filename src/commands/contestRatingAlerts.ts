@@ -7,6 +7,7 @@ import {
 import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 function parseHandleFilter(value: string | null): string[] {
   if (!value) {
@@ -169,7 +170,7 @@ export const contestRatingAlertsCommand: Command = {
 
         const embed = new EmbedBuilder()
           .setTitle("Contest rating alert subscriptions")
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .addFields(
             subscriptions.map((subscription, index) => ({
               name: `Subscription ${index + 1}`,

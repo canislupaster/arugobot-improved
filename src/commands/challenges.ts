@@ -13,6 +13,7 @@ import { formatTime } from "../utils/rating.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_LIMIT = 5;
 const DEFAULT_RECENT_LIMIT = 5;
@@ -101,7 +102,7 @@ export const challengesCommand: Command = {
 
         const embed = new EmbedBuilder()
           .setTitle("Active challenges")
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .setDescription(lines.join("\n"));
 
         if (challenges.length > limit) {
@@ -139,7 +140,7 @@ export const challengesCommand: Command = {
 
         const embed = new EmbedBuilder()
           .setTitle("Your active challenges")
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .setDescription(lines.join("\n"));
 
         await interaction.reply({ embeds: [embed] });
@@ -159,7 +160,7 @@ export const challengesCommand: Command = {
           return;
         }
 
-        const embed = new EmbedBuilder().setTitle("Recent challenges").setColor(0x3498db);
+        const embed = new EmbedBuilder().setTitle("Recent challenges").setColor(EMBED_COLORS.info);
 
         for (const challenge of challenges) {
           const solved = challenge.participants.filter(
@@ -235,7 +236,7 @@ export const challengesCommand: Command = {
 
       const embed = new EmbedBuilder()
         .setTitle("Cancel a challenge")
-        .setColor(0xe67e22)
+        .setColor(EMBED_COLORS.warning)
         .setDescription("Select the active challenge you want to cancel.");
 
       const response = await interaction.reply({

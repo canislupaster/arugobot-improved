@@ -10,6 +10,7 @@ import {
 } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_CONTESTS = 5;
 const DEFAULT_SCOPE: ContestScopeFilter = "official";
@@ -116,7 +117,7 @@ export const contestsCommand: Command = {
     const scopeLabel = scope === "all" ? " (Official + Gym)" : scope === "gym" ? " (Gym)" : "";
     const embed = new EmbedBuilder()
       .setTitle(`Codeforces Contests${scopeLabel}`)
-      .setColor(0x3498db);
+      .setColor(EMBED_COLORS.info);
 
     if (ongoing.length > 0) {
       const ongoingLines = ongoing

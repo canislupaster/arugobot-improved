@@ -28,6 +28,7 @@ import {
 } from "../utils/tournamentRecap.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const VALID_LENGTHS = new Set([40, 60, 80]);
 const DEFAULT_MIN_RATING = 800;
@@ -148,7 +149,7 @@ function buildHistoryDetailEmbed(detail: TournamentHistoryDetail): EmbedBuilder 
   const updatedAt = formatHistoryTimestamp(detail.entry.updatedAt);
   const embed = new EmbedBuilder()
     .setTitle("Tournament recap")
-    .setColor(0x3498db)
+    .setColor(EMBED_COLORS.info)
     .setDescription(
       `${statusLabel} • ${capitalize(detail.entry.format)} • ${detail.entry.lengthMinutes}m`
     )
@@ -342,7 +343,7 @@ export const tournamentCommand: Command = {
           return new EmbedBuilder()
             .setTitle("Tournament history")
             .setDescription(`Page ${pageNumber} of ${totalPages}`)
-            .setColor(0x3498db)
+            .setColor(EMBED_COLORS.info)
             .addFields({ name: "Recent tournaments", value: lines.join("\n"), inline: false });
         };
 
@@ -525,7 +526,7 @@ export const tournamentCommand: Command = {
           const lobbyEmbed = new EmbedBuilder()
             .setTitle("Tournament lobby")
             .setDescription("Use /tournament join, /tournament leave, or /tournament start.")
-            .setColor(0x3498db)
+            .setColor(EMBED_COLORS.info)
             .addFields(
               { name: "Format", value: capitalize(lobby.format), inline: true },
               { name: "Time", value: formatTime(lobby.lengthMinutes * 60), inline: true },
@@ -588,7 +589,7 @@ export const tournamentCommand: Command = {
 
           const embed = new EmbedBuilder()
             .setTitle("Active arena tournament")
-            .setColor(0x3498db)
+            .setColor(EMBED_COLORS.info)
             .addFields(
               { name: "Ends", value: endsAtLabel, inline: true },
               {
@@ -643,7 +644,7 @@ export const tournamentCommand: Command = {
             : [];
         const embed = new EmbedBuilder()
           .setTitle("Active tournament")
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .addFields(
             { name: "Format", value: capitalize(tournament.format), inline: true },
             {
@@ -895,7 +896,7 @@ export const tournamentCommand: Command = {
         const lobbyEmbed = new EmbedBuilder()
           .setTitle("Tournament lobby")
           .setDescription("Use /tournament join, /tournament leave, or /tournament start.")
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .addFields(
             { name: "Format", value: capitalize(format), inline: true },
             { name: "Time", value: formatTime(length * 60), inline: true },

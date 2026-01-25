@@ -13,6 +13,7 @@ import { waitForCompilationError } from "../services/verification.js";
 import { logError, type LogContext } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const VERIFICATION_TIMEOUT_MS = 60000;
 const VERIFICATION_POLL_MS = 5000;
@@ -338,7 +339,7 @@ export const unlinkCommand: Command = {
     const embed = new EmbedBuilder()
       .setTitle("Confirm unlink")
       .setDescription("Are you sure? This action cannot be undone.")
-      .setColor(0x3498db);
+      .setColor(EMBED_COLORS.info);
 
     const confirmId = `unlink_confirm_${interaction.user.id}`;
     const cancelId = `unlink_cancel_${interaction.user.id}`;

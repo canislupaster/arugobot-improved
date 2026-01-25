@@ -22,6 +22,7 @@ import { resolveRatingRanges } from "../utils/ratingRanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const VALID_LENGTHS = new Set([40, 60, 80]);
 const DEFAULT_MIN_RATING = 800;
@@ -363,7 +364,7 @@ export const challengeCommand: Command = {
       const confirmEmbed = new EmbedBuilder()
         .setTitle("Confirm challenge")
         .setDescription("All participants must confirm within 30 seconds.")
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .addFields(
           { name: "Time", value: formatTime(length * 60), inline: false },
           {
@@ -453,7 +454,7 @@ export const challengeCommand: Command = {
       const lobbyEmbed = new EmbedBuilder()
         .setTitle("Open challenge lobby")
         .setDescription("Click Join to participate. The host can start when ready.")
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .addFields(
           { name: "Time", value: formatTime(length * 60), inline: false },
           {

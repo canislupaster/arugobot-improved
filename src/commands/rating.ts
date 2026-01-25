@@ -12,6 +12,7 @@ import { Canvas } from "skia-canvas";
 import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const width = 900;
 const height = 450;
@@ -161,7 +162,7 @@ export const ratingCommand: Command = {
       const embed = new EmbedBuilder()
         .setTitle("Rating graph")
         .setDescription(`${targetMention}'s rating is ${rating}`)
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .setImage("attachment://rating.png");
 
       await interaction.editReply({ files: [attachment], embeds: [embed] });

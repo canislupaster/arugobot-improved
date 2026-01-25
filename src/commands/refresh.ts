@@ -3,6 +3,7 @@ import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.
 import { logCommandError } from "../utils/commandLogging.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 type RefreshScope = "all" | "contests" | "handles" | "problems";
 
@@ -42,7 +43,7 @@ export const refreshCommand: Command = {
     const scope = resolveScope(interaction.options.getString("scope"));
     await interaction.deferReply({ ephemeral: true });
 
-    const embed = new EmbedBuilder().setTitle("Refresh results").setColor(0x3498db);
+    const embed = new EmbedBuilder().setTitle("Refresh results").setColor(EMBED_COLORS.info);
     const errors: string[] = [];
     const refreshAll = scope === "all";
 

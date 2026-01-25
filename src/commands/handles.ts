@@ -9,6 +9,7 @@ import {
 } from "../utils/pagination.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const PAGE_SIZE = 10;
 
@@ -71,7 +72,7 @@ export const handlesCommand: Command = {
         const embed = new EmbedBuilder()
           .setTitle("Linked handles")
           .setDescription(`Page ${pageNumber} of ${totalPages}`)
-          .setColor(0x3498db)
+          .setColor(EMBED_COLORS.info)
           .addFields({ name: "Users", value: lines || "No entries.", inline: false });
         const row = buildPaginationRow(paginationIds, pageNumber, totalPages);
         return { embed, row };

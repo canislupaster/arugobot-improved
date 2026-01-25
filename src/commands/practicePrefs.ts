@@ -4,6 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { resolveRatingRanges, type RatingRange } from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
@@ -73,7 +74,7 @@ export const practicePrefsCommand: Command = {
 
         const embed = new EmbedBuilder()
           .setTitle("Practice preferences")
-          .setColor(0x2ecc71)
+          .setColor(EMBED_COLORS.success)
           .addFields(
             { name: "Ranges", value: formatRanges(preferences.ratingRanges), inline: false },
             {

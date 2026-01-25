@@ -4,6 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
@@ -119,7 +120,7 @@ export const contestHistoryCommand: Command = {
 
       const embed = new EmbedBuilder()
         .setTitle(`Contest history: ${handleResult.handle}`)
-        .setColor(0x3498db)
+        .setColor(EMBED_COLORS.info)
         .setDescription(lines.join("\n"));
 
       if (changesResult.isStale) {

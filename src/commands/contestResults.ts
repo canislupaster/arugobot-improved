@@ -11,6 +11,7 @@ import {
 } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 
 const MAX_MATCHES = 5;
 const MAX_HANDLES = 50;
@@ -121,7 +122,7 @@ function buildMatchEmbed(
 
   return new EmbedBuilder()
     .setTitle("Contest matches")
-    .setColor(0x3498db)
+    .setColor(EMBED_COLORS.info)
     .setDescription(`Results for "${query}":\n${lines}`)
     .setFooter({ text: "Use /contestresults with the contest ID for standings." });
 }
@@ -129,7 +130,7 @@ function buildMatchEmbed(
 function buildContestEmbed(contest: Contest): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(`Contest results: ${contest.name}`)
-    .setColor(0x3498db)
+    .setColor(EMBED_COLORS.info)
     .setDescription(`[Open contest](${buildContestUrl(contest)})`)
     .addFields(
       { name: "Contest ID", value: String(contest.id), inline: true },
