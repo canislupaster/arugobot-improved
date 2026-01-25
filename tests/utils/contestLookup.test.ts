@@ -1,3 +1,4 @@
+import type { Contest } from "../../src/services/contests.js";
 import {
   buildContestEmbed,
   buildContestMatchEmbed,
@@ -6,7 +7,6 @@ import {
   isLatestQuery,
   parseContestId,
 } from "../../src/utils/contestLookup.js";
-import type { Contest } from "../../src/services/contests.js";
 
 describe("contestLookup helpers", () => {
   it("parses contest ids from ids and URLs", () => {

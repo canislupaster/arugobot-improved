@@ -1,6 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
+
 import { buildContestUrl } from "./contestUrl.js";
 import { EMBED_COLORS } from "./embedColors.js";
 import {
