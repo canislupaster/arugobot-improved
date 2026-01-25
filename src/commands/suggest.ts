@@ -1,5 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
+import type { Problem } from "../services/problems.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   filterProblemsByRatingRanges,
@@ -10,7 +11,6 @@ import {
 } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
-import type { Problem } from "../services/problems.js";
 
 import type { Command } from "./types.js";
 
