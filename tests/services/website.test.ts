@@ -168,6 +168,20 @@ describe("WebsiteService", () => {
           updated_at: "2024-01-04T12:00:00.000Z",
         },
         {
+          id: "t-4",
+          guild_id: "guild-1",
+          channel_id: "channel-2",
+          host_user_id: "user-1",
+          format: "arena",
+          status: "active",
+          length_minutes: 90,
+          round_count: 5,
+          current_round: 1,
+          rating_ranges: "800-1200",
+          tags: "",
+          updated_at: "2024-01-06T12:00:00.000Z",
+        },
+        {
           id: "t-3",
           guild_id: "guild-2",
           channel_id: "channel-9",
@@ -182,6 +196,18 @@ describe("WebsiteService", () => {
           updated_at: "2024-01-05T12:00:00.000Z",
         },
       ])
+      .execute();
+
+    await db
+      .insertInto("tournament_arena_state")
+      .values({
+        tournament_id: "t-4",
+        starts_at: 1700000000,
+        ends_at: 1700005400,
+        problem_count: 5,
+        created_at: "2024-01-06T12:00:00.000Z",
+        updated_at: "2024-01-06T12:00:00.000Z",
+      })
       .execute();
 
     await db
@@ -211,6 +237,26 @@ describe("WebsiteService", () => {
           tournament_id: "t-2",
           user_id: "user-1",
           seed: 1,
+          score: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+        },
+        {
+          tournament_id: "t-4",
+          user_id: "user-1",
+          seed: 1,
+          score: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+        },
+        {
+          tournament_id: "t-4",
+          user_id: "user-2",
+          seed: 2,
           score: 0,
           wins: 0,
           losses: 0,
@@ -285,11 +331,11 @@ describe("WebsiteService", () => {
     expect(overview.activeChallenges).toBe(1);
     expect(overview.completedChallenges).toBe(2);
     expect(overview.totalChallenges).toBe(3);
-    expect(overview.activeTournaments).toBe(1);
+    expect(overview.activeTournaments).toBe(2);
     expect(overview.completedTournaments).toBe(2);
-    expect(overview.totalTournaments).toBe(3);
+    expect(overview.totalTournaments).toBe(4);
     expect(overview.lastChallengeAt).toBe("2024-01-03T00:00:00.000Z");
-    expect(overview.lastTournamentAt).toBe("2024-01-05T12:00:00.000Z");
+    expect(overview.lastTournamentAt).toBe("2024-01-06T12:00:00.000Z");
     expect(overview.contestActivity.contestCount).toBe(0);
     expect(overview.contestActivity.participantCount).toBe(0);
     expect(overview.contestActivity.lastContestAt).toBeNull();
@@ -326,7 +372,10 @@ describe("WebsiteService", () => {
     expect(overview?.stats.userCount).toBe(2);
     expect(overview?.ratingLeaderboard).toHaveLength(2);
     expect(overview?.solveLeaderboard).toHaveLength(1);
-    expect(overview?.tournaments).toHaveLength(2);
+    expect(overview?.tournaments).toHaveLength(3);
+    const arena = overview?.tournaments.find((entry) => entry.id === "t-4");
+    expect(arena?.arenaProblemCount).toBe(5);
+    expect(arena?.arenaEndsAt).toBe(1700005400);
   });
 
   it("summarizes recent contest activity from cached rating changes", async () => {

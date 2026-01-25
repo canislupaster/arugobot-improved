@@ -74,6 +74,76 @@ describe("web app", () => {
     expect(body).toContain("Guild One");
   });
 
+  it("renders arena tournament details", async () => {
+    await db
+      .insertInto("tournaments")
+      .values({
+        id: "arena-1",
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        host_user_id: "user-1",
+        format: "arena",
+        status: "active",
+        length_minutes: 75,
+        round_count: 4,
+        current_round: 1,
+        rating_ranges: "800-1200",
+        tags: "",
+        updated_at: "2024-01-06T12:00:00.000Z",
+      })
+      .execute();
+
+    await db
+      .insertInto("tournament_participants")
+      .values([
+        {
+          tournament_id: "arena-1",
+          user_id: "user-1",
+          seed: 1,
+          score: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+        },
+        {
+          tournament_id: "arena-1",
+          user_id: "user-2",
+          seed: 2,
+          score: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          eliminated: 0,
+        },
+      ])
+      .execute();
+
+    await db
+      .insertInto("tournament_arena_state")
+      .values({
+        tournament_id: "arena-1",
+        starts_at: 1700000000,
+        ends_at: 1700004500,
+        problem_count: 4,
+        created_at: "2024-01-06T12:00:00.000Z",
+        updated_at: "2024-01-06T12:00:00.000Z",
+      })
+      .execute();
+
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/guilds/guild-1");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("arena");
+    expect(body).toContain("problems");
+  });
+
   it("returns 404 for unknown guilds", async () => {
     const app = createWebApp({
       website,

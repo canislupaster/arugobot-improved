@@ -120,6 +120,25 @@ function formatUnixTimestamp(seconds: number | null | undefined): string {
   return formatTimestamp(new Date(seconds * 1000).toISOString());
 }
 
+function formatTournamentCount(tournament: TournamentSummary): string {
+  if (tournament.format === "arena") {
+    const count = tournament.arenaProblemCount ?? tournament.roundCount;
+    return `${formatNumber(count)} problems`;
+  }
+  return `${formatNumber(tournament.roundCount)} rounds`;
+}
+
+function formatArenaEndsAt(tournament: TournamentSummary): string | null {
+  if (tournament.format !== "arena") {
+    return null;
+  }
+  if (!tournament.arenaEndsAt) {
+    return null;
+  }
+  const label = tournament.status === "active" ? "Ends" : "Ended";
+  return `${label} ${formatUnixTimestamp(tournament.arenaEndsAt)}`;
+}
+
 function formatAgeSeconds(seconds: number | null): string {
   if (seconds === null || !Number.isFinite(seconds)) {
     return "N/A";
@@ -511,20 +530,24 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
             {guild.tournaments.length === 0 ? (
               <div class="muted">No tournaments recorded.</div>
             ) : (
-              guild.tournaments.map((tournament) => (
-                <div class="tournament-row">
-                  <div>
-                    <div class="title">
-                      {tournament.format} • {tournament.lengthMinutes}m • {tournament.status}
+              guild.tournaments.map((tournament) => {
+                const arenaEndsAt = formatArenaEndsAt(tournament);
+                return (
+                  <div class="tournament-row">
+                    <div>
+                      <div class="title">
+                        {tournament.format} • {tournament.lengthMinutes}m • {tournament.status}
+                      </div>
+                      <div class="muted">
+                        {formatNumber(tournament.participantCount)} players •{" "}
+                        {formatTournamentCount(tournament)}
+                        {arenaEndsAt ? <> • {arenaEndsAt}</> : null}
+                      </div>
                     </div>
-                    <div class="muted">
-                      {formatNumber(tournament.participantCount)} players •{" "}
-                      {formatNumber(tournament.roundCount)} rounds
-                    </div>
+                    <div class="pill">{formatTimestamp(tournament.updatedAt)}</div>
                   </div>
-                  <div class="pill">{formatTimestamp(tournament.updatedAt)}</div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

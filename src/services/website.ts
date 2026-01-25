@@ -51,6 +51,8 @@ export type TournamentSummary = {
   format: string;
   lengthMinutes: number;
   roundCount: number;
+  arenaProblemCount: number | null;
+  arenaEndsAt: number | null;
   participantCount: number;
   updatedAt: string;
 };
@@ -375,6 +377,11 @@ export class WebsiteService {
       const tournaments = await this.db
         .selectFrom("tournaments")
         .leftJoin(
+          "tournament_arena_state",
+          "tournament_arena_state.tournament_id",
+          "tournaments.id"
+        )
+        .leftJoin(
           "tournament_participants",
           "tournament_participants.tournament_id",
           "tournaments.id"
@@ -385,6 +392,8 @@ export class WebsiteService {
           ref("tournaments.format").as("format"),
           ref("tournaments.length_minutes").as("length_minutes"),
           ref("tournaments.round_count").as("round_count"),
+          ref("tournament_arena_state.problem_count").as("arena_problem_count"),
+          ref("tournament_arena_state.ends_at").as("arena_ends_at"),
           ref("tournaments.updated_at").as("updated_at"),
           fn.count<string>("tournament_participants.user_id").as("participant_count"),
         ])
@@ -407,6 +416,14 @@ export class WebsiteService {
           format: row.format,
           lengthMinutes: Number(row.length_minutes ?? 0),
           roundCount: Number(row.round_count ?? 0),
+          arenaProblemCount:
+            row.arena_problem_count === null || row.arena_problem_count === undefined
+              ? null
+              : Number(row.arena_problem_count),
+          arenaEndsAt:
+            row.arena_ends_at === null || row.arena_ends_at === undefined
+              ? null
+              : Number(row.arena_ends_at),
           participantCount: Number(row.participant_count ?? 0),
           updatedAt: row.updated_at,
         })),
