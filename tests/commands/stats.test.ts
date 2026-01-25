@@ -5,7 +5,9 @@ import type { CommandContext } from "../../src/types/commandContext.js";
 
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
+    commandName: "stats",
     guild: { id: "guild-1" },
+    user: { id: "user-1" },
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),
     reply: jest.fn().mockResolvedValue(undefined),
@@ -84,5 +86,26 @@ describe("statsCommand", () => {
     expect(fieldText).toContain("Active challenges");
     expect(fieldText).toContain("Active tournaments");
     expect(fieldText).toContain("Average rating");
+  });
+
+  it("handles service errors", async () => {
+    const interaction = createInteraction();
+    const context = createContext({
+      services: {
+        store: {
+          getServerStats: jest.fn().mockRejectedValue(new Error("boom")),
+        },
+        challenges: {
+          getActiveCountForServer: jest.fn().mockResolvedValue(0),
+        },
+        tournaments: {
+          getActiveCountForGuild: jest.fn().mockResolvedValue(0),
+        },
+      },
+    });
+
+    await statsCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith("Something went wrong.");
   });
 });
