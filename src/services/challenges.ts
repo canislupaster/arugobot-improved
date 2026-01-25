@@ -458,18 +458,14 @@ export class ChallengeService {
       );
 
     const ratings = await this.getRatings(serverId, participants);
-    const usersValue = participants
-      .sort((a, b) => a.position - b.position)
-      .map((participant) => {
-        const rating = ratings.get(participant.userId) ?? 0;
-        if (participant.solvedAt !== null) {
-          return `- <@${participant.userId}> (${rating}) :white_check_mark:`;
-        }
-        const [down, up] = getRatingChanges(rating, problem.rating, lengthMinutes);
-        return `- <@${participant.userId}> (${rating}) (don't solve: ${down}, solve: ${up}) :hourglass:`;
-      })
-      .join("\n");
-    embed.addFields({ name: "Users", value: usersValue || "No participants.", inline: false });
+    const usersValue = this.formatParticipantList(participants, ratings, (participant, rating) => {
+      if (participant.solvedAt !== null) {
+        return `- <@${participant.userId}> (${rating}) :white_check_mark:`;
+      }
+      const [down, up] = getRatingChanges(rating, problem.rating, lengthMinutes);
+      return `- <@${participant.userId}> (${rating}) (don't solve: ${down}, solve: ${up}) :hourglass:`;
+    });
+    embed.addFields({ name: "Users", value: usersValue, inline: false });
     if (streakUpdates && streakUpdates.length > 0) {
       embed.addFields({ name: "Streaks", value: streakUpdates.join("\n"), inline: false });
     }
@@ -495,25 +491,21 @@ export class ChallengeService {
       .addFields({ name: "Problem", value: buildProblemLink(problem), inline: false });
 
     const ratings = await this.getRatings(serverId, participants);
-    const usersValue = participants
-      .sort((a, b) => a.position - b.position)
-      .map((participant) => {
-        const rating = ratings.get(participant.userId) ?? 0;
-        const delta =
-          participant.ratingDelta === null || participant.ratingDelta === undefined
-            ? "N/A"
-            : participant.ratingDelta > 0
-              ? `+${participant.ratingDelta}`
-              : String(participant.ratingDelta);
-        if (participant.solvedAt !== null) {
-          const duration = formatTime(Math.max(0, participant.solvedAt - startedAt));
-          return `- <@${participant.userId}> (${rating}, ${delta}) solved in ${duration} :white_check_mark:`;
-        }
-        return `- <@${participant.userId}> (${rating}, ${delta}) not solved :x:`;
-      })
-      .join("\n");
+    const usersValue = this.formatParticipantList(participants, ratings, (participant, rating) => {
+      const delta =
+        participant.ratingDelta === null || participant.ratingDelta === undefined
+          ? "N/A"
+          : participant.ratingDelta > 0
+            ? `+${participant.ratingDelta}`
+            : String(participant.ratingDelta);
+      if (participant.solvedAt !== null) {
+        const duration = formatTime(Math.max(0, participant.solvedAt - startedAt));
+        return `- <@${participant.userId}> (${rating}, ${delta}) solved in ${duration} :white_check_mark:`;
+      }
+      return `- <@${participant.userId}> (${rating}, ${delta}) not solved :x:`;
+    });
 
-    embed.addFields({ name: "Users", value: usersValue || "No participants.", inline: false });
+    embed.addFields({ name: "Users", value: usersValue, inline: false });
 
     const streakUpdates = await this.buildStreakUpdates(serverId, challengeId, participants);
     if (streakUpdates.length > 0) {
@@ -815,19 +807,26 @@ export class ChallengeService {
       );
 
     const ratings = await this.getRatings(serverId, participants);
-    const usersValue = participants
-      .sort((a, b) => a.position - b.position)
-      .map((participant) => {
-        const rating = ratings.get(participant.userId) ?? 0;
-        if (participant.solvedAt !== null) {
-          return `- <@${participant.userId}> (${rating}) :white_check_mark:`;
-        }
-        return `- <@${participant.userId}> (${rating}) :x:`;
-      })
-      .join("\n");
+    const usersValue = this.formatParticipantList(participants, ratings, (participant, rating) =>
+      participant.solvedAt !== null
+        ? `- <@${participant.userId}> (${rating}) :white_check_mark:`
+        : `- <@${participant.userId}> (${rating}) :x:`
+    );
 
-    embed.addFields({ name: "Users", value: usersValue || "No participants.", inline: false });
+    embed.addFields({ name: "Users", value: usersValue, inline: false });
     return embed;
+  }
+
+  private formatParticipantList(
+    participants: ChallengeParticipant[],
+    ratings: Map<string, number>,
+    formatLine: (participant: ChallengeParticipant, rating: number) => string
+  ): string {
+    const lines = participants
+      .sort((a, b) => a.position - b.position)
+      .map((participant) => formatLine(participant, ratings.get(participant.userId) ?? 0))
+      .join("\n");
+    return lines || "No participants.";
   }
 
   private async gotAc(
