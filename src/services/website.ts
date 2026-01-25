@@ -108,6 +108,7 @@ const DEFAULT_CONTEST_ACTIVITY_DAYS = 90;
 const CACHE_STATUS_KEYS: Array<{ key: CacheKey; label: string }> = [
   { key: "problemset", label: "Problemset cache" },
   { key: "contest_list", label: "Contest list cache" },
+  { key: "contest_list_gym", label: "Gym contest list cache" },
 ];
 
 function getAgeSeconds(lastFetched: string | null): number | null {

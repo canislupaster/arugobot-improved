@@ -314,14 +314,21 @@ describe("WebsiteService", () => {
           payload: "[]",
           last_fetched: "2024-01-30T00:00:00.000Z",
         },
+        {
+          key: "contest_list_gym",
+          payload: "[]",
+          last_fetched: "2024-01-29T00:00:00.000Z",
+        },
       ])
       .execute();
 
     const status = await website.getCacheStatus();
-    expect(status).toHaveLength(2);
+    expect(status).toHaveLength(3);
     const problemset = status.find((entry) => entry.key === "problemset");
     expect(problemset?.lastFetched).toBe("2024-01-31T00:00:00.000Z");
     expect(problemset?.ageSeconds).toBe(24 * 60 * 60);
+    const gymList = status.find((entry) => entry.key === "contest_list_gym");
+    expect(gymList?.lastFetched).toBe("2024-01-29T00:00:00.000Z");
   });
 
   it("returns leaderboard exports for a public guild", async () => {

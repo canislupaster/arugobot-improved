@@ -130,7 +130,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Admin-only diagnostics (uptime, memory, DB status, last error, command usage/latency).
 
-- **/logs** `[limit]` `[level]` `[command]` `[user]`
+- **/logs** `[limit]` `[level]` `[command]` `[correlation]` `[user]`
 
   Admin-only log viewer for recent bot activity in the server.
 
@@ -258,7 +258,8 @@ Only guilds that opt in via `/dashboard set public:true` appear on the public pa
 If `WEB_PUBLIC_URL` is set, `/dashboard` responses include direct links to your guild page.
 The overview highlights core bot features alongside global contest participation cards sourced from
 cached rating changes, split by official vs gym activity. Per-guild pages include CSV/Markdown
-exports for rating/solve leaderboards, and `/status` shows cache ages for key Codeforces syncs.
+exports for rating/solve leaderboards, and `/status` shows cache ages for key Codeforces syncs
+including the gym contest list.
 `/status.json` returns the same cache status in JSON for external monitoring.
 `/healthz` returns JSON with a quick DB + Codeforces check plus cache status (useful for uptime monitors).
 
