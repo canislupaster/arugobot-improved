@@ -108,6 +108,16 @@ async function loadRecentSubmissions(
   };
 }
 
+async function loadOptional<T>(
+  enabled: boolean,
+  loader: () => Promise<T>
+): Promise<T | null> {
+  if (!enabled) {
+    return null;
+  }
+  return loader();
+}
+
 function formatRatingSummary(value: number | null | undefined, rank: string | null | undefined) {
   if (value !== null && value !== undefined) {
     return `${value} (${rank ?? "unrated"})`;
@@ -177,24 +187,20 @@ export const profileCommand: Command = {
         return;
       }
 
-      let totalChallenges = 0;
-      let recentLines = "";
-      let botRating: number | null = null;
+      const [challengeSummary, recentSubmissions] = await Promise.all([
+        loadOptional(!!linkedUserId, () =>
+          loadChallengeSummary(guildId, linkedUserId ?? "", context.services)
+        ),
+        loadOptional(handleInput.length > 0 || !linkedUserId, () =>
+          loadRecentSubmissions(handle, context.services)
+        ),
+      ]);
 
-      if (linkedUserId) {
-        const summary = await loadChallengeSummary(guildId, linkedUserId, context.services);
-        botRating = summary.botRating;
-        totalChallenges = summary.totalChallenges;
-        recentLines = summary.recentLines;
-      }
-
-      let recentSubmissionsLines = "";
-      let submissionsStale = false;
-      if (handleInput || !linkedUserId) {
-        const recent = await loadRecentSubmissions(handle, context.services);
-        submissionsStale = recent.isStale;
-        recentSubmissionsLines = recent.lines;
-      }
+      const botRating = challengeSummary?.botRating ?? null;
+      const totalChallenges = challengeSummary?.totalChallenges ?? 0;
+      const recentLines = challengeSummary?.recentLines ?? "";
+      const recentSubmissionsLines = recentSubmissions?.lines ?? "";
+      const submissionsStale = recentSubmissions?.isStale ?? false;
 
       const displayHandle = cfProfile.profile.displayHandle;
       const cfRating = formatRatingSummary(cfProfile.profile.rating, cfProfile.profile.rank);
