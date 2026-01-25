@@ -63,6 +63,11 @@ describe("healthCommand", () => {
           getLastTickAt: jest.fn().mockReturnValue(null),
           getLastError: jest.fn().mockReturnValue(null),
         },
+        weeklyDigest: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
         challenges: {
           getActiveCount: jest.fn().mockResolvedValue(0),
           getLastTickAt: jest.fn().mockReturnValue(null),

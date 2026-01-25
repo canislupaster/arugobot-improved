@@ -39,6 +39,7 @@ export const healthCommand: Command = {
       reminderCount,
       ratingAlertCount,
       practiceReminderCount,
+      digestCount,
       activeChallenges,
       activeTournaments,
       recapCount,
@@ -50,6 +51,7 @@ export const healthCommand: Command = {
       context.services.contestReminders.getSubscriptionCount(),
       context.services.contestRatingAlerts.getSubscriptionCount(),
       context.services.practiceReminders.getSubscriptionCount(),
+      context.services.weeklyDigest.getSubscriptionCount(),
       context.services.challenges.getActiveCount(),
       context.services.tournaments.getActiveCount(),
       context.services.tournamentRecaps.getSubscriptionCount(),
@@ -65,6 +67,8 @@ export const healthCommand: Command = {
     const ratingAlertLastError = context.services.contestRatingAlerts.getLastError();
     const practiceReminderLastTick = context.services.practiceReminders.getLastTickAt();
     const practiceReminderLastError = context.services.practiceReminders.getLastError();
+    const digestLastTick = context.services.weeklyDigest.getLastTickAt();
+    const digestLastError = context.services.weeklyDigest.getLastError();
     const challengeLastTick = context.services.challenges.getLastTickAt();
     const challengeLastError = context.services.challenges.getLastError();
     const tournamentLastError = context.services.tournaments.getLastError();
@@ -94,6 +98,7 @@ export const healthCommand: Command = {
         { name: "Contest reminders", value: String(reminderCount), inline: true },
         { name: "Contest rating alerts", value: String(ratingAlertCount), inline: true },
         { name: "Practice reminders", value: String(practiceReminderCount), inline: true },
+        { name: "Weekly digests", value: String(digestCount), inline: true },
         { name: "Active challenges", value: String(activeChallenges), inline: true },
         { name: "Active tournaments", value: String(activeTournaments), inline: true },
         { name: "Tournament recaps", value: String(recapCount), inline: true },
@@ -181,6 +186,13 @@ export const healthCommand: Command = {
         inline: false,
       });
     }
+    if (digestLastError) {
+      embed.addFields({
+        name: "Weekly digest last error",
+        value: `${digestLastError.timestamp} - ${digestLastError.message}`,
+        inline: false,
+      });
+    }
     if (challengeLastError) {
       embed.addFields({
         name: "Challenge loop last error",
@@ -234,6 +246,13 @@ export const healthCommand: Command = {
       embed.addFields({
         name: "Practice reminders last tick",
         value: practiceReminderLastTick,
+        inline: false,
+      });
+    }
+    if (digestLastTick) {
+      embed.addFields({
+        name: "Weekly digests last tick",
+        value: digestLastTick,
         inline: false,
       });
     }

@@ -35,6 +35,7 @@ import { StoreService } from "./services/store.js";
 import { TournamentRecapService } from "./services/tournamentRecaps.js";
 import { TournamentService, tournamentArenaIntervalMs } from "./services/tournaments.js";
 import { WebsiteService } from "./services/website.js";
+import { WeeklyDigestService, weeklyDigestIntervalMs } from "./services/weeklyDigest.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo, logWarn, setLogSink } from "./utils/logger.js";
 import { startWebServer } from "./web/server.js";
@@ -86,6 +87,7 @@ async function main() {
   challenges.setCompletionNotifier(tournaments);
   const practiceReminders = new PracticeReminderService(db, problems, store);
   const practiceSuggestions = new PracticeSuggestionService(problems, store);
+  const weeklyDigest = new WeeklyDigestService(db, store, contestActivity);
   const website = new WebsiteService(db, store, guildSettings, contestActivity);
 
   const commandSummaries = commandList.map((command) => ({
@@ -105,6 +107,7 @@ async function main() {
   let contestRatingAlertInterval: NodeJS.Timeout | null = null;
   let tournamentArenaInterval: NodeJS.Timeout | null = null;
   let logCleanupInterval: NodeJS.Timeout | null = null;
+  let weeklyDigestInterval: NodeJS.Timeout | null = null;
   let webServer: ServerType | null = null;
   let shuttingDown = false;
   let isChallengeTicking = false;
@@ -227,6 +230,15 @@ async function main() {
     await tickPracticeReminders();
     practiceReminderInterval = setInterval(tickPracticeReminders, practiceReminderIntervalMs);
 
+    const tickWeeklyDigest = async () => {
+      if (shuttingDown) {
+        return;
+      }
+      await weeklyDigest.runTick(client);
+    };
+    await tickWeeklyDigest();
+    weeklyDigestInterval = setInterval(tickWeeklyDigest, weeklyDigestIntervalMs);
+
     const tickContestRatingAlerts = async () => {
       if (shuttingDown) {
         return;
@@ -295,6 +307,7 @@ async function main() {
         store,
         tournamentRecaps,
         tournaments,
+        weeklyDigest,
       },
     };
     await handleCommandInteraction(interaction, commandMap, context, cooldowns, correlationId);
@@ -317,6 +330,9 @@ async function main() {
     }
     if (practiceReminderInterval) {
       clearInterval(practiceReminderInterval);
+    }
+    if (weeklyDigestInterval) {
+      clearInterval(weeklyDigestInterval);
     }
     if (contestRatingAlertInterval) {
       clearInterval(contestRatingAlertInterval);

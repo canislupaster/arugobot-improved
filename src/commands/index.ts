@@ -11,6 +11,7 @@ import { contestRemindersCommand } from "./contestReminders.js";
 import { contestResultsCommand } from "./contestResults.js";
 import { contestsCommand } from "./contests.js";
 import { dashboardCommand } from "./dashboard.js";
+import { digestCommand } from "./digest.js";
 import { handleAdminCommand } from "./handleAdmin.js";
 import { handlesCommand } from "./handles.js";
 import { healthCommand } from "./health.js";
@@ -48,6 +49,7 @@ export const commandList: Command[] = [
   contestResultsCommand,
   contestsCommand,
   dashboardCommand,
+  digestCommand,
   handleAdminCommand,
   handlesCommand,
   historyCommand,

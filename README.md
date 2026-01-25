@@ -197,6 +197,11 @@ Most command responses are public; handle-linking and admin diagnostics remain e
   Configure practice problem reminders (admin only). Use `set` to choose a channel, time, optional `utc_offset` (e.g. `+02:00`, `-05:30`, `Z`), optional `days` (e.g. `mon,wed,fri`, `weekdays`, `weekends`), rating ranges, optional tags, and an optional role mention. If `utc_offset` is omitted the time is interpreted as UTC.
   Use `post` to send a practice problem immediately (optionally `force` to send even if one was posted today).
 
+- **/digest** `set|status|clear|preview|post`
+
+  Configure a weekly digest for the server (admin only). Use `set` to choose a channel, day, time, optional `utc_offset`, and optional role mention.
+  Use `post` to send a digest immediately (optionally `force` to send even if one was already posted this week).
+
 ## Installation
 
 To invite the instance I am hosting, use this [link](https://discord.com/oauth2/authorize?client_id=1325529003473240124&permissions=277025507392&integration_type=0&scope=bot).
@@ -298,4 +303,4 @@ pnpm start
 ## Future TODOs
 
 - Add gym contest support for `/contests` and reminders.
-- Add a weekly digest post for guild activity and contest participation.
+- Add a weekly digest analytics card to the web dashboard.

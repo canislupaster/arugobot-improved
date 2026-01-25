@@ -318,6 +318,19 @@ export type GuildSettingsTable = {
   updated_at: Generated<string>;
 };
 
+export type WeeklyDigestsTable = {
+  guild_id: string;
+  channel_id: string;
+  day_of_week: number;
+  hour_utc: number;
+  minute_utc: number;
+  utc_offset_minutes: number;
+  role_id: string | null;
+  last_sent_at: string | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
 export type Database = {
   users: UsersTable;
   ac: AcTable;
@@ -351,4 +364,5 @@ export type Database = {
   command_metrics: CommandMetricsTable;
   log_entries: LogEntriesTable;
   guild_settings: GuildSettingsTable;
+  weekly_digests: WeeklyDigestsTable;
 };
