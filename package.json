@@ -24,7 +24,8 @@
     "dotenv": "^17.2.3",
     "hono": "^4.11.5",
     "kysely": "^0.28.10",
-    "skia-canvas": "^3.0.8"
+    "skia-canvas": "^3.0.8",
+    "undici": "^6.23.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

@@ -228,6 +228,7 @@ Optional environment variables:
 - `CODEFORCES_REQUEST_DELAY_MS` (default `2000`)
 - `CODEFORCES_TIMEOUT_MS` (default `10000`)
 - `CODEFORCES_SOLVED_MAX_PAGES` (default `10`, set `0` for unlimited)
+- `PROXY_FETCH_URL` (optional proxy list URL; one proxy per line as `host:port` or `host:port:user:pass`)
 - `LOG_RETENTION_DAYS` (default `30`, set `0` to disable log cleanup)
 - `WEB_HOST` (default `0.0.0.0`)
 - `WEB_PORT` (default `8787`)

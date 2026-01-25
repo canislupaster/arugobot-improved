@@ -1,5 +1,9 @@
+import type { Dispatcher } from "undici";
+
 import { logWarn } from "../utils/logger.js";
+import { RateLimiter } from "../utils/rateLimiter.js";
 import { sleep } from "../utils/sleep.js";
+import type { RequestScheduler } from "./requestPool.js";
 
 export type CodeforcesResponse<T> = {
   status: "OK" | "FAILED";
@@ -11,42 +15,24 @@ type RequestOptions = {
   baseUrl: string;
   requestDelayMs: number;
   timeoutMs: number;
+  scheduler?: RequestScheduler;
 };
 
-class RateLimiter {
-  private queue: Promise<void> = Promise.resolve();
-  private lastRequestAt = 0;
-
-  constructor(private delayMs: number) {}
-
-  async schedule<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.queue.then(async () => {
-      const now = Date.now();
-      const waitMs = Math.max(0, this.lastRequestAt + this.delayMs - now);
-      if (waitMs > 0) {
-        await sleep(waitMs);
-      }
-      try {
-        return await task();
-      } finally {
-        this.lastRequestAt = Date.now();
-      }
-    });
-    this.queue = run.then(
-      () => undefined,
-      () => undefined
-    );
-    return run;
-  }
-}
-
 export class CodeforcesClient {
-  private limiter: RateLimiter;
+  private scheduler: RequestScheduler;
   private lastError: { message: string; endpoint: string; timestamp: string } | null = null;
   private lastSuccessAt: string | null = null;
 
   constructor(private options: RequestOptions) {
-    this.limiter = new RateLimiter(options.requestDelayMs);
+    this.scheduler =
+      options.scheduler ??
+      (() => {
+        const limiter = new RateLimiter(options.requestDelayMs);
+        return {
+          schedule: <T>(task: (dispatcher?: Dispatcher) => Promise<T>) =>
+            limiter.schedule(() => task(undefined)),
+        } satisfies RequestScheduler;
+      })();
   }
 
   async request<T>(
@@ -58,11 +44,14 @@ export class CodeforcesClient {
       url.searchParams.set(key, String(value));
     }
 
-    const attempt = async () => {
+    const attempt = async (dispatcher?: Dispatcher) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.options.timeoutMs);
       try {
-        const response = await fetch(url.toString(), { signal: controller.signal });
+        const response = await fetch(url.toString(), {
+          signal: controller.signal,
+          ...(dispatcher ? { dispatcher } : {}),
+        });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -81,7 +70,7 @@ export class CodeforcesClient {
     const retries = 2;
     for (let attemptIndex = 0; attemptIndex <= retries; attemptIndex += 1) {
       try {
-        return await this.limiter.schedule(attempt);
+        return await this.scheduler.schedule(attempt);
       } catch (error) {
         if (attemptIndex >= retries) {
           const message = error instanceof Error ? error.message : String(error);

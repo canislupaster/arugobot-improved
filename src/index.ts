@@ -31,6 +31,7 @@ import {
 import { PracticeSuggestionService } from "./services/practiceSuggestions.js";
 import { ProblemService } from "./services/problems.js";
 import { RatingChangesService } from "./services/ratingChanges.js";
+import { createRequestPool } from "./services/requestPool.js";
 import { StoreService } from "./services/store.js";
 import { TournamentRecapService } from "./services/tournamentRecaps.js";
 import { TournamentService, tournamentArenaIntervalMs } from "./services/tournaments.js";
@@ -57,10 +58,15 @@ async function main() {
   setLogSink(logs);
   logInfo("Configuration loaded.", { environment: config.environment });
 
+  const requestPool = await createRequestPool({
+    proxyFetchUrl: config.proxyFetchUrl,
+    requestDelayMs: config.codeforcesRequestDelayMs,
+  });
   const codeforces = new CodeforcesClient({
     baseUrl: config.codeforcesApiBaseUrl,
     requestDelayMs: config.codeforcesRequestDelayMs,
     timeoutMs: config.codeforcesTimeoutMs,
+    scheduler: requestPool,
   });
   const cache = new CodeforcesCacheService(db);
   const guildSettings = new GuildSettingsService(db);
