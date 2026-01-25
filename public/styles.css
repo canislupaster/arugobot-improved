@@ -178,6 +178,7 @@ a:hover {
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  margin-top: 28px;
   margin-bottom: 32px;
 }
 
