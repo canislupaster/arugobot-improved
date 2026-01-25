@@ -88,7 +88,7 @@ async function main() {
   const practiceReminders = new PracticeReminderService(db, problems, store);
   const practiceSuggestions = new PracticeSuggestionService(problems, store);
   const weeklyDigest = new WeeklyDigestService(db, store, contestActivity);
-  const website = new WebsiteService(db, store, guildSettings, contestActivity);
+  const website = new WebsiteService(db, store, guildSettings, contestActivity, codeforces);
 
   const commandSummaries = commandList.map((command) => ({
     name: command.data.name,

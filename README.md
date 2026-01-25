@@ -254,7 +254,7 @@ The overview highlights core bot features alongside global contest participation
 cached rating changes, split by official vs gym activity. Per-guild pages include CSV/Markdown
 exports for rating/solve leaderboards, and `/status` shows cache ages for key Codeforces syncs.
 `/status.json` returns the same cache status in JSON for external monitoring.
-`/healthz` returns JSON with a quick DB check plus cache status (useful for uptime monitors).
+`/healthz` returns JSON with a quick DB + Codeforces check plus cache status (useful for uptime monitors).
 
 ## Deployment (Supervisor + Caddy)
 

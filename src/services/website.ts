@@ -3,6 +3,7 @@ import { sql, type Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { logError } from "../utils/logger.js";
 
+import type { CodeforcesClient } from "./codeforces.js";
 import type { CacheKey } from "./codeforcesCache.js";
 import type { ContestActivityService } from "./contestActivity.js";
 import type { GuildSettingsService } from "./guildSettings.js";
@@ -126,7 +127,8 @@ export class WebsiteService {
     private readonly db: Kysely<Database>,
     private readonly store: StoreService,
     private readonly settings: GuildSettingsService,
-    private readonly contestActivity: ContestActivityService
+    private readonly contestActivity: ContestActivityService,
+    private readonly codeforces: CodeforcesClient | null = null
   ) {}
 
   async getGlobalOverview(): Promise<GlobalOverview> {
@@ -518,6 +520,11 @@ export class WebsiteService {
     generatedAt: string;
     dbOk: boolean;
     cacheEntries: CacheStatusEntry[];
+    codeforces: {
+      lastSuccessAt: string | null;
+      lastError: { message: string; endpoint: string; timestamp: string } | null;
+    };
+    status: "ok" | "degraded";
   }> {
     const generatedAt = new Date().toISOString();
     let dbOk = true;
@@ -528,7 +535,17 @@ export class WebsiteService {
       logError(`Database error (health status): ${String(error)}`);
     }
     const cacheEntries = await this.getCacheStatus();
-    return { generatedAt, dbOk, cacheEntries };
+    const lastSuccessAt = this.codeforces?.getLastSuccessAt() ?? null;
+    const lastError = this.codeforces?.getLastError() ?? null;
+    const cfOk = !lastError || Boolean(lastSuccessAt);
+    const status = dbOk && cfOk ? "ok" : "degraded";
+    return {
+      generatedAt,
+      dbOk,
+      cacheEntries,
+      codeforces: { lastSuccessAt, lastError },
+      status,
+    };
   }
 
   // contest activity lives in ContestActivityService

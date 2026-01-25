@@ -10,7 +10,11 @@ import { StoreService } from "../../src/services/store.js";
 import { WebsiteService } from "../../src/services/website.js";
 import { createWebApp } from "../../src/web/app.js";
 
-const mockCodeforces = { request: jest.fn() } as unknown as CodeforcesClient;
+const mockCodeforces = {
+  request: jest.fn(),
+  getLastError: jest.fn().mockReturnValue(null),
+  getLastSuccessAt: jest.fn().mockReturnValue("2024-01-01T00:00:00.000Z"),
+} as unknown as CodeforcesClient;
 
 describe("web app", () => {
   let db: Kysely<Database>;
@@ -22,7 +26,7 @@ describe("web app", () => {
     const store = new StoreService(db, mockCodeforces);
     const settings = new GuildSettingsService(db);
     const contestActivity = new ContestActivityService(db, store);
-    website = new WebsiteService(db, store, settings, contestActivity);
+    website = new WebsiteService(db, store, settings, contestActivity, mockCodeforces);
 
     await db
       .insertInto("users")
@@ -230,9 +234,11 @@ describe("web app", () => {
     const body = (await response.json()) as {
       status: string;
       dbOk: boolean;
+      codeforces: { lastSuccessAt: string | null; lastError: unknown | null };
     };
     expect(body.status).toBe("ok");
     expect(body.dbOk).toBe(true);
+    expect(body.codeforces).toBeTruthy();
   });
 
   it("exports rating leaderboard as csv", async () => {

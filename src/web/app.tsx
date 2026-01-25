@@ -236,7 +236,7 @@ export function createWebApp({ website, client }: WebAppContext) {
 
   app.get("/healthz", async (c) => {
     const health = await website.getHealthStatus();
-    return c.json({ status: health.dbOk ? "ok" : "degraded", ...health });
+    return c.json(health);
   });
 
   app.notFound((c) => c.html(renderNotFoundPage("Page not found."), 404));
