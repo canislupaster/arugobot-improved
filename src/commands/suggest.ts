@@ -10,6 +10,7 @@ import {
 } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
 import { resolveRatingRanges } from "../utils/ratingRanges.js";
+import type { Problem } from "../services/problems.js";
 
 import type { Command } from "./types.js";
 
@@ -17,6 +18,13 @@ const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
 const MAX_SUGGESTIONS = 10;
 const MAX_HANDLES = 5;
+
+type HandleResolution = {
+  badHandles: string[];
+  excludedIds: Set<string>;
+  staleHandles: number;
+  validHandles: string[];
+};
 
 export function parseHandles(raw: string): string[] {
   const seen = new Set<string>();
@@ -33,6 +41,71 @@ export function parseHandles(raw: string): string[] {
     }
   }
   return handles;
+}
+
+function buildSuggestionDescription(suggestions: Problem[]): string {
+  const lines: string[] = [];
+  for (const problem of suggestions) {
+    const id = getProblemId(problem);
+    lines.push(
+      `- [${id}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index})`
+    );
+  }
+  return lines.join("\n");
+}
+
+async function resolveHandlesFromInput(
+  rawHandles: string,
+  interaction: Parameters<Command["execute"]>[0],
+  context: Parameters<Command["execute"]>[1]
+): Promise<string[]> {
+  let handles = parseHandles(rawHandles);
+  if (handles.length === 0 && interaction.guild) {
+    const linkedUsers = await context.services.store.getLinkedUsers(interaction.guild.id);
+    const filtered = await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
+      correlationId: context.correlationId,
+      command: interaction.commandName,
+      guildId: interaction.guild.id,
+      userId: interaction.user.id,
+    });
+    handles = filtered.map((entry) => entry.handle);
+  }
+  return handles;
+}
+
+async function resolveHandleData(
+  handles: string[],
+  interaction: Parameters<Command["execute"]>[0],
+  context: Parameters<Command["execute"]>[1]
+): Promise<HandleResolution | null> {
+  const validHandles: string[] = [];
+  const badHandles: string[] = [];
+  const excludedIds = new Set<string>();
+  let staleHandles = 0;
+
+  for (const handle of handles) {
+    const handleInfo = await context.services.store.resolveHandle(handle);
+    if (!handleInfo.exists) {
+      badHandles.push(handle);
+      continue;
+    }
+
+    const canonicalHandle = handleInfo.canonicalHandle ?? handle;
+    const solvedResult = await context.services.store.getSolvedProblemsResult(canonicalHandle);
+    if (!solvedResult) {
+      await interaction.editReply("Something went wrong. Try again in a bit.");
+      return null;
+    }
+    if (solvedResult.isStale) {
+      staleHandles += 1;
+    }
+    validHandles.push(canonicalHandle);
+    for (const solvedId of solvedResult.solved) {
+      excludedIds.add(solvedId);
+    }
+  }
+
+  return { badHandles, excludedIds, staleHandles, validHandles };
 }
 
 export const suggestCommand: Command = {
@@ -78,19 +151,9 @@ export const suggestCommand: Command = {
       await interaction.reply({ content: rangeResult.error });
       return;
     }
-    const ranges = rangeResult.ranges;
+    const { ranges } = rangeResult;
 
-    let handles = parseHandles(rawHandles);
-    if (handles.length === 0 && interaction.guild) {
-      const linkedUsers = await context.services.store.getLinkedUsers(interaction.guild.id);
-      const filtered = await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
-        correlationId: context.correlationId,
-        command: interaction.commandName,
-        guildId: interaction.guild.id,
-        userId: interaction.user.id,
-      });
-      handles = filtered.map((entry) => entry.handle);
-    }
+    const handles = await resolveHandlesFromInput(rawHandles, interaction, context);
     if (handles.length === 0) {
       await interaction.reply({
         content: "Provide handles or run this command in a server with linked users.",
@@ -120,31 +183,11 @@ export const suggestCommand: Command = {
       await interaction.editReply("No problems found in that rating range and tag filter.");
       return;
     }
-    const validHandles: string[] = [];
-    const badHandles: string[] = [];
-    const excludedIds = new Set<string>();
-    let staleHandles = 0;
-
-    for (const handle of handles) {
-      const handleInfo = await context.services.store.resolveHandle(handle);
-      if (handleInfo.exists) {
-        const canonicalHandle = handleInfo.canonicalHandle ?? handle;
-        const solvedResult = await context.services.store.getSolvedProblemsResult(canonicalHandle);
-        if (!solvedResult) {
-          await interaction.editReply("Something went wrong. Try again in a bit.");
-          return;
-        }
-        if (solvedResult.isStale) {
-          staleHandles += 1;
-        }
-        validHandles.push(canonicalHandle);
-        for (const solvedId of solvedResult.solved) {
-          excludedIds.add(solvedId);
-        }
-      } else {
-        badHandles.push(handle);
-      }
+    const handleData = await resolveHandleData(handles, interaction, context);
+    if (!handleData) {
+      return;
     }
+    const { badHandles, excludedIds, staleHandles, validHandles } = handleData;
 
     if (validHandles.length === 0) {
       await interaction.editReply("No valid handles found. Check your input and try again.");
@@ -152,16 +195,9 @@ export const suggestCommand: Command = {
     }
 
     const suggestions = selectRandomProblems(possibleProblems, excludedIds, MAX_SUGGESTIONS);
-
-    let description = "";
-    for (let i = 0; i < Math.min(MAX_SUGGESTIONS, suggestions.length); i += 1) {
-      const problem = suggestions[i];
-      const id = getProblemId(problem);
-      description += `- [${id}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index})`;
-      if (i !== Math.min(MAX_SUGGESTIONS, suggestions.length) - 1) {
-        description += "\n";
-      }
-    }
+    const description = buildSuggestionDescription(
+      suggestions.slice(0, Math.min(MAX_SUGGESTIONS, suggestions.length))
+    );
 
     const minRating = Math.min(...ranges.map((range) => range.min));
     const maxRating = Math.max(...ranges.map((range) => range.max));
