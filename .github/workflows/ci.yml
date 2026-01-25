@@ -4,26 +4,33 @@ on:
   push:
     branches: ["main"]
   pull_request:
+    branches: ["main"]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          version: 10
-      - uses: actions/setup-node@v4
+          node-version: "18"
+          cache: "pnpm"
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          node-version: 18
-          cache: pnpm
+          version: "9"
+          run_install: false
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+      - name: Format check
+        run: pnpm run format
       - name: Lint
         run: pnpm run lint
-      - name: Format
-        run: pnpm run format
-      - name: Test
-        run: pnpm run test
-      - name: Build
+      - name: Typecheck
         run: pnpm run build
+      - name: Test
+        run: pnpm exec jest
+        env:
+          NODE_ENV: test
