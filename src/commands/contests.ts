@@ -26,6 +26,45 @@ function buildContestLine(contest: Contest, timing: string, scope: ContestScopeF
   return `- [${contest.name}](${buildContestUrl(contest)})${label} ${timing}`;
 }
 
+function formatScopeLabel(scope: ContestScopeFilter) {
+  if (scope === "gym") {
+    return " (Gym)";
+  }
+  if (scope === "all") {
+    return " (Official + Gym)";
+  }
+  return "";
+}
+
+function buildFilterSummary(filters: ReturnType<typeof parseKeywordFilters>) {
+  const parts: string[] = [];
+  if (filters.includeKeywords.length > 0) {
+    parts.push(`include: ${filters.includeKeywords.join(", ")}`);
+  }
+  if (filters.excludeKeywords.length > 0) {
+    parts.push(`exclude: ${filters.excludeKeywords.join(", ")}`);
+  }
+  if (parts.length === 0) {
+    return null;
+  }
+  return `Filters: ${parts.join(" • ")}`;
+}
+
+function buildFooterText(stale: boolean, filters: ReturnType<typeof parseKeywordFilters>) {
+  const parts: string[] = [];
+  if (stale) {
+    parts.push("Showing cached data due to a temporary Codeforces error.");
+  }
+  const filterSummary = buildFilterSummary(filters);
+  if (filterSummary) {
+    parts.push(filterSummary);
+  }
+  if (parts.length === 0) {
+    return null;
+  }
+  return parts.join(" ");
+}
+
 export const contestsCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contests")
@@ -82,9 +121,8 @@ export const contestsCommand: Command = {
       return;
     }
 
-    const scopeLabel = scope === "all" ? " (Official + Gym)" : scope === "gym" ? " (Gym)" : "";
     const embed = new EmbedBuilder()
-      .setTitle(`Codeforces Contests${scopeLabel}`)
+      .setTitle(`Codeforces Contests${formatScopeLabel(scope)}`)
       .setColor(EMBED_COLORS.info);
 
     if (ongoing.length > 0) {
@@ -112,22 +150,9 @@ export const contestsCommand: Command = {
       embed.addFields({ name: "Upcoming", value: upcomingLines, inline: false });
     }
 
-    const filterParts: string[] = [];
-    if (filters.includeKeywords.length > 0) {
-      filterParts.push(`include: ${filters.includeKeywords.join(", ")}`);
-    }
-    if (filters.excludeKeywords.length > 0) {
-      filterParts.push(`exclude: ${filters.excludeKeywords.join(", ")}`);
-    }
-    const footerParts = [];
-    if (stale) {
-      footerParts.push("Showing cached data due to a temporary Codeforces error.");
-    }
-    if (filterParts.length > 0) {
-      footerParts.push(`Filters: ${filterParts.join(" • ")}`);
-    }
-    if (footerParts.length > 0) {
-      embed.setFooter({ text: footerParts.join(" ") });
+    const footerText = buildFooterText(stale, filters);
+    if (footerText) {
+      embed.setFooter({ text: footerText });
     }
 
     await interaction.editReply({ embeds: [embed] });
