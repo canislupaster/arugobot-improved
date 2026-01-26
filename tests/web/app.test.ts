@@ -82,6 +82,15 @@ describe("web app", () => {
       .insertInto("guild_settings")
       .values({ guild_id: "guild-1", dashboard_public: 1 })
       .execute();
+
+    await db
+      .insertInto("contest_rating_changes")
+      .values({
+        contest_id: 999,
+        payload: "[]",
+        last_fetched: "2024-02-02T00:00:00.000Z",
+      })
+      .execute();
   });
 
   afterEach(async () => {
@@ -104,6 +113,12 @@ describe("web app", () => {
     expect(body).toContain("Official Contest");
     expect(body).toContain("og:image");
     expect(body).toContain("/static/local-time.js");
+    expect(body).toMatch(
+      /Last refresh\s*<span class="js-local-time" data-iso="2024-02-01T00:00:00.000Z">/
+    );
+    expect(body).toMatch(
+      /Last fetched:\s*<span class="js-local-time" data-iso="2024-02-02T00:00:00.000Z">/
+    );
   });
 
   it("returns overview json", async () => {

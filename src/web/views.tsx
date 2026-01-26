@@ -95,6 +95,7 @@ export type StatusViewModel = {
   }>;
 };
 
+type InlineText = HtmlEscapedString | string | Promise<HtmlEscapedString>;
 type ViewResult = HtmlEscapedString | Promise<HtmlEscapedString>;
 type UpcomingContestEntry = UpcomingContestsOverview["official"][number];
 
@@ -135,9 +136,13 @@ function renderUpcomingContestCard(
   lastRefreshAt: string | null,
   emptyLabel: string
 ): ViewResult {
-  const subtitle = lastRefreshAt
-    ? `Last refresh ${formatTimestamp(lastRefreshAt)}`
-    : "Upcoming contests from the cached contest list.";
+  const subtitle = lastRefreshAt ? (
+    <>
+      Last refresh {renderLocalTime(lastRefreshAt)}
+    </>
+  ) : (
+    "Upcoming contests from the cached contest list."
+  );
 
   return (
     <div class="card">
@@ -266,7 +271,7 @@ function formatDurationSeconds(seconds: number | null | undefined): string {
   return `${hours}h ${minutes}m`;
 }
 
-function StatCard(props: { label: string; value: ViewResult; hint?: string }): ViewResult {
+function StatCard(props: { label: string; value: ViewResult; hint?: InlineText }): ViewResult {
   return (
     <div class="card stat">
       <div class="label">{props.label}</div>
@@ -276,7 +281,7 @@ function StatCard(props: { label: string; value: ViewResult; hint?: string }): V
   );
 }
 
-function SectionHeader(props: { title: string; subtitle?: string }): ViewResult {
+function SectionHeader(props: { title: string; subtitle?: InlineText }): ViewResult {
   return (
     <div class="section-header">
       <h2>{props.title}</h2>
@@ -492,9 +497,12 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
         <StatCard
           label="Rating change cache age"
           value={<span>{formatAgeSeconds(model.global.contestRatingAlerts.cacheAgeSeconds)}</span>}
-          hint={`Last fetched: ${formatTimestamp(
-            model.global.contestRatingAlerts.cacheLastFetched
-          )}`}
+          hint={
+            <>
+              Last fetched:{" "}
+              {renderLocalTime(model.global.contestRatingAlerts.cacheLastFetched)}
+            </>
+          }
         />
       </section>
 
