@@ -458,9 +458,15 @@ describe("web app", () => {
     const body = (await response.json()) as {
       generatedAt: string;
       cacheEntries: Array<{ label: string }>;
+      status: string;
+      dbOk: boolean;
+      codeforces: { lastSuccessAt: string | null; lastError: unknown | null };
     };
     expect(body.generatedAt).toBeTruthy();
     expect(body.cacheEntries.some((entry) => entry.label === "Problemset cache")).toBe(true);
+    expect(body.status).toBe("ok");
+    expect(body.dbOk).toBe(true);
+    expect(body.codeforces).toBeTruthy();
   });
 
   it("returns health status", async () => {

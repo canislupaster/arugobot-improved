@@ -327,17 +327,22 @@ export function createWebApp({ website, client }: WebAppContext) {
   });
 
   app.get("/status", async (c) => {
-    const cacheEntries = await website.getCacheStatus();
-    const tokenUsage = website.getTokenUsageSnapshot();
+    const health = await website.getHealthStatus();
     return c.html(
-      renderStatusPage({ generatedAt: new Date().toISOString(), cacheEntries, tokenUsage })
+      renderStatusPage({
+        generatedAt: health.generatedAt,
+        cacheEntries: health.cacheEntries,
+        tokenUsage: health.tokenUsage,
+        dbOk: health.dbOk,
+        codeforces: health.codeforces,
+        status: health.status,
+      })
     );
   });
 
   app.get("/status.json", async (c) => {
-    const cacheEntries = await website.getCacheStatus();
-    const tokenUsage = website.getTokenUsageSnapshot();
-    return c.json({ generatedAt: new Date().toISOString(), cacheEntries, tokenUsage });
+    const health = await website.getHealthStatus();
+    return c.json(health);
   });
 
   app.get("/healthz", async (c) => {

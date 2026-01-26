@@ -105,6 +105,12 @@ export type StatusViewModel = {
     ageSeconds: number | null;
   }>;
   tokenUsage: GlobalOverview["tokenUsage"];
+  dbOk: boolean;
+  status: "ok" | "degraded";
+  codeforces: {
+    lastSuccessAt: string | null;
+    lastError: { message: string; endpoint: string; timestamp: string } | null;
+  };
 };
 
 type InlineText = HtmlEscapedString | string | Promise<HtmlEscapedString>;
@@ -148,6 +154,10 @@ function formatImpactValue(value: number | null): string {
 function formatStreakValue(value: number): string {
   const emojis = formatStreakEmojis(value);
   return emojis ? `${formatNumber(value)} ${emojis}` : formatNumber(value);
+}
+
+function formatHealthStatus(status: "ok" | "degraded"): string {
+  return status === "ok" ? "OK" : "Degraded";
 }
 
 function renderContestRow(contest: UpcomingContestEntry) {
@@ -1108,6 +1118,14 @@ export function renderTournamentPage(model: TournamentViewModel): ViewResult {
 export function renderStatusPage(model: StatusViewModel): ViewResult {
   const tokenUsage = model.tokenUsage;
   const tokenAssumptions = tokenUsage?.impact.assumptions ?? null;
+  const codeforcesStatus = model.codeforces.lastError ? "Degraded" : "OK";
+  const codeforcesHint = model.codeforces.lastSuccessAt ? (
+    <>
+      Last success {renderLocalTime(model.codeforces.lastSuccessAt)}
+    </>
+  ) : (
+    "No successful requests yet."
+  );
   return (
     <Layout title="ArugoBot | Status" description="Diagnostics for Codeforces cache health.">
       <section class="hero compact">
@@ -1144,6 +1162,22 @@ export function renderStatusPage(model: StatusViewModel): ViewResult {
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="card">
+          <SectionHeader title="Service health" subtitle={`Status: ${formatHealthStatus(model.status)}`} />
+          <div class="stats-grid">
+            <StatCard label="Database" value={<span>{model.dbOk ? "OK" : "Failed"}</span>} />
+            <StatCard label="Codeforces" value={<span>{codeforcesStatus}</span>} hint={codeforcesHint} />
+          </div>
+          {model.codeforces.lastError ? (
+            <div class="muted">
+              Last error: {model.codeforces.lastError.message} ({model.codeforces.lastError.endpoint}) •{" "}
+              {renderLocalTime(model.codeforces.lastError.timestamp)}
+            </div>
+          ) : null}
         </div>
       </section>
 
