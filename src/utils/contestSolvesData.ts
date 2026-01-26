@@ -1,8 +1,13 @@
-import type { Problem } from "../services/problems.js";
-import type { ProblemService } from "../services/problems.js";
+import type { ChatInputCommandInteraction } from "discord.js";
+
+import type { Contest, ContestScopeFilter, ContestService } from "../services/contests.js";
+import type { Problem, ProblemService } from "../services/problems.js";
 import type { ContestSolvesResult, StoreService } from "../services/store.js";
 
+import type { ContestLookupService } from "./contestLookup.js";
+import { resolveContestOrReply } from "./contestLookup.js";
 import { getContestProblems } from "./contestProblems.js";
+import { refreshContestData } from "./contestScope.js";
 
 export type ContestSolvesDataResult =
   | { status: "ok"; contestProblems: Problem[]; contestSolves: ContestSolvesResult }
@@ -24,6 +29,54 @@ export function shouldShowContestSolvesStale(
   contestSolves: ContestSolvesResult
 ): boolean {
   return refreshWasStale || contestSolves.isStale;
+}
+
+export type ContestSolvesContextResult =
+  | {
+      status: "ok";
+      contest: Contest;
+      refreshWasStale: boolean;
+    }
+  | { status: "replied" };
+
+type ContestSolvesContextOptions = {
+  interaction: ChatInputCommandInteraction;
+  queryRaw: string;
+  scope: ContestScopeFilter;
+  contests: ContestLookupService & Pick<ContestService, "refresh" | "getLastRefreshAt">;
+  maxMatches?: number;
+  footerText: string;
+};
+
+export async function resolveContestSolvesContext(
+  options: ContestSolvesContextOptions
+): Promise<ContestSolvesContextResult> {
+  const refreshResult = await refreshContestData(options.contests, options.scope);
+  if ("error" in refreshResult) {
+    await options.interaction.editReply(refreshResult.error);
+    return { status: "replied" };
+  }
+
+  const lookup = await resolveContestOrReply(
+    options.interaction,
+    options.queryRaw,
+    options.scope,
+    options.contests,
+    {
+      maxMatches: options.maxMatches,
+      footerText: options.footerText,
+      refreshWasStale: refreshResult.stale,
+    }
+  );
+  if (lookup.status === "replied") {
+    return { status: "replied" };
+  }
+
+  return {
+    status: "ok",
+    contest: lookup.contest,
+    refreshWasStale: refreshResult.stale,
+  };
 }
 
 export async function loadContestSolvesData(

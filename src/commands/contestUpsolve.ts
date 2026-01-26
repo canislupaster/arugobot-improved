@@ -2,18 +2,16 @@ import { SlashCommandBuilder } from "discord.js";
 
 import type { StoreService } from "../services/store.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import {
-  buildContestEmbed,
-  resolveContestOrReply,
-} from "../utils/contestLookup.js";
+import { buildContestEmbed } from "../utils/contestLookup.js";
 import {
   formatUnsolvedProblemsValue,
   splitContestSolves,
 } from "../utils/contestProblems.js";
-import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
+import { parseContestScope } from "../utils/contestScope.js";
 import {
   getContestSolvesDataMessage,
   loadContestSolvesData,
+  resolveContestSolvesContext,
   shouldShowContestSolvesStale,
 } from "../utils/contestSolvesData.js";
 import {
@@ -122,24 +120,15 @@ export const contestUpsolveCommand: Command = {
 
     await interaction.deferReply();
 
-    const refreshResult = await refreshContestData(context.services.contests, scope);
-    if ("error" in refreshResult) {
-      await interaction.editReply(refreshResult.error);
-      return;
-    }
-
     try {
-      const lookup = await resolveContestOrReply(
+      const contestResult = await resolveContestSolvesContext({
         interaction,
         queryRaw,
         scope,
-        context.services.contests,
-        {
-          footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
-          refreshWasStale: refreshResult.stale,
-        }
-      );
-      if (lookup.status === "replied") {
+        contests: context.services.contests,
+        footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
+      });
+      if (contestResult.status === "replied") {
         return;
       }
 
@@ -154,7 +143,7 @@ export const contestUpsolveCommand: Command = {
       }
       const handle = handleResult.handle;
 
-      const contest = lookup.contest;
+      const contest = contestResult.contest;
       const contestData = await loadContestSolvesData(
         context.services.problems,
         context.services.store,
@@ -206,7 +195,7 @@ export const contestUpsolveCommand: Command = {
         inline: false,
       });
 
-      if (shouldShowContestSolvesStale(refreshResult.stale, contestSolves)) {
+      if (shouldShowContestSolvesStale(contestResult.refreshWasStale, contestSolves)) {
         embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
       }
 

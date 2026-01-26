@@ -3,6 +3,7 @@ import type { ContestSolvesResult, StoreService } from "../../src/services/store
 import {
   getContestSolvesDataMessage,
   loadContestSolvesData,
+  resolveContestSolvesContext,
   shouldShowContestSolvesStale,
 } from "../../src/utils/contestSolvesData.js";
 
@@ -120,5 +121,94 @@ describe("shouldShowContestSolvesStale", () => {
     } satisfies ContestSolvesResult;
 
     expect(shouldShowContestSolvesStale(false, contestSolves)).toBe(false);
+  });
+});
+
+describe("resolveContestSolvesContext", () => {
+  const contest = {
+    id: 1234,
+    name: "Codeforces Round #1234",
+    phase: "FINISHED",
+    startTimeSeconds: 1_700_000_000,
+    durationSeconds: 7200,
+  };
+
+  const createInteraction = () =>
+    ({
+      editReply: jest.fn().mockResolvedValue(undefined),
+    }) as unknown as import("discord.js").ChatInputCommandInteraction;
+
+  it("returns contest data after refresh and lookup", async () => {
+    const interaction = createInteraction();
+    const contests = {
+      refresh: jest.fn().mockResolvedValue(undefined),
+      getLastRefreshAt: jest.fn().mockReturnValue(1),
+      getLatestFinished: jest.fn().mockReturnValue(contest),
+      getContestById: jest.fn().mockReturnValue(contest),
+      searchContests: jest.fn().mockReturnValue([contest]),
+    };
+
+    const result = await resolveContestSolvesContext({
+      interaction,
+      queryRaw: "1234",
+      scope: "official",
+      contests,
+      footerText: "Footer",
+    });
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.contest.id).toBe(1234);
+      expect(result.refreshWasStale).toBe(false);
+    }
+    expect(interaction.editReply).not.toHaveBeenCalled();
+  });
+
+  it("replies when contest refresh fails without cache", async () => {
+    const interaction = createInteraction();
+    const contests = {
+      refresh: jest.fn().mockRejectedValue(new Error("CF down")),
+      getLastRefreshAt: jest.fn().mockReturnValue(0),
+      getLatestFinished: jest.fn(),
+      getContestById: jest.fn(),
+      searchContests: jest.fn(),
+    };
+
+    const result = await resolveContestSolvesContext({
+      interaction,
+      queryRaw: "1234",
+      scope: "official",
+      contests,
+      footerText: "Footer",
+    });
+
+    expect(result.status).toBe("replied");
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Unable to reach Codeforces right now. Try again in a few minutes."
+    );
+  });
+
+  it("replies when contest lookup finds no matches", async () => {
+    const interaction = createInteraction();
+    const contests = {
+      refresh: jest.fn().mockResolvedValue(undefined),
+      getLastRefreshAt: jest.fn().mockReturnValue(1),
+      getLatestFinished: jest.fn().mockReturnValue(null),
+      getContestById: jest.fn().mockReturnValue(null),
+      searchContests: jest.fn().mockReturnValue([]),
+    };
+
+    const result = await resolveContestSolvesContext({
+      interaction,
+      queryRaw: "mystery contest",
+      scope: "official",
+      contests,
+      footerText: "Footer",
+    });
+
+    expect(result.status).toBe("replied");
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No contests found matching that name."
+    );
   });
 });
