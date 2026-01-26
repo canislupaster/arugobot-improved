@@ -1,7 +1,9 @@
 import {
   normalizeHandleInput,
   normalizeHandleKey,
+  parseHandleList,
   resolveHandleTarget,
+  resolveHandleTargetWithOptionalGuild,
 } from "../../src/utils/handles.js";
 
 describe("normalizeHandleInput", () => {
@@ -29,6 +31,16 @@ describe("normalizeHandleKey", () => {
 
   it("returns an empty string for whitespace", () => {
     expect(normalizeHandleKey("   ")).toBe("");
+  });
+});
+
+describe("parseHandleList", () => {
+  it("splits handles by comma and whitespace", () => {
+    expect(parseHandleList("tourist,  petr\nneal")).toEqual(["tourist", "petr", "neal"]);
+  });
+
+  it("returns an empty array for whitespace", () => {
+    expect(parseHandleList("   ")).toEqual([]);
   });
 });
 
@@ -108,5 +120,52 @@ describe("resolveHandleTarget", () => {
         handleInput: "",
       })
     ).resolves.toEqual({ error: "Handle not linked." });
+  });
+});
+
+describe("resolveHandleTargetWithOptionalGuild", () => {
+  it("requires a handle when there is no guild", async () => {
+    const store = {
+      resolveHandle: jest.fn(async () => ({ exists: true })),
+      getHandle: jest.fn(async () => null),
+    };
+
+    await expect(
+      resolveHandleTargetWithOptionalGuild(store, {
+        guildId: null,
+        targetId: "user",
+        handleInput: "",
+      })
+    ).resolves.toEqual({ error: "Provide a handle when using this command in DMs." });
+  });
+
+  it("resolves a handle without a guild", async () => {
+    const store = {
+      resolveHandle: jest.fn(async () => ({ exists: true, canonicalHandle: "Tourist" })),
+      getHandle: jest.fn(async () => null),
+    };
+
+    await expect(
+      resolveHandleTargetWithOptionalGuild(store, {
+        guildId: null,
+        targetId: "user",
+        handleInput: "tourist",
+      })
+    ).resolves.toEqual({ handle: "Tourist", linkedUserId: null });
+  });
+
+  it("delegates to resolveHandleTarget when a guild is present", async () => {
+    const store = {
+      resolveHandle: jest.fn(async () => ({ exists: true })),
+      getHandle: jest.fn(async () => "neal"),
+    };
+
+    await expect(
+      resolveHandleTargetWithOptionalGuild(store, {
+        guildId: "guild",
+        targetId: "user-42",
+        handleInput: "",
+      })
+    ).resolves.toEqual({ handle: "neal", linkedUserId: "user-42" });
   });
 });

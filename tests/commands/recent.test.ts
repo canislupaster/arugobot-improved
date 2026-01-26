@@ -188,4 +188,72 @@ describe("recentCommand", () => {
     expect(payload.embeds[0].data.fields[1].value).toContain("Accepted");
     expect(payload.embeds[0].data.fields[1].value).not.toContain("Rejected");
   });
+
+  it("requires a handle in DMs", async () => {
+    const interaction = createInteraction({
+      guild: null,
+      options: {
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockImplementation(() => ""),
+      },
+    });
+    const context = { correlationId: "corr-7", services: {} } as unknown as CommandContext;
+
+    await recentCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Provide a handle when using this command in DMs.",
+    });
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
+  it("supports handles in DMs", async () => {
+    const interaction = createInteraction({
+      guild: null,
+      options: {
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockImplementation((name: string) =>
+          name === "handle" ? "tourist" : null
+        ),
+      },
+    });
+    const context = {
+      correlationId: "corr-8",
+      services: {
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: true,
+            canonicalHandle: "Tourist",
+            source: "api",
+          }),
+          getRecentSubmissions: jest.fn().mockResolvedValue({
+            submissions: [
+              {
+                id: 1,
+                contestId: 1000,
+                index: "A",
+                name: "Test Problem",
+                verdict: "OK",
+                creationTimeSeconds: 123,
+                programmingLanguage: "GNU C++17",
+              },
+            ],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await recentCommand.execute(interaction, context);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(context.services.store.resolveHandle).toHaveBeenCalledWith("tourist");
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    expect(payload.embeds[0].data.fields[0].value).toBe("Tourist");
+  });
 });

@@ -3,7 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolveHandleTarget } from "../utils/handles.js";
+import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
 import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
 import { formatSubmissionLines } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -106,18 +106,24 @@ export const profileCommand: Command = {
       option.setName("handle").setDescription("Codeforces handle to inspect")
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
-      return;
-    }
     const handleResolution = resolveHandleUserOptions(interaction);
     if (handleResolution.error) {
       await interaction.reply({ content: handleResolution.error });
       return;
     }
     const { handleInput, userOption, member } = handleResolution;
+    if (!interaction.guild && userOption) {
+      await interaction.reply({
+        content: "This command can only target other users in a server.",
+      });
+      return;
+    }
+    if (!interaction.guild && !handleInput) {
+      await interaction.reply({
+        content: "Provide a handle when using this command in DMs.",
+      });
+      return;
+    }
 
     const user = userOption ?? interaction.user;
     const targetId = user.id;
@@ -126,8 +132,8 @@ export const profileCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const guildId = interaction.guild.id;
-      const targetResolution = await resolveHandleTarget(context.services.store, {
+      const guildId = interaction.guild?.id;
+      const targetResolution = await resolveHandleTargetWithOptionalGuild(context.services.store, {
         guildId,
         targetId,
         handleInput,
@@ -145,11 +151,12 @@ export const profileCommand: Command = {
         return;
       }
 
-      const hasLinkedUser = Boolean(linkedUserId);
+      const linkedGuildId = linkedUserId && guildId ? guildId : null;
+      const hasLinkedUser = Boolean(linkedGuildId);
       const showSubmissions = handleInput.length > 0 || !linkedUserId;
       const [challengeSummary, recentSubmissions] = await Promise.all([
-        hasLinkedUser
-          ? loadChallengeSummary(guildId, linkedUserId ?? "", context.services)
+        linkedGuildId
+          ? loadChallengeSummary(linkedGuildId, linkedUserId ?? "", context.services)
           : Promise.resolve(null),
         showSubmissions ? loadRecentSubmissions(handle, context.services) : Promise.resolve(null),
       ]);

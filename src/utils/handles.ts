@@ -77,3 +77,28 @@ export async function resolveHandleTarget(
   }
   return { handle: linkedHandle, linkedUserId: targetId };
 }
+
+type HandleTargetContextOptions = {
+  guildId?: string | null;
+  targetId: string;
+  handleInput: string;
+  includeLinkedUserId?: boolean;
+};
+
+export async function resolveHandleTargetWithOptionalGuild(
+  store: HandleTargetStore,
+  options: HandleTargetContextOptions
+): Promise<HandleTargetResolution> {
+  const { guildId, targetId, handleInput, includeLinkedUserId = false } = options;
+  if (!guildId) {
+    if (!handleInput) {
+      return { error: "Provide a handle when using this command in DMs." };
+    }
+    const handleInfo = await store.resolveHandle(handleInput);
+    if (!handleInfo.exists) {
+      return { error: "Invalid handle." };
+    }
+    return { handle: handleInfo.canonicalHandle ?? handleInput, linkedUserId: null };
+  }
+  return resolveHandleTarget(store, { guildId, targetId, handleInput, includeLinkedUserId });
+}

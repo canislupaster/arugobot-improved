@@ -202,8 +202,13 @@ describe("profileCommand", () => {
     expect(interaction.deferReply).not.toHaveBeenCalled();
   });
 
-  it("rejects DMs", async () => {
+  it("requires a handle in DMs", async () => {
     const interaction = createInteraction({
+      options: {
+        getString: jest.fn().mockReturnValue(""),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
       guild: null,
     });
     const context = { correlationId: "corr-5", services: {} } as unknown as CommandContext;
@@ -212,9 +217,68 @@ describe("profileCommand", () => {
 
     expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: "This command can only be used in a server.",
+        content: "Provide a handle when using this command in DMs.",
       })
     );
     expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
+  it("supports handles in DMs", async () => {
+    const interaction = createInteraction({
+      guild: null,
+      options: {
+        getString: jest.fn().mockReturnValue("tourist"),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      correlationId: "corr-6",
+      services: {
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: true,
+            canonicalHandle: "Tourist",
+            source: "api",
+          }),
+          getCodeforcesProfile: jest.fn().mockResolvedValue({
+            profile: {
+              handle: "tourist",
+              displayHandle: "Tourist",
+              rating: 2500,
+              rank: "grandmaster",
+              maxRating: 2600,
+              maxRank: "grandmaster",
+              lastOnlineTimeSeconds: 123,
+              lastFetched: new Date().toISOString(),
+            },
+            source: "api",
+            isStale: false,
+          }),
+          getRecentSubmissions: jest.fn().mockResolvedValue({
+            submissions: [
+              {
+                id: 2,
+                contestId: 1001,
+                index: "B",
+                name: "Another Problem",
+                verdict: "WRONG_ANSWER",
+                creationTimeSeconds: 1200,
+                programmingLanguage: "GNU C++17",
+              },
+            ],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await profileCommand.execute(interaction, context);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ embeds: expect.any(Array) })
+    );
   });
 });

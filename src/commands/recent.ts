@@ -2,7 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolveHandleTarget } from "../utils/handles.js";
+import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
 import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
 import {
   filterSubmissionsByResult,
@@ -47,18 +47,24 @@ export const recentCommand: Command = {
         )
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
-      return;
-    }
     const handleResolution = resolveHandleUserOptions(interaction);
     if (handleResolution.error) {
       await interaction.reply({ content: handleResolution.error });
       return;
     }
     const { handleInput, userOption, member } = handleResolution;
+    if (!interaction.guild && userOption) {
+      await interaction.reply({
+        content: "This command can only target other users in a server.",
+      });
+      return;
+    }
+    if (!interaction.guild && !handleInput) {
+      await interaction.reply({
+        content: "Provide a handle when using this command in DMs.",
+      });
+      return;
+    }
 
     const user = userOption ?? interaction.user;
     const targetId = user.id;
@@ -76,8 +82,8 @@ export const recentCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const resolution = await resolveHandleTarget(context.services.store, {
-        guildId: interaction.guild.id,
+      const resolution = await resolveHandleTargetWithOptionalGuild(context.services.store, {
+        guildId: interaction.guild?.id ?? null,
         targetId,
         handleInput,
       });

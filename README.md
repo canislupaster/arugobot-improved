@@ -59,6 +59,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 - **/profile** `[user]` `[handle]`
 
   Shows a linked handle, rating, Codeforces profile info, and recent completed challenges (or a handle's Codeforces profile + recent submissions).
+  In DMs, provide a `handle`.
 
 - **/compare** `[user1..user4]` `[handles]`
 
@@ -68,6 +69,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Shows recent Codeforces submissions for a linked user or a handle.
   Use `result` to filter by `all`, `accepted`, or `rejected` submissions.
+  In DMs, provide a `handle`.
 
 - **/register** `handle`
 
