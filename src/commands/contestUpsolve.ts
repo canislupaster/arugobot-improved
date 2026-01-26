@@ -9,7 +9,7 @@ import {
 import {
   formatContestProblemLine,
   getContestProblems,
-  summarizeContestSolves,
+  splitContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { resolveHandleTarget } from "../utils/handles.js";
@@ -141,13 +141,11 @@ export const contestUpsolveCommand: Command = {
         return;
       }
 
-      const summaries = summarizeContestSolves(
+      const { summaries, solved, unsolved } = splitContestSolves(
         contestProblems,
         contestSolves.solves,
         new Map([[handle, handle]])
       );
-      const solved = summaries.filter((entry) => entry.solvedBy.size > 0);
-      const unsolved = summaries.filter((entry) => entry.solvedBy.size === 0);
       const solvedCount = solved.length;
       const unsolvedCount = unsolved.length;
       const targetLabel = handleInput ? handle : `${mention} (${handle})`;

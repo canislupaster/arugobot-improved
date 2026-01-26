@@ -10,7 +10,7 @@ import {
   compareProblemIndex,
   formatContestProblemLine,
   getContestProblems,
-  summarizeContestSolves,
+  splitContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
@@ -130,13 +130,11 @@ export const contestSolvesCommand: Command = {
       const handleToUserId = new Map(
         filteredUsers.map((user) => [user.handle, user.userId])
       );
-      const summaries = summarizeContestSolves(
+      const { summaries, solved, unsolved } = splitContestSolves(
         contestProblems,
         contestSolves.solves,
         handleToUserId
       );
-      const solved = summaries.filter((entry) => entry.solvedBy.size > 0);
-      const unsolved = summaries.filter((entry) => entry.solvedBy.size === 0);
       const solvedCount = solved.length;
       const unsolvedCount = unsolved.length;
 

@@ -2,7 +2,7 @@ import type { Problem } from "../services/problems.js";
 
 import { normalizeHandleKey } from "./handles.js";
 
-type ContestSolveEntry = {
+export type ContestSolveEntry = {
   handle: string;
   contestId: number;
   index: string;
@@ -11,6 +11,12 @@ type ContestSolveEntry = {
 export type ContestProblemSummary = {
   problem: Problem;
   solvedBy: Set<string>;
+};
+
+export type ContestSolveSplit = {
+  summaries: ContestProblemSummary[];
+  solved: ContestProblemSummary[];
+  unsolved: ContestProblemSummary[];
 };
 
 export function compareProblemIndex(a: Problem, b: Problem): number {
@@ -66,4 +72,15 @@ export function summarizeContestSolves(
       solvedBy: solvedByProblem.get(problemKey) ?? new Set<string>(),
     };
   });
+}
+
+export function splitContestSolves(
+  problems: Problem[],
+  solves: ContestSolveEntry[],
+  handleMap: Map<string, string>
+): ContestSolveSplit {
+  const summaries = summarizeContestSolves(problems, solves, handleMap);
+  const solved = summaries.filter((entry) => entry.solvedBy.size > 0);
+  const unsolved = summaries.filter((entry) => entry.solvedBy.size === 0);
+  return { summaries, solved, unsolved };
 }
