@@ -192,6 +192,16 @@ describe("validateHandleTargetContext", () => {
 
     expect(error).toBeNull();
   });
+
+  it("supports custom DM messages", () => {
+    const interaction = createInteraction(null);
+    const error = validateHandleTargetContext(interaction, "", { id: "user-1" } as never, {
+      userInDm: "Custom user message.",
+      missingHandleInDm: "Custom handle message.",
+    });
+
+    expect(error).toBe("Custom user message.");
+  });
 });
 
 describe("resolveBoundedIntegerOption", () => {

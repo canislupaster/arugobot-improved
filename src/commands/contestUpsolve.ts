@@ -16,7 +16,11 @@ import {
   formatContestSolvesSummary,
 } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
-import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
+import {
+  resolveHandleUserOptions,
+  resolveTargetLabels,
+  validateHandleTargetContext,
+} from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -50,16 +54,12 @@ export const contestUpsolveCommand: Command = {
     }
 
     const { handleInput, userOption, member } = handleResolution;
-    if (!interaction.guild && userOption) {
-      await interaction.reply({
-        content: "Specify handles directly when using this command outside a server.",
-      });
-      return;
-    }
-    if (!interaction.guild && !handleInput) {
-      await interaction.reply({
-        content: "Run this command in a server or provide a handle.",
-      });
+    const contextError = validateHandleTargetContext(interaction, handleInput, userOption, {
+      userInDm: "Specify handles directly when using this command outside a server.",
+      missingHandleInDm: "Run this command in a server or provide a handle.",
+    });
+    if (contextError) {
+      await interaction.reply({ content: contextError });
       return;
     }
 
