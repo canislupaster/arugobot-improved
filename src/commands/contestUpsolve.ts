@@ -9,8 +9,8 @@ import {
   formatContestProblemLines,
   splitContestSolves,
 } from "../utils/contestProblems.js";
-import { loadContestSolvesData } from "../utils/contestSolvesData.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
+import { loadContestSolvesData } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import {
   resolveBoundedIntegerOption,
