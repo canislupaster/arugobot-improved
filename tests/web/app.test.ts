@@ -106,6 +106,25 @@ describe("web app", () => {
     expect(body).toContain("/static/local-time.js");
   });
 
+  it("returns overview json", async () => {
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/api/overview");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      generatedAt: string;
+      global: { guildCount: number };
+      guilds: Array<{ id: string; name: string }>;
+    };
+    expect(body.generatedAt).toBeTruthy();
+    expect(body.global.guildCount).toBeGreaterThan(0);
+    expect(body.guilds[0]?.name).toBe("Guild One");
+  });
+
   it("renders a guild page", async () => {
     const app = createWebApp({
       website,
@@ -117,6 +136,25 @@ describe("web app", () => {
     expect(response.status).toBe(200);
     const body = await response.text();
     expect(body).toContain("Guild One");
+  });
+
+  it("returns guild overview json", async () => {
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/api/guilds/guild-1");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      generatedAt: string;
+      guild: { id: string; name: string; stats: { userCount: number } };
+    };
+    expect(body.generatedAt).toBeTruthy();
+    expect(body.guild.id).toBe("guild-1");
+    expect(body.guild.name).toBe("Guild One");
+    expect(body.guild.stats.userCount).toBeGreaterThan(0);
   });
 
   it("returns 404 for private guilds", async () => {
@@ -132,6 +170,22 @@ describe("web app", () => {
       } as never,
     });
     const response = await app.request("http://localhost/guilds/guild-1");
+    expect(response.status).toBe(404);
+  });
+
+  it("returns 404 for private guild overview json", async () => {
+    await db
+      .updateTable("guild_settings")
+      .set({ dashboard_public: 0 })
+      .where("guild_id", "=", "guild-1")
+      .execute();
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/api/guilds/guild-1");
     expect(response.status).toBe(404);
   });
 

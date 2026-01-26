@@ -145,6 +145,27 @@ export function createWebApp({ website, client }: WebAppContext) {
     return c.html(renderHomePage(viewModel));
   });
 
+  app.get("/api/overview", async (c) => {
+    const [global, guilds, upcomingContests] = await Promise.all([
+      website.getGlobalOverview(),
+      website.listGuildSummaries(20),
+      website.getUpcomingContests(5),
+    ]);
+    return c.json({
+      generatedAt: new Date().toISOString(),
+      global,
+      upcomingContests,
+      guilds: guilds.map((guild) => ({
+        id: guild.guildId,
+        name: resolveGuildName(client, guild.guildId),
+        linkedUsers: guild.linkedUsers,
+        activeChallenges: guild.activeChallenges,
+        completedChallenges: guild.completedChallenges,
+        lastChallengeAt: guild.lastChallengeAt,
+      })),
+    });
+  });
+
   app.get("/guilds/:guildId", async (c) => {
     const guildId = c.req.param("guildId");
     const activityDays = 30;
@@ -208,6 +229,38 @@ export function createWebApp({ website, client }: WebAppContext) {
       },
     };
     return c.html(renderGuildPage(viewModel));
+  });
+
+  app.get("/api/guilds/:guildId", async (c) => {
+    const guildId = c.req.param("guildId");
+    const activityDays = 30;
+    const overview = await website.getGuildOverview(guildId);
+    if (!overview || !overview.hasData) {
+      return c.json({ error: "Guild not found or no data available." }, 404);
+    }
+    return c.json({
+      generatedAt: new Date().toISOString(),
+      guild: {
+        id: guildId,
+        name: resolveGuildName(client, guildId),
+        stats: overview.stats,
+        ratingLeaderboard: overview.ratingLeaderboard,
+        solveLeaderboard: overview.solveLeaderboard,
+        currentStreakLeaderboard: overview.currentStreakLeaderboard,
+        longestStreakLeaderboard: overview.longestStreakLeaderboard,
+        roster: overview.roster,
+        activity: {
+          windowLabel: `Last ${activityDays}d`,
+          completedChallenges: overview.activity.completedChallenges,
+          participantCount: overview.activity.participantCount,
+          uniqueParticipants: overview.activity.uniqueParticipants,
+          solvedCount: overview.activity.solvedCount,
+          topSolvers: overview.activity.topSolvers,
+        },
+        contestActivity: overview.contestActivity,
+        tournaments: overview.tournaments,
+      },
+    });
   });
 
   app.get("/guilds/:guildId/exports/:metric/:format", async (c) => {

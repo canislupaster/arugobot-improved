@@ -282,6 +282,8 @@ contest rating alert coverage, and rating-change cache freshness. Per-guild page
 CSV/Markdown exports for rating/solve leaderboards, and `/status` shows cache ages for key
 Codeforces syncs including the gym contest list.
 `/status.json` returns the same cache status in JSON for external monitoring.
+`/api/overview` returns the global snapshot and public guild summaries as JSON, and
+`/api/guilds/:guildId` returns the per-guild overview payload (respecting the public dashboard setting).
 `/healthz` returns JSON with a quick DB + Codeforces check plus cache status (useful for uptime monitors).
 
 ## Deployment (Supervisor + Caddy)
