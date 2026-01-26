@@ -49,7 +49,7 @@ export function parseHandleList(raw: string): string[] {
   }
   return raw
     .split(/[\s,]+/u)
-    .map((value) => value.trim())
+    .map((value) => normalizeHandleInput(value))
     .filter(Boolean);
 }
 

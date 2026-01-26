@@ -39,6 +39,12 @@ describe("parseHandleList", () => {
     expect(parseHandleList("tourist,  petr\nneal")).toEqual(["tourist", "petr", "neal"]);
   });
 
+  it("normalizes profile URLs in handle lists", () => {
+    expect(
+      parseHandleList("https://codeforces.com/profile/tourist, https://codeforces.com/u/Petr")
+    ).toEqual(["tourist", "Petr"]);
+  });
+
   it("returns an empty array for whitespace", () => {
     expect(parseHandleList("   ")).toEqual([]);
   });
