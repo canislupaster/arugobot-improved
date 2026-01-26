@@ -12,8 +12,8 @@ import {
   splitContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
-import { parseHandleList } from "../utils/handles.js";
 import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
+import { parseHandleList } from "../utils/handles.js";
 
 import type { Command } from "./types.js";
 

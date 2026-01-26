@@ -8,12 +8,12 @@ import {
   resolveContestLookup,
 } from "../utils/contestLookup.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
-import { parseHandleList } from "../utils/handles.js";
 import {
   getUserOptions,
   resolveContestTargets,
   type TargetHandle,
 } from "../utils/contestTargets.js";
+import { parseHandleList } from "../utils/handles.js";
 
 import type { Command } from "./types.js";
 

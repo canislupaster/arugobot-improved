@@ -13,15 +13,15 @@ import {
   resolveContestLookup,
 } from "../utils/contestLookup.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
-import { buildContestUrl } from "../utils/contestUrl.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
-import { parseHandleList } from "../utils/handles.js";
-import { formatRatingDelta } from "../utils/ratingChanges.js";
 import {
   getUserOptions,
   resolveContestTargets,
   type TargetHandle,
 } from "../utils/contestTargets.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
+import { parseHandleList } from "../utils/handles.js";
+import { formatRatingDelta } from "../utils/ratingChanges.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
