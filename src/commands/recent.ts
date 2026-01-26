@@ -4,9 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
 import {
-  resolveHandleUserOptions,
-  resolveTargetLabels,
-  validateHandleTargetContext,
+  resolveHandleTargetLabels,
 } from "../utils/interaction.js";
 import {
   filterSubmissionsByResult,
@@ -51,21 +49,14 @@ export const recentCommand: Command = {
         )
     ),
   async execute(interaction, context) {
-    const handleResolution = resolveHandleUserOptions(interaction);
-    if (handleResolution.error) {
-      await interaction.reply({ content: handleResolution.error });
-      return;
-    }
-    const { handleInput, userOption, member } = handleResolution;
-    const contextError = validateHandleTargetContext(interaction, handleInput, userOption);
-    if (contextError) {
-      await interaction.reply({ content: contextError });
+    const targetResolution = resolveHandleTargetLabels(interaction);
+    if (targetResolution.status === "error") {
+      await interaction.reply({ content: targetResolution.error });
       return;
     }
 
-    const user = userOption ?? interaction.user;
-    const targetId = user.id;
-    const { displayName } = resolveTargetLabels(user, member);
+    const { handleInput, targetId } = targetResolution;
+    const { displayName } = targetResolution.labels;
     const targetName = handleInput || displayName;
     const limit = interaction.options.getInteger("limit") ?? MAX_RECENT;
     const resultFilterRaw = interaction.options.getString("result") ?? "all";

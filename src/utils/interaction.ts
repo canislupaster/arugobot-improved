@@ -170,6 +170,56 @@ export function validateHandleTargetContext(
   return null;
 }
 
+type HandleTargetLabelsResult =
+  | { status: "error"; error: string }
+  | {
+      status: "ok";
+      handleInput: string;
+      userOption: User | null;
+      member: unknown;
+      user: User;
+      targetId: string;
+      labels: { displayName: string; mention: string };
+    };
+
+export function resolveHandleTargetLabels(
+  interaction: ChatInputCommandInteraction,
+  options: {
+    handleOptionName?: string;
+    userOptionName?: string;
+    contextMessages?: HandleTargetContextMessages;
+  } = {}
+): HandleTargetLabelsResult {
+  const handleResolution = resolveHandleUserOptions(interaction, {
+    handleOptionName: options.handleOptionName,
+    userOptionName: options.userOptionName,
+  });
+  if (handleResolution.error) {
+    return { status: "error", error: handleResolution.error };
+  }
+  const { handleInput, userOption, member } = handleResolution;
+  const contextError = validateHandleTargetContext(
+    interaction,
+    handleInput,
+    userOption,
+    options.contextMessages ?? {}
+  );
+  if (contextError) {
+    return { status: "error", error: contextError };
+  }
+  const user = userOption ?? interaction.user;
+  const labels = resolveTargetLabels(user, member);
+  return {
+    status: "ok",
+    handleInput,
+    userOption,
+    member,
+    user,
+    targetId: user.id,
+    labels,
+  };
+}
+
 type IntegerOptionResolver = {
   options: { getInteger: (name: string) => number | null };
 };

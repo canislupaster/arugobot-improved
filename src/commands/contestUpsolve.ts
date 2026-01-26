@@ -17,9 +17,7 @@ import {
 } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import {
-  resolveHandleUserOptions,
-  resolveTargetLabels,
-  validateHandleTargetContext,
+  resolveHandleTargetLabels,
 } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
@@ -47,25 +45,19 @@ export const contestUpsolveCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     ),
   async execute(interaction, context) {
-    const handleResolution = resolveHandleUserOptions(interaction);
-    if (handleResolution.error) {
-      await interaction.reply({ content: handleResolution.error });
-      return;
-    }
-
-    const { handleInput, userOption, member } = handleResolution;
-    const contextError = validateHandleTargetContext(interaction, handleInput, userOption, {
-      userInDm: "Specify handles directly when using this command outside a server.",
-      missingHandleInDm: "Run this command in a server or provide a handle.",
+    const targetResolution = resolveHandleTargetLabels(interaction, {
+      contextMessages: {
+        userInDm: "Specify handles directly when using this command outside a server.",
+        missingHandleInDm: "Run this command in a server or provide a handle.",
+      },
     });
-    if (contextError) {
-      await interaction.reply({ content: contextError });
+    if (targetResolution.status === "error") {
+      await interaction.reply({ content: targetResolution.error });
       return;
     }
 
-    const user = userOption ?? interaction.user;
-    const { mention, displayName } = resolveTargetLabels(user, member);
-    const targetId = user.id;
+    const { handleInput, targetId } = targetResolution;
+    const { mention, displayName } = targetResolution.labels;
 
     const optionResult = await resolveContestSolvesOptionsOrReply(interaction, {
       defaultLimit: DEFAULT_LIMIT,

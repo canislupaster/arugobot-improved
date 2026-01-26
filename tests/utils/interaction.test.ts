@@ -1,5 +1,6 @@
 import {
   resolveBoundedIntegerOption,
+  resolveHandleTargetLabels,
   resolveHandleUserOptions,
   resolveTargetLabels,
   safeInteractionDefer,
@@ -159,6 +160,68 @@ describe("resolveHandleUserOptions", () => {
 
     expect(result.handleInput).toBe("tourist");
     expect(result.userOption).toBeNull();
+  });
+});
+
+describe("resolveHandleTargetLabels", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      options: {
+        getString: jest.fn().mockReturnValue(null),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+      user: { id: "user-1", username: "Aru", toString: () => "<@1>" },
+      guild: { id: "guild-1" },
+      ...overrides,
+    }) as never;
+
+  it("returns an error when both handle and user are provided", () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn().mockReturnValue("tourist"),
+        getUser: jest.fn().mockReturnValue({ id: "user-2" }),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+
+    const result = resolveHandleTargetLabels(interaction);
+
+    expect(result).toEqual({ status: "error", error: "Provide either a handle or a user, not both." });
+  });
+
+  it("returns custom DM errors", () => {
+    const interaction = createInteraction({ guild: null });
+
+    const result = resolveHandleTargetLabels(interaction, {
+      contextMessages: {
+        missingHandleInDm: "Custom handle needed.",
+      },
+    });
+
+    expect(result).toEqual({ status: "error", error: "Custom handle needed." });
+  });
+
+  it("returns labels and user info on success", () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn().mockReturnValue(""),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue({ displayName: "Nickname", toString: () => "<@!1>" }),
+      },
+    });
+
+    const result = resolveHandleTargetLabels(interaction);
+
+    expect(result).toEqual({
+      status: "ok",
+      handleInput: "",
+      userOption: null,
+      member: { displayName: "Nickname", toString: expect.any(Function) },
+      user: { id: "user-1", username: "Aru", toString: expect.any(Function) },
+      targetId: "user-1",
+      labels: { displayName: "Nickname", mention: "<@!1>" },
+    });
   });
 });
 

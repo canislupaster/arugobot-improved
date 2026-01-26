@@ -4,11 +4,7 @@ import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
-import {
-  resolveHandleUserOptions,
-  resolveTargetLabels,
-  validateHandleTargetContext,
-} from "../utils/interaction.js";
+import { resolveHandleTargetLabels } from "../utils/interaction.js";
 import { formatSubmissionLines } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -110,21 +106,14 @@ export const profileCommand: Command = {
       option.setName("handle").setDescription("Codeforces handle to inspect")
     ),
   async execute(interaction, context) {
-    const handleResolution = resolveHandleUserOptions(interaction);
-    if (handleResolution.error) {
-      await interaction.reply({ content: handleResolution.error });
-      return;
-    }
-    const { handleInput, userOption, member } = handleResolution;
-    const contextError = validateHandleTargetContext(interaction, handleInput, userOption);
-    if (contextError) {
-      await interaction.reply({ content: contextError });
+    const targetResolution = resolveHandleTargetLabels(interaction);
+    if (targetResolution.status === "error") {
+      await interaction.reply({ content: targetResolution.error });
       return;
     }
 
-    const user = userOption ?? interaction.user;
-    const targetId = user.id;
-    const { displayName: targetName, mention: targetMention } = resolveTargetLabels(user, member);
+    const { handleInput, targetId } = targetResolution;
+    const { displayName: targetName, mention: targetMention } = targetResolution.labels;
 
     await interaction.deferReply();
 
