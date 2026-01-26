@@ -8,9 +8,9 @@ import {
 import {
   compareProblemIndex,
   formatContestProblemLines,
-  getContestProblems,
   splitContestSolves,
 } from "../utils/contestProblems.js";
+import { loadContestSolvesData } from "../utils/contestSolvesData.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
@@ -116,9 +116,12 @@ export const contestSolvesCommand: Command = {
       }
 
       const contest = lookup.contest;
-      const problems = await context.services.problems.ensureProblemsLoaded();
-      const contestProblems = getContestProblems(problems, contest.id);
-      if (contestProblems.length === 0) {
+      const contestData = await loadContestSolvesData(
+        context.services.problems,
+        context.services.store,
+        contest.id
+      );
+      if (contestData.status === "no_problems") {
         await interaction.editReply("No contest problems found in the cache yet.");
         return;
       }
@@ -139,11 +142,11 @@ export const contestSolvesCommand: Command = {
       }
       const targets = targetResult.targets;
 
-      const contestSolves = await context.services.store.getContestSolvesResult(contest.id);
-      if (!contestSolves) {
+      if (contestData.status === "no_solves") {
         await interaction.editReply("Contest submissions cache not ready yet. Try again soon.");
         return;
       }
+      const { contestProblems, contestSolves } = contestData;
 
       const handleToUserId = new Map(targets.map((target) => [target.handle, target.label]));
       const { summaries, solved, unsolved } = splitContestSolves(

@@ -7,9 +7,9 @@ import {
 } from "../utils/contestLookup.js";
 import {
   formatContestProblemLines,
-  getContestProblems,
   splitContestSolves,
 } from "../utils/contestProblems.js";
+import { loadContestSolvesData } from "../utils/contestSolvesData.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import {
@@ -118,18 +118,20 @@ export const contestUpsolveCommand: Command = {
       const handle = handleTarget.handle;
 
       const contest = lookup.contest;
-      const problems = await context.services.problems.ensureProblemsLoaded();
-      const contestProblems = getContestProblems(problems, contest.id);
-      if (contestProblems.length === 0) {
+      const contestData = await loadContestSolvesData(
+        context.services.problems,
+        context.services.store,
+        contest.id
+      );
+      if (contestData.status === "no_problems") {
         await interaction.editReply("No contest problems found in the cache yet.");
         return;
       }
-
-      const contestSolves = await context.services.store.getContestSolvesResult(contest.id);
-      if (!contestSolves) {
+      if (contestData.status === "no_solves") {
         await interaction.editReply("Contest submissions cache not ready yet. Try again soon.");
         return;
       }
+      const { contestProblems, contestSolves } = contestData;
 
       const { summaries, solved, unsolved } = splitContestSolves(
         contestProblems,
