@@ -11,8 +11,9 @@ import {
   getContestSolvesDataMessage,
   loadContestSolvesData,
   resolveContestSolvesContext,
-  resolveContestSolvesOptions,
+  resolveContestSolvesOptionsOrReply,
   shouldShowContestSolvesStale,
+  formatContestSolvesSummary,
 } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
@@ -66,12 +67,11 @@ export const contestUpsolveCommand: Command = {
     const { mention, displayName } = resolveTargetLabels(user, member);
     const targetId = user.id;
 
-    const optionResult = resolveContestSolvesOptions(interaction, {
+    const optionResult = await resolveContestSolvesOptionsOrReply(interaction, {
       defaultLimit: DEFAULT_LIMIT,
       maxLimit: MAX_LIMIT,
     });
-    if (optionResult.status === "error") {
-      await interaction.reply({ content: optionResult.message });
+    if (optionResult.status === "replied") {
       return;
     }
     const { queryRaw, scope, limit } = optionResult;
@@ -135,10 +135,11 @@ export const contestUpsolveCommand: Command = {
         { name: "Target", value: targetLabel, inline: false },
         {
           name: "Summary",
-          value: [
-            `Solved problems: ${solvedCount}/${summaries.length}`,
-            `Unsolved problems: ${unsolvedCount}`,
-          ].join("\n"),
+          value: formatContestSolvesSummary({
+            totalProblems: summaries.length,
+            solvedCount,
+            unsolvedCount,
+          }),
           inline: false,
         }
       );

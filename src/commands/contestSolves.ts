@@ -13,8 +13,9 @@ import {
   getContestSolvesDataMessage,
   loadContestSolvesData,
   resolveContestSolvesContext,
-  resolveContestSolvesOptions,
+  resolveContestSolvesOptionsOrReply,
   shouldShowContestSolvesStale,
+  formatContestSolvesSummary,
 } from "../utils/contestSolvesData.js";
 import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
@@ -49,12 +50,11 @@ export const contestSolvesCommand: Command = {
     ),
   async execute(interaction, context) {
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
-    const optionResult = resolveContestSolvesOptions(interaction, {
+    const optionResult = await resolveContestSolvesOptionsOrReply(interaction, {
       defaultLimit: DEFAULT_LIMIT,
       maxLimit: MAX_LIMIT,
     });
-    if (optionResult.status === "error") {
-      await interaction.reply({ content: optionResult.message });
+    if (optionResult.status === "replied") {
       return;
     }
     const { queryRaw, scope, limit } = optionResult;
@@ -149,11 +149,12 @@ export const contestSolvesCommand: Command = {
       });
       embed.addFields({
         name: "Summary",
-        value: [
-          `Handles included: ${targets.length}`,
-          `Solved problems: ${solvedCount}/${summaries.length}`,
-          `Unsolved problems: ${unsolvedCount}`,
-        ].join("\n"),
+        value: formatContestSolvesSummary({
+          totalProblems: summaries.length,
+          solvedCount,
+          unsolvedCount,
+          handleCount: targets.length,
+        }),
         inline: false,
       });
 

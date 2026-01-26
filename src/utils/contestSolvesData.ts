@@ -32,12 +32,38 @@ export function shouldShowContestSolvesStale(
   return refreshWasStale || contestSolves.isStale;
 }
 
+export function formatContestSolvesSummary(options: {
+  totalProblems: number;
+  solvedCount: number;
+  unsolvedCount: number;
+  handleCount?: number;
+}): string {
+  const lines: string[] = [];
+  if (options.handleCount !== undefined) {
+    lines.push(`Handles included: ${options.handleCount}`);
+  }
+  lines.push(`Solved problems: ${options.solvedCount}/${options.totalProblems}`);
+  lines.push(`Unsolved problems: ${options.unsolvedCount}`);
+  return lines.join("\n");
+}
+
 export type ContestSolvesOptionsResult =
   | { status: "ok"; queryRaw: string; scope: ContestScopeFilter; limit: number }
   | { status: "error"; message: string };
 
+type ContestSolvesOptionsInteraction = {
+  options: {
+    getString: {
+      (name: string, required: true): string;
+      (name: string, required?: false): string | null;
+      (name: string, required?: boolean): string | null;
+    };
+    getInteger: (name: string) => number | null;
+  };
+};
+
 export function resolveContestSolvesOptions(
-  interaction: Pick<ChatInputCommandInteraction, "options">,
+  interaction: ContestSolvesOptionsInteraction,
   options: { defaultLimit: number; maxLimit: number }
 ): ContestSolvesOptionsResult {
   const queryRaw = interaction.options.getString("query", true).trim();
@@ -53,6 +79,22 @@ export function resolveContestSolvesOptions(
     return { status: "error", message: resolvedLimit.error };
   }
   return { status: "ok", queryRaw, scope, limit: resolvedLimit.value };
+}
+
+export async function resolveContestSolvesOptionsOrReply(
+  interaction: ContestSolvesOptionsInteraction & {
+    reply: (options: { content: string }) => Promise<unknown>;
+  },
+  options: { defaultLimit: number; maxLimit: number }
+): Promise<{ status: "ok"; queryRaw: string; scope: ContestScopeFilter; limit: number } | {
+  status: "replied";
+}> {
+  const result = resolveContestSolvesOptions(interaction, options);
+  if (result.status === "error") {
+    await interaction.reply({ content: result.message });
+    return { status: "replied" };
+  }
+  return result;
 }
 
 export type ContestSolvesContextResult =
