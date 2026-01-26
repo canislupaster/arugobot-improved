@@ -2,7 +2,11 @@ import { EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database, PracticeRemindersTable } from "../db/types.js";
-import { resolveSendableChannel, type SendableChannel } from "../utils/discordChannels.js";
+import {
+  resolveSendableChannel,
+  resolveSendableChannelOrWarn,
+  type SendableChannel,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
@@ -371,7 +375,7 @@ export class PracticeReminderService {
       };
     }
 
-    const channel = await this.resolveSendableChannel(subscription.channelId, client);
+    const channel = await resolveSendableChannel(client, subscription.channelId);
     if (!channel) {
       return { status: "channel_missing", channelId: subscription.channelId };
     }
@@ -440,12 +444,13 @@ export class PracticeReminderService {
           continue;
         }
 
-        const channel = await this.resolveSendableChannel(subscription.channelId, client);
+        const channel = await resolveSendableChannelOrWarn(
+          client,
+          subscription.channelId,
+          "Practice reminder channel missing or invalid.",
+          { guildId: subscription.guildId }
+        );
         if (!channel) {
-          logWarn("Practice reminder channel missing or invalid.", {
-            guildId: subscription.guildId,
-            channelId: subscription.channelId,
-          });
           continue;
         }
 
@@ -565,13 +570,6 @@ export class PracticeReminderService {
       })
       .onConflict((oc) => oc.columns(["guild_id", "problem_id"]).doNothing())
       .execute();
-  }
-
-  private async resolveSendableChannel(
-    channelId: string,
-    client: Client
-  ): Promise<SendableChannel | null> {
-    return resolveSendableChannel(client, channelId);
   }
 
   private async sendReminderMessage(

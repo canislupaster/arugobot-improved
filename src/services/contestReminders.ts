@@ -10,7 +10,7 @@ import {
   serializeKeywords,
 } from "../utils/contestFilters.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
-import { resolveSendableChannel } from "../utils/discordChannels.js";
+import { resolveSendableChannel, resolveSendableChannelOrWarn } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
@@ -418,16 +418,15 @@ export class ContestReminderService {
       }
 
       for (const subscription of subscriptions) {
-        const channel = await resolveSendableChannel(client, subscription.channelId);
-        if (!channel) {
-          logWarn("Contest reminder channel missing or invalid.", {
-            guildId: subscription.guildId,
-            channelId: subscription.channelId,
-          });
+        const textChannel = await resolveSendableChannelOrWarn(
+          client,
+          subscription.channelId,
+          "Contest reminder channel missing or invalid.",
+          { guildId: subscription.guildId }
+        );
+        if (!textChannel) {
           continue;
         }
-
-        const textChannel = channel;
         const scopedUpcoming = upcomingByScope.get(subscription.scope) ?? [];
         const filtered = filterContestsByKeywords(scopedUpcoming, {
           includeKeywords: subscription.includeKeywords,

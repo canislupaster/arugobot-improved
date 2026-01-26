@@ -5,7 +5,11 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
-import { resolveSendableChannel, type SendableChannel } from "../utils/discordChannels.js";
+import {
+  resolveSendableChannel,
+  resolveSendableChannelOrWarn,
+  type SendableChannel,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
@@ -404,12 +408,13 @@ export class ContestRatingAlertService {
       }
 
       for (const subscription of subscriptions) {
-        const channel = await resolveSendableChannel(client, subscription.channelId);
+        const channel = await resolveSendableChannelOrWarn(
+          client,
+          subscription.channelId,
+          "Contest rating alert channel missing or invalid.",
+          { guildId: subscription.guildId }
+        );
         if (!channel) {
-          logWarn("Contest rating alert channel missing or invalid.", {
-            guildId: subscription.guildId,
-            channelId: subscription.channelId,
-          });
           continue;
         }
 
