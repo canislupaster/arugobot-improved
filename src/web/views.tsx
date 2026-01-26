@@ -1,11 +1,11 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 
+import type { TournamentRecap } from "../services/tournaments.js";
 import type {
   GlobalOverview,
   TournamentSummary,
   UpcomingContestsOverview,
 } from "../services/website.js";
-import type { TournamentRecap } from "../services/tournaments.js";
 import { buildProblemLink } from "../utils/contestProblems.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { formatTime } from "../utils/rating.js";
