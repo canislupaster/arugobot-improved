@@ -14,6 +14,7 @@ describe("contestLookup helpers", () => {
     expect(parseContestId("1234")).toBe(1234);
     expect(parseContestId("https://codeforces.com/contest/5678")).toBe(5678);
     expect(parseContestId("https://codeforces.com/contests/9012")).toBe(9012);
+    expect(parseContestId("https://codeforces.com/gym/3456")).toBe(3456);
     expect(parseContestId("not a contest")).toBeNull();
   });
 

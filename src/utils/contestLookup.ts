@@ -44,7 +44,7 @@ type ContestEmbedOptions = {
 
 export function parseContestId(raw: string): number | null {
   const trimmed = raw.trim();
-  const urlMatch = trimmed.match(/\bcontests?\/(\d+)/i);
+  const urlMatch = trimmed.match(/\b(?:contests?|gym)\/(\d+)/i);
   if (urlMatch) {
     const id = Number(urlMatch[1]);
     return Number.isFinite(id) ? id : null;
