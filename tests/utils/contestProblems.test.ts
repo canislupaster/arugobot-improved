@@ -1,6 +1,5 @@
-import { splitContestSolves, type ContestSolveEntry } from "../../src/utils/contestProblems.js";
-
 import type { Problem } from "../../src/services/problems.js";
+import { splitContestSolves, type ContestSolveEntry } from "../../src/utils/contestProblems.js";
 
 describe("splitContestSolves", () => {
   it("splits solved and unsolved problems using normalized handles", () => {
