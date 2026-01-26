@@ -1,12 +1,9 @@
-import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
 
-import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   buildContestEmbed,
-  buildContestMatchEmbed,
-  resolveContestLookup,
+  resolveContestOrReply,
 } from "../utils/contestLookup.js";
 import {
   formatContestProblemLine,
@@ -15,66 +12,16 @@ import {
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { resolveHandleTarget } from "../utils/handles.js";
-import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
+import {
+  resolveBoundedIntegerOption,
+  resolveHandleUserOptions,
+  resolveTargetLabels,
+} from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
-const MAX_MATCHES = 5;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
-
-type ContestLookupOutcome =
-  | { status: "ok"; contest: Contest }
-  | { status: "replied" };
-
-const resolveLimit = (
-  interaction: ChatInputCommandInteraction
-): { limit: number } | { error: string } => {
-  const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-    return { error: "Invalid limit." };
-  }
-  return { limit };
-};
-
-const resolveContestOrReply = async (
-  interaction: ChatInputCommandInteraction,
-  queryRaw: string,
-  scope: ContestScopeFilter,
-  contests: {
-    getLatestFinished: (scopeFilter: ContestScopeFilter) => Contest | null;
-    getContestById: (contestId: number, scopeFilter: ContestScopeFilter) => Contest | null;
-    searchContests: (query: string, limit: number, scopeFilter: ContestScopeFilter) => Contest[];
-  },
-  refreshWasStale: boolean
-): Promise<ContestLookupOutcome> => {
-  const lookup = resolveContestLookup(queryRaw, scope, contests, MAX_MATCHES);
-  if (lookup.status === "ok") {
-    return { status: "ok", contest: lookup.contest };
-  }
-  if (lookup.status === "ambiguous") {
-    const embed = buildContestMatchEmbed({
-      query: queryRaw,
-      matches: lookup.matches,
-      scope,
-      footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
-    });
-    if (refreshWasStale) {
-      embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
-    }
-    await interaction.editReply({ embeds: [embed] });
-    return { status: "replied" };
-  }
-
-  const errorMessage =
-    lookup.status === "missing_latest"
-      ? "No finished contests found yet."
-      : lookup.status === "missing_id"
-        ? "No contest found with that ID."
-        : "No contests found matching that name.";
-  await interaction.editReply(errorMessage);
-  return { status: "replied" };
-};
 
 export const contestUpsolveCommand: Command = {
   data: new SlashCommandBuilder()
@@ -123,12 +70,18 @@ export const contestUpsolveCommand: Command = {
 
     const queryRaw = interaction.options.getString("query", true).trim();
     const scope = parseContestScope(interaction.options.getString("scope"));
-    const resolvedLimit = resolveLimit(interaction);
+    const resolvedLimit = resolveBoundedIntegerOption(interaction, {
+      name: "limit",
+      defaultValue: DEFAULT_LIMIT,
+      min: 1,
+      max: MAX_LIMIT,
+      errorMessage: "Invalid limit.",
+    });
     if ("error" in resolvedLimit) {
       await interaction.reply({ content: resolvedLimit.error });
       return;
     }
-    const { limit } = resolvedLimit;
+    const { value: limit } = resolvedLimit;
 
     await interaction.deferReply();
 
@@ -144,7 +97,10 @@ export const contestUpsolveCommand: Command = {
         queryRaw,
         scope,
         context.services.contests,
-        refreshResult.stale
+        {
+          footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
+          refreshWasStale: refreshResult.stale,
+        }
       );
       if (lookup.status === "replied") {
         return;

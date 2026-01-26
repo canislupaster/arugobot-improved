@@ -14,6 +14,7 @@ import {
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
+import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -56,11 +57,18 @@ export const contestSolvesCommand: Command = {
     const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
     const scope = parseContestScope(interaction.options.getString("scope"));
-    const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-      await interaction.reply({ content: "Invalid limit." });
+    const resolvedLimit = resolveBoundedIntegerOption(interaction, {
+      name: "limit",
+      defaultValue: DEFAULT_LIMIT,
+      min: 1,
+      max: MAX_LIMIT,
+      errorMessage: "Invalid limit.",
+    });
+    if ("error" in resolvedLimit) {
+      await interaction.reply({ content: resolvedLimit.error });
       return;
     }
+    const { value: limit } = resolvedLimit;
     const handleInputs = parseHandleList(handlesRaw);
     const userOptions = getUserOptions([
       interaction.options.getUser("user1"),

@@ -1,4 +1,5 @@
 import {
+  resolveBoundedIntegerOption,
   resolveHandleUserOptions,
   resolveTargetLabels,
   safeInteractionEdit,
@@ -129,5 +130,54 @@ describe("resolveHandleUserOptions", () => {
 
     expect(result.handleInput).toBe("tourist");
     expect(result.userOption).toBeNull();
+  });
+});
+
+describe("resolveBoundedIntegerOption", () => {
+  const createInteraction = (value: number | null) =>
+    ({
+      options: {
+        getInteger: jest.fn().mockReturnValue(value),
+      },
+    }) as never;
+
+  it("returns default when option is missing", () => {
+    const interaction = createInteraction(null);
+
+    const result = resolveBoundedIntegerOption(interaction, {
+      name: "limit",
+      defaultValue: 10,
+      min: 1,
+      max: 20,
+    });
+
+    expect(result).toEqual({ value: 10 });
+  });
+
+  it("rejects values outside the range", () => {
+    const interaction = createInteraction(25);
+
+    const result = resolveBoundedIntegerOption(interaction, {
+      name: "limit",
+      defaultValue: 10,
+      min: 1,
+      max: 20,
+      errorMessage: "Invalid limit.",
+    });
+
+    expect(result).toEqual({ error: "Invalid limit." });
+  });
+
+  it("accepts values within the range", () => {
+    const interaction = createInteraction(5);
+
+    const result = resolveBoundedIntegerOption(interaction, {
+      name: "limit",
+      defaultValue: 10,
+      min: 1,
+      max: 20,
+    });
+
+    expect(result).toEqual({ value: 5 });
   });
 });

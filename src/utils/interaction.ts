@@ -130,3 +130,26 @@ export function resolveHandleUserOptions(
 
   return { handleInput, userOption, member };
 }
+
+type IntegerOptionResolver = {
+  options: { getInteger: (name: string) => number | null };
+};
+
+type BoundedIntegerOptionConfig = {
+  name: string;
+  min: number;
+  max: number;
+  defaultValue: number;
+  errorMessage?: string;
+};
+
+export function resolveBoundedIntegerOption(
+  interaction: IntegerOptionResolver,
+  config: BoundedIntegerOptionConfig
+): { value: number } | { error: string } {
+  const value = interaction.options.getInteger(config.name) ?? config.defaultValue;
+  if (!Number.isInteger(value) || value < config.min || value > config.max) {
+    return { error: config.errorMessage ?? "Invalid value." };
+  }
+  return { value };
+}
