@@ -147,6 +147,38 @@ describe("contestUpsolveCommand", () => {
     expect(interaction.editReply).toHaveBeenCalledWith("Handle not linked.");
   });
 
+  it("rejects invalid handle input", async () => {
+    const interaction = createInteraction({ query: "1234", handle: "bad" });
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([]),
+        },
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({ exists: false }),
+          getHandle: jest.fn(),
+          getContestSolvesResult: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestUpsolveCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith("Invalid handle.");
+  });
+
   it("rejects invalid limits", async () => {
     const interaction = createInteraction({ query: "1234", limit: 99 });
     const context = {

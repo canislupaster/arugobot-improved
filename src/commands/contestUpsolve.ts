@@ -1,6 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
 
-import type { StoreService } from "../services/store.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestEmbed } from "../utils/contestLookup.js";
 import {
@@ -15,37 +14,13 @@ import {
   resolveContestSolvesOptions,
   shouldShowContestSolvesStale,
 } from "../utils/contestSolvesData.js";
+import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
-
-type HandleResolutionResult = { ok: true; handle: string } | { ok: false; error: string };
-
-async function resolveUpsolveHandle(
-  store: Pick<StoreService, "resolveHandle" | "getHandle">,
-  options: { guildId?: string; targetId: string; handleInput: string }
-): Promise<HandleResolutionResult> {
-  if (options.handleInput) {
-    const handleInfo = await store.resolveHandle(options.handleInput);
-    if (!handleInfo.exists) {
-      return { ok: false, error: "Invalid handle." };
-    }
-    return { ok: true, handle: handleInfo.canonicalHandle ?? options.handleInput };
-  }
-
-  if (!options.guildId) {
-    return { ok: false, error: "Run this command in a server or provide a handle." };
-  }
-
-  const linkedHandle = await store.getHandle(options.guildId, options.targetId);
-  if (!linkedHandle) {
-    return { ok: false, error: "Handle not linked." };
-  }
-  return { ok: true, handle: linkedHandle };
-}
 
 export const contestUpsolveCommand: Command = {
   data: new SlashCommandBuilder()
@@ -115,12 +90,12 @@ export const contestUpsolveCommand: Command = {
         return;
       }
 
-      const handleResult = await resolveUpsolveHandle(context.services.store, {
-        guildId: interaction.guild?.id,
+      const handleResult = await resolveHandleTarget(context.services.store, {
+        guildId: interaction.guildId ?? "",
         targetId,
         handleInput,
       });
-      if (!handleResult.ok) {
+      if ("error" in handleResult) {
         await interaction.editReply(handleResult.error);
         return;
       }
