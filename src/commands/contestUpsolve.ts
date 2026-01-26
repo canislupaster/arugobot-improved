@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 
+import type { StoreService } from "../services/store.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   buildContestEmbed,
@@ -11,7 +12,6 @@ import {
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { loadContestSolvesData } from "../utils/contestSolvesData.js";
-import { resolveHandleTarget } from "../utils/handles.js";
 import {
   resolveBoundedIntegerOption,
   resolveHandleUserOptions,
@@ -22,6 +22,31 @@ import type { Command } from "./types.js";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
+
+type HandleResolutionResult = { ok: true; handle: string } | { ok: false; error: string };
+
+async function resolveUpsolveHandle(
+  store: Pick<StoreService, "resolveHandle" | "getHandle">,
+  options: { guildId?: string; targetId: string; handleInput: string }
+): Promise<HandleResolutionResult> {
+  if (options.handleInput) {
+    const handleInfo = await store.resolveHandle(options.handleInput);
+    if (!handleInfo.exists) {
+      return { ok: false, error: "Invalid handle." };
+    }
+    return { ok: true, handle: handleInfo.canonicalHandle ?? options.handleInput };
+  }
+
+  if (!options.guildId) {
+    return { ok: false, error: "Run this command in a server or provide a handle." };
+  }
+
+  const linkedHandle = await store.getHandle(options.guildId, options.targetId);
+  if (!linkedHandle) {
+    return { ok: false, error: "Handle not linked." };
+  }
+  return { ok: true, handle: linkedHandle };
+}
 
 export const contestUpsolveCommand: Command = {
   data: new SlashCommandBuilder()
@@ -52,11 +77,6 @@ export const contestUpsolveCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server." });
-      return;
-    }
-
     const handleResolution = resolveHandleUserOptions(interaction);
     if (handleResolution.error) {
       await interaction.reply({ content: handleResolution.error });
@@ -64,6 +84,19 @@ export const contestUpsolveCommand: Command = {
     }
 
     const { handleInput, userOption, member } = handleResolution;
+    if (!interaction.guild && userOption) {
+      await interaction.reply({
+        content: "Specify handles directly when using this command outside a server.",
+      });
+      return;
+    }
+    if (!interaction.guild && !handleInput) {
+      await interaction.reply({
+        content: "Run this command in a server or provide a handle.",
+      });
+      return;
+    }
+
     const user = userOption ?? interaction.user;
     const { mention, displayName } = resolveTargetLabels(user, member);
     const targetId = user.id;
@@ -106,16 +139,16 @@ export const contestUpsolveCommand: Command = {
         return;
       }
 
-      const handleTarget = await resolveHandleTarget(context.services.store, {
-        guildId: interaction.guild.id,
+      const handleResult = await resolveUpsolveHandle(context.services.store, {
+        guildId: interaction.guild?.id,
         targetId,
         handleInput,
       });
-      if ("error" in handleTarget) {
-        await interaction.editReply(handleTarget.error);
+      if (!handleResult.ok) {
+        await interaction.editReply(handleResult.error);
         return;
       }
-      const handle = handleTarget.handle;
+      const handle = handleResult.handle;
 
       const contest = lookup.contest;
       const contestData = await loadContestSolvesData(
