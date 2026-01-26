@@ -8,6 +8,15 @@ const CONTEST_URL_PATTERN = /codeforces\.com\/contest\/(\d+)\/problem\/([A-Za-z0
 const PROBLEMSET_URL_PATTERN = /codeforces\.com\/problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/i;
 const ID_PATTERN = /^(\d+)([A-Za-z][A-Za-z0-9]*)$/;
 
+function buildReference(contestIdRaw: string, indexRaw: string): ProblemReference | null {
+  const contestId = Number(contestIdRaw);
+  if (!Number.isFinite(contestId) || contestId <= 0) {
+    return null;
+  }
+  const index = indexRaw.toUpperCase();
+  return { contestId, index, id: `${contestId}${index}` };
+}
+
 export function parseProblemReference(raw: string): ProblemReference | null {
   const trimmed = raw.trim();
   if (!trimmed) {
@@ -16,12 +25,7 @@ export function parseProblemReference(raw: string): ProblemReference | null {
 
   const urlMatch = trimmed.match(CONTEST_URL_PATTERN) ?? trimmed.match(PROBLEMSET_URL_PATTERN);
   if (urlMatch) {
-    const contestId = Number(urlMatch[1]);
-    const index = urlMatch[2]!.toUpperCase();
-    if (!Number.isFinite(contestId) || contestId <= 0) {
-      return null;
-    }
-    return { contestId, index, id: `${contestId}${index}` };
+    return buildReference(urlMatch[1], urlMatch[2] ?? "");
   }
 
   const compact = trimmed.replace(/\s+/g, "");
@@ -29,12 +33,5 @@ export function parseProblemReference(raw: string): ProblemReference | null {
   if (!idMatch) {
     return null;
   }
-
-  const contestId = Number(idMatch[1]);
-  const index = idMatch[2]!.toUpperCase();
-  if (!Number.isFinite(contestId) || contestId <= 0) {
-    return null;
-  }
-
-  return { contestId, index, id: `${contestId}${index}` };
+  return buildReference(idMatch[1], idMatch[2] ?? "");
 }
