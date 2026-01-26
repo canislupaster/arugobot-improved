@@ -5,6 +5,7 @@ import type {
   TournamentSummary,
   UpcomingContestsOverview,
 } from "../services/website.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 import { capitalize } from "../utils/text.js";
 
@@ -116,8 +117,9 @@ function formatStreakValue(value: number): string {
 }
 
 function renderContestRow(contest: UpcomingContestEntry) {
+  const contestUrl = buildContestUrl({ id: contest.id, isGym: contest.isGym });
   return (
-    <div class="tournament-row">
+    <a class="tournament-row" href={contestUrl}>
       <div>
         <div class="title">{contest.name}</div>
         <div class="muted">
@@ -126,7 +128,7 @@ function renderContestRow(contest: UpcomingContestEntry) {
         </div>
       </div>
       <div class="pill">#{contest.id}</div>
-    </div>
+    </a>
   );
 }
 

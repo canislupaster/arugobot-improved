@@ -111,6 +111,8 @@ describe("web app", () => {
     expect(body).toContain("Guild One");
     expect(body).toContain("Upcoming official contests");
     expect(body).toContain("Official Contest");
+    expect(body).toContain("https://codeforces.com/contest/1000");
+    expect(body).toContain("https://codeforces.com/gym/2000");
     expect(body).toContain("og:image");
     expect(body).toContain("/static/local-time.js");
     expect(body).toMatch(
