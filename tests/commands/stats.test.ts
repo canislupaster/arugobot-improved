@@ -14,26 +14,39 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
 
-const createContext = (overrides: Record<string, unknown> = {}) =>
-  ({
-    services: {
-      store: {
-        getServerStats: jest.fn().mockResolvedValue({
-          userCount: 1,
-          totalChallenges: 4,
-          avgRating: 1200,
-          topRating: 1500,
-        }),
-      },
-      challenges: {
-        getActiveCountForServer: jest.fn().mockResolvedValue(2),
-      },
-      tournaments: {
-        getActiveCountForGuild: jest.fn().mockResolvedValue(1),
-      },
+const createContext = (overrides: Record<string, unknown> = {}) => {
+  const { services: serviceOverrides, ...rest } = overrides as {
+    services?: Record<string, unknown>;
+  };
+  const services = {
+    store: {
+      getServerStats: jest.fn().mockResolvedValue({
+        userCount: 1,
+        totalChallenges: 4,
+        avgRating: 1200,
+        topRating: 1500,
+      }),
     },
-    ...overrides,
-  }) as unknown as CommandContext;
+    challenges: {
+      getActiveCountForServer: jest.fn().mockResolvedValue(2),
+    },
+    tournaments: {
+      getActiveCountForGuild: jest.fn().mockResolvedValue(1),
+    },
+    contestActivity: {
+      getGuildContestActivity: jest.fn().mockResolvedValue({
+        lookbackDays: 90,
+        contestCount: 3,
+        participantCount: 2,
+      }),
+    },
+    ...(serviceOverrides ?? {}),
+  };
+  return {
+    services,
+    ...rest,
+  } as unknown as CommandContext;
+};
 
 describe("statsCommand", () => {
   it("rejects DMs", async () => {
@@ -65,6 +78,13 @@ describe("statsCommand", () => {
         tournaments: {
           getActiveCountForGuild: jest.fn().mockResolvedValue(0),
         },
+        contestActivity: {
+          getGuildContestActivity: jest.fn().mockResolvedValue({
+            lookbackDays: 90,
+            contestCount: 0,
+            participantCount: 0,
+          }),
+        },
       },
     });
 
@@ -85,6 +105,8 @@ describe("statsCommand", () => {
     const fieldText = JSON.stringify(fields);
     expect(fieldText).toContain("Active challenges");
     expect(fieldText).toContain("Active tournaments");
+    expect(fieldText).toContain("Contests (90d)");
+    expect(fieldText).toContain("Contest participants (90d)");
     expect(fieldText).toContain("Average rating");
   });
 
@@ -100,6 +122,13 @@ describe("statsCommand", () => {
         },
         tournaments: {
           getActiveCountForGuild: jest.fn().mockResolvedValue(0),
+        },
+        contestActivity: {
+          getGuildContestActivity: jest.fn().mockResolvedValue({
+            lookbackDays: 90,
+            contestCount: 0,
+            participantCount: 0,
+          }),
         },
       },
     });

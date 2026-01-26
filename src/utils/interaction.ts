@@ -1,5 +1,6 @@
 import type {
   ChatInputCommandInteraction,
+  InteractionDeferReplyOptions,
   InteractionEditReplyOptions,
   InteractionReplyOptions,
   RepliableInteraction,
@@ -57,6 +58,24 @@ export async function safeInteractionEdit(
     {
       skipMessage: "Skipping interaction edit (already acknowledged).",
       errorMessage: "Interaction edit failed.",
+    },
+    context
+  );
+}
+
+export async function safeInteractionDefer(
+  interaction: RepliableInteraction,
+  options?: InteractionDeferReplyOptions,
+  context?: LogContext
+): Promise<boolean> {
+  if (interaction.deferred || interaction.replied) {
+    return true;
+  }
+  return safeInteractionAction(
+    () => interaction.deferReply(options),
+    {
+      skipMessage: "Skipping interaction defer (already acknowledged).",
+      errorMessage: "Interaction defer failed.",
     },
     context
   );

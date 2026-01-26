@@ -13,6 +13,11 @@ type StatsSummary = {
   topRating: number | null;
   activeChallenges: number;
   activeTournaments: number;
+  contestActivity: {
+    lookbackDays: number;
+    contestCount: number;
+    participantCount: number;
+  };
 };
 
 function formatRatingValue(value: number | null): string {
@@ -20,6 +25,7 @@ function formatRatingValue(value: number | null): string {
 }
 
 function buildStatsEmbed(summary: StatsSummary): EmbedBuilder {
+  const contestWindowLabel = `${summary.contestActivity.lookbackDays}d`;
   return new EmbedBuilder()
     .setTitle("Server stats")
     .setColor(EMBED_COLORS.info)
@@ -28,6 +34,16 @@ function buildStatsEmbed(summary: StatsSummary): EmbedBuilder {
       { name: "Total challenges", value: String(summary.totalChallenges), inline: true },
       { name: "Active challenges", value: String(summary.activeChallenges), inline: true },
       { name: "Active tournaments", value: String(summary.activeTournaments), inline: true },
+      {
+        name: `Contests (${contestWindowLabel})`,
+        value: String(summary.contestActivity.contestCount),
+        inline: true,
+      },
+      {
+        name: `Contest participants (${contestWindowLabel})`,
+        value: String(summary.contestActivity.participantCount),
+        inline: true,
+      },
       { name: "Average rating", value: formatRatingValue(summary.avgRating), inline: true },
       { name: "Top rating", value: formatRatingValue(summary.topRating), inline: true }
     );
@@ -37,10 +53,11 @@ async function fetchStatsSummary(
   guildId: string,
   context: CommandContext
 ): Promise<StatsSummary> {
-  const [stats, activeChallenges, activeTournaments] = await Promise.all([
+  const [stats, activeChallenges, activeTournaments, contestActivity] = await Promise.all([
     context.services.store.getServerStats(guildId),
     context.services.challenges.getActiveCountForServer(guildId),
     context.services.tournaments.getActiveCountForGuild(guildId),
+    context.services.contestActivity.getGuildContestActivity(guildId),
   ]);
 
   return {
@@ -50,6 +67,11 @@ async function fetchStatsSummary(
     topRating: stats.topRating,
     activeChallenges,
     activeTournaments,
+    contestActivity: {
+      lookbackDays: contestActivity.lookbackDays,
+      contestCount: contestActivity.contestCount,
+      participantCount: contestActivity.participantCount,
+    },
   };
 }
 

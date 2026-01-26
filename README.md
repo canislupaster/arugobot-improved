@@ -147,7 +147,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
 - **/stats**
 
-  Shows server challenge stats (linked users, total challenges, ratings).
+  Shows server challenge stats plus recent contest participation (linked users, challenges, ratings, contest counts).
 
 - **/activity** `[days]` `[user]`
 

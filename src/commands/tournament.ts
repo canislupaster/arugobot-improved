@@ -18,7 +18,11 @@ import {
 import type { TournamentHistoryDetail, TournamentHistoryEntry } from "../services/tournaments.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { safeInteractionEdit, safeInteractionReply } from "../utils/interaction.js";
+import {
+  safeInteractionDefer,
+  safeInteractionEdit,
+  safeInteractionReply,
+} from "../utils/interaction.js";
 import {
   buildPaginationIds,
   buildPaginationRow,
@@ -73,10 +77,10 @@ async function respondToInteraction(
   await safeInteractionReply(interaction, replyPayload);
 }
 
-async function deferIfNeeded(interaction: ChatInputCommandInteraction): Promise<void> {
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply();
-  }
+async function deferIfNeeded(
+  interaction: ChatInputCommandInteraction
+): Promise<boolean> {
+  return safeInteractionDefer(interaction);
 }
 
 function formatScore(value: number): string {
@@ -338,7 +342,9 @@ export const tournamentCommand: Command = {
           await respondToInteraction(interaction, "Invalid page.");
           return;
         }
-        await interaction.deferReply();
+        if (!(await deferIfNeeded(interaction))) {
+          return;
+        }
         const paginationIds = buildPaginationIds("tournament_history", interaction.id);
         const history = await context.services.tournaments.getHistoryPage(
           guildId,
@@ -550,7 +556,9 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "status") {
-        await interaction.deferReply();
+        if (!(await deferIfNeeded(interaction))) {
+          return;
+        }
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
           const lobby = await context.services.tournaments.getLobby(guildId);
@@ -756,7 +764,9 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "advance") {
-        await interaction.deferReply();
+        if (!(await deferIfNeeded(interaction))) {
+          return;
+        }
         const result = await context.services.tournaments.advanceTournament(
           guildId,
           context.client
@@ -807,7 +817,9 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "cancel") {
-        await deferIfNeeded(interaction);
+        if (!(await deferIfNeeded(interaction))) {
+          return;
+        }
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (!tournament) {
           const lobby = await context.services.tournaments.getLobby(guildId);
@@ -907,7 +919,9 @@ export const tournamentCommand: Command = {
           return;
         }
 
-        await interaction.deferReply();
+        if (!(await deferIfNeeded(interaction))) {
+          return;
+        }
         const existing = await context.services.tournaments.getActiveTournament(guildId);
         if (existing) {
           await interaction.editReply("An active tournament already exists for this server.");
@@ -965,7 +979,9 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "join") {
-        await deferIfNeeded(interaction);
+        if (!(await deferIfNeeded(interaction))) {
+          return;
+        }
         const tournament = await context.services.tournaments.getActiveTournament(guildId);
         if (tournament) {
           await respondToInteraction(
@@ -1018,7 +1034,9 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "leave") {
-        await deferIfNeeded(interaction);
+        if (!(await deferIfNeeded(interaction))) {
+          return;
+        }
         const lobby = await context.services.tournaments.getLobby(guildId);
         if (!lobby) {
           await respondToInteraction(interaction, "No tournament lobby is open.");
@@ -1043,7 +1061,9 @@ export const tournamentCommand: Command = {
       }
 
       if (subcommand === "start") {
-        await deferIfNeeded(interaction);
+        if (!(await deferIfNeeded(interaction))) {
+          return;
+        }
         const lobby = await context.services.tournaments.getLobby(guildId);
         if (!lobby) {
           await respondToInteraction(interaction, "No tournament lobby is open.");

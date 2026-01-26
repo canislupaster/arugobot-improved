@@ -2,6 +2,7 @@ import {
   resolveBoundedIntegerOption,
   resolveHandleUserOptions,
   resolveTargetLabels,
+  safeInteractionDefer,
   safeInteractionEdit,
   safeInteractionReply,
 } from "../../src/utils/interaction.js";
@@ -60,6 +61,7 @@ describe("safe interaction helpers", () => {
       reply: jest.fn().mockResolvedValue(undefined),
       followUp: jest.fn().mockResolvedValue(undefined),
       editReply: jest.fn().mockResolvedValue(undefined),
+      deferReply: jest.fn().mockResolvedValue(undefined),
       ...overrides,
     }) as unknown as { [key: string]: unknown };
 
@@ -89,6 +91,32 @@ describe("safe interaction helpers", () => {
     await expect(safeInteractionEdit(interaction as never, "Nope")).resolves.toBe(false);
 
     expect(interaction.editReply).toHaveBeenCalledWith("Nope");
+  });
+
+  it("defers replies when not already acknowledged", async () => {
+    const interaction = createInteraction();
+
+    await expect(safeInteractionDefer(interaction as never)).resolves.toBe(true);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith(undefined);
+  });
+
+  it("returns true without deferring when already replied", async () => {
+    const interaction = createInteraction({ replied: true });
+
+    await expect(safeInteractionDefer(interaction as never)).resolves.toBe(true);
+
+    expect(interaction.deferReply).not.toHaveBeenCalled();
+  });
+
+  it("returns false for ignorable defer errors", async () => {
+    const interaction = createInteraction({
+      deferReply: jest.fn().mockRejectedValue(new Error("Interaction has already been acknowledged")),
+    });
+
+    await expect(safeInteractionDefer(interaction as never)).resolves.toBe(false);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
   });
 });
 
