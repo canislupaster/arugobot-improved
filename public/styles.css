@@ -311,6 +311,15 @@ tbody tr:hover {
   font-size: 0.85rem;
 }
 
+.code-block {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
 .leaderboard {
   list-style: none;
   display: grid;

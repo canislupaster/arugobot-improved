@@ -328,12 +328,16 @@ export function createWebApp({ website, client }: WebAppContext) {
 
   app.get("/status", async (c) => {
     const cacheEntries = await website.getCacheStatus();
-    return c.html(renderStatusPage({ generatedAt: new Date().toISOString(), cacheEntries }));
+    const tokenUsage = website.getTokenUsageSnapshot();
+    return c.html(
+      renderStatusPage({ generatedAt: new Date().toISOString(), cacheEntries, tokenUsage })
+    );
   });
 
   app.get("/status.json", async (c) => {
     const cacheEntries = await website.getCacheStatus();
-    return c.json({ generatedAt: new Date().toISOString(), cacheEntries });
+    const tokenUsage = website.getTokenUsageSnapshot();
+    return c.json({ generatedAt: new Date().toISOString(), cacheEntries, tokenUsage });
   });
 
   app.get("/healthz", async (c) => {

@@ -16,6 +16,7 @@ export type AppConfig = {
   logRetentionDays: number;
   databaseBackupDir?: string;
   databaseBackupRetentionDays: number;
+  codexLogPath?: string;
   webHost: string;
   webPort: number;
   webPublicUrl?: string;
@@ -63,6 +64,9 @@ export function validateConfig(config: AppConfig): string[] {
   }
   if (config.proxyFetchUrl && !isValidUrl(config.proxyFetchUrl)) {
     errors.push("PROXY_FETCH_URL must be a valid http(s) URL.");
+  }
+  if (config.codexLogPath !== undefined && !config.codexLogPath) {
+    errors.push("CODEX_LOG_PATH must be a non-empty path when set.");
   }
   if (!Number.isFinite(config.logRetentionDays) || config.logRetentionDays < 0) {
     errors.push("LOG_RETENTION_DAYS must be 0 or greater.");
@@ -112,6 +116,7 @@ export function loadConfig(): AppConfig {
     process.env.DATABASE_BACKUP_RETENTION_DAYS ?? "7",
     7
   );
+  const codexLogPath = process.env.CODEX_LOG_PATH?.trim() || undefined;
   const webHost = process.env.WEB_HOST?.trim() || "0.0.0.0";
   const webPort = parseNumber(process.env.WEB_PORT ?? "8787", 8787);
   const webPublicUrlRaw = process.env.WEB_PUBLIC_URL?.trim();
@@ -131,6 +136,7 @@ export function loadConfig(): AppConfig {
     logRetentionDays,
     databaseBackupDir,
     databaseBackupRetentionDays,
+    codexLogPath,
     webHost,
     webPort,
     webPublicUrl,

@@ -93,6 +93,10 @@ describe("healthCommand", () => {
           getSubscriptionCount: jest.fn().mockResolvedValue(0),
           getLastError: jest.fn().mockReturnValue(null),
         },
+        tokenUsage: {
+          getSnapshot: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
       },
     } as unknown as CommandContext;
 

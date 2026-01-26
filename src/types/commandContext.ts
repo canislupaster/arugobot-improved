@@ -18,6 +18,7 @@ import type { PracticeSuggestionService } from "../services/practiceSuggestions.
 import type { ProblemService } from "../services/problems.js";
 import type { RatingChangesService } from "../services/ratingChanges.js";
 import type { StoreService } from "../services/store.js";
+import type { TokenUsageService } from "../services/tokenUsage.js";
 import type { TournamentRecapService } from "../services/tournamentRecaps.js";
 import type { TournamentService } from "../services/tournaments.js";
 import type { WeeklyDigestService } from "../services/weeklyDigest.js";
@@ -48,6 +49,7 @@ export type CommandContext = {
     problems: ProblemService;
     ratingChanges: RatingChangesService;
     store: StoreService;
+    tokenUsage: TokenUsageService;
     tournamentRecaps: TournamentRecapService;
     tournaments: TournamentService;
     weeklyDigest: WeeklyDigestService;

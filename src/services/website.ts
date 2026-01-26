@@ -9,6 +9,7 @@ import type { ContestActivityService } from "./contestActivity.js";
 import type { Contest, ContestService } from "./contests.js";
 import type { GuildSettingsService } from "./guildSettings.js";
 import type { StoreService } from "./store.js";
+import type { TokenUsageSnapshot, TokenUsageService } from "./tokenUsage.js";
 import type { TournamentRecap, TournamentService } from "./tournaments.js";
 
 type ServerStats = Awaited<ReturnType<StoreService["getServerStats"]>>;
@@ -46,6 +47,7 @@ export type GlobalOverview = {
       gym: { contestCount: number; participantCount: number; lastContestAt: number | null };
     };
   };
+  tokenUsage: TokenUsageSnapshot | null;
 };
 
 export type GuildSummary = {
@@ -178,6 +180,7 @@ function buildEmptyGlobalOverview(): GlobalOverview {
     lastTournamentAt: null,
     contestRatingAlerts: buildEmptyContestRatingAlerts(),
     contestActivity: buildEmptyContestActivity(DEFAULT_CONTEST_ACTIVITY_DAYS),
+    tokenUsage: null,
   };
 }
 
@@ -185,6 +188,7 @@ export class WebsiteService {
   private readonly contests: ContestService | null;
   private readonly codeforces: CodeforcesClient | null;
   private readonly tournaments: Pick<TournamentService, "getRecap"> | null;
+  private readonly tokenUsage: TokenUsageService | null;
 
   constructor(
     private readonly db: Kysely<Database>,
@@ -195,11 +199,13 @@ export class WebsiteService {
       codeforces?: CodeforcesClient | null;
       contests?: ContestService | null;
       tournaments?: Pick<TournamentService, "getRecap"> | null;
+      tokenUsage?: TokenUsageService | null;
     } = {}
   ) {
     this.codeforces = options.codeforces ?? null;
     this.contests = options.contests ?? null;
     this.tournaments = options.tournaments ?? null;
+    this.tokenUsage = options.tokenUsage ?? null;
   }
 
   private async getPublicGuildStatus(
@@ -252,7 +258,10 @@ export class WebsiteService {
     try {
       const publicGuildIds = await this.settings.listPublicGuildIds();
       if (publicGuildIds.length === 0) {
-        return buildEmptyGlobalOverview();
+        return {
+          ...buildEmptyGlobalOverview(),
+          tokenUsage: this.tokenUsage?.getSnapshot() ?? null,
+        };
       }
 
       const guildCountRow = await this.db
@@ -330,11 +339,16 @@ export class WebsiteService {
         lastTournamentAt: lastTournamentRow?.last ?? null,
         contestRatingAlerts,
         contestActivity,
+        tokenUsage: this.tokenUsage?.getSnapshot() ?? null,
       };
     } catch (error) {
       logError(`Database error (global overview): ${String(error)}`);
       return buildEmptyGlobalOverview();
     }
+  }
+
+  getTokenUsageSnapshot(): TokenUsageSnapshot | null {
+    return this.tokenUsage?.getSnapshot() ?? null;
   }
 
   private async getContestRatingAlertOverview(
@@ -659,6 +673,7 @@ export class WebsiteService {
       lastSuccessAt: string | null;
       lastError: { message: string; endpoint: string; timestamp: string } | null;
     };
+    tokenUsage: TokenUsageSnapshot | null;
     status: "ok" | "degraded";
   }> {
     const generatedAt = new Date().toISOString();
@@ -679,6 +694,7 @@ export class WebsiteService {
       dbOk,
       cacheEntries,
       codeforces: { lastSuccessAt, lastError },
+      tokenUsage: this.tokenUsage?.getSnapshot() ?? null,
       status,
     };
   }

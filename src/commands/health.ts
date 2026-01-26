@@ -11,6 +11,12 @@ import { getLastError } from "../utils/logger.js";
 
 import type { Command } from "./types.js";
 
+const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+
+function formatNumber(value: number): string {
+  return numberFormatter.format(value);
+}
+
 export const healthCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("health")
@@ -40,6 +46,8 @@ export const healthCommand: Command = {
     const contestLastError = context.services.contests.getLastError();
     const contestRatingChangesLastError = context.services.contestRatingChanges.getLastError();
     const ratingChangesLastError = context.services.ratingChanges.getLastError();
+    const tokenSnapshot = context.services.tokenUsage.getSnapshot();
+    const tokenLastError = context.services.tokenUsage.getLastError();
     const webStatus = context.webStatus;
     const webPort =
       webStatus.actualPort ?? (webStatus.requestedPort === 0 ? null : webStatus.requestedPort);
@@ -132,6 +140,21 @@ export const healthCommand: Command = {
         { name: "Bot version", value: process.env.npm_package_version ?? "unknown", inline: true },
       ]);
 
+    if (tokenSnapshot) {
+      const tokenLines = [
+        `Total: ${formatNumber(tokenSnapshot.totalTokens)}`,
+        `Energy: ${formatNumber(tokenSnapshot.impact.energyKwh)} kWh`,
+        `Water: ${formatNumber(tokenSnapshot.impact.waterLiters)} L`,
+        `Carbon: ${formatNumber(tokenSnapshot.impact.carbonKg)} kg CO2e`,
+        tokenSnapshot.lastUpdatedAt ? `Updated: ${tokenSnapshot.lastUpdatedAt}` : null,
+      ].filter(Boolean);
+      embed.addFields({
+        name: "Token estimates",
+        value: tokenLines.join("\n"),
+        inline: false,
+      });
+    }
+
     if (lastCommandAt) {
       embed.addFields({ name: "Last command", value: lastCommandAt, inline: true });
     }
@@ -162,6 +185,7 @@ export const healthCommand: Command = {
       { name: "Tournament last error", value: tournamentLastError },
       { name: "Tournament recaps last error", value: recapLastError },
       { name: "DB backups last error", value: backupLastError },
+      { name: "Token usage last error", value: tokenLastError },
     ];
 
     for (const entry of errorFields) {

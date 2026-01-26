@@ -172,6 +172,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
   Shows standings for linked users (or specified handles) in a contest.
   Use `latest` to target the most recent finished contest.
+  Use `include_practice` to include practice submissions in the standings.
 
 - **/contestchanges** `query` `[limit]` `[user1..user4]` `[handles]` `[scope]`
 
@@ -252,6 +253,7 @@ Optional environment variables:
 - `LOG_RETENTION_DAYS` (default `30`, set `0` to disable log cleanup)
 - `DATABASE_BACKUP` (directory for automated backups, disabled if unset)
 - `DATABASE_BACKUP_RETENTION_DAYS` (default `7`, set `0` to keep all backups)
+- `CODEX_LOG_PATH` (path to the Codex log file for token usage estimates, e.g. `../codex.log`)
 - `WEB_HOST` (default `0.0.0.0`)
 - `WEB_PORT` (default `8787`, set `0` to bind a random open port)
 - `WEB_PUBLIC_URL` (optional, e.g. `https://bot.example.com`, used for `/dashboard` links)
@@ -287,6 +289,24 @@ at `/guilds/:guildId/tournaments/:tournamentId` (with rounds, match results, and
 `/api/overview` returns the global snapshot and public guild summaries as JSON, and
 `/api/guilds/:guildId` returns the per-guild overview payload (respecting the public dashboard setting).
 `/healthz` returns JSON with a quick DB + Codeforces check plus cache status (useful for uptime monitors).
+
+## Token usage estimates
+
+If `CODEX_LOG_PATH` is set, the bot periodically scans the log for token totals and reports
+approximate energy, water, and carbon estimates (GPT-5 medium assumptions) in `/health` and
+the `/status` dashboard page.
+
+```
+@misc{jegham2025hungryaibenchmarkingenergy,
+      title={How Hungry is AI? Benchmarking Energy, Water, and Carbon Footprint of LLM Inference},
+      author={Nidhal Jegham and Marwan Abdelatti and Chan Young Koh and Lassad Elmoubarki and Abdeltawab Hendawi},
+      year={2025},
+      eprint={2505.09598},
+      archivePrefix={arXiv},
+      primaryClass={cs.CY},
+      url={https://arxiv.org/abs/2505.09598},
+}
+```
 
 ## Deployment (Supervisor + Caddy)
 

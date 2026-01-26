@@ -104,6 +104,7 @@ export type StatusViewModel = {
     lastFetched: string | null;
     ageSeconds: number | null;
   }>;
+  tokenUsage: GlobalOverview["tokenUsage"];
 };
 
 type InlineText = HtmlEscapedString | string | Promise<HtmlEscapedString>;
@@ -113,12 +114,35 @@ type UpcomingContestEntry = UpcomingContestsOverview["official"][number];
 const numberFormatter = new Intl.NumberFormat("en-US");
 const defaultDescription =
   "ArugoBot keeps Codeforces practice on track with challenges, tournaments, reminders, and stats.";
+const BIBTEX_CITATION = `@misc{jegham2025hungryaibenchmarkingenergy,
+  title={How Hungry is AI? Benchmarking Energy, Water, and Carbon Footprint of LLM Inference},
+  author={Nidhal Jegham and Marwan Abdelatti and Chan Young Koh and Lassad Elmoubarki and Abdeltawab Hendawi},
+  year={2025},
+  eprint={2505.09598},
+  archivePrefix={arXiv},
+  primaryClass={cs.CY},
+  url={https://arxiv.org/abs/2505.09598},
+}`;
 
 function formatNumber(value: number | null): string {
   if (value === null || !Number.isFinite(value)) {
     return "N/A";
   }
   return numberFormatter.format(value);
+}
+
+function formatTokenValue(value: number | null): string {
+  if (value === null) {
+    return "Disabled";
+  }
+  return formatNumber(value);
+}
+
+function formatImpactValue(value: number | null): string {
+  if (value === null) {
+    return "N/A";
+  }
+  return formatNumber(value);
 }
 
 function formatStreakValue(value: number): string {
@@ -568,6 +592,28 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
               Last fetched:{" "}
               {renderLocalTime(model.global.contestRatingAlerts.cacheLastFetched)}
             </>
+          }
+        />
+        <StatCard
+          label="Token total"
+          value={<span>{formatTokenValue(model.global.tokenUsage?.totalTokens ?? null)}</span>}
+        />
+        <StatCard
+          label="Energy estimate (kWh)"
+          value={
+            <span>{formatImpactValue(model.global.tokenUsage?.impact.energyKwh ?? null)}</span>
+          }
+        />
+        <StatCard
+          label="Water estimate (L)"
+          value={
+            <span>{formatImpactValue(model.global.tokenUsage?.impact.waterLiters ?? null)}</span>
+          }
+        />
+        <StatCard
+          label="Carbon estimate (kg CO2e)"
+          value={
+            <span>{formatImpactValue(model.global.tokenUsage?.impact.carbonKg ?? null)}</span>
           }
         />
       </section>
@@ -1060,6 +1106,8 @@ export function renderTournamentPage(model: TournamentViewModel): ViewResult {
 }
 
 export function renderStatusPage(model: StatusViewModel): ViewResult {
+  const tokenUsage = model.tokenUsage;
+  const tokenAssumptions = tokenUsage?.impact.assumptions ?? null;
   return (
     <Layout title="ArugoBot | Status" description="Diagnostics for Codeforces cache health.">
       <section class="hero compact">
@@ -1096,6 +1144,45 @@ export function renderStatusPage(model: StatusViewModel): ViewResult {
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="card">
+          <SectionHeader
+            title="Token usage estimates"
+            subtitle="Approximate footprint based on GPT-5 (medium) estimates."
+          />
+          <div class="stats-grid">
+            <StatCard
+              label="Token total"
+              value={<span>{formatTokenValue(tokenUsage?.totalTokens ?? null)}</span>}
+              hint={tokenUsage?.lastUpdatedAt ? `Updated ${tokenUsage.lastUpdatedAt}` : undefined}
+            />
+            <StatCard
+              label="Energy estimate (kWh)"
+              value={<span>{formatImpactValue(tokenUsage?.impact.energyKwh ?? null)}</span>}
+            />
+            <StatCard
+              label="Water estimate (L)"
+              value={<span>{formatImpactValue(tokenUsage?.impact.waterLiters ?? null)}</span>}
+            />
+            <StatCard
+              label="Carbon estimate (kg CO2e)"
+              value={<span>{formatImpactValue(tokenUsage?.impact.carbonKg ?? null)}</span>}
+            />
+          </div>
+          {tokenAssumptions ? (
+            <div class="muted">
+              Assumptions: {tokenAssumptions.model} • {tokenAssumptions.energyWhPerQuery} Wh per
+              query • {tokenAssumptions.latencySeconds}s @ {tokenAssumptions.tokensPerSecond} TPS •
+              {tokenAssumptions.wueSourceLitersPerKwh} L/kWh •{" "}
+              {tokenAssumptions.carbonKgPerKwh} kgCO2/kWh
+              <pre class="code-block">{BIBTEX_CITATION}</pre>
+            </div>
+          ) : (
+            <div class="muted">Set CODEX_LOG_PATH to enable token usage estimates.</div>
+          )}
         </div>
       </section>
     </Layout>

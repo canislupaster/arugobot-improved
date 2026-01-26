@@ -36,6 +36,7 @@ import { createRequestPool } from "./services/requestPool.js";
 import { StoreService } from "./services/store.js";
 import { TournamentRecapService } from "./services/tournamentRecaps.js";
 import { TournamentService, tournamentArenaIntervalMs } from "./services/tournaments.js";
+import { TokenUsageService } from "./services/tokenUsage.js";
 import { WebsiteService } from "./services/website.js";
 import { WeeklyDigestService, weeklyDigestIntervalMs } from "./services/weeklyDigest.js";
 import type { WebServerStatus } from "./types/webStatus.js";
@@ -81,6 +82,7 @@ async function main() {
     config.databaseBackupDir ?? null,
     config.databaseBackupRetentionDays
   );
+  const tokenUsage = new TokenUsageService(config.codexLogPath ?? null);
   const metrics = new MetricsService(db);
   const contestReminders = new ContestReminderService(db, contests);
   const problems = new ProblemService(codeforces, cache);
@@ -106,6 +108,7 @@ async function main() {
     codeforces,
     contests,
     tournaments,
+    tokenUsage,
   });
 
   const commandSummaries = commandList.map((command) => ({
@@ -134,6 +137,7 @@ async function main() {
   let logCleanupInterval: NodeJS.Timeout | null = null;
   let weeklyDigestInterval: NodeJS.Timeout | null = null;
   let databaseBackupInterval: NodeJS.Timeout | null = null;
+  let tokenUsageInterval: NodeJS.Timeout | null = null;
   let webServer: ServerType | null = null;
   let shuttingDown = false;
   let isChallengeTicking = false;
@@ -351,6 +355,7 @@ async function main() {
         problems,
         ratingChanges,
         store,
+        tokenUsage,
         tournamentRecaps,
         tournaments,
         weeklyDigest,
@@ -402,6 +407,9 @@ async function main() {
     if (databaseBackupInterval) {
       clearInterval(databaseBackupInterval);
     }
+    if (tokenUsageInterval) {
+      clearInterval(tokenUsageInterval);
+    }
     if (webServer) {
       await new Promise<void>((resolve) => {
         webServer?.close(() => resolve());
@@ -446,6 +454,10 @@ async function main() {
   if (config.databaseBackupDir) {
     await runDatabaseBackup();
     databaseBackupInterval = setInterval(runDatabaseBackup, databaseBackupIntervalMs);
+  }
+  if (config.codexLogPath) {
+    await tokenUsage.refresh();
+    tokenUsageInterval = setInterval(() => tokenUsage.refresh(), 60 * 1000);
   }
 
   await validateConnectivity();
