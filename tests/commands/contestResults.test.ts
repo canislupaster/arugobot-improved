@@ -3,7 +3,12 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { contestResultsCommand } from "../../src/commands/contestResults.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (query: string, handles?: string, scope?: string) =>
+const createInteraction = (
+  query: string,
+  handles?: string,
+  scope?: string,
+  includePractice?: boolean
+) =>
   ({
     options: {
       getString: jest.fn((name: string) => {
@@ -19,6 +24,12 @@ const createInteraction = (query: string, handles?: string, scope?: string) =>
         return null;
       }),
       getInteger: jest.fn().mockReturnValue(null),
+      getBoolean: jest.fn((name: string) => {
+        if (name === "include_practice") {
+          return includePractice ?? null;
+        }
+        return null;
+      }),
       getUser: jest.fn().mockReturnValue(null),
     },
     user: { id: "user-1" },
@@ -94,6 +105,12 @@ describe("contestResultsCommand", () => {
 
     await contestResultsCommand.execute(interaction, context);
 
+    expect(context.services.contestStandings.getStandings).toHaveBeenCalledWith(
+      1234,
+      expect.arrayContaining(["tourist", "petr"]),
+      "FINISHED",
+      false
+    );
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     const embed = payload.embeds[0].data;
     expect(embed.title).toContain("Contest results");
@@ -102,6 +119,127 @@ describe("contestResultsCommand", () => {
     );
     expect(standingsField?.value).toContain("tourist");
     expect(standingsField?.value).toContain("petr");
+  });
+
+  it("filters practice results by default", async () => {
+    const interaction = createInteraction("1234", "tourist,practice");
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({ exists: true, canonicalHandle: null }),
+        },
+        contestStandings: {
+          getStandings: jest.fn().mockResolvedValue({
+            entries: [
+              {
+                handle: "tourist",
+                rank: 1,
+                points: 100,
+                penalty: 0,
+                participantType: "CONTESTANT",
+              },
+              {
+                handle: "practice",
+                rank: 0,
+                points: 1,
+                penalty: 99,
+                participantType: "PRACTICE",
+              },
+            ],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestResultsCommand.execute(interaction, context);
+
+    expect(context.services.contestStandings.getStandings).toHaveBeenCalledWith(
+      1234,
+      expect.arrayContaining(["tourist", "practice"]),
+      "FINISHED",
+      false
+    );
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0].data;
+    const standingsField = embed.fields?.find(
+      (field: { name: string; value: string }) => field.name === "Standings"
+    );
+    expect(standingsField?.value).toContain("tourist");
+    expect(standingsField?.value).not.toContain("practice");
+  });
+
+  it("includes practice results when requested", async () => {
+    const interaction = createInteraction("1234", "tourist,practice", undefined, true);
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({ exists: true, canonicalHandle: null }),
+        },
+        contestStandings: {
+          getStandings: jest.fn().mockResolvedValue({
+            entries: [
+              {
+                handle: "tourist",
+                rank: 1,
+                points: 100,
+                penalty: 0,
+                participantType: "CONTESTANT",
+              },
+              {
+                handle: "practice",
+                rank: 0,
+                points: 1,
+                penalty: 99,
+                participantType: "PRACTICE",
+              },
+            ],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestResultsCommand.execute(interaction, context);
+
+    expect(context.services.contestStandings.getStandings).toHaveBeenCalledWith(
+      1234,
+      expect.arrayContaining(["tourist", "practice"]),
+      "FINISHED",
+      true
+    );
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0].data;
+    const standingsField = embed.fields?.find(
+      (field: { name: string; value: string }) => field.name === "Standings"
+    );
+    expect(standingsField?.value).toContain("practice");
   });
 
   it("uses the latest finished contest when requested", async () => {

@@ -65,10 +65,16 @@ export const contestResultsCommand: Command = {
     .addStringOption((option) =>
       option.setName("handles").setDescription("Comma or space separated handles to include")
     )
+    .addBooleanOption((option) =>
+      option
+        .setName("include_practice")
+        .setDescription("Include practice submissions in the standings")
+    )
     .addStringOption((option) => addContestScopeOption(option)),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
+    const includePractice = interaction.options.getBoolean("include_practice") ?? false;
     const scope = parseContestScope(interaction.options.getString("scope"));
     const handleInputs = parseHandleList(handlesRaw);
     const userOptions = getUserOptions([
@@ -157,11 +163,15 @@ export const contestResultsCommand: Command = {
       const standings = await context.services.contestStandings.getStandings(
         contest.id,
         targetList.map((target) => target.handle),
-        contest.phase
+        contest.phase,
+        includePractice
       );
 
+      const standingsEntries = includePractice
+        ? standings.entries
+        : standings.entries.filter((entry) => entry.participantType !== "PRACTICE");
       const entryMap = new Map(
-        standings.entries.map((entry) => [entry.handle.toLowerCase(), entry])
+        standingsEntries.map((entry) => [entry.handle.toLowerCase(), entry])
       );
 
       const found: Array<

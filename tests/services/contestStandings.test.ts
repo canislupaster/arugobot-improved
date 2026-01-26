@@ -132,6 +132,19 @@ describe("ContestStandingsService", () => {
     expect(client.request).toHaveBeenCalledWith("contest.standings", {
       contestId: 101,
       handles: "Tourist;Petr",
+      showUnofficial: false,
+    });
+  });
+
+  it("allows unofficial standings when requested", async () => {
+    client.request.mockResolvedValue({ rows: [] });
+    const service = new ContestStandingsService(db, client);
+
+    await service.getStandings(202, ["tourist"], "CODING", true);
+
+    expect(client.request).toHaveBeenCalledWith("contest.standings", {
+      contestId: 202,
+      handles: "tourist",
       showUnofficial: true,
     });
   });

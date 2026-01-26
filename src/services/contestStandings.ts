@@ -49,12 +49,13 @@ function getCacheTtl(phase?: Contest["phase"]): number {
   return DEFAULT_CACHE_TTL_MS;
 }
 
-export function hashHandles(handles: string[]): string {
+export function hashHandles(handles: string[], showUnofficial = false): string {
   const normalized = handles
     .map((handle) => normalizeHandleKey(handle))
     .filter(Boolean)
     .sort();
-  return createHash("sha1").update(normalized.join("|")).digest("hex");
+  const payload = `${normalized.join("|")}|unofficial:${showUnofficial ? "1" : "0"}`;
+  return createHash("sha1").update(payload).digest("hex");
 }
 
 function dedupeHandles(handles: string[]): string[] {
@@ -124,14 +125,15 @@ export class ContestStandingsService {
   async getStandings(
     contestId: number,
     handles: string[],
-    phase?: Contest["phase"]
+    phase?: Contest["phase"],
+    showUnofficial = false
   ): Promise<ContestStandingsResult> {
     const uniqueHandles = dedupeHandles(handles);
     if (uniqueHandles.length === 0) {
       return { entries: [], source: "cache", isStale: false };
     }
 
-    const handlesHash = hashHandles(uniqueHandles);
+    const handlesHash = hashHandles(uniqueHandles, showUnofficial);
     const ttlMs = getCacheTtl(phase);
     const cached = await this.getCache(contestId, handlesHash);
     if (cached && isCacheFresh(cached.lastFetched, ttlMs)) {
@@ -142,7 +144,7 @@ export class ContestStandingsService {
       const response = await this.client.request<ContestStandingsResponse>("contest.standings", {
         contestId,
         handles: uniqueHandles.join(";"),
-        showUnofficial: true,
+        showUnofficial,
       });
       const entries = mapEntries(response.rows);
       await this.setCache(contestId, handlesHash, uniqueHandles, entries);
