@@ -230,7 +230,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 - **/digest** `set|status|clear|preview|post`
 
   Configure a weekly digest for the server (admin only). Use `set` to choose a channel, day, time, optional `utc_offset`, and optional role mention.
-  Digests include challenge activity, contest participation, and rating delta highlights.
+  Digests include challenge activity, top contests by participation, and rating delta highlights.
   Use `post` to send a digest immediately (optionally `force` to send even if one was already posted this week).
 
 ## Installation

@@ -452,6 +452,24 @@ export class WeeklyDigestService {
       inline: false,
     });
 
+    if (contestActivity.topContests.length > 0) {
+      const lines = contestActivity.topContests
+        .map((contest, index) => {
+          const scopeLabel = contest.scope === "gym" ? " [Gym]" : "";
+          return `${index + 1}. ${contest.contestName}${scopeLabel} • ${
+            contest.participantCount
+          } participants • ${formatDiscordRelativeTime(contest.ratingUpdateTimeSeconds)}`;
+        })
+        .join("\n");
+      embed.addFields({ name: "Top contests", value: lines, inline: false });
+    } else {
+      embed.addFields({
+        name: "Top contests",
+        value: "No contest participation recorded.",
+        inline: false,
+      });
+    }
+
     const ratingLines = [
       `Rated contests: ${ratingSummary.contestCount}`,
       `Participants: ${ratingSummary.participantCount}`,

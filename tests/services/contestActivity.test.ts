@@ -116,6 +116,11 @@ describe("ContestActivityService", () => {
     expect(activity.byScope.gym.participantCount).toBe(1);
     expect(activity.byScope.official.lastContestAt).toBe(nowSeconds - 1800);
     expect(activity.byScope.gym.lastContestAt).toBe(nowSeconds - 7200);
+    expect(activity.topContests[0]).toMatchObject({
+      contestId: 1000,
+      contestName: "Contest A",
+      participantCount: 2,
+    });
     expect(activity.participants[0]?.handle).toBe("Alice");
     expect(activity.participants[0]?.contestCount).toBe(2);
     expect(activity.participants[0]?.officialCount).toBe(1);
@@ -201,6 +206,7 @@ describe("ContestActivityService", () => {
     expect(activity.participantCount).toBe(0);
     expect(activity.byScope.official.contestCount).toBe(0);
     expect(activity.byScope.gym.contestCount).toBe(0);
+    expect(activity.topContests).toEqual([]);
     expect(activity.participants).toEqual([]);
 
     await db.destroy();

@@ -15,6 +15,7 @@ export type ContestActivitySummary = {
   lookbackDays: number;
   contestCount: number;
   participantCount: number;
+  topContests: ContestParticipationSummary[];
   recentContests: Array<{
     contestId: number;
     contestName: string;
@@ -22,6 +23,14 @@ export type ContestActivitySummary = {
     scope: ContestScope;
   }>;
   byScope: ContestScopeBreakdown;
+};
+
+export type ContestParticipationSummary = {
+  contestId: number;
+  contestName: string;
+  participantCount: number;
+  ratingUpdateTimeSeconds: number;
+  scope: ContestScope;
 };
 
 export type ContestParticipantSummary = {
@@ -76,6 +85,7 @@ export type ContestScopeBreakdown = {
 
 const DEFAULT_LOOKBACK_DAYS = 90;
 const DEFAULT_RECENT_LIMIT = 4;
+const DEFAULT_TOP_CONTEST_LIMIT = 3;
 const DEFAULT_DELTA_LIMIT = 3;
 const MAX_REFRESH_HANDLES = 500;
 
@@ -202,10 +212,12 @@ export class ContestActivityService {
       lookbackDays?: number;
       recentLimit?: number;
       participantLimit?: number;
+      topContestLimit?: number;
     }
   ): Promise<GuildContestActivity> {
     const lookbackDays = options?.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
     const recentLimit = Math.max(1, options?.recentLimit ?? DEFAULT_RECENT_LIMIT);
+    const topContestLimit = Math.max(1, options?.topContestLimit ?? DEFAULT_TOP_CONTEST_LIMIT);
     const participantLimit = options?.participantLimit ?? null;
     const { handles, rosterMap } = this.buildRosterLookup(roster);
     if (handles.length === 0) {
@@ -213,6 +225,7 @@ export class ContestActivityService {
         lookbackDays,
         contestCount: 0,
         participantCount: 0,
+        topContests: [],
         recentContests: [],
         byScope: createScopeBreakdown(),
         participants: [],
@@ -235,6 +248,7 @@ export class ContestActivityService {
       >();
       const scopeStats = createScopeStats();
       const participants = new Map<string, ContestParticipantSummary>();
+      const contestParticipantCounts = new Map<number, number>();
 
       for (const row of rows) {
         const rosterEntry = rosterMap.get(row.handle);
@@ -279,6 +293,12 @@ export class ContestActivityService {
         }
 
         if (contestIds.size > 0) {
+          for (const contestId of contestIds) {
+            contestParticipantCounts.set(
+              contestId,
+              (contestParticipantCounts.get(contestId) ?? 0) + 1
+            );
+          }
           participants.set(row.handle, {
             userId: rosterEntry.userId,
             handle: rosterEntry.handle,
@@ -295,6 +315,31 @@ export class ContestActivityService {
       if (participantLimit && participantLimit > 0) {
         participantList = participantList.slice(0, participantLimit);
       }
+      const topContests = Array.from(contestParticipantCounts.entries())
+        .map(([contestId, participantCount]) => {
+          const contest = contestMap.get(contestId);
+          if (!contest) {
+            return null;
+          }
+          return {
+            contestId,
+            contestName: contest.contestName,
+            participantCount,
+            ratingUpdateTimeSeconds: contest.ratingUpdateTimeSeconds,
+            scope: contest.scope,
+          };
+        })
+        .filter((contest): contest is ContestParticipationSummary => Boolean(contest))
+        .sort((a, b) => {
+          if (b.participantCount !== a.participantCount) {
+            return b.participantCount - a.participantCount;
+          }
+          if (b.ratingUpdateTimeSeconds !== a.ratingUpdateTimeSeconds) {
+            return b.ratingUpdateTimeSeconds - a.ratingUpdateTimeSeconds;
+          }
+          return a.contestName.localeCompare(b.contestName);
+        })
+        .slice(0, topContestLimit);
       const recentContests = Array.from(contestMap.values())
         .sort((a, b) => b.ratingUpdateTimeSeconds - a.ratingUpdateTimeSeconds)
         .slice(0, recentLimit);
@@ -304,6 +349,7 @@ export class ContestActivityService {
         lookbackDays,
         contestCount: contestMap.size,
         participantCount,
+        topContests,
         recentContests,
         byScope,
         participants: participantList,
@@ -314,6 +360,7 @@ export class ContestActivityService {
         lookbackDays,
         contestCount: 0,
         participantCount: 0,
+        topContests: [],
         recentContests: [],
         byScope: createScopeBreakdown(),
         participants: [],

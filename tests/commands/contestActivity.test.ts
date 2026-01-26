@@ -49,6 +49,15 @@ describe("contestActivityCommand", () => {
             lookbackDays: 90,
             contestCount: 2,
             participantCount: 2,
+            topContests: [
+              {
+                contestId: 1000,
+                contestName: "Contest A",
+                participantCount: 2,
+                ratingUpdateTimeSeconds: Math.floor(Date.now() / 1000),
+                scope: "official",
+              },
+            ],
             recentContests: [
               {
                 contestId: 1000,
@@ -91,6 +100,7 @@ describe("contestActivityCommand", () => {
     const fields = embed.data.fields ?? [];
     const fieldText = JSON.stringify(fields);
     expect(fieldText).toContain("Top participants");
+    expect(fieldText).toContain("Top contests");
     expect(fieldText).toContain("user-1");
     expect(fieldText).toContain("Contest A");
   });
@@ -114,6 +124,22 @@ describe("contestActivityCommand", () => {
             lookbackDays: 90,
             contestCount: 2,
             participantCount: 2,
+            topContests: [
+              {
+                contestId: 1000,
+                contestName: "Contest A",
+                participantCount: 1,
+                ratingUpdateTimeSeconds: Math.floor(Date.now() / 1000),
+                scope: "official",
+              },
+              {
+                contestId: 1001,
+                contestName: "Contest B",
+                participantCount: 1,
+                ratingUpdateTimeSeconds: Math.floor(Date.now() / 1000),
+                scope: "gym",
+              },
+            ],
             recentContests: [
               {
                 contestId: 1000,
@@ -169,6 +195,7 @@ describe("contestActivityCommand", () => {
             lookbackDays: 90,
             contestCount: 0,
             participantCount: 0,
+            topContests: [],
             recentContests: [],
             byScope: {
               official: { contestCount: 0, participantCount: 0, lastContestAt: null },

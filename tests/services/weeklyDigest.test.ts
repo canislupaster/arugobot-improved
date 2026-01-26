@@ -26,6 +26,15 @@ const mockContestActivity = {
     lookbackDays: 7,
     contestCount: 1,
     participantCount: 1,
+    topContests: [
+      {
+        contestId: 100,
+        contestName: "Weekly Contest",
+        participantCount: 1,
+        ratingUpdateTimeSeconds: 1_700_000_000,
+        scope: "official",
+      },
+    ],
     recentContests: [
       {
         contestId: 100,
@@ -87,6 +96,7 @@ describe("WeeklyDigestService", () => {
     expect(preview?.embed.data.title).toBe("Weekly digest");
     const fieldNames = preview?.embed.data.fields?.map((field) => field.name) ?? [];
     expect(fieldNames).toContain("Rating changes");
+    expect(fieldNames).toContain("Top contests");
   });
 
   it("blocks manual posts already sent this week", async () => {
@@ -115,5 +125,33 @@ describe("WeeklyDigestService", () => {
     } as never);
     expect(result.status).toBe("sent");
     expect(send).toHaveBeenCalled();
+  });
+
+  it("keeps sending when a scheduled digest fails", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2024-01-08T09:05:00.000Z"));
+
+    await service.setSubscription("guild-2", "channel-2", 1, 9, 0, 0, null);
+
+    const sendFail = jest.fn().mockRejectedValue(new Error("send failed"));
+    const sendOk = jest.fn().mockResolvedValue(undefined);
+    const client = {
+      channels: {
+        fetch: jest.fn().mockImplementation((channelId: string) => {
+          if (channelId === "channel-1") {
+            return Promise.resolve({ type: ChannelType.GuildText, send: sendFail });
+          }
+          if (channelId === "channel-2") {
+            return Promise.resolve({ type: ChannelType.GuildText, send: sendOk });
+          }
+          return Promise.resolve(null);
+        }),
+      },
+    } as never;
+
+    await service.runTick(client);
+
+    expect(sendFail).toHaveBeenCalledTimes(1);
+    expect(sendOk).toHaveBeenCalledTimes(1);
   });
 });

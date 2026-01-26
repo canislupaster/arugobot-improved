@@ -44,6 +44,19 @@ function formatContestLine(contest: {
   )}`;
 }
 
+function formatTopContestLine(contest: {
+  contestId: number;
+  contestName: string;
+  participantCount: number;
+  ratingUpdateTimeSeconds: number;
+  scope: "official" | "gym";
+}): string {
+  const scopeLabel = contest.scope === "gym" ? "Gym" : "Official";
+  return `${contest.contestName} (${contest.contestId}) • ${contest.participantCount} participants • ${scopeLabel} • ${formatDiscordRelativeTime(
+    contest.ratingUpdateTimeSeconds
+  )}`;
+}
+
 function getParticipantCountForScope(
   participant: { contestCount: number; officialCount: number; gymCount: number },
   scope: ContestScopeFilter
@@ -203,6 +216,14 @@ export const contestActivityCommand: Command = {
         const participantLines = buildParticipantLines(activity.participants, scope);
         if (participantLines) {
           embed.addFields({ name: "Top participants", value: participantLines, inline: false });
+        }
+      }
+
+      if (activity.topContests.length > 0) {
+        const filtered = filterRecentContests(activity.topContests, scope);
+        if (filtered.length > 0) {
+          const lines = filtered.map(formatTopContestLine).join("\n");
+          embed.addFields({ name: "Top contests", value: lines, inline: false });
         }
       }
 
