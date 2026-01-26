@@ -11,6 +11,7 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
+import { addContestScopeOption } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -157,16 +158,7 @@ export const contestRemindersCommand: Command = {
             .setName("exclude")
             .setDescription("Skip contests matching keywords (comma-separated)")
         )
-        .addStringOption((option) =>
-          option
-            .setName("scope")
-            .setDescription("Which contests to include")
-            .addChoices(
-              { name: "Official", value: "official" },
-              { name: "Gym", value: "gym" },
-              { name: "All", value: "all" }
-            )
-        )
+        .addStringOption((option) => addContestScopeOption(option, "Which contests to include"))
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -199,16 +191,7 @@ export const contestRemindersCommand: Command = {
             .setName("exclude")
             .setDescription("Skip contests matching keywords (comma-separated)")
         )
-        .addStringOption((option) =>
-          option
-            .setName("scope")
-            .setDescription("Which contests to include")
-            .addChoices(
-              { name: "Official", value: "official" },
-              { name: "Gym", value: "gym" },
-              { name: "All", value: "all" }
-            )
-        )
+        .addStringOption((option) => addContestScopeOption(option, "Which contests to include"))
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("status").setDescription("List current reminder subscriptions")
@@ -247,16 +230,7 @@ export const contestRemindersCommand: Command = {
             .setMinValue(MIN_MINUTES)
             .setMaxValue(MAX_MINUTES)
         )
-        .addStringOption((option) =>
-          option
-            .setName("scope")
-            .setDescription("Which contests to include")
-            .addChoices(
-              { name: "Official", value: "official" },
-              { name: "Gym", value: "gym" },
-              { name: "All", value: "all" }
-            )
-        )
+        .addStringOption((option) => addContestScopeOption(option, "Which contests to include"))
     )
     .addSubcommand((subcommand) =>
       subcommand

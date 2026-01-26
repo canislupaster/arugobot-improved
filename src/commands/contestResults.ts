@@ -7,7 +7,7 @@ import {
   formatContestTag,
   resolveContestLookup,
 } from "../utils/contestLookup.js";
-import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
+import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
   getUserOptions,
   resolveContestTargets,
@@ -65,16 +65,7 @@ export const contestResultsCommand: Command = {
     .addStringOption((option) =>
       option.setName("handles").setDescription("Comma or space separated handles to include")
     )
-    .addStringOption((option) =>
-      option
-        .setName("scope")
-        .setDescription("Which contests to search")
-        .addChoices(
-          { name: "Official", value: "official" },
-          { name: "Gym", value: "gym" },
-          { name: "All", value: "all" }
-        )
-    ),
+    .addStringOption((option) => addContestScopeOption(option)),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";

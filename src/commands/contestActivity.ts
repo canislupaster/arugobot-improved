@@ -2,7 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { parseContestScope } from "../utils/contestScope.js";
+import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -117,14 +117,7 @@ export const contestActivityCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     )
     .addStringOption((option) =>
-      option
-        .setName("scope")
-        .setDescription("Which contests to include")
-        .addChoices(
-          { name: "All", value: "all" },
-          { name: "Official", value: "official" },
-          { name: "Gym", value: "gym" }
-        )
+      addContestScopeOption(option, "Which contests to include", ["all", "official", "gym"])
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {

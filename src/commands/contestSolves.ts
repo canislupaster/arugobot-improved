@@ -8,7 +8,7 @@ import {
   formatUnsolvedProblemsValue,
   splitContestSolves,
 } from "../utils/contestProblems.js";
-import { parseContestScope } from "../utils/contestScope.js";
+import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import {
   getContestSolvesDataMessage,
   loadContestSolvesData,
@@ -39,16 +39,7 @@ export const contestSolvesCommand: Command = {
     .addStringOption((option) =>
       option.setName("handles").setDescription("Comma or space separated handles to include")
     )
-    .addStringOption((option) =>
-      option
-        .setName("scope")
-        .setDescription("Which contests to search")
-        .addChoices(
-          { name: "Official", value: "official" },
-          { name: "Gym", value: "gym" },
-          { name: "All", value: "all" }
-        )
-    )
+    .addStringOption((option) => addContestScopeOption(option))
     .addIntegerOption((option) =>
       option
         .setName("limit")

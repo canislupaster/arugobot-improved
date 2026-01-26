@@ -1,3 +1,5 @@
+import type { SlashCommandStringOption } from "discord.js";
+
 import type { ContestService, ContestScope, ContestScopeFilter } from "../services/contests.js";
 
 const DEFAULT_SCOPE: ContestScopeFilter = "official";
@@ -39,4 +41,22 @@ export async function refreshContestData(
     }
     return { error: CONTEST_UNAVAILABLE_MESSAGE };
   }
+}
+
+const CONTEST_SCOPE_CHOICES: Record<ContestScopeFilter, { name: string; value: ContestScopeFilter }> =
+  {
+    official: { name: "Official", value: "official" },
+    gym: { name: "Gym", value: "gym" },
+    all: { name: "All", value: "all" },
+  };
+
+const DEFAULT_SCOPE_ORDER: ContestScopeFilter[] = ["official", "gym", "all"];
+
+export function addContestScopeOption(
+  option: SlashCommandStringOption,
+  description = "Which contests to search",
+  order: ContestScopeFilter[] = DEFAULT_SCOPE_ORDER
+): SlashCommandStringOption {
+  const choices = order.map((scope) => CONTEST_SCOPE_CHOICES[scope]);
+  return option.setName("scope").setDescription(description).addChoices(...choices);
 }

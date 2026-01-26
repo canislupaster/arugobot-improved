@@ -2,7 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { filterContestsByKeywords, parseKeywordFilters } from "../utils/contestFilters.js";
-import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
+import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
@@ -88,16 +88,7 @@ export const contestsCommand: Command = {
     .addStringOption((option) =>
       option.setName("exclude").setDescription("Hide contests matching keywords (comma-separated)")
     )
-    .addStringOption((option) =>
-      option
-        .setName("scope")
-        .setDescription("Which contests to show")
-        .addChoices(
-          { name: "Official", value: "official" },
-          { name: "Gym", value: "gym" },
-          { name: "All", value: "all" }
-        )
-    ),
+    .addStringOption((option) => addContestScopeOption(option, "Which contests to show")),
   async execute(interaction, context) {
     const limit = interaction.options.getInteger("limit") ?? MAX_CONTESTS;
     const filters = parseKeywordFilters(

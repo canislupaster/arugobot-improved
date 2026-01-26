@@ -2,7 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
+import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
@@ -133,16 +133,7 @@ export const contestCommand: Command = {
     .addStringOption((option) =>
       option.setName("query").setDescription("Contest id, URL, or name").setRequired(true)
     )
-    .addStringOption((option) =>
-      option
-        .setName("scope")
-        .setDescription("Which contests to search")
-        .addChoices(
-          { name: "Official", value: "official" },
-          { name: "Gym", value: "gym" },
-          { name: "All", value: "all" }
-        )
-    ),
+    .addStringOption((option) => addContestScopeOption(option)),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
     const scope = parseContestScope(interaction.options.getString("scope"));
