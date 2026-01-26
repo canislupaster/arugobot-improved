@@ -7,7 +7,7 @@ import {
 } from "../utils/contestLookup.js";
 import {
   compareProblemIndex,
-  formatContestProblemLine,
+  formatContestProblemLines,
   getContestProblems,
   splitContestSolves,
 } from "../utils/contestProblems.js";
@@ -171,11 +171,11 @@ export const contestSolvesCommand: Command = {
       });
 
       if (unsolved.length > 0) {
-        const lines = unsolved
-          .slice(0, limit)
-          .map((entry) => formatContestProblemLine(entry.problem, null))
-          .join("\n");
-        embed.addFields({ name: "Unsolved problems", value: lines, inline: false });
+        embed.addFields({
+          name: "Unsolved problems",
+          value: formatContestProblemLines(unsolved, limit),
+          inline: false,
+        });
       } else {
         embed.addFields({
           name: "Unsolved problems",
@@ -185,13 +185,13 @@ export const contestSolvesCommand: Command = {
       }
 
       if (solved.length > 0) {
-        const lines = solved
-          .sort(
+        const lines = formatContestProblemLines(
+          solved.sort(
             (a, b) => b.solvedBy.size - a.solvedBy.size || compareProblemIndex(a.problem, b.problem)
-          )
-          .slice(0, limit)
-          .map((entry) => formatContestProblemLine(entry.problem, entry.solvedBy.size))
-          .join("\n");
+          ),
+          limit,
+          (entry) => entry.solvedBy.size
+        );
         embed.addFields({ name: "Solved problems", value: lines, inline: false });
       }
 

@@ -42,6 +42,18 @@ export function formatContestProblemLine(
   return `${label} • ${solvedCount} solved`;
 }
 
+export function formatContestProblemLines(
+  entries: ContestProblemSummary[],
+  limit: number,
+  solvedCount?: (entry: ContestProblemSummary) => number | null
+): string {
+  const resolveSolvedCount = solvedCount ?? (() => null);
+  return entries
+    .slice(0, limit)
+    .map((entry) => formatContestProblemLine(entry.problem, resolveSolvedCount(entry)))
+    .join("\n");
+}
+
 export function summarizeContestSolves(
   problems: Problem[],
   solves: ContestSolveEntry[],

@@ -6,7 +6,7 @@ import {
   resolveContestOrReply,
 } from "../utils/contestLookup.js";
 import {
-  formatContestProblemLine,
+  formatContestProblemLines,
   getContestProblems,
   splitContestSolves,
 } from "../utils/contestProblems.js";
@@ -160,11 +160,11 @@ export const contestUpsolveCommand: Command = {
       );
 
       if (unsolved.length > 0) {
-        const lines = unsolved
-          .slice(0, limit)
-          .map((entry) => formatContestProblemLine(entry.problem, null))
-          .join("\n");
-        embed.addFields({ name: "Unsolved problems", value: lines, inline: false });
+        embed.addFields({
+          name: "Unsolved problems",
+          value: formatContestProblemLines(unsolved, limit),
+          inline: false,
+        });
       } else {
         embed.addFields({
           name: "Unsolved problems",
