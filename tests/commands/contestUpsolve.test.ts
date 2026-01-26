@@ -141,4 +141,70 @@ describe("contestUpsolveCommand", () => {
 
     expect(interaction.editReply).toHaveBeenCalledWith("Handle not linked.");
   });
+
+  it("rejects invalid limits", async () => {
+    const interaction = createInteraction("1234", undefined, 99);
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn(),
+          getLastRefreshAt: jest.fn(),
+          getContestById: jest.fn(),
+          searchContests: jest.fn(),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn(),
+        },
+        store: {
+          getHandle: jest.fn(),
+          getContestSolvesResult: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestUpsolveCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Invalid limit." });
+  });
+
+  it("returns a message when contest solves cache is missing", async () => {
+    const interaction = createInteraction("1234");
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([
+            {
+              contestId: 1234,
+              index: "A",
+              name: "Problem A",
+              rating: 800,
+              tags: [],
+            },
+          ]),
+        },
+        store: {
+          getHandle: jest.fn().mockResolvedValue("tourist"),
+          getContestSolvesResult: jest.fn().mockResolvedValue(null),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestUpsolveCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Contest submissions cache not ready yet. Try again soon."
+    );
+  });
 });

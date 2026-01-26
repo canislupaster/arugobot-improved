@@ -1,5 +1,7 @@
+import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
 
+import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   buildContestEmbed,
@@ -20,6 +22,59 @@ import type { Command } from "./types.js";
 const MAX_MATCHES = 5;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
+
+type ContestLookupOutcome =
+  | { status: "ok"; contest: Contest }
+  | { status: "replied" };
+
+const resolveLimit = (
+  interaction: ChatInputCommandInteraction
+): { limit: number } | { error: string } => {
+  const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+    return { error: "Invalid limit." };
+  }
+  return { limit };
+};
+
+const resolveContestOrReply = async (
+  interaction: ChatInputCommandInteraction,
+  queryRaw: string,
+  scope: ContestScopeFilter,
+  contests: {
+    getLatestFinished: (scopeFilter: ContestScopeFilter) => Contest | null;
+    getContestById: (contestId: number, scopeFilter: ContestScopeFilter) => Contest | null;
+    searchContests: (query: string, limit: number, scopeFilter: ContestScopeFilter) => Contest[];
+  },
+  refreshWasStale: boolean
+): Promise<ContestLookupOutcome> => {
+  const lookup = resolveContestLookup(queryRaw, scope, contests, MAX_MATCHES);
+  if (lookup.status === "ok") {
+    return { status: "ok", contest: lookup.contest };
+  }
+  if (lookup.status === "ambiguous") {
+    const embed = buildContestMatchEmbed({
+      query: queryRaw,
+      matches: lookup.matches,
+      scope,
+      footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
+    });
+    if (refreshWasStale) {
+      embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+    }
+    await interaction.editReply({ embeds: [embed] });
+    return { status: "replied" };
+  }
+
+  const errorMessage =
+    lookup.status === "missing_latest"
+      ? "No finished contests found yet."
+      : lookup.status === "missing_id"
+        ? "No contest found with that ID."
+        : "No contests found matching that name.";
+  await interaction.editReply(errorMessage);
+  return { status: "replied" };
+};
 
 export const contestUpsolveCommand: Command = {
   data: new SlashCommandBuilder()
@@ -68,11 +123,12 @@ export const contestUpsolveCommand: Command = {
 
     const queryRaw = interaction.options.getString("query", true).trim();
     const scope = parseContestScope(interaction.options.getString("scope"));
-    const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-      await interaction.reply({ content: "Invalid limit." });
+    const resolvedLimit = resolveLimit(interaction);
+    if ("error" in resolvedLimit) {
+      await interaction.reply({ content: resolvedLimit.error });
       return;
     }
+    const { limit } = resolvedLimit;
 
     await interaction.deferReply();
 
@@ -83,37 +139,15 @@ export const contestUpsolveCommand: Command = {
     }
 
     try {
-      const lookup = resolveContestLookup(
+      const lookup = await resolveContestOrReply(
+        interaction,
         queryRaw,
         scope,
         context.services.contests,
-        MAX_MATCHES
+        refreshResult.stale
       );
-      if (lookup.status !== "ok") {
-        switch (lookup.status) {
-          case "missing_latest":
-            await interaction.editReply("No finished contests found yet.");
-            return;
-          case "missing_id":
-            await interaction.editReply("No contest found with that ID.");
-            return;
-          case "missing_name":
-            await interaction.editReply("No contests found matching that name.");
-            return;
-          case "ambiguous": {
-            const embed = buildContestMatchEmbed({
-              query: queryRaw,
-              matches: lookup.matches,
-              scope,
-              footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
-            });
-            if (refreshResult.stale) {
-              embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
-            }
-            await interaction.editReply({ embeds: [embed] });
-            return;
-          }
-        }
+      if (lookup.status === "replied") {
+        return;
       }
 
       const handleTarget = await resolveHandleTarget(context.services.store, {
