@@ -179,10 +179,11 @@ Most command responses are public; handle-linking and admin diagnostics remain e
   Use `latest` to target the most recent finished contest.
   Rating changes are only available for official contests; gym contests show a warning.
 
-- **/contestsolves** `query` `[limit]` `[scope]`
+- **/contestsolves** `query` `[limit]` `[user1..user4]` `[handles]` `[scope]`
 
   Shows which contest problems linked users have solved and highlights unsolved problems.
   Use `latest` to target the most recent finished contest.
+  Provide handles or users to limit the list (handles are required outside a server).
 
 - **/contestupsolve** `query` `[user]` `[handle]` `[limit]` `[scope]`
 

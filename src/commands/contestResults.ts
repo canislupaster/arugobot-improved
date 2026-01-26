@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type Guild, type User } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import {
@@ -8,7 +8,12 @@ import {
   resolveContestLookup,
 } from "../utils/contestLookup.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
-import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { parseHandleList } from "../utils/handles.js";
+import {
+  getUserOptions,
+  resolveContestTargets,
+  type TargetHandle,
+} from "../utils/contestTargets.js";
 
 import type { Command } from "./types.js";
 
@@ -16,21 +21,6 @@ const MAX_MATCHES = 5;
 const MAX_HANDLES = 50;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
-type TargetHandle = {
-  handle: string;
-  label: string;
-};
-
-function parseHandleList(raw: string): string[] {
-  if (!raw.trim()) {
-    return [];
-  }
-  return raw
-    .split(/[\s,]+/u)
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
 function formatParticipantType(type: string): string {
   switch (type) {
     case "OUT_OF_COMPETITION":
@@ -52,84 +42,6 @@ function formatPoints(points: number): string {
     return String(points);
   }
   return points.toFixed(2);
-}
-
-function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, label: string) {
-  const key = handle.toLowerCase();
-  if (existing.has(key)) {
-    return;
-  }
-  existing.set(key, { handle, label });
-}
-
-function getUserOptions(users: Array<User | null | undefined>): User[] {
-  return users.filter((user): user is User => Boolean(user));
-}
-
-async function buildTargets(
-  context: {
-    services: {
-      store: {
-        getHandle: (guildId: string, userId: string) => Promise<string | null>;
-        resolveHandle: (handle: string) => Promise<{
-          exists: boolean;
-          canonicalHandle: string | null;
-        }>;
-        getLinkedUsers: (guildId: string) => Promise<Array<{ userId: string; handle: string }>>;
-      };
-    };
-    correlationId: string;
-  },
-  interaction: { guildId: string | null; commandName: string; user: User; guild: Guild | null },
-  userOptions: User[],
-  handleInputs: string[]
-): Promise<{ targets: TargetHandle[] } | { error: string }> {
-  const targets = new Map<string, TargetHandle>();
-
-  if (userOptions.length > 0 || handleInputs.length > 0) {
-    if (interaction.guildId) {
-      for (const user of userOptions) {
-        const handle = await context.services.store.getHandle(interaction.guildId, user.id);
-        if (!handle) {
-          return { error: `User <@${user.id}> does not have a linked handle.` };
-        }
-        addTargetHandle(targets, handle, `<@${user.id}>`);
-      }
-    }
-
-    for (const handleInput of handleInputs) {
-      const resolved = await context.services.store.resolveHandle(handleInput);
-      if (!resolved.exists) {
-        return { error: `Invalid handle: ${handleInput}` };
-      }
-      const handle = resolved.canonicalHandle ?? handleInput;
-      addTargetHandle(targets, handle, handle);
-    }
-  } else {
-    const guildId = interaction.guildId ?? "";
-    const linkedUsers = await context.services.store.getLinkedUsers(guildId);
-    const filteredLinkedUsers = interaction.guild
-      ? await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
-          correlationId: context.correlationId,
-          command: interaction.commandName,
-          guildId: interaction.guildId ?? undefined,
-          userId: interaction.user.id,
-        })
-      : linkedUsers;
-    if (filteredLinkedUsers.length === 0) {
-      return { error: "No linked handles found in this server yet." };
-    }
-    if (filteredLinkedUsers.length > MAX_HANDLES) {
-      return {
-        error: `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`,
-      };
-    }
-    for (const linked of filteredLinkedUsers) {
-      addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
-    }
-  }
-
-  return { targets: Array.from(targets.values()) };
 }
 
 export const contestResultsCommand: Command = {
@@ -234,26 +146,22 @@ export const contestResultsCommand: Command = {
 
       const contest = lookup.contest;
 
-      const targetResult = await buildTargets(
-        context,
-        {
-          guildId: interaction.guildId,
-          commandName: interaction.commandName,
-          user: interaction.user,
-          guild: interaction.guild,
-        },
+      const targetResult = await resolveContestTargets({
+        guild: interaction.guild,
+        guildId: interaction.guildId,
+        user: interaction.user,
+        commandName: interaction.commandName,
         userOptions,
-        handleInputs
-      );
-      if ("error" in targetResult) {
-        await interaction.editReply(targetResult.error);
+        handleInputs,
+        correlationId: context.correlationId,
+        store: context.services.store,
+        maxLinkedHandles: MAX_HANDLES,
+      });
+      if (targetResult.status === "error") {
+        await interaction.editReply(targetResult.message);
         return;
       }
       const targetList = targetResult.targets;
-      if (targetList.length === 0) {
-        await interaction.editReply("No handles found to check.");
-        return;
-      }
 
       const standings = await context.services.contestStandings.getStandings(
         contest.id,

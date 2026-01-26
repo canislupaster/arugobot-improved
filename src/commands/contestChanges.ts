@@ -1,13 +1,10 @@
 import {
   EmbedBuilder,
   SlashCommandBuilder,
-  type ChatInputCommandInteraction,
-  type User,
 } from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
-import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   buildContestMatchEmbed,
@@ -18,8 +15,13 @@ import {
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { parseHandleList } from "../utils/handles.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
+import {
+  getUserOptions,
+  resolveContestTargets,
+  type TargetHandle,
+} from "../utils/contestTargets.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -32,18 +34,6 @@ const MAX_MATCHES = 5;
 const MAX_HANDLES = 50;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
-type TargetHandle = {
-  handle: string;
-  label: string;
-};
-
-function parseHandleList(raw: string): string[] {
-  return raw
-    .split(/[\s,]+/u)
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
 function buildContestEmbed(contest: Contest): EmbedBuilder {
   return new EmbedBuilder()
     .setTitle(`Contest rating changes: ${contest.name}`)
@@ -85,18 +75,6 @@ function buildContestStatusEmbed(
   return embed;
 }
 
-function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, label: string) {
-  const key = handle.toLowerCase();
-  if (existing.has(key)) {
-    return;
-  }
-  existing.set(key, { handle, label });
-}
-
-function getUserOptions(users: Array<User | null | undefined>): User[] {
-  return users.filter((user): user is User => Boolean(user));
-}
-
 function mapChangesByHandle(changes: RatingChange[]): Map<string, RatingChange> {
   const map = new Map<string, RatingChange>();
   for (const change of changes) {
@@ -106,70 +84,6 @@ function mapChangesByHandle(changes: RatingChange[]): Map<string, RatingChange> 
     map.set(change.handle.toLowerCase(), change);
   }
   return map;
-}
-
-type TargetResolution =
-  | { status: "ok"; targets: TargetHandle[] }
-  | { status: "error"; message: string };
-
-async function resolveTargets(params: {
-  interaction: ChatInputCommandInteraction;
-  context: CommandContext;
-  handleInputs: string[];
-  userOptions: User[];
-}): Promise<TargetResolution> {
-  const { interaction, context, handleInputs, userOptions } = params;
-  const targets = new Map<string, TargetHandle>();
-
-  if (userOptions.length > 0 || handleInputs.length > 0) {
-    if (interaction.guild) {
-      for (const user of userOptions) {
-        const handle = await context.services.store.getHandle(interaction.guild.id, user.id);
-        if (!handle) {
-          return { status: "error", message: `User <@${user.id}> does not have a linked handle.` };
-        }
-        addTargetHandle(targets, handle, `<@${user.id}>`);
-      }
-    }
-
-    for (const handleInput of handleInputs) {
-      const resolved = await context.services.store.resolveHandle(handleInput);
-      if (!resolved.exists) {
-        return { status: "error", message: `Invalid handle: ${handleInput}` };
-      }
-      const handle = resolved.canonicalHandle ?? handleInput;
-      addTargetHandle(targets, handle, handle);
-    }
-  } else {
-    const guildId = interaction.guild?.id ?? "";
-    const linkedUsers = await context.services.store.getLinkedUsers(guildId);
-    const filteredLinkedUsers = interaction.guild
-      ? await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
-          correlationId: context.correlationId,
-          command: interaction.commandName,
-          guildId: interaction.guild.id,
-          userId: interaction.user.id,
-        })
-      : linkedUsers;
-    if (filteredLinkedUsers.length === 0) {
-      return { status: "error", message: "No linked handles found in this server yet." };
-    }
-    if (filteredLinkedUsers.length > MAX_HANDLES) {
-      return {
-        status: "error",
-        message: `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`,
-      };
-    }
-    for (const linked of filteredLinkedUsers) {
-      addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
-    }
-  }
-
-  const targetList = Array.from(targets.values());
-  if (targetList.length === 0) {
-    return { status: "error", message: "No handles found to check." };
-  }
-  return { status: "ok", targets: targetList };
 }
 
 export const contestChangesCommand: Command = {
@@ -300,11 +214,16 @@ export const contestChangesCommand: Command = {
         return;
       }
 
-      const targetResult = await resolveTargets({
-        interaction,
-        context,
-        handleInputs,
+      const targetResult = await resolveContestTargets({
+        guild: interaction.guild,
+        guildId: interaction.guildId,
+        user: interaction.user,
+        commandName: interaction.commandName,
         userOptions,
+        handleInputs,
+        correlationId: context.correlationId,
+        store: context.services.store,
+        maxLinkedHandles: MAX_HANDLES,
       });
       if (targetResult.status === "error") {
         await interaction.editReply(targetResult.message);

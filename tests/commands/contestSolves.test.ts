@@ -3,41 +3,52 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { contestSolvesCommand } from "../../src/commands/contestSolves.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (query: string, scope?: string, limit?: number) =>
+const createInteraction = (
+  query: string,
+  options: { scope?: string; limit?: number; handles?: string; guild?: boolean } = {}
+) =>
   ({
+    commandName: "contestsolves",
     options: {
       getString: jest.fn((name: string) => {
         if (name === "query") {
           return query;
         }
         if (name === "scope") {
-          return scope ?? null;
+          return options.scope ?? null;
+        }
+        if (name === "handles") {
+          return options.handles ?? null;
         }
         return null;
       }),
       getInteger: jest.fn((name: string) => {
         if (name === "limit") {
-          return limit ?? null;
+          return options.limit ?? null;
         }
         return null;
       }),
+      getUser: jest.fn(() => null),
     },
     user: { id: "user-1" },
-    guild: {
-      id: "guild-1",
-      members: {
-        fetch: jest.fn().mockResolvedValue(
-          new Map([
-            ["user-1", { user: { id: "user-1" } }],
-            ["user-2", { user: { id: "user-2" } }],
-          ])
-        ),
-        cache: new Map([
-          ["user-1", { user: { id: "user-1" } }],
-          ["user-2", { user: { id: "user-2" } }],
-        ]),
-      },
-    },
+    guild:
+      options.guild === false
+        ? null
+        : {
+            id: "guild-1",
+            members: {
+              fetch: jest.fn().mockResolvedValue(
+                new Map([
+                  ["user-1", { user: { id: "user-1" } }],
+                  ["user-2", { user: { id: "user-2" } }],
+                ])
+              ),
+              cache: new Map([
+                ["user-1", { user: { id: "user-1" } }],
+                ["user-2", { user: { id: "user-2" } }],
+              ]),
+            },
+          },
     reply: jest.fn().mockResolvedValue(undefined),
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),
@@ -153,5 +164,93 @@ describe("contestSolvesCommand", () => {
     expect(interaction.editReply).toHaveBeenCalledWith(
       "No linked handles found in this server yet."
     );
+  });
+
+  it("accepts explicit handles outside a guild", async () => {
+    const interaction = createInteraction("1234", { handles: "tourist", guild: false });
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([
+            {
+              contestId: 1234,
+              index: "A",
+              name: "Problem A",
+              rating: 800,
+              tags: [],
+            },
+          ]),
+        },
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: true,
+            canonicalHandle: "tourist",
+          }),
+          getContestSolvesResult: jest.fn().mockResolvedValue({
+            solves: [],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestSolvesCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalled();
+  });
+
+  it("returns a message when a handle is invalid", async () => {
+    const interaction = createInteraction("1234", { handles: "unknown", guild: false });
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([
+            {
+              contestId: 1234,
+              index: "A",
+              name: "Problem A",
+              rating: 800,
+              tags: [],
+            },
+          ]),
+        },
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: false,
+            canonicalHandle: null,
+          }),
+          getContestSolvesResult: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestSolvesCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith("Invalid handle: unknown");
   });
 });

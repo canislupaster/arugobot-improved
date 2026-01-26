@@ -3,8 +3,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   buildContestEmbed,
-  buildContestMatchEmbed,
-  resolveContestLookup,
+  resolveContestOrReply,
 } from "../utils/contestLookup.js";
 import {
   compareProblemIndex,
@@ -13,7 +12,8 @@ import {
   splitContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
-import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { parseHandleList } from "../utils/handles.js";
+import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
 
 import type { Command } from "./types.js";
 
@@ -27,6 +27,13 @@ export const contestSolvesCommand: Command = {
     .setDescription("Shows which contest problems linked users have solved")
     .addStringOption((option) =>
       option.setName("query").setDescription("Contest id, URL, or name").setRequired(true)
+    )
+    .addUserOption((option) => option.setName("user1").setDescription("User to include"))
+    .addUserOption((option) => option.setName("user2").setDescription("User to include"))
+    .addUserOption((option) => option.setName("user3").setDescription("User to include"))
+    .addUserOption((option) => option.setName("user4").setDescription("User to include"))
+    .addStringOption((option) =>
+      option.setName("handles").setDescription("Comma or space separated handles to include")
     )
     .addStringOption((option) =>
       option
@@ -46,16 +53,33 @@ export const contestSolvesCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({ content: "This command can only be used in a server." });
-      return;
-    }
-
     const queryRaw = interaction.options.getString("query", true).trim();
+    const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
     const scope = parseContestScope(interaction.options.getString("scope"));
     const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
       await interaction.reply({ content: "Invalid limit." });
+      return;
+    }
+    const handleInputs = parseHandleList(handlesRaw);
+    const userOptions = getUserOptions([
+      interaction.options.getUser("user1"),
+      interaction.options.getUser("user2"),
+      interaction.options.getUser("user3"),
+      interaction.options.getUser("user4"),
+    ]);
+
+    if (!interaction.guild && userOptions.length > 0) {
+      await interaction.reply({
+        content: "Specify handles directly when using this command outside a server.",
+      });
+      return;
+    }
+
+    if (!interaction.guild && handleInputs.length === 0) {
+      await interaction.reply({
+        content: "Provide at least one handle or run this command in a server.",
+      });
       return;
     }
 
@@ -68,37 +92,19 @@ export const contestSolvesCommand: Command = {
     }
 
     try {
-      const lookup = resolveContestLookup(
+      const lookup = await resolveContestOrReply(
+        interaction,
         queryRaw,
         scope,
         context.services.contests,
-        MAX_MATCHES
-      );
-      if (lookup.status !== "ok") {
-        switch (lookup.status) {
-          case "missing_latest":
-            await interaction.editReply("No finished contests found yet.");
-            return;
-          case "missing_id":
-            await interaction.editReply("No contest found with that ID.");
-            return;
-          case "missing_name":
-            await interaction.editReply("No contests found matching that name.");
-            return;
-          case "ambiguous": {
-            const embed = buildContestMatchEmbed({
-              query: queryRaw,
-              matches: lookup.matches,
-              scope,
-              footerText: "Use /contestsolves with the contest ID to see solve counts.",
-            });
-            if (refreshResult.stale) {
-              embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
-            }
-            await interaction.editReply({ embeds: [embed] });
-            return;
-          }
+        {
+          maxMatches: MAX_MATCHES,
+          footerText: "Use /contestsolves with the contest ID to see solve counts.",
+          refreshWasStale: refreshResult.stale,
         }
+      );
+      if (lookup.status === "replied") {
+        return;
       }
 
       const contest = lookup.contest;
@@ -109,17 +115,21 @@ export const contestSolvesCommand: Command = {
         return;
       }
 
-      const linkedUsers = await context.services.store.getLinkedUsers(interaction.guild.id);
-      const filteredUsers = await filterEntriesByGuildMembers(interaction.guild, linkedUsers, {
+      const targetResult = await resolveContestTargets({
+        guild: interaction.guild,
+        guildId: interaction.guildId,
+        user: interaction.user,
+        commandName: interaction.commandName,
+        userOptions,
+        handleInputs,
         correlationId: context.correlationId,
-        command: interaction.commandName,
-        guildId: interaction.guild.id,
-        userId: interaction.user.id,
+        store: context.services.store,
       });
-      if (filteredUsers.length === 0) {
-        await interaction.editReply("No linked handles found in this server yet.");
+      if (targetResult.status === "error") {
+        await interaction.editReply(targetResult.message);
         return;
       }
+      const targets = targetResult.targets;
 
       const contestSolves = await context.services.store.getContestSolvesResult(contest.id);
       if (!contestSolves) {
@@ -127,9 +137,7 @@ export const contestSolvesCommand: Command = {
         return;
       }
 
-      const handleToUserId = new Map(
-        filteredUsers.map((user) => [user.handle, user.userId])
-      );
+      const handleToUserId = new Map(targets.map((target) => [target.handle, target.label]));
       const { summaries, solved, unsolved } = splitContestSolves(
         contestProblems,
         contestSolves.solves,
@@ -147,7 +155,7 @@ export const contestSolvesCommand: Command = {
       embed.addFields({
         name: "Summary",
         value: [
-          `Linked handles: ${filteredUsers.length}`,
+          `Handles included: ${targets.length}`,
           `Solved problems: ${solvedCount}/${summaries.length}`,
           `Unsolved problems: ${unsolvedCount}`,
         ].join("\n"),
