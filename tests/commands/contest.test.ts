@@ -35,6 +35,7 @@ describe("contestCommand", () => {
             startTimeSeconds: 1_700_000_000,
             durationSeconds: 7200,
           }),
+          getLatestFinished: jest.fn().mockReturnValue(null),
           searchContests: jest.fn().mockReturnValue([]),
         },
       },
@@ -56,6 +57,7 @@ describe("contestCommand", () => {
           refresh: jest.fn().mockResolvedValue(undefined),
           getLastRefreshAt: jest.fn().mockReturnValue(1),
           getContestById: jest.fn().mockReturnValue(null),
+          getLatestFinished: jest.fn().mockReturnValue(null),
           searchContests: jest.fn().mockReturnValue([
             {
               id: 900,
@@ -83,5 +85,53 @@ describe("contestCommand", () => {
     expect(embed.title).toBe("Contest matches");
     expect(embed.description).toContain("Codeforces Round #900");
     expect(embed.description).toContain("ID 900");
+  });
+
+  it("resolves the latest finished contest", async () => {
+    const interaction = createInteraction("latest");
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue(null),
+          getLatestFinished: jest.fn().mockReturnValue({
+            id: 2100,
+            name: "Codeforces Round #2100",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestCommand.execute(interaction, context);
+
+    expect(context.services.contests.getLatestFinished).toHaveBeenCalledWith("official");
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0].data;
+    expect(embed.title).toContain("Codeforces Round #2100");
+  });
+
+  it("handles missing latest contest", async () => {
+    const interaction = createInteraction("latest");
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue(null),
+          getLatestFinished: jest.fn().mockReturnValue(null),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    expect(payload).toBe("No finished contests found yet.");
   });
 });

@@ -167,8 +167,8 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
 - **/contest** `query` `[scope]`
 
-  Shows details for a contest by id, URL, or name. Use `scope` to search `official`, `gym`,
-  or `all` contests.
+  Shows details for a contest by id, URL, name, or `latest` (most recent finished contest).
+  Use `scope` to search `official`, `gym`, or `all` contests.
 
 - **/contestresults** `query` `[limit]` `[user1..user4]` `[handles]` `[scope]`
 
