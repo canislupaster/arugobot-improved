@@ -7,7 +7,8 @@ import type { ContestSolvesResult, StoreService } from "../services/store.js";
 import type { ContestLookupService } from "./contestLookup.js";
 import { resolveContestOrReply } from "./contestLookup.js";
 import { getContestProblems } from "./contestProblems.js";
-import { refreshContestData } from "./contestScope.js";
+import { parseContestScope, refreshContestData } from "./contestScope.js";
+import { resolveBoundedIntegerOption } from "./interaction.js";
 
 export type ContestSolvesDataResult =
   | { status: "ok"; contestProblems: Problem[]; contestSolves: ContestSolvesResult }
@@ -29,6 +30,29 @@ export function shouldShowContestSolvesStale(
   contestSolves: ContestSolvesResult
 ): boolean {
   return refreshWasStale || contestSolves.isStale;
+}
+
+export type ContestSolvesOptionsResult =
+  | { status: "ok"; queryRaw: string; scope: ContestScopeFilter; limit: number }
+  | { status: "error"; message: string };
+
+export function resolveContestSolvesOptions(
+  interaction: Pick<ChatInputCommandInteraction, "options">,
+  options: { defaultLimit: number; maxLimit: number }
+): ContestSolvesOptionsResult {
+  const queryRaw = interaction.options.getString("query", true).trim();
+  const scope = parseContestScope(interaction.options.getString("scope"));
+  const resolvedLimit = resolveBoundedIntegerOption(interaction, {
+    name: "limit",
+    defaultValue: options.defaultLimit,
+    min: 1,
+    max: options.maxLimit,
+    errorMessage: "Invalid limit.",
+  });
+  if ("error" in resolvedLimit) {
+    return { status: "error", message: resolvedLimit.error };
+  }
+  return { status: "ok", queryRaw, scope, limit: resolvedLimit.value };
 }
 
 export type ContestSolvesContextResult =

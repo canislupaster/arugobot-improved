@@ -8,16 +8,16 @@ import {
   formatUnsolvedProblemsValue,
   splitContestSolves,
 } from "../utils/contestProblems.js";
-import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
+import { addContestScopeOption } from "../utils/contestScope.js";
 import {
   getContestSolvesDataMessage,
   loadContestSolvesData,
   resolveContestSolvesContext,
+  resolveContestSolvesOptions,
   shouldShowContestSolvesStale,
 } from "../utils/contestSolvesData.js";
 import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
-import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -48,21 +48,16 @@ export const contestSolvesCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     ),
   async execute(interaction, context) {
-    const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
-    const scope = parseContestScope(interaction.options.getString("scope"));
-    const resolvedLimit = resolveBoundedIntegerOption(interaction, {
-      name: "limit",
-      defaultValue: DEFAULT_LIMIT,
-      min: 1,
-      max: MAX_LIMIT,
-      errorMessage: "Invalid limit.",
+    const optionResult = resolveContestSolvesOptions(interaction, {
+      defaultLimit: DEFAULT_LIMIT,
+      maxLimit: MAX_LIMIT,
     });
-    if ("error" in resolvedLimit) {
-      await interaction.reply({ content: resolvedLimit.error });
+    if (optionResult.status === "error") {
+      await interaction.reply({ content: optionResult.message });
       return;
     }
-    const { value: limit } = resolvedLimit;
+    const { queryRaw, scope, limit } = optionResult;
     const handleInputs = parseHandleList(handlesRaw);
     const userOptions = getUserOptions([
       interaction.options.getUser("user1"),

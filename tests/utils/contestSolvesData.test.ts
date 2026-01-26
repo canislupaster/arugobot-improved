@@ -4,6 +4,7 @@ import {
   getContestSolvesDataMessage,
   loadContestSolvesData,
   resolveContestSolvesContext,
+  resolveContestSolvesOptions,
   shouldShowContestSolvesStale,
 } from "../../src/utils/contestSolvesData.js";
 
@@ -210,5 +211,70 @@ describe("resolveContestSolvesContext", () => {
     expect(interaction.editReply).toHaveBeenCalledWith(
       "No contests found matching that name."
     );
+  });
+});
+
+describe("resolveContestSolvesOptions", () => {
+  const createInteraction = (options: {
+    query?: string;
+    scope?: string | null;
+    limit?: number | null;
+  }) =>
+    ({
+      options: {
+        getString: (name: string, required?: boolean) => {
+          if (name === "query") {
+            if (options.query === undefined && required) {
+              throw new Error("query required");
+            }
+            return options.query ?? null;
+          }
+          if (name === "scope") {
+            return options.scope ?? null;
+          }
+          return null;
+        },
+        getInteger: (name: string) => {
+          if (name === "limit") {
+            return options.limit ?? null;
+          }
+          return null;
+        },
+      },
+    }) as unknown as import("discord.js").ChatInputCommandInteraction;
+
+  it("returns an error when limit is invalid", () => {
+    const interaction = createInteraction({
+      query: "1234",
+      scope: "official",
+      limit: 99,
+    });
+
+    const result = resolveContestSolvesOptions(interaction, {
+      defaultLimit: 10,
+      maxLimit: 25,
+    });
+
+    expect(result).toEqual({ status: "error", message: "Invalid limit." });
+  });
+
+  it("returns parsed options when inputs are valid", () => {
+    const interaction = createInteraction({
+      query: "  1234  ",
+      scope: "gym",
+      limit: null,
+    });
+
+    const result = resolveContestSolvesOptions(interaction, {
+      defaultLimit: 10,
+      maxLimit: 25,
+    });
+
+    expect(result).toEqual({
+      status: "ok",
+      queryRaw: "1234",
+      scope: "gym",
+      limit: 10,
+    });
   });
 });
