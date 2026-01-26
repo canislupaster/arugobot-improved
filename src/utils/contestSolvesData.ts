@@ -9,6 +9,23 @@ export type ContestSolvesDataResult =
   | { status: "no_problems" }
   | { status: "no_solves" };
 
+export function getContestSolvesDataMessage(result: ContestSolvesDataResult): string | null {
+  if (result.status === "no_problems") {
+    return "No contest problems found in the cache yet.";
+  }
+  if (result.status === "no_solves") {
+    return "Contest submissions cache not ready yet. Try again soon.";
+  }
+  return null;
+}
+
+export function shouldShowContestSolvesStale(
+  refreshWasStale: boolean,
+  contestSolves: ContestSolvesResult
+): boolean {
+  return refreshWasStale || contestSolves.isStale;
+}
+
 export async function loadContestSolvesData(
   problems: Pick<ProblemService, "ensureProblemsLoaded">,
   store: Pick<StoreService, "getContestSolvesResult">,

@@ -11,7 +11,11 @@ import {
   splitContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
-import { loadContestSolvesData } from "../utils/contestSolvesData.js";
+import {
+  getContestSolvesDataMessage,
+  loadContestSolvesData,
+  shouldShowContestSolvesStale,
+} from "../utils/contestSolvesData.js";
 import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
 import { resolveBoundedIntegerOption } from "../utils/interaction.js";
@@ -122,7 +126,9 @@ export const contestSolvesCommand: Command = {
         contest.id
       );
       if (contestData.status === "no_problems") {
-        await interaction.editReply("No contest problems found in the cache yet.");
+        await interaction.editReply(
+          getContestSolvesDataMessage(contestData) ?? "No contest data available."
+        );
         return;
       }
 
@@ -143,7 +149,9 @@ export const contestSolvesCommand: Command = {
       const targets = targetResult.targets;
 
       if (contestData.status === "no_solves") {
-        await interaction.editReply("Contest submissions cache not ready yet. Try again soon.");
+        await interaction.editReply(
+          getContestSolvesDataMessage(contestData) ?? "No contest data available."
+        );
         return;
       }
       const { contestProblems, contestSolves } = contestData;
@@ -198,8 +206,7 @@ export const contestSolvesCommand: Command = {
         embed.addFields({ name: "Solved problems", value: lines, inline: false });
       }
 
-      const showStale = refreshResult.stale || contestSolves.isStale;
-      if (showStale) {
+      if (shouldShowContestSolvesStale(refreshResult.stale, contestSolves)) {
         embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
       }
 

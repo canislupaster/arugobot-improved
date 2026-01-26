@@ -11,7 +11,11 @@ import {
   splitContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
-import { loadContestSolvesData } from "../utils/contestSolvesData.js";
+import {
+  getContestSolvesDataMessage,
+  loadContestSolvesData,
+  shouldShowContestSolvesStale,
+} from "../utils/contestSolvesData.js";
 import {
   resolveBoundedIntegerOption,
   resolveHandleUserOptions,
@@ -156,12 +160,10 @@ export const contestUpsolveCommand: Command = {
         context.services.store,
         contest.id
       );
-      if (contestData.status === "no_problems") {
-        await interaction.editReply("No contest problems found in the cache yet.");
-        return;
-      }
-      if (contestData.status === "no_solves") {
-        await interaction.editReply("Contest submissions cache not ready yet. Try again soon.");
+      if (contestData.status !== "ok") {
+        await interaction.editReply(
+          getContestSolvesDataMessage(contestData) ?? "No contest data available."
+        );
         return;
       }
       const { contestProblems, contestSolves } = contestData;
@@ -208,8 +210,7 @@ export const contestUpsolveCommand: Command = {
         });
       }
 
-      const showStale = refreshResult.stale || contestSolves.isStale;
-      if (showStale) {
+      if (shouldShowContestSolvesStale(refreshResult.stale, contestSolves)) {
         embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
       }
 

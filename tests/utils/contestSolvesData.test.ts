@@ -1,6 +1,10 @@
 import type { ProblemService } from "../../src/services/problems.js";
 import type { ContestSolvesResult, StoreService } from "../../src/services/store.js";
-import { loadContestSolvesData } from "../../src/utils/contestSolvesData.js";
+import {
+  getContestSolvesDataMessage,
+  loadContestSolvesData,
+  shouldShowContestSolvesStale,
+} from "../../src/utils/contestSolvesData.js";
 
 describe("loadContestSolvesData", () => {
   it("returns no_problems when contest has no cached problems", async () => {
@@ -65,5 +69,56 @@ describe("loadContestSolvesData", () => {
       expect(result.contestProblems[0].contestId).toBe(3);
       expect(result.contestSolves).toBe(contestSolves);
     }
+  });
+});
+
+describe("getContestSolvesDataMessage", () => {
+  it("returns messages for missing contest data", () => {
+    expect(getContestSolvesDataMessage({ status: "no_problems" })).toBe(
+      "No contest problems found in the cache yet."
+    );
+    expect(getContestSolvesDataMessage({ status: "no_solves" })).toBe(
+      "Contest submissions cache not ready yet. Try again soon."
+    );
+  });
+
+  it("returns null for ok results", () => {
+    const contestSolves = {
+      solves: [],
+      source: "cache",
+      isStale: false,
+    } satisfies ContestSolvesResult;
+    expect(
+      getContestSolvesDataMessage({
+        status: "ok",
+        contestProblems: [],
+        contestSolves,
+      })
+    ).toBeNull();
+  });
+});
+
+describe("shouldShowContestSolvesStale", () => {
+  it("returns true when refresh or contest data is stale", () => {
+    const contestSolves = {
+      solves: [],
+      source: "cache",
+      isStale: true,
+    } satisfies ContestSolvesResult;
+
+    expect(shouldShowContestSolvesStale(false, contestSolves)).toBe(true);
+    expect(
+      shouldShowContestSolvesStale(true, { ...contestSolves, isStale: false })
+    ).toBe(true);
+  });
+
+  it("returns false when both refresh and contest data are fresh", () => {
+    const contestSolves = {
+      solves: [],
+      source: "cache",
+      isStale: false,
+    } satisfies ContestSolvesResult;
+
+    expect(shouldShowContestSolvesStale(false, contestSolves)).toBe(false);
   });
 });
