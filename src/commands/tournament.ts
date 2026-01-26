@@ -324,9 +324,7 @@ export const tournamentCommand: Command = {
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+      await respondToInteraction(interaction, "This command can only be used in a server.");
       return;
     }
 
@@ -337,7 +335,7 @@ export const tournamentCommand: Command = {
       if (subcommand === "history") {
         const page = interaction.options.getInteger("page") ?? 1;
         if (!Number.isInteger(page) || page < 1) {
-          await interaction.reply({ content: "Invalid page." });
+          await respondToInteraction(interaction, "Invalid page.");
           return;
         }
         await interaction.deferReply();
@@ -869,16 +867,18 @@ export const tournamentCommand: Command = {
         const tagsRaw = interaction.options.getString("tags") ?? "";
 
         if (!VALID_LENGTHS.has(length)) {
-          await interaction.reply({
-            content: "Invalid length. Valid lengths are 40, 60, and 80 minutes.",
-          });
+          await respondToInteraction(
+            interaction,
+            "Invalid length. Valid lengths are 40, 60, and 80 minutes."
+          );
           return;
         }
 
         if (maxParticipants < MIN_PARTICIPANTS || maxParticipants > MAX_PARTICIPANTS) {
-          await interaction.reply({
-            content: `Invalid max participants. Choose ${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS}.`,
-          });
+          await respondToInteraction(
+            interaction,
+            `Invalid max participants. Choose ${MIN_PARTICIPANTS}-${MAX_PARTICIPANTS}.`
+          );
           return;
         }
 
@@ -887,9 +887,10 @@ export const tournamentCommand: Command = {
           (arenaProblemCount < MIN_ARENA_PROBLEM_COUNT ||
             arenaProblemCount > MAX_ARENA_PROBLEM_COUNT)
         ) {
-          await interaction.reply({
-            content: `Invalid arena problem count. Choose ${MIN_ARENA_PROBLEM_COUNT}-${MAX_ARENA_PROBLEM_COUNT}.`,
-          });
+          await respondToInteraction(
+            interaction,
+            `Invalid arena problem count. Choose ${MIN_ARENA_PROBLEM_COUNT}-${MAX_ARENA_PROBLEM_COUNT}.`
+          );
           return;
         }
 
@@ -902,7 +903,7 @@ export const tournamentCommand: Command = {
           defaultMax: DEFAULT_MAX_RATING,
         });
         if (rangeResult.error) {
-          await interaction.reply({ content: rangeResult.error });
+          await respondToInteraction(interaction, rangeResult.error);
           return;
         }
 
