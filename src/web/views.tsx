@@ -636,16 +636,16 @@ export function renderHomePage(model: HomeViewModel): ViewResult {
       <section class="section">
         <div class="card callout">
           <div>
-            <div class="eyebrow">Get started</div>
-            <h3>Invite, link, compete</h3>
+            <div class="eyebrow">Community</div>
+            <h3>Join Purdue CPU</h3>
             <p>
-              Add ArugoBot to your Discord server, link handles with <strong>/register</strong>,
-              then start a challenge or tournament in minutes.
+              Try ArugoBot in the Purdue CPU Discord, link handles with{" "}
+              <strong>/register</strong>, and start a challenge or tournament.
             </p>
           </div>
           <div class="callout-actions">
-            <a class="button" href="https://codeforces.com" rel="noreferrer">
-              Visit Codeforces
+            <a class="button" href="https://purduecpu.com/discord" rel="noreferrer">
+              Join CPU Discord
             </a>
             <a class="button ghost" href="/status">
               View cache status

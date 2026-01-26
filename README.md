@@ -233,7 +233,7 @@ Most command responses are public; handle-linking and admin diagnostics remain e
 
 ## Installation
 
-To invite the instance I am hosting, use this [link](https://discord.com/oauth2/authorize?client_id=1325529003473240124&permissions=277025507392&integration_type=0&scope=bot).
+To try the bot, join the Purdue CPU Discord: https://purduecpu.com/discord
 If you want to host it, install dependencies with pnpm (Node 18+), set the required env vars, and run the bot:
 
 Required environment variables:
