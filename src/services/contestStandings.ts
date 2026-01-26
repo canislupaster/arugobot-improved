@@ -81,9 +81,9 @@ function dedupeHandles(handles: string[]): string[] {
 function mapEntries(rows: ContestStandingsResponse["rows"]): ContestStandingEntry[] {
   const entries: ContestStandingEntry[] = [];
   for (const row of rows) {
-    const rank = Math.max(0, Math.floor(toSafeNumber(row.rank)));
-    const points = toSafeNumber(row.points);
-    const penalty = toSafeNumber(row.penalty);
+    const rank = Math.max(0, Math.floor(row.rank));
+    const points = row.points;
+    const penalty = row.penalty;
     const participantType = row.party.participantType ?? "CONTESTANT";
     for (const member of row.party.members) {
       entries.push({
@@ -98,17 +98,13 @@ function mapEntries(rows: ContestStandingsResponse["rows"]): ContestStandingEntr
   return entries;
 }
 
-function toSafeNumber(value: number, fallback = 0): number {
-  return Number.isFinite(value) ? value : fallback;
-}
-
 function parseCachedEntries(
   payload: string
 ): { entries: ContestStandingEntry[] | null; error?: string } {
   try {
     const parsed = JSON.parse(payload) as ContestStandingEntry[];
     if (!Array.isArray(parsed)) {
-      return { entries: null };
+      return { entries: null, error: "Cached standings payload was not an array." };
     }
     return { entries: parsed };
   } catch (error) {
