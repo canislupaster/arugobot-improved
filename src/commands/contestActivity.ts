@@ -5,6 +5,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -127,17 +128,31 @@ export const contestActivityCommand: Command = {
       return;
     }
 
-    const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
-    const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
     const scope = parseContestScope(interaction.options.getString("scope"), DEFAULT_SCOPE);
-    if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
-      await interaction.reply({ content: "Invalid lookback window." });
+    const daysResult = resolveBoundedIntegerOption(interaction, {
+      name: "days",
+      min: MIN_DAYS,
+      max: MAX_DAYS,
+      defaultValue: DEFAULT_DAYS,
+      errorMessage: "Invalid lookback window.",
+    });
+    if ("error" in daysResult) {
+      await interaction.reply({ content: daysResult.error });
       return;
     }
-    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-      await interaction.reply({ content: "Invalid participant limit." });
+    const limitResult = resolveBoundedIntegerOption(interaction, {
+      name: "limit",
+      min: 1,
+      max: MAX_LIMIT,
+      defaultValue: DEFAULT_LIMIT,
+      errorMessage: "Invalid participant limit.",
+    });
+    if ("error" in limitResult) {
+      await interaction.reply({ content: limitResult.error });
       return;
     }
+    const { value: days } = daysResult;
+    const { value: limit } = limitResult;
 
     await interaction.deferReply();
 

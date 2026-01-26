@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -122,13 +123,19 @@ export const activityCommand: Command = {
       });
       return;
     }
-
-    const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
-    const user = interaction.options.getUser("user");
-    if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
-      await interaction.reply({ content: "Invalid lookback window." });
+    const daysResult = resolveBoundedIntegerOption(interaction, {
+      name: "days",
+      min: MIN_DAYS,
+      max: MAX_DAYS,
+      defaultValue: DEFAULT_DAYS,
+      errorMessage: "Invalid lookback window.",
+    });
+    if ("error" in daysResult) {
+      await interaction.reply({ content: daysResult.error });
       return;
     }
+    const { value: days } = daysResult;
+    const user = interaction.options.getUser("user");
 
     await interaction.deferReply();
 
