@@ -81,9 +81,9 @@ function dedupeHandles(handles: string[]): string[] {
 function mapEntries(rows: ContestStandingsResponse["rows"]): ContestStandingEntry[] {
   const entries: ContestStandingEntry[] = [];
   for (const row of rows) {
-    const rank = Number.isFinite(row.rank) ? Math.max(0, Math.floor(row.rank)) : 0;
-    const points = Number.isFinite(row.points) ? row.points : 0;
-    const penalty = Number.isFinite(row.penalty) ? row.penalty : 0;
+    const rank = Math.max(0, Math.floor(toSafeNumber(row.rank)));
+    const points = toSafeNumber(row.points);
+    const penalty = toSafeNumber(row.penalty);
     const participantType = row.party.participantType ?? "CONTESTANT";
     for (const member of row.party.members) {
       entries.push({
@@ -96,6 +96,27 @@ function mapEntries(rows: ContestStandingsResponse["rows"]): ContestStandingEntr
     }
   }
   return entries;
+}
+
+function toSafeNumber(value: number, fallback = 0): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function parseCachedEntries(
+  payload: string
+): { entries: ContestStandingEntry[] | null; error?: string } {
+  try {
+    const parsed = JSON.parse(payload) as ContestStandingEntry[];
+    if (!Array.isArray(parsed)) {
+      return { entries: null };
+    }
+    return { entries: parsed };
+  } catch (error) {
+    return {
+      entries: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export class ContestStandingsService {
@@ -153,19 +174,15 @@ export class ContestStandingsService {
     if (!row) {
       return null;
     }
-    try {
-      const parsed = JSON.parse(row.payload) as ContestStandingEntry[];
-      if (!Array.isArray(parsed)) {
-        return null;
-      }
-      return { entries: parsed, lastFetched: row.last_fetched };
-    } catch (error) {
+    const { entries, error } = parseCachedEntries(row.payload);
+    if (!entries) {
       logWarn("Failed to parse cached contest standings.", {
         contestId,
-        error: error instanceof Error ? error.message : String(error),
+        error,
       });
       return null;
     }
+    return { entries, lastFetched: row.last_fetched };
   }
 
   private async setCache(
