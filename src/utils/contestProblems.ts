@@ -54,6 +54,17 @@ export function formatContestProblemLines(
     .join("\n");
 }
 
+export function formatUnsolvedProblemsValue(
+  unsolved: ContestProblemSummary[],
+  limit: number,
+  emptyMessage: string
+): string {
+  if (unsolved.length === 0) {
+    return emptyMessage;
+  }
+  return formatContestProblemLines(unsolved, limit);
+}
+
 export function summarizeContestSolves(
   problems: Problem[],
   solves: ContestSolveEntry[],

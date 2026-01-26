@@ -7,7 +7,7 @@ import {
   resolveContestOrReply,
 } from "../utils/contestLookup.js";
 import {
-  formatContestProblemLines,
+  formatUnsolvedProblemsValue,
   splitContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
@@ -196,19 +196,15 @@ export const contestUpsolveCommand: Command = {
         }
       );
 
-      if (unsolved.length > 0) {
-        embed.addFields({
-          name: "Unsolved problems",
-          value: formatContestProblemLines(unsolved, limit),
-          inline: false,
-        });
-      } else {
-        embed.addFields({
-          name: "Unsolved problems",
-          value: "All contest problems were solved by this handle.",
-          inline: false,
-        });
-      }
+      embed.addFields({
+        name: "Unsolved problems",
+        value: formatUnsolvedProblemsValue(
+          unsolved,
+          limit,
+          "All contest problems were solved by this handle."
+        ),
+        inline: false,
+      });
 
       if (shouldShowContestSolvesStale(refreshResult.stale, contestSolves)) {
         embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });

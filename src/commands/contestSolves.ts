@@ -8,6 +8,7 @@ import {
 import {
   compareProblemIndex,
   formatContestProblemLines,
+  formatUnsolvedProblemsValue,
   splitContestSolves,
 } from "../utils/contestProblems.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
@@ -181,19 +182,15 @@ export const contestSolvesCommand: Command = {
         inline: false,
       });
 
-      if (unsolved.length > 0) {
-        embed.addFields({
-          name: "Unsolved problems",
-          value: formatContestProblemLines(unsolved, limit),
-          inline: false,
-        });
-      } else {
-        embed.addFields({
-          name: "Unsolved problems",
-          value: "All contest problems were solved by linked users.",
-          inline: false,
-        });
-      }
+      embed.addFields({
+        name: "Unsolved problems",
+        value: formatUnsolvedProblemsValue(
+          unsolved,
+          limit,
+          "All contest problems were solved by linked users."
+        ),
+        inline: false,
+      });
 
       if (solved.length > 0) {
         const lines = formatContestProblemLines(

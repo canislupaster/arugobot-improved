@@ -1,6 +1,7 @@
 import type { Problem } from "../../src/services/problems.js";
 import {
   formatContestProblemLines,
+  formatUnsolvedProblemsValue,
   splitContestSolves,
   type ContestSolveEntry,
 } from "../../src/utils/contestProblems.js";
@@ -44,5 +45,31 @@ describe("formatContestProblemLines", () => {
     expect(lines).toContain("Alpha");
     expect(lines).toContain("2 solved");
     expect(lines).not.toContain("Beta");
+  });
+});
+
+describe("formatUnsolvedProblemsValue", () => {
+  it("returns the empty message when there are no unsolved problems", () => {
+    const value = formatUnsolvedProblemsValue([], 10, "All solved.");
+
+    expect(value).toBe("All solved.");
+  });
+
+  it("formats the unsolved list when entries exist", () => {
+    const entries = [
+      {
+        problem: { contestId: 1, index: "A", name: "Alpha", tags: [] },
+        solvedBy: new Set<string>(),
+      },
+      {
+        problem: { contestId: 1, index: "B", name: "Beta", tags: [] },
+        solvedBy: new Set<string>(),
+      },
+    ];
+
+    const value = formatUnsolvedProblemsValue(entries, 1, "All solved.");
+
+    expect(value).toContain("Alpha");
+    expect(value).not.toContain("Beta");
   });
 });
