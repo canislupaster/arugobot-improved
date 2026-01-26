@@ -5,6 +5,7 @@ import {
   safeInteractionDefer,
   safeInteractionEdit,
   safeInteractionReply,
+  validateHandleTargetContext,
 } from "../../src/utils/interaction.js";
 
 type FakeUser = { username: string; toString: () => string };
@@ -158,6 +159,38 @@ describe("resolveHandleUserOptions", () => {
 
     expect(result.handleInput).toBe("tourist");
     expect(result.userOption).toBeNull();
+  });
+});
+
+describe("validateHandleTargetContext", () => {
+  const createInteraction = (guild: object | null) => ({ guild }) as never;
+
+  it("blocks user mentions in DMs", () => {
+    const interaction = createInteraction(null);
+    const error = validateHandleTargetContext(interaction, "tourist", { id: "user-1" } as never);
+
+    expect(error).toBe("This command can only target other users in a server.");
+  });
+
+  it("requires a handle in DMs when user is missing", () => {
+    const interaction = createInteraction(null);
+    const error = validateHandleTargetContext(interaction, "", null);
+
+    expect(error).toBe("Provide a handle when using this command in DMs.");
+  });
+
+  it("allows handles in DMs", () => {
+    const interaction = createInteraction(null);
+    const error = validateHandleTargetContext(interaction, "tourist", null);
+
+    expect(error).toBeNull();
+  });
+
+  it("allows user targets in guilds", () => {
+    const interaction = createInteraction({ id: "guild-1" });
+    const error = validateHandleTargetContext(interaction, "", { id: "user-1" } as never);
+
+    expect(error).toBeNull();
   });
 });
 

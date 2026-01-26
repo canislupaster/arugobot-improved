@@ -150,6 +150,20 @@ export function resolveHandleUserOptions(
   return { handleInput, userOption, member };
 }
 
+export function validateHandleTargetContext(
+  interaction: ChatInputCommandInteraction,
+  handleInput: string,
+  userOption: User | null
+): string | null {
+  if (!interaction.guild && userOption) {
+    return "This command can only target other users in a server.";
+  }
+  if (!interaction.guild && !handleInput) {
+    return "Provide a handle when using this command in DMs.";
+  }
+  return null;
+}
+
 type IntegerOptionResolver = {
   options: { getInteger: (name: string) => number | null };
 };

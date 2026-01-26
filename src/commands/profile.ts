@@ -4,7 +4,11 @@ import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
-import { resolveHandleUserOptions, resolveTargetLabels } from "../utils/interaction.js";
+import {
+  resolveHandleUserOptions,
+  resolveTargetLabels,
+  validateHandleTargetContext,
+} from "../utils/interaction.js";
 import { formatSubmissionLines } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -112,16 +116,9 @@ export const profileCommand: Command = {
       return;
     }
     const { handleInput, userOption, member } = handleResolution;
-    if (!interaction.guild && userOption) {
-      await interaction.reply({
-        content: "This command can only target other users in a server.",
-      });
-      return;
-    }
-    if (!interaction.guild && !handleInput) {
-      await interaction.reply({
-        content: "Provide a handle when using this command in DMs.",
-      });
+    const contextError = validateHandleTargetContext(interaction, handleInput, userOption);
+    if (contextError) {
+      await interaction.reply({ content: contextError });
       return;
     }
 
