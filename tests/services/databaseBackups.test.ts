@@ -42,4 +42,28 @@ describe("DatabaseBackupService", () => {
     const lastError = service.getLastError();
     expect(lastError?.message).toContain("unsupported DATABASE_URL");
   });
+
+  it("uses the next second when a backup name already exists", async () => {
+    const rootDir = await createTempDir();
+    const backupDir = path.join(rootDir, "backups");
+    await fs.mkdir(backupDir, { recursive: true });
+    const dbPath = path.join(rootDir, "bot_data.db");
+    await fs.writeFile(dbPath, "test-data");
+
+    const fixedNow = Date.parse("2024-02-01T00:00:00.000Z");
+    const dateNowSpy = jest.spyOn(Date, "now").mockReturnValue(fixedNow);
+    try {
+      const nowSeconds = Math.floor(fixedNow / 1000);
+      await fs.writeFile(path.join(backupDir, String(nowSeconds)), "existing");
+
+      const service = new DatabaseBackupService(`sqlite:${dbPath}`, backupDir, 7);
+      const result = await service.runBackup();
+      expect(result.status).toBe("success");
+      if (result.status === "success") {
+        expect(result.filePath).toBe(path.join(backupDir, String(nowSeconds + 1)));
+      }
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
 });

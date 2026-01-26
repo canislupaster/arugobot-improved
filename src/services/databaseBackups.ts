@@ -48,7 +48,7 @@ export class DatabaseBackupService {
     const startedAt = Date.now();
     try {
       await fs.mkdir(this.backupDir, { recursive: true });
-      const backupPath = path.join(this.backupDir, String(currentEpochSeconds()));
+      const { backupPath } = await this.resolveBackupPath(startedAt);
       await fs.copyFile(this.databasePath, backupPath, fsConstants.COPYFILE_EXCL);
       const deletedCount = await this.cleanupOldBackups(Date.now());
       this.lastBackupAt = new Date().toISOString();
@@ -122,6 +122,31 @@ export class DatabaseBackupService {
     }
     logError("Database backup failed.", { error: message });
   }
+
+  private async resolveBackupPath(
+    nowMs: number
+  ): Promise<{ backupPath: string; timestampSeconds: number }> {
+    if (!this.backupDir) {
+      throw new Error("Backup directory not configured.");
+    }
+    const baseSeconds = Math.floor(nowMs / 1000);
+    const maxAttempts = 5;
+    for (let offset = 0; offset <= maxAttempts; offset += 1) {
+      const timestampSeconds = baseSeconds + offset;
+      const backupPath = path.join(this.backupDir, String(timestampSeconds));
+      try {
+        await fs.access(backupPath);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "ENOENT") {
+          return { backupPath, timestampSeconds };
+        }
+        throw error;
+      }
+    }
+    const timestampSeconds = baseSeconds + maxAttempts + 1;
+    return { backupPath: path.join(this.backupDir, String(timestampSeconds)), timestampSeconds };
+  }
 }
 
 function resolveSqlitePath(databaseUrl: string): string | null {
@@ -134,8 +159,4 @@ function resolveSqlitePath(databaseUrl: string): string | null {
   }
   const normalized = raw.startsWith("//") ? raw.slice(2) : raw;
   return path.resolve(normalized);
-}
-
-function currentEpochSeconds(): number {
-  return Math.floor(Date.now() / 1000);
 }
