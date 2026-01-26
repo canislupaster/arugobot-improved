@@ -568,7 +568,7 @@ export class ContestActivityService {
             continue;
           }
           for (const contest of parsed) {
-            if (!contest || !Number.isFinite(contest.id)) {
+            if (!contest) {
               continue;
             }
             const scope: ContestScope = contest.isGym || isGymDefault ? "gym" : "official";

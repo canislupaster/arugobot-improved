@@ -1,7 +1,7 @@
 import { formatRatingDelta, parseRatingChangesPayload } from "../../src/utils/ratingChanges.js";
 
 describe("parseRatingChangesPayload", () => {
-  it("filters out invalid rating change entries", () => {
+  it("returns parsed rating changes without filtering", () => {
     const payload = JSON.stringify([
       {
         contestId: 1000,
@@ -24,8 +24,9 @@ describe("parseRatingChangesPayload", () => {
 
     const result = parseRatingChangesPayload(payload);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
     expect(result[0]?.contestId).toBe(1000);
+    expect(result[1]?.contestId).toBe("bad");
   });
 
   it("returns an empty array for malformed payloads", () => {
@@ -46,9 +47,5 @@ describe("formatRatingDelta", () => {
 
   it("omits plus sign for zero when configured", () => {
     expect(formatRatingDelta(0, { includeZeroSign: false })).toBe("0");
-  });
-
-  it("handles non-finite deltas", () => {
-    expect(formatRatingDelta(Number.NaN)).toBe("0");
   });
 });

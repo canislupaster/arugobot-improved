@@ -135,7 +135,7 @@ export class ContestService {
     const filtered = this.getContestsByScope(scope).filter(
       (contest) => contest.phase === "FINISHED"
     );
-    const since = Number.isFinite(sinceSeconds) ? (sinceSeconds as number) : null;
+    const since = sinceSeconds ?? null;
     const matches = since
       ? filtered.filter((contest) => contest.startTimeSeconds >= since)
       : filtered;
