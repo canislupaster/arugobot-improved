@@ -5,9 +5,13 @@ import type {
   TournamentSummary,
   UpcomingContestsOverview,
 } from "../services/website.js";
+import type { TournamentRecap } from "../services/tournaments.js";
+import { buildProblemLink } from "../utils/contestProblems.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { formatTime } from "../utils/rating.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 import { capitalize } from "../utils/text.js";
+import { formatRatingRanges, formatTags } from "../utils/tournamentRecap.js";
 
 type GuildCard = {
   id: string;
@@ -85,6 +89,12 @@ export type HomeViewModel = {
 export type GuildViewModel = {
   generatedAt: string;
   guild: GuildView;
+};
+
+export type TournamentViewModel = {
+  generatedAt: string;
+  guild: { id: string; name: string };
+  recap: TournamentRecap;
 };
 
 export type StatusViewModel = {
@@ -236,6 +246,60 @@ function formatArenaEndsAt(tournament: TournamentSummary): ViewResult | null {
       {label} {renderLocalTimeFromUnix(tournament.arenaEndsAt)}
     </>
   );
+}
+
+function formatParticipantLabel(
+  userId: string,
+  handles: Record<string, string | null>
+): string {
+  const handle = handles[userId];
+  return handle ? `${handle} (${userId})` : userId;
+}
+
+function formatStandingsDetail(
+  entry: TournamentRecap["standings"][number],
+  format: TournamentRecap["entry"]["format"]
+): string {
+  if (format === "arena") {
+    const timeLabel = entry.score > 0 ? ` • ${formatTime(entry.tiebreak)}` : "";
+    return `${entry.score} solves${timeLabel}`;
+  }
+  const record = `${entry.wins}-${entry.losses}-${entry.draws}`;
+  const tiebreakLabel = format === "swiss" ? ` • TB ${entry.tiebreak.toFixed(1)}` : "";
+  return `${entry.score} pts (${record})${tiebreakLabel}`;
+}
+
+function formatMatchSummary(
+  match: TournamentRecap["rounds"][number]["matches"][number],
+  handles: Record<string, string | null>
+): { title: string; subtitle: string; status: string } {
+  const player1 = formatParticipantLabel(match.player1Id, handles);
+  if (!match.player2Id) {
+    return {
+      title: `Match ${match.matchNumber}`,
+      subtitle: `${player1} has a bye`,
+      status: "bye",
+    };
+  }
+  const player2 = formatParticipantLabel(match.player2Id, handles);
+  const winner = match.winnerId
+    ? formatParticipantLabel(match.winnerId, handles)
+    : match.isDraw
+      ? "Draw"
+      : "No winner";
+  const status = match.status === "completed" ? "completed" : match.status;
+  return {
+    title: `Match ${match.matchNumber}`,
+    subtitle: `${player1} vs ${player2} • Winner: ${winner}`,
+    status,
+  };
+}
+
+function formatProblemLabel(problem: TournamentRecap["rounds"][number]["problem"]) {
+  const problemId = `${problem.contestId}${problem.index}`;
+  const url = buildProblemLink(problem);
+  const rating = problem.rating ? ` (${problem.rating})` : "";
+  return { problemId, url, label: `${problemId} • ${problem.name}${rating}` };
 }
 
 function formatAgeSeconds(seconds: number | null): string {
@@ -691,7 +755,10 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
               guild.tournaments.map((tournament) => {
                 const arenaEndsAt = formatArenaEndsAt(tournament);
                 return (
-                  <div class="tournament-row">
+                  <a
+                    class="tournament-row"
+                    href={`/guilds/${guild.id}/tournaments/${tournament.id}`}
+                  >
                     <div>
                       <div class="title">
                         {capitalize(tournament.format)} • {tournament.lengthMinutes}m •{" "}
@@ -704,7 +771,7 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
                       </div>
                     </div>
                     <div class="pill">{renderLocalTime(tournament.updatedAt)}</div>
-                  </div>
+                  </a>
                 );
               })
             )}
@@ -814,6 +881,180 @@ export function renderGuildPage(model: GuildViewModel): ViewResult {
           </table>
         </div>
       </section>
+    </Layout>
+  );
+}
+
+export function renderTournamentPage(model: TournamentViewModel): ViewResult {
+  const recap = model.recap;
+  const formatLabel = capitalize(recap.entry.format);
+  const statusLabel = recap.entry.status === "completed" ? "Completed" : "Cancelled";
+  const winnerLabel = recap.entry.winnerId
+    ? formatParticipantLabel(recap.entry.winnerId, recap.participantHandles)
+    : "None";
+  const ratingRanges = formatRatingRanges(recap.entry.ratingRanges);
+  const tags = formatTags(recap.entry.tags);
+  const hostLabel = formatParticipantLabel(recap.hostUserId, recap.participantHandles);
+
+  return (
+    <Layout
+      title={`ArugoBot | Tournament ${recap.entry.id}`}
+      description={`Tournament recap for ${model.guild.name}.`}
+    >
+      <section class="hero compact">
+        <div>
+          <h1>{model.guild.name}</h1>
+          <p>
+            {formatLabel} tournament recap • Last refresh {renderLocalTime(model.generatedAt)}
+          </p>
+        </div>
+        <div class="hero-glow" aria-hidden="true" />
+      </section>
+
+      <section class="section split">
+        <div class="card">
+          <SectionHeader title="Tournament summary" subtitle={`Status: ${statusLabel}`} />
+          <div class="metrics">
+            <div>
+              <div class="label">Participants</div>
+              <div class="value">{formatNumber(recap.entry.participantCount)}</div>
+            </div>
+            <div>
+              <div class="label">Rounds</div>
+              <div class="value">{formatNumber(recap.entry.roundCount)}</div>
+            </div>
+            <div>
+              <div class="label">Length</div>
+              <div class="value">{formatNumber(recap.entry.lengthMinutes)}m</div>
+            </div>
+          </div>
+          <div class="subheader">Winner</div>
+          <div>{winnerLabel}</div>
+          <div class="subheader">Host</div>
+          <div>{hostLabel}</div>
+          <div class="subheader">Channel</div>
+          <div>{recap.channelId}</div>
+          <div class="subheader">Ranges</div>
+          <div>{ratingRanges}</div>
+          <div class="subheader">Tags</div>
+          <div>{tags}</div>
+          <div class="subheader">Updated</div>
+          <div>{renderLocalTime(recap.entry.updatedAt)}</div>
+          <div class="subheader">Guild</div>
+          <div>
+            <a href={`/guilds/${model.guild.id}`}>Back to {model.guild.name}</a>
+          </div>
+        </div>
+        <div class="card">
+          <SectionHeader title="Standings" subtitle="Final table and seed order." />
+          {recap.standings.length === 0 ? (
+            <div class="muted">No standings recorded.</div>
+          ) : (
+            <div class="stack">
+              {recap.standings.map((entry, index) => {
+                const label = formatParticipantLabel(entry.userId, recap.participantHandles);
+                const detail = formatStandingsDetail(entry, recap.entry.format);
+                const status = entry.eliminated ? "Eliminated" : `Seed ${entry.seed}`;
+                return (
+                  <div class="tournament-row">
+                    <div>
+                      <div class="title">
+                        #{index + 1} {label}
+                      </div>
+                      <div class="muted">{detail}</div>
+                    </div>
+                    <div class="pill">{status}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {recap.entry.format === "arena" ? (
+        <section class="section">
+          <div class="card">
+            <SectionHeader title="Arena problems" subtitle="Ordered by rating." />
+            <div class="stack">
+              {recap.arenaProblems?.length ? (
+                recap.arenaProblems.map((problem) => {
+                  const label = formatProblemLabel(problem);
+                  return (
+                    <div class="tournament-row">
+                      <div>
+                        <div class="title">
+                          <a href={label.url} rel="noreferrer">
+                            {label.problemId}
+                          </a>
+                        </div>
+                        <div class="muted">{label.label}</div>
+                      </div>
+                      {problem.rating ? <div class="pill">{problem.rating}</div> : null}
+                    </div>
+                  );
+                })
+              ) : (
+                <div class="muted">No arena problems recorded.</div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <></>
+      )}
+
+      {recap.entry.format !== "arena" ? (
+        <section class="section">
+          <SectionHeader title="Rounds" subtitle="Problems and match results." />
+          <div class="stack">
+            {recap.rounds.length === 0 ? (
+              <div class="card">
+                <div class="muted">No rounds recorded.</div>
+              </div>
+            ) : (
+              recap.rounds.map((round) => {
+                const problem = formatProblemLabel(round.problem);
+                return (
+                  <div class="card">
+                    <SectionHeader
+                      title={`Round ${round.roundNumber}`}
+                      subtitle={`Status: ${round.status}`}
+                    />
+                    <div class="subheader">Problem</div>
+                    <div>
+                      <a href={problem.url} rel="noreferrer">
+                        {problem.label}
+                      </a>
+                    </div>
+                    <div class="subheader">Matches</div>
+                    {round.matches.length === 0 ? (
+                      <div class="muted">No matches recorded.</div>
+                    ) : (
+                      <div class="stack">
+                        {round.matches.map((match) => {
+                          const summary = formatMatchSummary(match, recap.participantHandles);
+                          return (
+                            <div class="tournament-row">
+                              <div>
+                                <div class="title">{summary.title}</div>
+                                <div class="muted">{summary.subtitle}</div>
+                              </div>
+                              <div class="pill">{summary.status}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+      ) : (
+        <></>
+      )}
     </Layout>
   );
 }

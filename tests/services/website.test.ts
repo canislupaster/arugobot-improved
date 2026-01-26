@@ -8,6 +8,7 @@ import { ContestActivityService } from "../../src/services/contestActivity.js";
 import { GuildSettingsService } from "../../src/services/guildSettings.js";
 import type { RatingChangesService } from "../../src/services/ratingChanges.js";
 import { StoreService } from "../../src/services/store.js";
+import type { TournamentRecap } from "../../src/services/tournaments.js";
 import { WebsiteService } from "../../src/services/website.js";
 
 const mockCodeforces = {
@@ -19,6 +20,10 @@ const mockCodeforces = {
 const mockRatingChanges = {
   getRatingChanges: jest.fn().mockResolvedValue(null),
 } as unknown as RatingChangesService;
+
+const mockTournaments = {
+  getRecap: jest.fn().mockResolvedValue(null),
+};
 
 describe("WebsiteService", () => {
   let db: Kysely<Database>;
@@ -34,7 +39,9 @@ describe("WebsiteService", () => {
     const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
     website = new WebsiteService(db, store, settings, contestActivity, {
       codeforces: mockCodeforces,
+      tournaments: mockTournaments,
     });
+    mockTournaments.getRecap.mockResolvedValue(null);
 
     await db
       .insertInto("users")
@@ -401,6 +408,34 @@ describe("WebsiteService", () => {
     expect(arena?.arenaEndsAt).toBe(1700005400);
   });
 
+  it("returns tournament recap for public guilds", async () => {
+    const recap: TournamentRecap = {
+      entry: {
+        id: "t-1",
+        format: "swiss",
+        status: "completed",
+        lengthMinutes: 60,
+        roundCount: 2,
+        ratingRanges: [],
+        tags: "",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T01:00:00.000Z",
+        participantCount: 2,
+        winnerId: "user-1",
+      },
+      channelId: "channel-1",
+      hostUserId: "user-1",
+      standings: [],
+      rounds: [],
+      participantHandles: {},
+    };
+    mockTournaments.getRecap.mockResolvedValue(recap);
+
+    const result = await website.getTournamentRecap("guild-1", "t-1");
+    expect(result?.entry.id).toBe("t-1");
+    expect(mockTournaments.getRecap).toHaveBeenCalledWith("guild-1", "t-1");
+  });
+
   it("returns null when dashboard is private", async () => {
     await settings.setDashboardPublic("guild-1", false);
     const overview = await website.getGuildOverview("guild-1");
@@ -600,6 +635,7 @@ describe("WebsiteService", () => {
     const websiteWithContests = new WebsiteService(db, store, settings, contestActivity, {
       codeforces: mockCodeforces,
       contests: contestService as never,
+      tournaments: mockTournaments,
     });
 
     const upcoming = await websiteWithContests.getUpcomingContests(3);

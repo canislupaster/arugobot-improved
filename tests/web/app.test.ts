@@ -8,6 +8,7 @@ import { ContestActivityService } from "../../src/services/contestActivity.js";
 import { GuildSettingsService } from "../../src/services/guildSettings.js";
 import type { RatingChangesService } from "../../src/services/ratingChanges.js";
 import { StoreService } from "../../src/services/store.js";
+import type { TournamentRecap } from "../../src/services/tournaments.js";
 import { WebsiteService } from "../../src/services/website.js";
 import { createWebApp } from "../../src/web/app.js";
 
@@ -51,6 +52,10 @@ const mockContestService = {
   getLastRefreshAt: jest.fn().mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z")),
 };
 
+const mockTournaments = {
+  getRecap: jest.fn(),
+};
+
 describe("web app", () => {
   let db: Kysely<Database>;
   let website: WebsiteService;
@@ -64,7 +69,9 @@ describe("web app", () => {
     website = new WebsiteService(db, store, settings, contestActivity, {
       codeforces: mockCodeforces,
       contests: mockContestService as never,
+      tournaments: mockTournaments,
     });
+    mockTournaments.getRecap.mockResolvedValue(null);
 
     await db
       .insertInto("users")
@@ -172,6 +179,128 @@ describe("web app", () => {
     expect(body.guild.id).toBe("guild-1");
     expect(body.guild.name).toBe("Guild One");
     expect(body.guild.stats.userCount).toBeGreaterThan(0);
+  });
+
+  it("renders tournament recap page", async () => {
+    const recap: TournamentRecap = {
+      entry: {
+        id: "t-99",
+        format: "swiss",
+        status: "completed",
+        lengthMinutes: 60,
+        roundCount: 2,
+        ratingRanges: [{ min: 800, max: 1200 }],
+        tags: "dp",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T01:00:00.000Z",
+        participantCount: 2,
+        winnerId: "user-1",
+      },
+      channelId: "channel-1",
+      hostUserId: "user-1",
+      standings: [
+        {
+          userId: "user-1",
+          seed: 1,
+          score: 2,
+          wins: 2,
+          losses: 0,
+          draws: 0,
+          eliminated: false,
+          tiebreak: 2,
+          matchesPlayed: 2,
+        },
+        {
+          userId: "user-2",
+          seed: 2,
+          score: 0,
+          wins: 0,
+          losses: 2,
+          draws: 0,
+          eliminated: true,
+          tiebreak: 0,
+          matchesPlayed: 2,
+        },
+      ],
+      rounds: [
+        {
+          roundNumber: 1,
+          status: "completed",
+          problem: {
+            contestId: 1000,
+            index: "A",
+            name: "Two Sum",
+            rating: 800,
+            tags: [],
+          },
+          matches: [
+            {
+              matchNumber: 1,
+              player1Id: "user-1",
+              player2Id: "user-2",
+              winnerId: "user-1",
+              status: "completed",
+              isDraw: false,
+            },
+          ],
+        },
+      ],
+      participantHandles: { "user-1": "alice", "user-2": "bob" },
+    };
+    mockTournaments.getRecap.mockResolvedValue(recap);
+
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/guilds/guild-1/tournaments/t-99");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Tournament summary");
+    expect(body).toContain("Round 1");
+    expect(body).toContain("Two Sum");
+    expect(mockTournaments.getRecap).toHaveBeenCalledWith("guild-1", "t-99");
+  });
+
+  it("returns tournament recap json", async () => {
+    const recap: TournamentRecap = {
+      entry: {
+        id: "t-98",
+        format: "arena",
+        status: "completed",
+        lengthMinutes: 60,
+        roundCount: 4,
+        ratingRanges: [],
+        tags: "",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T01:00:00.000Z",
+        participantCount: 1,
+        winnerId: null,
+      },
+      channelId: "channel-1",
+      hostUserId: "user-1",
+      standings: [],
+      rounds: [],
+      participantHandles: {},
+      arenaProblems: [],
+    };
+    mockTournaments.getRecap.mockResolvedValue(recap);
+
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+    });
+    const response = await app.request("http://localhost/api/guilds/guild-1/tournaments/t-98");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      recap: { entry: { id: string; format: string } };
+    };
+    expect(body.recap.entry.id).toBe("t-98");
+    expect(body.recap.entry.format).toBe("arena");
   });
 
   it("returns 404 for private guilds", async () => {

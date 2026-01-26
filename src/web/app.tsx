@@ -12,8 +12,10 @@ import {
   renderHomePage,
   renderNotFoundPage,
   renderStatusPage,
+  renderTournamentPage,
   type GuildViewModel,
   type HomeViewModel,
+  type TournamentViewModel,
 } from "./views.js";
 
 type WebAppContext = {
@@ -91,6 +93,30 @@ function formatLeaderboardMarkdown(rows: LeaderboardRow[], valueLabel: string): 
   return [header, divider, ...body].join("\n");
 }
 
+async function buildHomeViewModel(
+  website: WebsiteService,
+  client: Client
+): Promise<HomeViewModel> {
+  const [global, guilds, upcomingContests] = await Promise.all([
+    website.getGlobalOverview(),
+    website.listGuildSummaries(20),
+    website.getUpcomingContests(5),
+  ]);
+  return {
+    generatedAt: new Date().toISOString(),
+    global,
+    upcomingContests,
+    guilds: guilds.map((guild) => ({
+      id: guild.guildId,
+      name: resolveGuildName(client, guild.guildId),
+      linkedUsers: guild.linkedUsers,
+      activeChallenges: guild.activeChallenges,
+      completedChallenges: guild.completedChallenges,
+      lastChallengeAt: guild.lastChallengeAt,
+    })),
+  };
+}
+
 export function createWebApp({ website, client }: WebAppContext) {
   const app = new Hono<{ Variables: WebVariables }>();
 
@@ -124,46 +150,13 @@ export function createWebApp({ website, client }: WebAppContext) {
   });
 
   app.get("/", async (c) => {
-    const [global, guilds, upcomingContests] = await Promise.all([
-      website.getGlobalOverview(),
-      website.listGuildSummaries(20),
-      website.getUpcomingContests(5),
-    ]);
-    const viewModel: HomeViewModel = {
-      generatedAt: new Date().toISOString(),
-      global,
-      upcomingContests,
-      guilds: guilds.map((guild) => ({
-        id: guild.guildId,
-        name: resolveGuildName(client, guild.guildId),
-        linkedUsers: guild.linkedUsers,
-        activeChallenges: guild.activeChallenges,
-        completedChallenges: guild.completedChallenges,
-        lastChallengeAt: guild.lastChallengeAt,
-      })),
-    };
+    const viewModel = await buildHomeViewModel(website, client);
     return c.html(renderHomePage(viewModel));
   });
 
   app.get("/api/overview", async (c) => {
-    const [global, guilds, upcomingContests] = await Promise.all([
-      website.getGlobalOverview(),
-      website.listGuildSummaries(20),
-      website.getUpcomingContests(5),
-    ]);
-    return c.json({
-      generatedAt: new Date().toISOString(),
-      global,
-      upcomingContests,
-      guilds: guilds.map((guild) => ({
-        id: guild.guildId,
-        name: resolveGuildName(client, guild.guildId),
-        linkedUsers: guild.linkedUsers,
-        activeChallenges: guild.activeChallenges,
-        completedChallenges: guild.completedChallenges,
-        lastChallengeAt: guild.lastChallengeAt,
-      })),
-    });
+    const viewModel = await buildHomeViewModel(website, client);
+    return c.json(viewModel);
   });
 
   app.get("/guilds/:guildId", async (c) => {
@@ -231,6 +224,21 @@ export function createWebApp({ website, client }: WebAppContext) {
     return c.html(renderGuildPage(viewModel));
   });
 
+  app.get("/guilds/:guildId/tournaments/:tournamentId", async (c) => {
+    const guildId = c.req.param("guildId");
+    const tournamentId = c.req.param("tournamentId");
+    const recap = await website.getTournamentRecap(guildId, tournamentId);
+    if (!recap) {
+      return c.html(renderNotFoundPage("Tournament not found or unavailable."), 404);
+    }
+    const viewModel: TournamentViewModel = {
+      generatedAt: new Date().toISOString(),
+      guild: { id: guildId, name: resolveGuildName(client, guildId) },
+      recap,
+    };
+    return c.html(renderTournamentPage(viewModel));
+  });
+
   app.get("/api/guilds/:guildId", async (c) => {
     const guildId = c.req.param("guildId");
     const activityDays = 30;
@@ -260,6 +268,20 @@ export function createWebApp({ website, client }: WebAppContext) {
         contestActivity: overview.contestActivity,
         tournaments: overview.tournaments,
       },
+    });
+  });
+
+  app.get("/api/guilds/:guildId/tournaments/:tournamentId", async (c) => {
+    const guildId = c.req.param("guildId");
+    const tournamentId = c.req.param("tournamentId");
+    const recap = await website.getTournamentRecap(guildId, tournamentId);
+    if (!recap) {
+      return c.json({ error: "Tournament not found or unavailable." }, 404);
+    }
+    return c.json({
+      generatedAt: new Date().toISOString(),
+      guild: { id: guildId, name: resolveGuildName(client, guildId) },
+      recap,
     });
   });
 

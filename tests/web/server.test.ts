@@ -30,6 +30,10 @@ const mockContestService = {
   getLastRefreshAt: jest.fn().mockReturnValue(0),
 };
 
+const mockTournaments = {
+  getRecap: jest.fn().mockResolvedValue(null),
+};
+
 async function createWebsite(): Promise<{ db: Kysely<Database>; website: WebsiteService }> {
   const db = createDb(":memory:");
   await migrateToLatest(db);
@@ -39,6 +43,7 @@ async function createWebsite(): Promise<{ db: Kysely<Database>; website: Website
   const website = new WebsiteService(db, store, settings, contestActivity, {
     codeforces: mockCodeforces,
     contests: mockContestService as never,
+    tournaments: mockTournaments,
   });
   return { db, website };
 }

@@ -105,6 +105,7 @@ async function main() {
   const website = new WebsiteService(db, store, guildSettings, contestActivity, {
     codeforces,
     contests,
+    tournaments,
   });
 
   const commandSummaries = commandList.map((command) => ({

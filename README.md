@@ -280,7 +280,9 @@ The overview highlights core bot features alongside upcoming contest cards, plus
 participation snapshots sourced from cached rating changes (split by official vs gym activity),
 contest rating alert coverage, and rating-change cache freshness. Per-guild pages include
 CSV/Markdown exports for rating/solve leaderboards, and `/status` shows cache ages for key
-Codeforces syncs including the gym contest list.
+Codeforces syncs including the gym contest list. Tournament summaries link to full recap pages
+at `/guilds/:guildId/tournaments/:tournamentId` (with rounds, match results, and problem lists), and
+`/api/guilds/:guildId/tournaments/:tournamentId` exposes the same data as JSON.
 `/status.json` returns the same cache status in JSON for external monitoring.
 `/api/overview` returns the global snapshot and public guild summaries as JSON, and
 `/api/guilds/:guildId` returns the per-guild overview payload (respecting the public dashboard setting).

@@ -9,6 +9,7 @@ import type { ContestActivityService } from "./contestActivity.js";
 import type { Contest, ContestService } from "./contests.js";
 import type { GuildSettingsService } from "./guildSettings.js";
 import type { StoreService } from "./store.js";
+import type { TournamentRecap, TournamentService } from "./tournaments.js";
 
 type ServerStats = Awaited<ReturnType<StoreService["getServerStats"]>>;
 type RatingEntry = NonNullable<Awaited<ReturnType<StoreService["getLeaderboard"]>>>[number];
@@ -183,16 +184,22 @@ function buildEmptyGlobalOverview(): GlobalOverview {
 export class WebsiteService {
   private readonly contests: ContestService | null;
   private readonly codeforces: CodeforcesClient | null;
+  private readonly tournaments: Pick<TournamentService, "getRecap"> | null;
 
   constructor(
     private readonly db: Kysely<Database>,
     private readonly store: StoreService,
     private readonly settings: GuildSettingsService,
     private readonly contestActivity: ContestActivityService,
-    options: { codeforces?: CodeforcesClient | null; contests?: ContestService | null } = {}
+    options: {
+      codeforces?: CodeforcesClient | null;
+      contests?: ContestService | null;
+      tournaments?: Pick<TournamentService, "getRecap"> | null;
+    } = {}
   ) {
     this.codeforces = options.codeforces ?? null;
     this.contests = options.contests ?? null;
+    this.tournaments = options.tournaments ?? null;
   }
 
   private async getPublicGuildStatus(
@@ -589,6 +596,25 @@ export class WebsiteService {
       };
     } catch (error) {
       logError(`Database error (guild exports): ${String(error)}`);
+      return null;
+    }
+  }
+
+  async getTournamentRecap(
+    guildId: string,
+    tournamentId: string
+  ): Promise<TournamentRecap | null> {
+    try {
+      if (!this.tournaments) {
+        return null;
+      }
+      const status = await this.getPublicGuildStatus(guildId);
+      if (!status || !status.hasData) {
+        return null;
+      }
+      return this.tournaments.getRecap(guildId, tournamentId);
+    } catch (error) {
+      logError(`Database error (tournament recap): ${String(error)}`);
       return null;
     }
   }
