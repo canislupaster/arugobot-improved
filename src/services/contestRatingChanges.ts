@@ -5,44 +5,32 @@ import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
 import type { RatingChange } from "./ratingChanges.js";
-import { fetchRatingChangesWithTracking } from "./ratingChangesHelpers.js";
+import type { RatingChangesCacheResult } from "./ratingChangesCache.js";
+import { RatingChangesServiceBase } from "./ratingChangesServiceBase.js";
 
-export type ContestRatingChangesResult = {
-  changes: RatingChange[];
-  source: "cache" | "api";
-  isStale: boolean;
-};
+export type ContestRatingChangesResult = RatingChangesCacheResult<RatingChange>;
 
 const DEFAULT_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
-export class ContestRatingChangesService {
-  private lastError: { message: string; timestamp: string } | null = null;
-
+export class ContestRatingChangesService extends RatingChangesServiceBase {
   constructor(
-    private db: Kysely<Database>,
+    db: Kysely<Database>,
     private client: Pick<CodeforcesClient, "request">
-  ) {}
-
-  getLastError(): { message: string; timestamp: string } | null {
-    return this.lastError;
+  ) {
+    super(db);
   }
 
   async getContestRatingChanges(
     contestId: number,
     ttlMs = DEFAULT_CACHE_TTL_MS
   ): Promise<ContestRatingChangesResult | null> {
-    const { result, lastError } = await fetchRatingChangesWithTracking(
-      this.db,
-      { type: "contest", contestId },
+    return this.fetchWithTracking({
+      key: { type: "contest", contestId },
       ttlMs,
-      () => this.client.request<RatingChange[]>("contest.ratingChanges", { contestId }),
-      parseRatingChangesPayload,
-      "Contest rating changes request failed; using cached data if available.",
-      { contestId }
-    );
-
-    this.lastError = lastError;
-
-    return result;
+      fetcher: () => this.client.request<RatingChange[]>("contest.ratingChanges", { contestId }),
+      parsePayload: parseRatingChangesPayload,
+      warnMessage: "Contest rating changes request failed; using cached data if available.",
+      warnContext: { contestId },
+    });
   }
 }

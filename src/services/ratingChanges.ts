@@ -5,7 +5,8 @@ import { normalizeHandleKey } from "../utils/handles.js";
 import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
-import { fetchRatingChangesWithTracking } from "./ratingChangesHelpers.js";
+import type { RatingChangesCacheResult } from "./ratingChangesCache.js";
+import { RatingChangesServiceBase } from "./ratingChangesServiceBase.js";
 
 export type RatingChange = {
   handle?: string;
@@ -19,24 +20,16 @@ export type RatingChange = {
 
 type RatingChangesResponse = RatingChange[];
 
-export type RatingChangesResult = {
-  changes: RatingChange[];
-  source: "cache" | "api";
-  isStale: boolean;
-};
+export type RatingChangesResult = RatingChangesCacheResult<RatingChange>;
 
 const DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000;
 
-export class RatingChangesService {
-  private lastError: { message: string; timestamp: string } | null = null;
-
+export class RatingChangesService extends RatingChangesServiceBase {
   constructor(
-    private db: Kysely<Database>,
+    db: Kysely<Database>,
     private client: Pick<CodeforcesClient, "request">
-  ) {}
-
-  getLastError(): { message: string; timestamp: string } | null {
-    return this.lastError;
+  ) {
+    super(db);
   }
 
   async getRatingChanges(
@@ -44,18 +37,13 @@ export class RatingChangesService {
     ttlMs = DEFAULT_CACHE_TTL_MS
   ): Promise<RatingChangesResult | null> {
     const key = normalizeHandleKey(handle);
-    const { result, lastError } = await fetchRatingChangesWithTracking(
-      this.db,
-      { type: "handle", handle: key },
+    return this.fetchWithTracking({
+      key: { type: "handle", handle: key },
       ttlMs,
-      () => this.client.request<RatingChangesResponse>("user.rating", { handle }),
-      parseRatingChangesPayload,
-      "Rating change request failed; using cached data if available.",
-      { handle: key }
-    );
-
-    this.lastError = lastError;
-
-    return result;
+      fetcher: () => this.client.request<RatingChangesResponse>("user.rating", { handle }),
+      parsePayload: parseRatingChangesPayload,
+      warnMessage: "Rating change request failed; using cached data if available.",
+      warnContext: { handle: key },
+    });
   }
 }
