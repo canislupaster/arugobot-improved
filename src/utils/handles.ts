@@ -43,6 +43,16 @@ export function normalizeHandleKey(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+export function parseHandleList(raw: string): string[] {
+  if (!raw.trim()) {
+    return [];
+  }
+  return raw
+    .split(/[\s,]+/u)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 export async function resolveHandleTarget(
   store: HandleTargetStore,
   options: HandleTargetOptions

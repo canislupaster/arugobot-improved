@@ -1,3 +1,4 @@
+import type { ChatInputCommandInteraction } from "discord.js";
 import { EmbedBuilder } from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
@@ -29,6 +30,10 @@ export type ContestLookupService = {
   getContestById: (contestId: number, scopeFilter: ContestScopeFilter) => Contest | null;
   searchContests: (query: string, limit: number, scopeFilter: ContestScopeFilter) => Contest[];
 };
+
+export type ContestLookupReplyResult =
+  | { status: "ok"; contest: Contest }
+  | { status: "replied" };
 
 type ContestEmbedOptions = {
   contest: Contest;
@@ -85,6 +90,53 @@ export function resolveContestLookup(
     return { status: "ambiguous", matches };
   }
   return { status: "ok", contest: matches[0] };
+}
+
+type ContestLookupReplyOptions = {
+  maxMatches?: number;
+  footerText: string;
+  refreshWasStale: boolean;
+  missingLatestMessage?: string;
+  missingIdMessage?: string;
+  missingNameMessage?: string;
+};
+
+export async function resolveContestOrReply(
+  interaction: ChatInputCommandInteraction,
+  queryRaw: string,
+  scope: ContestScopeFilter,
+  contests: ContestLookupService,
+  options: ContestLookupReplyOptions
+): Promise<ContestLookupReplyResult> {
+  const lookup = resolveContestLookup(queryRaw, scope, contests, options.maxMatches ?? 5);
+  if (lookup.status === "ok") {
+    return { status: "ok", contest: lookup.contest };
+  }
+  if (lookup.status === "ambiguous") {
+    const embed = buildContestMatchEmbed({
+      query: queryRaw,
+      matches: lookup.matches,
+      scope,
+      footerText: options.footerText,
+    });
+    if (options.refreshWasStale) {
+      embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+    }
+    await interaction.editReply({ embeds: [embed] });
+    return { status: "replied" };
+  }
+
+  const missingLatestMessage = options.missingLatestMessage ?? "No finished contests found yet.";
+  const missingIdMessage = options.missingIdMessage ?? "No contest found with that ID.";
+  const missingNameMessage = options.missingNameMessage ?? "No contests found matching that name.";
+  const errorMessage =
+    lookup.status === "missing_latest"
+      ? missingLatestMessage
+      : lookup.status === "missing_id"
+        ? missingIdMessage
+        : missingNameMessage;
+  await interaction.editReply(errorMessage);
+  return { status: "replied" };
 }
 
 export function formatContestPhase(phase: Contest["phase"]): string {
