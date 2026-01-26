@@ -34,27 +34,17 @@ export async function safeInteractionReply(
   options: InteractionReplyOptions,
   context?: LogContext
 ): Promise<boolean> {
-  try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp(options);
-    } else {
-      await interaction.reply(options);
-    }
-    return true;
-  } catch (error) {
-    if (isIgnorableInteractionError(error)) {
-      logWarn("Skipping interaction response (already acknowledged).", {
-        ...context,
-        error: getErrorMessage(error) || String(error),
-      });
-      return false;
-    }
-    logWarn("Interaction response failed.", {
-      ...context,
-      error: getErrorMessage(error) || String(error),
-    });
-    return false;
-  }
+  return safeInteractionAction(
+    () =>
+      interaction.deferred || interaction.replied
+        ? interaction.followUp(options)
+        : interaction.reply(options),
+    {
+      skipMessage: "Skipping interaction response (already acknowledged).",
+      errorMessage: "Interaction response failed.",
+    },
+    context
+  );
 }
 
 export async function safeInteractionEdit(
@@ -62,21 +52,31 @@ export async function safeInteractionEdit(
   options: InteractionEditReplyOptions | string,
   context?: LogContext
 ): Promise<boolean> {
+  return safeInteractionAction(
+    () => interaction.editReply(options),
+    {
+      skipMessage: "Skipping interaction edit (already acknowledged).",
+      errorMessage: "Interaction edit failed.",
+    },
+    context
+  );
+}
+
+async function safeInteractionAction(
+  action: () => Promise<unknown>,
+  labels: { skipMessage: string; errorMessage: string },
+  context?: LogContext
+): Promise<boolean> {
   try {
-    await interaction.editReply(options);
+    await action();
     return true;
   } catch (error) {
+    const errorMessage = getErrorMessage(error) || String(error);
     if (isIgnorableInteractionError(error)) {
-      logWarn("Skipping interaction edit (already acknowledged).", {
-        ...context,
-        error: getErrorMessage(error) || String(error),
-      });
+      logWarn(labels.skipMessage, { ...context, error: errorMessage });
       return false;
     }
-    logWarn("Interaction edit failed.", {
-      ...context,
-      error: getErrorMessage(error) || String(error),
-    });
+    logWarn(labels.errorMessage, { ...context, error: errorMessage });
     return false;
   }
 }
