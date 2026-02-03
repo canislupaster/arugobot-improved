@@ -1,6 +1,10 @@
 import { ChannelType, type Client } from "discord.js";
 
-import { getManualSendFailure, resolveManualSendChannel } from "../../src/utils/reminders.js";
+import {
+  getManualSendFailure,
+  recordReminderSendFailure,
+  resolveManualSendChannel,
+} from "../../src/utils/reminders.js";
 
 describe("resolveManualSendChannel", () => {
   it("returns already_sent when a reminder was sent in the period", async () => {
@@ -75,5 +79,33 @@ describe("getManualSendFailure", () => {
     });
 
     expect(result).toEqual({ status: "channel_missing", channelId: "channel-2" });
+  });
+});
+
+describe("recordReminderSendFailure", () => {
+  it("records and logs the error message", () => {
+    const record = jest.fn();
+    const log = jest.fn();
+
+    const message = recordReminderSendFailure({
+      error: new Error("boom"),
+      record,
+      log,
+      logMessage: "Manual reminder failed.",
+      logContext: { guildId: "guild-1", channelId: "channel-1" },
+    });
+
+    expect(message).toBe("boom");
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "boom", timestamp: expect.any(String) })
+    );
+    expect(log).toHaveBeenCalledWith(
+      "Manual reminder failed.",
+      expect.objectContaining({
+        guildId: "guild-1",
+        channelId: "channel-1",
+        error: "boom",
+      })
+    );
   });
 });

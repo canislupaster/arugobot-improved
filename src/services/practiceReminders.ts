@@ -7,10 +7,7 @@ import {
   type SendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import {
-  buildServiceErrorFromException,
-  recordServiceErrorMessage,
-} from "../utils/errors.js";
+import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
@@ -21,7 +18,11 @@ import {
   selectRandomProblem,
 } from "../utils/problemSelection.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
-import { getManualSendFailure, resolveManualSendChannel } from "../utils/reminders.js";
+import {
+  getManualSendFailure,
+  recordReminderSendFailure,
+  resolveManualSendChannel,
+} from "../utils/reminders.js";
 import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
@@ -392,13 +393,17 @@ export class PracticeReminderService {
       const problemId = await this.sendReminderMessage(subscription, selection, channel, "manual");
       return { status: "sent", problemId, channelId: subscription.channelId };
     } catch (error) {
-      const message = recordServiceErrorMessage(error, (entry) => {
-        this.lastError = entry;
-      });
-      logWarn("Manual practice reminder failed.", {
-        guildId: subscription.guildId,
-        channelId: subscription.channelId,
-        error: message,
+      const message = recordReminderSendFailure({
+        error,
+        record: (entry) => {
+          this.lastError = entry;
+        },
+        log: logWarn,
+        logMessage: "Manual practice reminder failed.",
+        logContext: {
+          guildId: subscription.guildId,
+          channelId: subscription.channelId,
+        },
       });
       return { status: "error", message };
     }

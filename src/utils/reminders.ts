@@ -1,5 +1,7 @@
 import type { Client } from "discord.js";
 
+import type { ServiceError } from "./errors.js";
+import { recordServiceErrorMessage } from "./errors.js";
 import { resolveSendableChannel, type SendableChannel } from "./discordChannels.js";
 import { wasSentSince } from "./time.js";
 
@@ -43,4 +45,16 @@ export function getManualSendFailure(
     return { status: "already_sent", lastSentAt: result.lastSentAt };
   }
   return { status: "channel_missing", channelId: result.channelId };
+}
+
+export function recordReminderSendFailure(params: {
+  error: unknown;
+  record: (serviceError: ServiceError) => void;
+  log: (message: string, context?: Record<string, unknown>) => void;
+  logMessage: string;
+  logContext: Record<string, unknown>;
+}): string {
+  const message = recordServiceErrorMessage(params.error, params.record);
+  params.log(params.logMessage, { ...params.logContext, error: message });
+  return message;
 }

@@ -12,12 +12,10 @@ import {
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { resolveSendableChannel, resolveSendableChannelOrWarn } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import {
-  buildServiceErrorFromException,
-  recordServiceErrorMessage,
-} from "../utils/errors.js";
+import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
+import { recordReminderSendFailure } from "../utils/reminders.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -324,16 +322,20 @@ export class ContestReminderService {
         isStale,
       };
     } catch (error) {
-      const message = recordServiceErrorMessage(error, (entry) => {
-        this.lastError = entry;
-      });
-      logWarn("Contest reminder send failed (manual).", {
-        guildId: subscription.guildId,
-        subscriptionId: subscription.id,
-        channelId: subscription.channelId,
-        contestId: contest.id,
-        scope: subscription.scope,
-        error: message,
+      const message = recordReminderSendFailure({
+        error,
+        record: (entry) => {
+          this.lastError = entry;
+        },
+        log: logWarn,
+        logMessage: "Contest reminder send failed (manual).",
+        logContext: {
+          guildId: subscription.guildId,
+          subscriptionId: subscription.id,
+          channelId: subscription.channelId,
+          contestId: contest.id,
+          scope: subscription.scope,
+        },
       });
       return { status: "error", message };
     }
