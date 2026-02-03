@@ -12,14 +12,17 @@ import {
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   buildChannelServiceError,
-  getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
-import { buildReminderSendErrorResult, recordReminderSendFailure } from "../utils/reminders.js";
+import {
+  buildReminderSendErrorResult,
+  recordReminderSendFailure,
+  resolveManualChannel,
+} from "../utils/reminders.js";
 import {
   clearSubscriptionsWithNotifications,
   removeSubscriptionWithNotifications,
@@ -234,16 +237,9 @@ export class ContestReminderService {
     client: Client,
     force = false
   ): Promise<ManualContestReminderResult> {
-    const channelStatus = await getSendableChannelStatus(client, subscription.channelId);
-    if (channelStatus.status === "missing") {
-      return { status: "channel_missing", channelId: subscription.channelId };
-    }
-    if (channelStatus.status === "missing_permissions") {
-      return {
-        status: "channel_missing_permissions",
-        channelId: subscription.channelId,
-        missingPermissions: channelStatus.missingPermissions,
-      };
+    const channelStatus = await resolveManualChannel(client, subscription.channelId);
+    if (channelStatus.status !== "ready") {
+      return channelStatus;
     }
     const channel = channelStatus.channel;
 

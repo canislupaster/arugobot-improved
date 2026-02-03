@@ -4,16 +4,37 @@ import { getSendableChannelStatus, type SendableChannel } from "./discordChannel
 import { recordServiceErrorMessage, type ServiceError } from "./errors.js";
 import { wasSentSince } from "./time.js";
 
-export type ManualSendCheckResult =
+export type ManualChannelCheckResult =
   | { status: "ready"; channel: SendableChannel }
-  | { status: "already_sent"; lastSentAt: string }
   | { status: "channel_missing"; channelId: string }
   | { status: "channel_missing_permissions"; channelId: string; missingPermissions: string[] };
+
+export type ManualSendCheckResult =
+  | ManualChannelCheckResult
+  | { status: "already_sent"; lastSentAt: string };
 
 export type ManualSendFailure =
   | { status: "already_sent"; lastSentAt: string }
   | { status: "channel_missing"; channelId: string }
   | { status: "channel_missing_permissions"; channelId: string; missingPermissions: string[] };
+
+export async function resolveManualChannel(
+  client: Client,
+  channelId: string
+): Promise<ManualChannelCheckResult> {
+  const status = await getSendableChannelStatus(client, channelId);
+  if (status.status === "missing") {
+    return { status: "channel_missing", channelId };
+  }
+  if (status.status === "missing_permissions") {
+    return {
+      status: "channel_missing_permissions",
+      channelId,
+      missingPermissions: status.missingPermissions,
+    };
+  }
+  return { status: "ready", channel: status.channel };
+}
 
 export async function resolveManualSendChannel(
   client: Client,
@@ -31,18 +52,7 @@ export async function resolveManualSendChannel(
     };
   }
 
-  const status = await getSendableChannelStatus(client, params.channelId);
-  if (status.status === "missing") {
-    return { status: "channel_missing", channelId: params.channelId };
-  }
-  if (status.status === "missing_permissions") {
-    return {
-      status: "channel_missing_permissions",
-      channelId: params.channelId,
-      missingPermissions: status.missingPermissions,
-    };
-  }
-  return { status: "ready", channel: status.channel };
+  return resolveManualChannel(client, params.channelId);
 }
 
 export function getManualSendFailure(

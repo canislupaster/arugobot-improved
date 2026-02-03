@@ -7,7 +7,6 @@ import type { ContestRatingAlertSubscriptionsTable, Database } from "../db/types
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   buildChannelServiceError,
-  getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
@@ -17,6 +16,7 @@ import { normalizeHandleFilter, normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
+import { resolveManualChannel } from "../utils/reminders.js";
 import {
   clearSubscriptionsWithNotifications,
   removeSubscriptionWithNotifications,
@@ -295,16 +295,9 @@ export class ContestRatingAlertService {
     client: Client,
     force = false
   ): Promise<ManualContestRatingAlertResult> {
-    const channelStatus = await getSendableChannelStatus(client, subscription.channelId);
-    if (channelStatus.status === "missing") {
-      return { status: "channel_missing", channelId: subscription.channelId };
-    }
-    if (channelStatus.status === "missing_permissions") {
-      return {
-        status: "channel_missing_permissions",
-        channelId: subscription.channelId,
-        missingPermissions: channelStatus.missingPermissions,
-      };
+    const channelStatus = await resolveManualChannel(client, subscription.channelId);
+    if (channelStatus.status !== "ready") {
+      return channelStatus;
     }
     const channel = channelStatus.channel;
 

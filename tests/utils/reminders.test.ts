@@ -3,6 +3,7 @@ import { ChannelType, type Client } from "discord.js";
 import {
   buildReminderSendErrorResult,
   getManualSendFailure,
+  resolveManualChannel,
   recordReminderSendFailure,
   resolveManualSendChannel,
 } from "../../src/utils/reminders.js";
@@ -87,6 +88,57 @@ describe("resolveManualSendChannel", () => {
       force: true,
       periodStartMs: Date.now(),
     });
+
+    expect(result).toEqual({ status: "ready", channel });
+  });
+});
+
+describe("resolveManualChannel", () => {
+  it("returns channel_missing when the channel is not sendable", async () => {
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(null),
+      },
+    } as unknown as Client;
+
+    const result = await resolveManualChannel(client, "channel-1");
+
+    expect(result).toEqual({ status: "channel_missing", channelId: "channel-1" });
+  });
+
+  it("returns channel_missing_permissions when permissions are missing", async () => {
+    const channel = {
+      id: "channel-2",
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(false),
+      }),
+    };
+    const client = {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+
+    const result = await resolveManualChannel(client, "channel-2");
+
+    expect(result).toEqual({
+      status: "channel_missing_permissions",
+      channelId: "channel-2",
+      missingPermissions: ["ViewChannel", "SendMessages"],
+    });
+  });
+
+  it("returns ready with the resolved channel", async () => {
+    const channel = { id: "channel-3", type: ChannelType.GuildText };
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+
+    const result = await resolveManualChannel(client, "channel-3");
 
     expect(result).toEqual({ status: "ready", channel });
   });
