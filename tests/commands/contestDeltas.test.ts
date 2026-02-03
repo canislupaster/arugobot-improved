@@ -23,6 +23,7 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     user: { id: "user-1" },
     options: {
       getInteger: jest.fn().mockReturnValue(null),
+      getString: jest.fn().mockReturnValue(null),
     },
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),
@@ -84,6 +85,44 @@ describe("contestDeltasCommand", () => {
     expect(fieldText).toContain("Top losers");
     expect(fieldText).toContain("user-1");
     expect(fieldText).toContain("user-2");
+  });
+
+  it("passes scope selection to contest activity", async () => {
+    const interaction = createInteraction({
+      options: {
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockReturnValue("gym"),
+      },
+    });
+    const getRatingChangeSummaryForRoster = jest.fn().mockResolvedValue({
+      lookbackDays: 90,
+      contestCount: 0,
+      participantCount: 0,
+      totalDelta: 0,
+      lastContestAt: null,
+      topGainers: [],
+      topLosers: [],
+    });
+    const context = {
+      correlationId: "corr-1",
+      services: {
+        store: {
+          getServerRoster: jest
+            .fn()
+            .mockResolvedValue([{ userId: "user-1", handle: "Alice" }]),
+        },
+        contestActivity: {
+          getRatingChangeSummaryForRoster,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestDeltasCommand.execute(interaction, context);
+
+    expect(getRatingChangeSummaryForRoster).toHaveBeenCalledWith(
+      [{ userId: "user-1", handle: "Alice" }],
+      { lookbackDays: 90, limit: 5, scope: "gym" }
+    );
   });
 
   it("handles empty rating changes", async () => {
@@ -179,6 +218,7 @@ describe("contestDeltasCommand", () => {
     const interaction = createInteraction({
       options: {
         getInteger: jest.fn((name: string) => (name === "days" ? 0 : null)),
+        getString: jest.fn().mockReturnValue(null),
       },
     });
     const context = {} as CommandContext;
@@ -194,6 +234,7 @@ describe("contestDeltasCommand", () => {
     const interaction = createInteraction({
       options: {
         getInteger: jest.fn((name: string) => (name === "limit" ? 99 : null)),
+        getString: jest.fn().mockReturnValue(null),
       },
     });
     const context = {} as CommandContext;

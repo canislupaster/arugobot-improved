@@ -5,7 +5,7 @@ import { normalizeHandleKey } from "../utils/handles.js";
 import { logError, logWarn } from "../utils/logger.js";
 import { parseRatingChangesPayload } from "../utils/ratingChanges.js";
 
-import type { ContestScope } from "./contests.js";
+import type { ContestScope, ContestScopeFilter } from "./contests.js";
 import type { RatingChangesService } from "./ratingChanges.js";
 import type { StoreService } from "./store.js";
 
@@ -176,6 +176,17 @@ function sortDeltaAscending(a: RatingChangeParticipantSummary, b: RatingChangePa
   return a.handle.localeCompare(b.handle);
 }
 
+function resolveContestScope(
+  scopeMap: Map<number, ContestScope> | null,
+  contestId: number
+): ContestScope {
+  return scopeMap?.get(contestId) ?? "official";
+}
+
+function matchesScope(scopeFilter: ContestScopeFilter, scope: ContestScope): boolean {
+  return scopeFilter === "all" || scope === scopeFilter;
+}
+
 export class ContestActivityService {
   constructor(
     private readonly db: Kysely<Database>,
@@ -200,6 +211,7 @@ export class ContestActivityService {
     options?: {
       lookbackDays?: number;
       limit?: number;
+      scope?: ContestScopeFilter;
     }
   ): Promise<GuildRatingChangeSummary> {
     const roster = await this.store.getServerRoster(guildId);
@@ -373,10 +385,12 @@ export class ContestActivityService {
     options?: {
       lookbackDays?: number;
       limit?: number;
+      scope?: ContestScopeFilter;
     }
   ): Promise<GuildRatingChangeSummary> {
     const lookbackDays = options?.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
     const limit = options?.limit ?? DEFAULT_DELTA_LIMIT;
+    const scopeFilter = options?.scope ?? "all";
     const { handles, rosterMap } = this.buildRosterLookup(roster);
     if (handles.length === 0) {
       return {
@@ -394,6 +408,7 @@ export class ContestActivityService {
       const rows = await this.loadRatingChangeRows(handles, rosterMap);
 
       const cutoffSeconds = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
+      const contestScopes = scopeFilter === "all" ? null : await this.loadContestScopeMap();
       const contestMap = new Map<number, number>();
       const participants = new Map<string, RatingChangeParticipantSummary>();
       let lastContestAt: number | null = null;
@@ -411,6 +426,10 @@ export class ContestActivityService {
 
         for (const change of changes) {
           if (change.ratingUpdateTimeSeconds < cutoffSeconds) {
+            continue;
+          }
+          const contestScope = resolveContestScope(contestScopes, change.contestId);
+          if (!matchesScope(scopeFilter, contestScope)) {
             continue;
           }
           const delta = change.newRating - change.oldRating;

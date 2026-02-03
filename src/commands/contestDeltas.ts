@@ -4,7 +4,9 @@ import type {
   GuildRatingChangeSummary,
   RatingChangeParticipantSummary,
 } from "../services/contestActivity.js";
+import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { resolveBoundedIntegerOption } from "../utils/interaction.js";
@@ -18,6 +20,7 @@ const MIN_DAYS = 1;
 const MAX_DAYS = 365;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
+const DEFAULT_SCOPE: ContestScopeFilter = "all";
 
 function formatParticipantLine(entry: RatingChangeParticipantSummary): string {
   const lastContest =
@@ -42,12 +45,13 @@ function formatParticipantSection(
 }
 
 type ContestDeltaOptions =
-  | { status: "ok"; days: number; limit: number }
+  | { status: "ok"; days: number; limit: number; scope: ContestScopeFilter }
   | { status: "error"; message: string };
 
 function getContestDeltaOptions(interaction: {
-  options: { getInteger: (name: string) => number | null };
+  options: { getInteger: (name: string) => number | null; getString: (name: string) => string | null };
 }): ContestDeltaOptions {
+  const scope = parseContestScope(interaction.options.getString("scope"), DEFAULT_SCOPE);
   const daysResult = resolveBoundedIntegerOption(interaction, {
     name: "days",
     min: MIN_DAYS,
@@ -72,7 +76,7 @@ function getContestDeltaOptions(interaction: {
 
   const days = daysResult.value;
   const limit = limitResult.value;
-  return { status: "ok", days, limit };
+  return { status: "ok", days, limit, scope };
 }
 
 function buildSummaryEmbed(
@@ -134,6 +138,9 @@ export const contestDeltasCommand: Command = {
         .setDescription(`Top gainers/losers to show (1-${MAX_LIMIT})`)
         .setMinValue(1)
         .setMaxValue(MAX_LIMIT)
+    )
+    .addStringOption((option) =>
+      addContestScopeOption(option, "Which contests to include", ["all", "official", "gym"])
     ),
   async execute(interaction, context) {
     if (!interaction.guild) {
@@ -148,7 +155,7 @@ export const contestDeltasCommand: Command = {
       await interaction.reply({ content: optionResult.message });
       return;
     }
-    const { days, limit } = optionResult;
+    const { days, limit, scope } = optionResult;
 
     await interaction.deferReply();
 
@@ -174,7 +181,7 @@ export const contestDeltasCommand: Command = {
       }
       const summary = await context.services.contestActivity.getRatingChangeSummaryForRoster(
         filteredRoster,
-        { lookbackDays: days, limit }
+        { lookbackDays: days, limit, scope }
       );
 
       if (summary.contestCount === 0) {

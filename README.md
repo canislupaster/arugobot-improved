@@ -203,9 +203,10 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Shows recent contest participation for the server's linked handles, including top participants and recent contests.
 
-- **/contestdeltas** `[days]` `[limit]`
+- **/contestdeltas** `[days]` `[limit]` `[scope]`
 
   Shows recent contest rating deltas for the server's linked handles, including top gainers/losers.
+  Use `scope` to show `official`, `gym`, or `all` contests.
 
 - **/contestreminders** `add|set|list|status|preset|remove|clear|cleanup|preview|post`
 
