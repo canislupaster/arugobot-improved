@@ -522,9 +522,14 @@ describe("practiceRemindersCommand", () => {
 
     await practiceRemindersCommand.execute(interaction, context);
 
-    const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
+    expect(interaction.deferReply).toHaveBeenCalled();
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds[0].data.title).toBe("Practice reminder preview");
-    expect(payload.flags).toBeUndefined();
+    const fields = payload.embeds[0].data.fields ?? [];
+    const candidateField = fields.find(
+      (field: { name: string }) => field.name === "Candidate pool"
+    );
+    expect(candidateField?.value).toBe("100");
   });
 
   it("posts a practice reminder immediately", async () => {

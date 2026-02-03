@@ -19,6 +19,9 @@ import type { Command } from "./types.js";
 const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    return "unknown";
+  }
   return numberFormatter.format(value);
 }
 

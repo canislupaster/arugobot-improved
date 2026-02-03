@@ -218,6 +218,117 @@ describe("healthCommand", () => {
     expect(webField?.value).toBe("Failed (see last error)");
   });
 
+  it("handles invalid token estimates without throwing", async () => {
+    const interaction = createInteraction();
+    const context = {
+      client: createClient(),
+      webStatus: {
+        status: "listening",
+        host: "0.0.0.0",
+        requestedPort: 8787,
+        actualPort: 8787,
+        lastError: null,
+      },
+      services: {
+        metrics: {
+          getCommandCount: jest.fn().mockResolvedValue(0),
+          getUniqueCommandCount: jest.fn().mockResolvedValue(0),
+          getLastCommandAt: jest.fn().mockResolvedValue(null),
+          getCommandUsageSummary: jest.fn().mockResolvedValue([]),
+        },
+        store: { checkDb: jest.fn().mockResolvedValue(true) },
+        codeforces: {
+          getLastError: jest.fn().mockReturnValue(null),
+          getLastSuccessAt: jest.fn().mockReturnValue(null),
+        },
+        problems: {
+          getLastRefreshAt: jest.fn().mockReturnValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contests: {
+          getLastRefreshAt: jest.fn().mockReturnValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestRatingChanges: {
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        ratingChanges: {
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        databaseBackups: {
+          getBackupDir: jest.fn().mockReturnValue(null),
+          getLastBackupAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestReminders: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          listSubscriptions: jest.fn().mockResolvedValue([]),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestRatingAlerts: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          listSubscriptions: jest.fn().mockResolvedValue([]),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        practiceReminders: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getSubscription: jest.fn().mockResolvedValue(null),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        weeklyDigest: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getSubscription: jest.fn().mockResolvedValue(null),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        challenges: {
+          getActiveCount: jest.fn().mockResolvedValue(0),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tournaments: {
+          getActiveCount: jest.fn().mockResolvedValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tournamentRecaps: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getSubscription: jest.fn().mockResolvedValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tokenUsage: {
+          getSnapshot: jest.fn().mockReturnValue({
+            totalTokens: Number.NaN,
+            lastUpdatedAt: null,
+            impact: {
+              energyKwh: Number.NaN,
+              waterLiters: Number.NaN,
+              carbonKg: Number.NaN,
+              assumptions: {
+                model: "GPT-5 (medium)",
+                energyWhPerQuery: 13.27,
+                latencySeconds: 51,
+                tokensPerSecond: 121,
+                wueSourceLitersPerKwh: 4.35,
+                carbonKgPerKwh: 0.34,
+              },
+            },
+          }),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await healthCommand.execute(interaction, context);
+
+    const replyArg = (interaction.reply as jest.Mock).mock.calls[0]?.[0];
+    const fields = replyArg.embeds[0].data.fields ?? [];
+    const tokenField = fields.find((field: { name: string }) => field.name === "Token estimates");
+    expect(tokenField?.value).toContain("unknown");
+  });
+
   it("includes misconfigured reminder channels", async () => {
     const interaction = createInteraction();
     const context = {

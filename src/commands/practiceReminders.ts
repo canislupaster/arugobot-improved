@@ -11,7 +11,7 @@ import {
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild } from "../utils/interaction.js";
+import { requireGuild, safeInteractionDefer, safeInteractionEdit, safeInteractionReply } from "../utils/interaction.js";
 import { buildProblemUrl } from "../utils/problemReference.js";
 import {
   formatRatingRangesWithDefaults,
@@ -410,11 +410,13 @@ export const practiceRemindersCommand: Command = {
       }
 
       if (subcommand === "preview") {
+        const deferred = await safeInteractionDefer(interaction);
+        if (!deferred) {
+          return;
+        }
         const preview = await context.services.practiceReminders.getPreview(guildId);
         if (!preview) {
-          await interaction.reply({
-            content: "No practice reminders configured for this server.",
-          });
+          await safeInteractionEdit(interaction, "No practice reminders configured for this server.");
           return;
         }
 
@@ -471,6 +473,11 @@ export const practiceRemindersCommand: Command = {
               inline: false,
             }
           );
+        embed.addFields({
+          name: "Candidate pool",
+          value: String(preview.candidateCount),
+          inline: true,
+        });
 
         if (preview.problem) {
           embed.addFields({
@@ -507,7 +514,7 @@ export const practiceRemindersCommand: Command = {
           embed.setFooter({ text: notes.join(" • ") });
         }
 
-        await interaction.reply({ embeds: [embed] });
+        await safeInteractionEdit(interaction, { embeds: [embed] });
         return;
       }
 
@@ -569,7 +576,7 @@ export const practiceRemindersCommand: Command = {
         interaction,
         context.correlationId
       );
-      await interaction.reply({ content: "Something went wrong." });
+      await safeInteractionReply(interaction, { content: "Something went wrong." });
     }
   },
 };
