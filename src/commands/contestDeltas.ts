@@ -6,10 +6,10 @@ import type {
 } from "../services/contestActivity.js";
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
+import { addContestScopeOption } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { resolveBoundedIntegerOption } from "../utils/interaction.js";
+import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -42,41 +42,6 @@ function formatParticipantSection(
     return emptyLabel;
   }
   return entries.map((entry, index) => `${index + 1}. ${formatParticipantLine(entry)}`).join("\n");
-}
-
-type ContestDeltaOptions =
-  | { status: "ok"; days: number; limit: number; scope: ContestScopeFilter }
-  | { status: "error"; message: string };
-
-function getContestDeltaOptions(interaction: {
-  options: { getInteger: (name: string) => number | null; getString: (name: string) => string | null };
-}): ContestDeltaOptions {
-  const scope = parseContestScope(interaction.options.getString("scope"), DEFAULT_SCOPE);
-  const daysResult = resolveBoundedIntegerOption(interaction, {
-    name: "days",
-    min: MIN_DAYS,
-    max: MAX_DAYS,
-    defaultValue: DEFAULT_DAYS,
-    errorMessage: "Invalid lookback window.",
-  });
-  if ("error" in daysResult) {
-    return { status: "error", message: daysResult.error };
-  }
-
-  const limitResult = resolveBoundedIntegerOption(interaction, {
-    name: "limit",
-    min: 1,
-    max: MAX_LIMIT,
-    defaultValue: DEFAULT_LIMIT,
-    errorMessage: "Invalid limit.",
-  });
-  if ("error" in limitResult) {
-    return { status: "error", message: limitResult.error };
-  }
-
-  const days = daysResult.value;
-  const limit = limitResult.value;
-  return { status: "ok", days, limit, scope };
 }
 
 function buildSummaryEmbed(
@@ -150,7 +115,16 @@ export const contestDeltasCommand: Command = {
       return;
     }
 
-    const optionResult = getContestDeltaOptions(interaction);
+    const optionResult = resolveContestActivityOptions(interaction, {
+      defaultDays: DEFAULT_DAYS,
+      minDays: MIN_DAYS,
+      maxDays: MAX_DAYS,
+      defaultLimit: DEFAULT_LIMIT,
+      maxLimit: MAX_LIMIT,
+      defaultScope: DEFAULT_SCOPE,
+      daysErrorMessage: "Invalid lookback window.",
+      limitErrorMessage: "Invalid limit.",
+    });
     if (optionResult.status === "error") {
       await interaction.reply({ content: optionResult.message });
       return;

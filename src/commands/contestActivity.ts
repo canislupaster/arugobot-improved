@@ -2,10 +2,10 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
+import { addContestScopeOption } from "../utils/contestScope.js";
+import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -141,31 +141,21 @@ export const contestActivityCommand: Command = {
       return;
     }
 
-    const scope = parseContestScope(interaction.options.getString("scope"), DEFAULT_SCOPE);
-    const daysResult = resolveBoundedIntegerOption(interaction, {
-      name: "days",
-      min: MIN_DAYS,
-      max: MAX_DAYS,
-      defaultValue: DEFAULT_DAYS,
-      errorMessage: "Invalid lookback window.",
+    const optionResult = resolveContestActivityOptions(interaction, {
+      defaultDays: DEFAULT_DAYS,
+      minDays: MIN_DAYS,
+      maxDays: MAX_DAYS,
+      defaultLimit: DEFAULT_LIMIT,
+      maxLimit: MAX_LIMIT,
+      defaultScope: DEFAULT_SCOPE,
+      daysErrorMessage: "Invalid lookback window.",
+      limitErrorMessage: "Invalid participant limit.",
     });
-    if ("error" in daysResult) {
-      await interaction.reply({ content: daysResult.error });
+    if (optionResult.status === "error") {
+      await interaction.reply({ content: optionResult.message });
       return;
     }
-    const limitResult = resolveBoundedIntegerOption(interaction, {
-      name: "limit",
-      min: 1,
-      max: MAX_LIMIT,
-      defaultValue: DEFAULT_LIMIT,
-      errorMessage: "Invalid participant limit.",
-    });
-    if ("error" in limitResult) {
-      await interaction.reply({ content: limitResult.error });
-      return;
-    }
-    const { value: days } = daysResult;
-    const { value: limit } = limitResult;
+    const { days, limit, scope } = optionResult;
 
     await interaction.deferReply();
 
