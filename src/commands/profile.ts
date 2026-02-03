@@ -245,7 +245,7 @@ export const profileCommand: Command = {
         return;
       }
 
-      const linkedGuildId = linkedUserId && guildId ? guildId : null;
+      const linkedGuildId = guildId && linkedUserId ? guildId : null;
       const hasLinkedUser = Boolean(linkedGuildId);
       const showSubmissions = handleInput.length > 0 || !linkedUserId;
       const [challengeSummary, recentSubmissions, ratingChanges] = await Promise.all([
@@ -256,12 +256,14 @@ export const profileCommand: Command = {
         context.services.ratingChanges.getRatingChanges(handle),
       ]);
 
-      const botRating = challengeSummary?.botRating ?? null;
-      const totalChallenges = challengeSummary?.totalChallenges ?? 0;
-      const recentLines = challengeSummary?.recentLines ?? "";
-      const streakSummary = challengeSummary?.streak ?? null;
-      const recentSubmissionsLines = recentSubmissions?.lines ?? "";
-      const submissionsStale = recentSubmissions?.isStale ?? false;
+      const {
+        botRating = null,
+        totalChallenges = 0,
+        recentLines = "",
+        streak: streakSummary = null,
+      } = challengeSummary ?? {};
+      const { lines: recentSubmissionsLines = "", isStale: submissionsStale = false } =
+        recentSubmissions ?? {};
       const lastRatingChange = ratingChanges?.changes.at(-1) ?? null;
       const ratingChangeLine = ratingChanges
         ? formatLastRatingChange(lastRatingChange)
