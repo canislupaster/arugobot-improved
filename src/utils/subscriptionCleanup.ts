@@ -64,3 +64,27 @@ export async function clearSubscriptionsWithNotifications(
     return Number(result.numDeletedRows ?? 0);
   });
 }
+
+export async function getLastNotificationMap(
+  db: Kysely<Database>,
+  table: NotificationTable,
+  subscriptionIds: string[]
+): Promise<Map<string, string>> {
+  if (subscriptionIds.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .selectFrom(table)
+    .select(({ fn }) => [
+      "subscription_id",
+      fn.max<string>("notified_at").as("last_notified_at"),
+    ])
+    .where("subscription_id", "in", subscriptionIds)
+    .groupBy("subscription_id")
+    .execute();
+  return new Map(
+    rows
+      .filter((row) => Boolean(row.last_notified_at))
+      .map((row) => [row.subscription_id, row.last_notified_at!])
+  );
+}

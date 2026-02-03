@@ -5,6 +5,7 @@ import { migrateToLatest } from "../../src/db/migrator.js";
 import type { Database } from "../../src/db/types.js";
 import {
   clearSubscriptionsWithNotifications,
+  getLastNotificationMap,
   removeSubscriptionWithNotifications,
 } from "../../src/utils/subscriptionCleanup.js";
 
@@ -140,5 +141,45 @@ describe("subscriptionCleanup", () => {
       .select(["subscription_id", "contest_id"])
       .execute();
     expect(remainingNotifications).toEqual([{ subscription_id: "alert-3", contest_id: 101 }]);
+  });
+
+  it("returns last notification timestamps for subscriptions", async () => {
+    await db
+      .insertInto("contest_notifications")
+      .values({ subscription_id: "sub-1", contest_id: 1, notified_at: "2024-01-01T00:00:00Z" })
+      .execute();
+    await db
+      .insertInto("contest_notifications")
+      .values({ subscription_id: "sub-1", contest_id: 2, notified_at: "2024-01-02T00:00:00Z" })
+      .execute();
+    await db
+      .insertInto("contest_notifications")
+      .values({ subscription_id: "sub-2", contest_id: 3, notified_at: "2024-01-03T00:00:00Z" })
+      .execute();
+
+    const reminderMap = await getLastNotificationMap(db, "contest_notifications", [
+      "sub-1",
+      "sub-2",
+      "missing",
+    ]);
+
+    expect(reminderMap.get("sub-1")).toBe("2024-01-02T00:00:00Z");
+    expect(reminderMap.get("sub-2")).toBe("2024-01-03T00:00:00Z");
+    expect(reminderMap.has("missing")).toBe(false);
+
+    await db
+      .insertInto("contest_rating_alert_notifications")
+      .values({
+        subscription_id: "alert-1",
+        contest_id: 10,
+        notified_at: "2024-02-01T00:00:00Z",
+      })
+      .execute();
+
+    const alertMap = await getLastNotificationMap(db, "contest_rating_alert_notifications", [
+      "alert-1",
+    ]);
+
+    expect(alertMap.get("alert-1")).toBe("2024-02-01T00:00:00Z");
   });
 });

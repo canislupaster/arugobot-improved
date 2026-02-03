@@ -25,6 +25,7 @@ import {
 } from "../utils/reminders.js";
 import {
   clearSubscriptionsWithNotifications,
+  getLastNotificationMap,
   removeSubscriptionWithNotifications,
 } from "../utils/subscriptionCleanup.js";
 import {
@@ -488,23 +489,7 @@ export class ContestReminderService {
   }
 
   async getLastNotificationMap(subscriptionIds: string[]): Promise<Map<string, string>> {
-    if (subscriptionIds.length === 0) {
-      return new Map();
-    }
-    const rows = await this.db
-      .selectFrom("contest_notifications")
-      .select(({ fn }) => [
-        "subscription_id",
-        fn.max<string>("notified_at").as("last_notified_at"),
-      ])
-      .where("subscription_id", "in", subscriptionIds)
-      .groupBy("subscription_id")
-      .execute();
-    return new Map(
-      rows
-        .filter((row) => Boolean(row.last_notified_at))
-        .map((row) => [row.subscription_id, row.last_notified_at!])
-    );
+    return getLastNotificationMap(this.db, "contest_notifications", subscriptionIds);
   }
 
   private async wasNotified(subscriptionId: string, contestId: number): Promise<boolean> {
