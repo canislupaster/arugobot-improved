@@ -10,6 +10,7 @@ const createInteraction = (handle: string | null, limit: number | null) =>
     options: {
       getString: jest.fn((name: string) => (name === "handle" ? handle : null)),
       getUser: jest.fn().mockReturnValue(null),
+      getMember: jest.fn().mockReturnValue(null),
       getInteger: jest.fn((name: string) => (name === "limit" ? limit : null)),
     },
     deferReply: jest.fn().mockResolvedValue(undefined),

@@ -2,6 +2,8 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
+import { resolveHandleUserOptions } from "../utils/interaction.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -12,33 +14,6 @@ const MAX_LIMIT = 10;
 
 function clampLimit(limit: number): number {
   return Math.min(Math.max(limit, 1), MAX_LIMIT);
-}
-
-type HandleResolution =
-  | { ok: true; handle: string }
-  | { ok: false; errorMessage: string };
-
-async function resolveTargetHandle(
-  interaction: Parameters<Command["execute"]>[0],
-  context: Parameters<Command["execute"]>[1],
-  handleInput: string,
-  userOption: ReturnType<typeof interaction.options.getUser>
-): Promise<HandleResolution> {
-  if (handleInput) {
-    const handleInfo = await context.services.store.resolveHandle(handleInput);
-    if (!handleInfo.exists) {
-      return { ok: false, errorMessage: "Invalid handle." };
-    }
-    return { ok: true, handle: handleInfo.canonicalHandle ?? handleInput };
-  }
-
-  const targetUser = userOption ?? interaction.user;
-  const guildId = interaction.guild?.id ?? "";
-  const linkedHandle = await context.services.store.getHandle(guildId, targetUser.id);
-  if (!linkedHandle) {
-    return { ok: false, errorMessage: "Handle not linked." };
-  }
-  return { ok: true, handle: linkedHandle };
 }
 
 export const contestHistoryCommand: Command = {
@@ -57,16 +32,13 @@ export const contestHistoryCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     ),
   async execute(interaction, context) {
-    const handleInput = interaction.options.getString("handle")?.trim() ?? "";
-    const userOption = interaction.options.getUser("user");
-    const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-
-    if (handleInput && userOption) {
-      await interaction.reply({
-        content: "Provide either a handle or a user, not both.",
-      });
+    const handleResolution = resolveHandleUserOptions(interaction);
+    if (handleResolution.error) {
+      await interaction.reply({ content: handleResolution.error });
       return;
     }
+    const { handleInput, userOption } = handleResolution;
+    const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
 
     if (!interaction.guild && !handleInput) {
       await interaction.reply({
@@ -78,14 +50,17 @@ export const contestHistoryCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const handleResult = await resolveTargetHandle(
-        interaction,
-        context,
-        handleInput,
-        userOption
+      const targetUser = userOption ?? interaction.user;
+      const handleResult = await resolveHandleTargetWithOptionalGuild(
+        context.services.store,
+        {
+          guildId: interaction.guild?.id ?? null,
+          targetId: targetUser.id,
+          handleInput,
+        }
       );
-      if (!handleResult.ok) {
-        await interaction.editReply(handleResult.errorMessage);
+      if ("error" in handleResult) {
+        await interaction.editReply(handleResult.error);
         return;
       }
 
