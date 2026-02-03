@@ -48,9 +48,9 @@ export class DatabaseBackupService {
     const startedAt = Date.now();
     try {
       await fs.mkdir(this.backupDir, { recursive: true });
-      const { backupPath } = await this.resolveBackupPath(startedAt);
-      await fs.copyFile(this.databasePath, backupPath, fsConstants.COPYFILE_EXCL);
-      const deletedCount = await this.cleanupOldBackups(Date.now());
+      const baseSeconds = Math.floor(startedAt / 1000);
+      const { backupPath } = await this.copyBackupFile(this.databasePath, baseSeconds);
+      const deletedCount = await this.cleanupOldBackups(startedAt);
       this.lastBackupAt = new Date().toISOString();
       this.lastError = null;
       logInfo("Database backup created.", {
@@ -123,29 +123,32 @@ export class DatabaseBackupService {
     logError("Database backup failed.", { error: message });
   }
 
-  private async resolveBackupPath(
-    nowMs: number
+  private async copyBackupFile(
+    sourcePath: string,
+    baseSeconds: number
   ): Promise<{ backupPath: string; timestampSeconds: number }> {
     if (!this.backupDir) {
       throw new Error("Backup directory not configured.");
     }
-    const baseSeconds = Math.floor(nowMs / 1000);
     const maxAttempts = 5;
     for (let offset = 0; offset <= maxAttempts; offset += 1) {
       const timestampSeconds = baseSeconds + offset;
       const backupPath = path.join(this.backupDir, String(timestampSeconds));
       try {
-        await fs.access(backupPath);
+        await fs.copyFile(sourcePath, backupPath, fsConstants.COPYFILE_EXCL);
+        return { backupPath, timestampSeconds };
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
-        if (code === "ENOENT") {
-          return { backupPath, timestampSeconds };
+        if (code === "EEXIST") {
+          continue;
         }
         throw error;
       }
     }
     const timestampSeconds = baseSeconds + maxAttempts + 1;
-    return { backupPath: path.join(this.backupDir, String(timestampSeconds)), timestampSeconds };
+    const backupPath = path.join(this.backupDir, String(timestampSeconds));
+    await fs.copyFile(sourcePath, backupPath, fsConstants.COPYFILE_EXCL);
+    return { backupPath, timestampSeconds };
   }
 }
 
