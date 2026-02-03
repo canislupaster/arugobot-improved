@@ -54,7 +54,12 @@ describe("logsCommand", () => {
               timestamp: "2024-01-01T00:00:00.000Z",
               level: "error",
               message: "Boom",
-              context: { command: "ping", userId: "user-1", latencyMs: 123 },
+              context: {
+                command: "ping",
+                userId: "user-1",
+                latencyMs: 123,
+                correlationId: "abc",
+              },
             },
           ]),
         },
@@ -76,6 +81,7 @@ describe("logsCommand", () => {
     const embed = payload.embeds[0].data;
     expect(embed.title).toBe("Recent logs");
     expect(embed.description).toContain("Boom");
+    expect(embed.description).toContain("corr:abc");
     expect(embed.description).toContain("123ms");
   });
 

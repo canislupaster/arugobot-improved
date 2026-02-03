@@ -55,7 +55,7 @@ function formatEntryLine(entry: {
   timestamp: string;
   level: LogLevel;
   message: string;
-  context?: { command?: string; userId?: string; latencyMs?: number };
+  context?: { command?: string; userId?: string; latencyMs?: number; correlationId?: string };
 }): string {
   const parts = [formatTimestamp(entry.timestamp), entry.message];
   if (entry.context?.command) {
@@ -63,6 +63,9 @@ function formatEntryLine(entry: {
   }
   if (entry.context?.userId) {
     parts.push(`<@${entry.context.userId}>`);
+  }
+  if (entry.context?.correlationId) {
+    parts.push(`corr:${entry.context.correlationId}`);
   }
   if (Number.isFinite(entry.context?.latencyMs)) {
     parts.push(`${Math.round(entry.context?.latencyMs ?? 0)}ms`);
