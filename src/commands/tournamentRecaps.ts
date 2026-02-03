@@ -10,6 +10,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
+  formatCannotPostPermissionsMessage,
   getSendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -177,11 +178,7 @@ export const tournamentRecapsCommand: Command = {
           }
           if (result.status === "channel_missing_permissions") {
             await interaction.editReply(
-              formatCannotPostMessage(result.channelId, {
-                status: "missing_permissions",
-                channelId: result.channelId,
-                missingPermissions: result.missingPermissions,
-              })
+              formatCannotPostPermissionsMessage(result.channelId, result.missingPermissions)
             );
             return;
           }
