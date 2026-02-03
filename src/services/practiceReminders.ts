@@ -226,6 +226,15 @@ export class PracticeReminderService {
   private lastTickAt: string | null = null;
   private lastError: { message: string; timestamp: string } | null = null;
   private isTicking = false;
+  private readonly tickState = createServiceTickState(
+    () => this.isTicking,
+    (value) => {
+      this.isTicking = value;
+    },
+    (value) => {
+      this.lastTickAt = value;
+    }
+  );
 
   constructor(
     private db: Kysely<Database>,
@@ -410,18 +419,20 @@ export class PracticeReminderService {
 
   async runTick(client: Client): Promise<void> {
     await runServiceTick(
-      createServiceTickState(
-        () => this.isTicking,
-        (value) => {
-          this.isTicking = value;
-        },
-        (value) => {
-          this.lastTickAt = value;
-        }
-      ),
+      this.tickState,
       async () => {
         try {
-          const subscriptions = await this.listSubscriptions();
+          let subscriptions: PracticeReminder[] = [];
+          try {
+            subscriptions = await this.listSubscriptions();
+          } catch (error) {
+            const serviceError = buildServiceErrorFromException(error);
+            this.lastError = serviceError;
+            logError("Practice reminder subscription load failed.", {
+              error: serviceError.message,
+            });
+            return;
+          }
           if (subscriptions.length === 0) {
             return;
           }

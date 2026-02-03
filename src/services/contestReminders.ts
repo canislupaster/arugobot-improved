@@ -87,6 +87,15 @@ export class ContestReminderService {
   private lastTickAt: string | null = null;
   private lastError: { message: string; timestamp: string } | null = null;
   private isTicking = false;
+  private readonly tickState = createServiceTickState(
+    () => this.isTicking,
+    (value) => {
+      this.isTicking = value;
+    },
+    (value) => {
+      this.lastTickAt = value;
+    }
+  );
 
   constructor(
     private db: Kysely<Database>,
@@ -329,15 +338,7 @@ export class ContestReminderService {
 
   async runTick(client: Client): Promise<void> {
     await runServiceTick(
-      createServiceTickState(
-        () => this.isTicking,
-        (value) => {
-          this.isTicking = value;
-        },
-        (value) => {
-          this.lastTickAt = value;
-        }
-      ),
+      this.tickState,
       async () => {
         try {
           let subscriptions: ContestReminder[] = [];

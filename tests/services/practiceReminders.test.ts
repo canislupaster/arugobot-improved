@@ -188,6 +188,28 @@ describe("PracticeReminderService", () => {
     expect(service.getLastError()?.message).toContain("Practice reminder channel");
   });
 
+  it("records an error when subscription loading fails", async () => {
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue([]),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+    const listSpy = jest
+      .spyOn(service, "listSubscriptions")
+      .mockRejectedValue(new Error("db failed"));
+
+    await service.runTick({} as Client);
+
+    expect(listSpy).toHaveBeenCalledTimes(1);
+    expect(service.getLastError()?.message).toBe("db failed");
+  });
+
   it("returns recent practice posts in descending order", async () => {
     const service = new PracticeReminderService(
       db,
