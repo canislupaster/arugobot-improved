@@ -11,6 +11,7 @@ import {
   type SendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { getErrorMessageForLog } from "../utils/errors.js";
 import { normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
@@ -379,7 +380,7 @@ export class ContestRatingAlertService {
       try {
         subscriptions = await this.listSubscriptions();
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getErrorMessageForLog(error);
         this.lastError = { message, timestamp: new Date().toISOString() };
         logError("Contest rating alert subscription load failed.", { error: message });
         return;
@@ -403,7 +404,7 @@ export class ContestRatingAlertService {
       try {
         await this.cleanupNotifications(cutoff);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getErrorMessageForLog(error);
         logWarn("Contest rating alert cleanup failed.", { error: message });
       }
 
@@ -431,7 +432,7 @@ export class ContestRatingAlertService {
         await this.sendAlert(subscription, channel, candidate.preview, "scheduled");
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessageForLog(error);
       this.lastError = { message, timestamp: new Date().toISOString() };
       logError("Contest rating alert tick failed.", { error: message });
     } finally {
@@ -449,7 +450,7 @@ export class ContestRatingAlertService {
       await this.contests.refresh();
     } catch (error) {
       isStale = true;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessageForLog(error);
       this.lastError = { message, timestamp: new Date().toISOString() };
       logWarn("Contest rating alert refresh failed; using cached contests.", { error: message });
     }
@@ -498,7 +499,7 @@ export class ContestRatingAlertService {
       logInfo(logLabel, logContext);
       return { status: "sent" };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessageForLog(error);
       if (mode === "manual") {
         this.lastError = { message, timestamp: new Date().toISOString() };
       }
