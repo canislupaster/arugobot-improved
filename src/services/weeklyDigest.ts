@@ -7,6 +7,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getErrorMessage } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
+import { resolveManualSendChannel } from "../utils/reminders.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import {
   formatDiscordRelativeTime,
@@ -275,17 +276,19 @@ export class WeeklyDigestService {
       subscription.utcOffsetMinutes,
       subscription.dayOfWeek
     );
-    if (!force && wasSentSince(subscription.lastSentAt, weekStart)) {
-      return {
-        status: "already_sent",
-        lastSentAt: subscription.lastSentAt ?? new Date().toISOString(),
-      };
+    const manualCheck = await resolveManualSendChannel(client, {
+      channelId: subscription.channelId,
+      lastSentAt: subscription.lastSentAt,
+      force,
+      periodStartMs: weekStart,
+    });
+    if (manualCheck.status !== "ready") {
+      if (manualCheck.status === "already_sent") {
+        return { status: "already_sent", lastSentAt: manualCheck.lastSentAt };
+      }
+      return { status: "channel_missing", channelId: manualCheck.channelId };
     }
-
-    const channel = await resolveSendableChannel(client, subscription.channelId);
-    if (!channel) {
-      return { status: "channel_missing", channelId: subscription.channelId };
-    }
+    const channel = manualCheck.channel;
 
     const sendResult = await this.trySendDigest(subscription, channel, "manual");
     if (!sendResult.ok) {

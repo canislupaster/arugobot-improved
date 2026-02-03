@@ -3,7 +3,6 @@ import type { Kysely } from "kysely";
 
 import type { Database, PracticeRemindersTable } from "../db/types.js";
 import {
-  resolveSendableChannel,
   resolveSendableChannelOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
@@ -19,6 +18,7 @@ import {
   selectRandomProblem,
 } from "../utils/problemSelection.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
+import { resolveManualSendChannel } from "../utils/reminders.js";
 import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
@@ -368,17 +368,19 @@ export class PracticeReminderService {
 
     const now = new Date();
     const todayStart = getLocalDayStartUtcMs(now, subscription.utcOffsetMinutes);
-    if (!force && wasSentSince(subscription.lastSentAt, todayStart)) {
-      return {
-        status: "already_sent",
-        lastSentAt: subscription.lastSentAt ?? new Date().toISOString(),
-      };
+    const manualCheck = await resolveManualSendChannel(client, {
+      channelId: subscription.channelId,
+      lastSentAt: subscription.lastSentAt,
+      force,
+      periodStartMs: todayStart,
+    });
+    if (manualCheck.status !== "ready") {
+      if (manualCheck.status === "already_sent") {
+        return { status: "already_sent", lastSentAt: manualCheck.lastSentAt };
+      }
+      return { status: "channel_missing", channelId: manualCheck.channelId };
     }
-
-    const channel = await resolveSendableChannel(client, subscription.channelId);
-    if (!channel) {
-      return { status: "channel_missing", channelId: subscription.channelId };
-    }
+    const channel = manualCheck.channel;
 
     try {
       await this.cleanupPosts();
