@@ -80,6 +80,7 @@ type ChallengeClock = {
 type ContestStatusResponse = Array<{
   verdict?: string;
   creationTimeSeconds: number;
+  contestId?: number;
   problem: {
     contestId: number;
     index: string;
@@ -666,14 +667,14 @@ export class ChallengeService {
       });
       return false;
     }
-    const solved = await this.gotAc(
+    const status = await this.getSubmissionStatus(
       challenge.problem.contestId,
       challenge.problem.index,
       handle,
       challenge.lengthMinutes,
       challenge.startedAt
     );
-    if (!solved) {
+    if (status !== "ok") {
       return false;
     }
 
@@ -721,16 +722,48 @@ export class ChallengeService {
   private async finalizeChallenge(challenge: ActiveChallenge, client: Client): Promise<void> {
     const nowSeconds = this.clock.nowSeconds();
     const participants = challenge.participants;
+    let hasPending = false;
+    let hasError = false;
+    const unresolvedParticipants: ChallengeParticipant[] = [];
 
     for (const participant of participants) {
       if (participant.solvedAt !== null) {
         continue;
       }
-      const solved = await this.checkSolve(challenge, participant);
-      if (solved) {
+      const status = await this.getSubmissionStatus(
+        challenge.problem.contestId,
+        challenge.problem.index,
+        await this.store.getHandle(challenge.serverId, participant.userId),
+        challenge.lengthMinutes,
+        challenge.startedAt
+      );
+      if (status === "ok") {
+        await this.markSolved(challenge, participant);
         participant.solvedAt = nowSeconds;
         continue;
       }
+      if (status === "pending") {
+        hasPending = true;
+        continue;
+      }
+      if (status === "error") {
+        hasError = true;
+        continue;
+      }
+      unresolvedParticipants.push(participant);
+    }
+
+    if (hasPending || hasError) {
+      logInfo("Challenge finalization delayed.", {
+        challengeId: challenge.id,
+        guildId: challenge.serverId,
+        pending: hasPending,
+        error: hasError,
+      });
+      return;
+    }
+
+    for (const participant of unresolvedParticipants) {
       const rating = await this.store.getRating(challenge.serverId, participant.userId);
       if (rating < 0) {
         logWarn("Missing rating while applying challenge penalty.", {
@@ -829,13 +862,16 @@ export class ChallengeService {
     return lines || "No participants.";
   }
 
-  private async gotAc(
+  private async getSubmissionStatus(
     contestId: number,
     problemIndex: string,
-    handle: string,
+    handle: string | null,
     lengthMinutes: number,
     startTime: number
-  ): Promise<boolean> {
+  ): Promise<"ok" | "pending" | "none" | "error"> {
+    if (!handle) {
+      return "none";
+    }
     try {
       const response = await this.codeforces.request<ContestStatusResponse>("contest.status", {
         contestId,
@@ -843,24 +879,30 @@ export class ChallengeService {
         from: 1,
         count: 100,
       });
+      let hasPending = false;
       for (const item of response) {
-        const id = `${item.problem.contestId}${item.problem.index}`;
+        const itemContestId = item.problem.contestId ?? item.contestId ?? contestId;
+        const id = `${itemContestId}${item.problem.index}`;
         if (
           id === `${contestId}${problemIndex}` &&
-          item.verdict === "OK" &&
           item.creationTimeSeconds <= startTime + lengthMinutes * 60 &&
           item.creationTimeSeconds >= startTime
         ) {
-          return true;
+          if (item.verdict === "OK") {
+            return "ok";
+          }
+          if (!item.verdict || item.verdict === "TESTING") {
+            hasPending = true;
+          }
         }
       }
-      return false;
+      return hasPending ? "pending" : "none";
     } catch (error) {
       logError(`Error during challenge check: ${String(error)}`, {
         contestId,
         handle,
       });
-      return false;
+      return "error";
     }
   }
 

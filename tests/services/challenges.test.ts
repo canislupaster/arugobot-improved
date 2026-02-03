@@ -166,6 +166,60 @@ describe("ChallengeService", () => {
     expect(participantRow?.rating_delta).toBe(down);
   });
 
+  it("waits for pending submissions before completing a challenge", async () => {
+    const store = new StoreService(db, mockCodeforces as never);
+    await store.insertUser("guild-1", "user-1", "tourist");
+
+    const clock = { nowSeconds: () => 2000 };
+    const service = new ChallengeService(db, store, mockCodeforces as never, clock);
+    const { client } = createClientMock();
+
+    mockCodeforces.request
+      .mockResolvedValueOnce([
+        {
+          verdict: "TESTING",
+          creationTimeSeconds: 1005,
+          problem: { contestId: 1000, index: "A" },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          verdict: "OK",
+          creationTimeSeconds: 1005,
+          problem: { contestId: 1000, index: "A" },
+        },
+      ]);
+
+    await service.createChallenge({
+      serverId: "guild-1",
+      channelId: "channel-1",
+      messageId: "message-1",
+      hostUserId: "user-1",
+      problem: { contestId: 1000, index: "A", name: "Test", rating: 1200 },
+      lengthMinutes: 10,
+      participants: ["user-1"],
+      startedAt: 1000,
+    });
+
+    await service.runTick(client);
+
+    const statusRow = await db.selectFrom("challenges").select("status").executeTakeFirstOrThrow();
+    expect(statusRow.status).toBe("active");
+    expect(await store.getRating("guild-1", "user-1")).toBe(1500);
+
+    await service.runTick(client);
+
+    const [down, up] = getRatingChanges(1500, 1200, 10);
+    expect(up).toBeGreaterThan(0);
+    expect(down).toBeLessThan(0);
+    expect(await store.getRating("guild-1", "user-1")).toBe(1500 + up);
+    const completed = await db
+      .selectFrom("challenges")
+      .select("status")
+      .executeTakeFirstOrThrow();
+    expect(completed.status).toBe("completed");
+  });
+
   it("keeps challenges active when Codeforces requests fail", async () => {
     const store = new StoreService(db, mockCodeforces as never);
     await store.insertUser("guild-1", "user-1", "tourist");
