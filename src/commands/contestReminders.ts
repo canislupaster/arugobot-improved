@@ -29,6 +29,10 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
+import {
+  resolveSubscriptionId,
+  resolveSubscriptionSelectionOrReply,
+} from "../utils/subscriptionSelection.js";
 
 import type { Command } from "./types.js";
 
@@ -227,95 +231,16 @@ function addReminderOptions(
     .addStringOption((option) => addContestScopeOption(option, "Which contests to include"));
 }
 
-function resolveSubscriptionId(
-  subscriptions: Array<{ id: string }>,
-  inputId: string
-):
-  | { status: "not_found" }
-  | { status: "ambiguous"; matches: string[] }
-  | { status: "ok"; id: string } {
-  const normalized = inputId.toLowerCase();
-  const matches = subscriptions.filter((sub) => sub.id.toLowerCase().startsWith(normalized));
-  if (matches.length === 0) {
-    return { status: "not_found" };
-  }
-  if (matches.length > 1) {
-    return { status: "ambiguous", matches: matches.map((match) => match.id) };
-  }
-  return { status: "ok", id: matches[0]!.id };
-}
-
-async function getSubscriptionsOrReply(
-  interaction: Parameters<Command["execute"]>[0],
-  contestReminders: { listSubscriptions: (guildId: string) => Promise<ContestReminder[]> },
-  guildId: string
-): Promise<ContestReminder[] | null> {
-  const subscriptions = await contestReminders.listSubscriptions(guildId);
-  if (subscriptions.length === 0) {
-    await interaction.reply({
-      content: "No contest reminders configured for this server.",
-    });
-    return null;
-  }
-  return subscriptions;
-}
-
-async function resolveSubscriptionIdOrReply(
-  interaction: Parameters<Command["execute"]>[0],
-  subscriptions: ContestReminder[],
-  id: string
-): Promise<string | null> {
-  const resolution = resolveSubscriptionId(subscriptions, id);
-  if (resolution.status === "not_found") {
-    await interaction.reply({
-      content: "Subscription id not found. Use /contestreminders list to see current ids.",
-    });
-    return null;
-  }
-  if (resolution.status === "ambiguous") {
-    await interaction.reply({
-      content: `Subscription id matches multiple entries. Use the full id. Matches: ${resolution.matches.join(
-        ", "
-      )}`,
-    });
-    return null;
-  }
-  return resolution.id;
-}
-
-async function selectSubscriptionOrReply(
-  interaction: Parameters<Command["execute"]>[0],
-  subscriptions: ContestReminder[],
-  id: string | null,
-  multiMessage: string
-): Promise<ContestReminder | null> {
-  if (id) {
-    const resolvedId = await resolveSubscriptionIdOrReply(interaction, subscriptions, id);
-    if (!resolvedId) {
-      return null;
-    }
-    return subscriptions.find((entry) => entry.id === resolvedId) ?? subscriptions[0]!;
-  }
-  if (subscriptions.length > 1) {
-    await interaction.reply({ content: multiMessage });
-    return null;
-  }
-  return subscriptions[0] ?? null;
-}
-
-async function resolveSubscriptionSelectionOrReply(
-  interaction: Parameters<Command["execute"]>[0],
-  contestReminders: { listSubscriptions: (guildId: string) => Promise<ContestReminder[]> },
-  guildId: string,
-  id: string | null,
-  multiMessage: string
-): Promise<ContestReminder | null> {
-  const subscriptions = await getSubscriptionsOrReply(interaction, contestReminders, guildId);
-  if (!subscriptions) {
-    return null;
-  }
-  return selectSubscriptionOrReply(interaction, subscriptions, id, multiMessage);
-}
+const NO_SUBSCRIPTIONS_MESSAGE = "No contest reminders configured for this server.";
+const MULTIPLE_SUBSCRIPTIONS_MESSAGE =
+  "Multiple contest reminder subscriptions are configured. Provide an id from /contestreminders list.";
+const selectionMessages = {
+  none: NO_SUBSCRIPTIONS_MESSAGE,
+  needsId: MULTIPLE_SUBSCRIPTIONS_MESSAGE,
+  notFound: "Subscription id not found. Use /contestreminders list to see current ids.",
+  ambiguous: (matches: string[]) =>
+    `Subscription id matches multiple entries. Use the full id. Matches: ${matches.join(", ")}`,
+};
 
 export const contestRemindersCommand: Command = {
   data: new SlashCommandBuilder()
@@ -410,12 +335,9 @@ export const contestRemindersCommand: Command = {
 
     try {
       if (subcommand === "status" || subcommand === "list") {
-        const subscriptions = await getSubscriptionsOrReply(
-          interaction,
-          context.services.contestReminders,
-          guildId
-        );
-        if (!subscriptions) {
+        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
+        if (subscriptions.length === 0) {
+          await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
           return;
         }
 
@@ -480,12 +402,9 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "cleanup") {
-        const subscriptions = await getSubscriptionsOrReply(
-          interaction,
-          context.services.contestReminders,
-          guildId
-        );
-        if (!subscriptions) {
+        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
+        if (subscriptions.length === 0) {
+          await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
           return;
         }
 
@@ -647,18 +566,21 @@ export const contestRemindersCommand: Command = {
 
       if (subcommand === "remove") {
         const id = interaction.options.getString("id", true);
-        const subscriptions = await getSubscriptionsOrReply(
-          interaction,
-          context.services.contestReminders,
-          guildId
-        );
-        if (!subscriptions) {
+        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
+        if (subscriptions.length === 0) {
+          await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
           return;
         }
-        const resolvedId = await resolveSubscriptionIdOrReply(interaction, subscriptions, id);
-        if (!resolvedId) {
+        const resolution = resolveSubscriptionId(subscriptions, id);
+        if (resolution.status === "not_found") {
+          await interaction.reply({ content: selectionMessages.notFound });
           return;
         }
+        if (resolution.status === "ambiguous") {
+          await interaction.reply({ content: selectionMessages.ambiguous(resolution.matches) });
+          return;
+        }
+        const resolvedId = resolution.id;
         const removed = await context.services.contestReminders.removeSubscription(
           guildId,
           resolvedId
@@ -673,12 +595,12 @@ export const contestRemindersCommand: Command = {
 
       if (subcommand === "preview") {
         const id = interaction.options.getString("id");
+        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
         const subscription = await resolveSubscriptionSelectionOrReply(
           interaction,
-          context.services.contestReminders,
-          guildId,
+          subscriptions,
           id,
-          "Multiple contest reminder subscriptions are configured. Provide an id from /contestreminders list."
+          selectionMessages
         );
         if (!subscription) {
           return;
@@ -787,12 +709,12 @@ export const contestRemindersCommand: Command = {
       if (subcommand === "post") {
         const force = interaction.options.getBoolean("force") ?? false;
         const id = interaction.options.getString("id");
+        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
         const subscription = await resolveSubscriptionSelectionOrReply(
           interaction,
-          context.services.contestReminders,
-          guildId,
+          subscriptions,
           id,
-          "Multiple contest reminder subscriptions are configured. Provide an id from /contestreminders list."
+          selectionMessages
         );
         if (!subscription) {
           return;

@@ -1,6 +1,5 @@
 import {
   ChannelType,
-  type ChatInputCommandInteraction,
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -20,6 +19,10 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
+import {
+  resolveSubscriptionId,
+  resolveSubscriptionSelectionOrReply,
+} from "../utils/subscriptionSelection.js";
 
 import type { Command } from "./types.js";
 
@@ -58,82 +61,13 @@ function formatSubscriptionSummary(
 const NO_SUBSCRIPTIONS_MESSAGE = "No contest rating alerts configured for this server.";
 const MULTIPLE_SUBSCRIPTIONS_MESSAGE =
   "Multiple contest rating alerts are configured. Provide an id from /contestratingalerts list.";
-
-function resolveSubscriptionId(
-  subscriptions: Array<{ id: string }>,
-  inputId: string
-):
-  | { status: "not_found" }
-  | { status: "ambiguous"; matches: string[] }
-  | { status: "ok"; id: string } {
-  const normalized = inputId.toLowerCase();
-  const matches = subscriptions.filter((sub) => sub.id.toLowerCase().startsWith(normalized));
-  if (matches.length === 0) {
-    return { status: "not_found" };
-  }
-  if (matches.length > 1) {
-    return { status: "ambiguous", matches: matches.map((match) => match.id) };
-  }
-  return { status: "ok", id: matches[0]!.id };
-}
-
-function selectSubscription(
-  subscriptions: ContestRatingAlertSubscription[],
-  inputId: string | null
-):
-  | { status: "none" }
-  | { status: "needs_id" }
-  | { status: "not_found" }
-  | { status: "ambiguous"; matches: string[] }
-  | { status: "ok"; subscription: ContestRatingAlertSubscription } {
-  if (subscriptions.length === 0) {
-    return { status: "none" };
-  }
-  if (!inputId) {
-    if (subscriptions.length > 1) {
-      return { status: "needs_id" };
-    }
-    return { status: "ok", subscription: subscriptions[0]! };
-  }
-  const resolution = resolveSubscriptionId(subscriptions, inputId);
-  if (resolution.status !== "ok") {
-    return resolution;
-  }
-  const subscription =
-    subscriptions.find((entry) => entry.id === resolution.id) ?? subscriptions[0]!;
-  return { status: "ok", subscription };
-}
-
-async function resolveSubscriptionSelection(
-  interaction: ChatInputCommandInteraction,
-  subscriptions: ContestRatingAlertSubscription[],
-  inputId: string | null
-): Promise<ContestRatingAlertSubscription | null> {
-  const selection = selectSubscription(subscriptions, inputId);
-  if (selection.status === "none") {
-    await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
-    return null;
-  }
-  if (selection.status === "needs_id") {
-    await interaction.reply({ content: MULTIPLE_SUBSCRIPTIONS_MESSAGE });
-    return null;
-  }
-  if (selection.status === "not_found") {
-    await interaction.reply({
-      content: "Subscription id not found. Use /contestratingalerts list to see current ids.",
-    });
-    return null;
-  }
-  if (selection.status === "ambiguous") {
-    await interaction.reply({
-      content: `Subscription id matches multiple entries. Use the full id. Matches: ${selection.matches.join(
-        ", "
-      )}`,
-    });
-    return null;
-  }
-  return selection.subscription;
-}
+const selectionMessages = {
+  none: NO_SUBSCRIPTIONS_MESSAGE,
+  needsId: MULTIPLE_SUBSCRIPTIONS_MESSAGE,
+  notFound: "Subscription id not found. Use /contestratingalerts list to see current ids.",
+  ambiguous: (matches: string[]) =>
+    `Subscription id matches multiple entries. Use the full id. Matches: ${matches.join(", ")}`,
+};
 
 export const contestRatingAlertsCommand: Command = {
   data: new SlashCommandBuilder()
@@ -409,17 +343,11 @@ export const contestRatingAlertsCommand: Command = {
         }
         const resolution = resolveSubscriptionId(subscriptions, id);
         if (resolution.status === "not_found") {
-          await interaction.reply({
-            content: "Subscription id not found. Use /contestratingalerts list to see current ids.",
-          });
+          await interaction.reply({ content: selectionMessages.notFound });
           return;
         }
         if (resolution.status === "ambiguous") {
-          await interaction.reply({
-            content: `Subscription id matches multiple entries. Use the full id. Matches: ${resolution.matches.join(
-              ", "
-            )}`,
-          });
+          await interaction.reply({ content: selectionMessages.ambiguous(resolution.matches) });
           return;
         }
         const removed = await context.services.contestRatingAlerts.removeSubscription(
@@ -437,7 +365,12 @@ export const contestRatingAlertsCommand: Command = {
       if (subcommand === "preview") {
         const id = interaction.options.getString("id");
         const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const subscription = await resolveSubscriptionSelection(interaction, subscriptions, id);
+        const subscription = await resolveSubscriptionSelectionOrReply(
+          interaction,
+          subscriptions,
+          id,
+          selectionMessages
+        );
         if (!subscription) {
           return;
         }
@@ -494,7 +427,12 @@ export const contestRatingAlertsCommand: Command = {
         const force = interaction.options.getBoolean("force") ?? false;
         const id = interaction.options.getString("id");
         const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const subscription = await resolveSubscriptionSelection(interaction, subscriptions, id);
+        const subscription = await resolveSubscriptionSelectionOrReply(
+          interaction,
+          subscriptions,
+          id,
+          selectionMessages
+        );
         if (!subscription) {
           return;
         }
