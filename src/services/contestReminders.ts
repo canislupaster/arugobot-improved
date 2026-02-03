@@ -23,6 +23,7 @@ import {
   recordReminderSendFailure,
   resolveManualChannel,
 } from "../utils/reminders.js";
+import { beginServiceTick } from "../utils/serviceTicks.js";
 import {
   clearSubscriptionsWithNotifications,
   getLastNotificationMap,
@@ -328,11 +329,18 @@ export class ContestReminderService {
   }
 
   async runTick(client: Client): Promise<void> {
-    if (this.isTicking) {
+    const finishTick = beginServiceTick({
+      isTicking: this.isTicking,
+      setTicking: (value) => {
+        this.isTicking = value;
+      },
+      setLastTickAt: (value) => {
+        this.lastTickAt = value;
+      },
+    });
+    if (!finishTick) {
       return;
     }
-    this.isTicking = true;
-    this.lastTickAt = new Date().toISOString();
     try {
       let subscriptions: ContestReminder[] = [];
       try {
@@ -484,7 +492,7 @@ export class ContestReminderService {
       this.lastError = { message, timestamp: new Date().toISOString() };
       logError("Contest reminder refresh failed.", { error: message });
     } finally {
-      this.isTicking = false;
+      finishTick();
     }
   }
 
