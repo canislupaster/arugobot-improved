@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 import { buildPaginationIds, runPaginatedInteraction } from "../utils/pagination.js";
 import { formatTime } from "../utils/rating.js";
 
@@ -105,11 +106,18 @@ export const historyCommand: Command = {
       return;
     }
     const guildId = interaction.guild.id;
-    const page = interaction.options.getInteger("page") ?? 1;
-    if (!Number.isInteger(page) || page < 1) {
-      await interaction.reply({ content: "Invalid page." });
+    const pageResult = resolveBoundedIntegerOption(interaction, {
+      name: "page",
+      min: 1,
+      max: Number.MAX_SAFE_INTEGER,
+      defaultValue: 1,
+      errorMessage: "Invalid page.",
+    });
+    if ("error" in pageResult) {
+      await interaction.reply({ content: pageResult.error });
       return;
     }
+    const page = pageResult.value;
 
     await interaction.deferReply();
 
