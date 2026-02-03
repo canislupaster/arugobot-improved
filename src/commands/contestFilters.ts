@@ -1,7 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { parseKeywordFilters } from "../utils/contestFilters.js";
+import { formatKeywordFilterClauses, parseKeywordFilters } from "../utils/contestFilters.js";
 import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import { replyEphemeral } from "../utils/interaction.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
@@ -39,13 +39,10 @@ function formatScope(scope: string | null): string {
 
 function buildFilterSummary(include: string | null, exclude: string | null): string {
   const filters = parseKeywordFilters(include, exclude);
-  const parts: string[] = [];
-  if (filters.includeKeywords.length > 0) {
-    parts.push(`Include: ${filters.includeKeywords.join(", ")}`);
-  }
-  if (filters.excludeKeywords.length > 0) {
-    parts.push(`Exclude: ${filters.excludeKeywords.join(", ")}`);
-  }
+  const parts = formatKeywordFilterClauses(filters, {
+    include: "Include",
+    exclude: "Exclude",
+  });
   if (parts.length === 0) {
     return "None";
   }

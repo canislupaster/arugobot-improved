@@ -3,6 +3,11 @@ export type KeywordFilters = {
   excludeKeywords: string[];
 };
 
+export type KeywordFilterClauseLabels = {
+  include: string;
+  exclude: string;
+};
+
 export type ContestReminderPreset = "div2" | "div3" | "div4" | "educational";
 
 type ContestReminderPresetConfig = KeywordFilters & { label: string };
@@ -64,6 +69,20 @@ export function listContestReminderPresets(): Array<{
 
 export function serializeKeywords(keywords: string[]): string {
   return keywords.join(", ");
+}
+
+export function formatKeywordFilterClauses(
+  filters: KeywordFilters,
+  labels: KeywordFilterClauseLabels = { include: "include", exclude: "exclude" }
+): string[] {
+  const parts: string[] = [];
+  if (filters.includeKeywords.length > 0) {
+    parts.push(`${labels.include}: ${filters.includeKeywords.join(", ")}`);
+  }
+  if (filters.excludeKeywords.length > 0) {
+    parts.push(`${labels.exclude}: ${filters.excludeKeywords.join(", ")}`);
+  }
+  return parts;
 }
 
 export function filterContestsByKeywords<T extends { name: string }>(

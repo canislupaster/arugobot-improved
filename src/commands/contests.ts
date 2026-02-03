@@ -1,7 +1,11 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
-import { filterContestsByKeywords, parseKeywordFilters } from "../utils/contestFilters.js";
+import {
+  filterContestsByKeywords,
+  formatKeywordFilterClauses,
+  parseKeywordFilters,
+} from "../utils/contestFilters.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -37,13 +41,7 @@ function formatScopeLabel(scope: ContestScopeFilter) {
 }
 
 function buildFilterSummary(filters: ReturnType<typeof parseKeywordFilters>) {
-  const parts: string[] = [];
-  if (filters.includeKeywords.length > 0) {
-    parts.push(`include: ${filters.includeKeywords.join(", ")}`);
-  }
-  if (filters.excludeKeywords.length > 0) {
-    parts.push(`exclude: ${filters.excludeKeywords.join(", ")}`);
-  }
+  const parts = formatKeywordFilterClauses(filters);
   if (parts.length === 0) {
     return null;
   }

@@ -1,5 +1,6 @@
 import {
   filterContestsByKeywords,
+  formatKeywordFilterClauses,
   getContestReminderPreset,
   listContestReminderPresets,
   parseKeywordFilters,
@@ -27,6 +28,17 @@ describe("contestFilters", () => {
       "Codeforces Round #900 (Div. 2)",
       "Educational Codeforces Round",
     ]);
+  });
+
+  it("formats keyword filter clauses with labels", () => {
+    const filters = parseKeywordFilters("Div. 2, educational", "kotlin");
+    const clauses = formatKeywordFilterClauses(filters);
+    expect(clauses).toEqual(["include: div. 2, educational", "exclude: kotlin"]);
+    const customClauses = formatKeywordFilterClauses(filters, {
+      include: "Include",
+      exclude: "Exclude",
+    });
+    expect(customClauses).toEqual(["Include: div. 2, educational", "Exclude: kotlin"]);
   });
 
   it("exposes contest reminder presets", () => {
