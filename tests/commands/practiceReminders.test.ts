@@ -179,6 +179,95 @@ describe("practiceRemindersCommand", () => {
     });
   });
 
+  it("cleans up missing practice reminder channels", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("cleanup"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getRole: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-3a",
+      client: createClient(null),
+      services: {
+        practiceReminders: {
+          getSubscription: jest.fn().mockResolvedValue({
+            guildId: "guild-1",
+            channelId: "channel-1",
+            hourUtc: 9,
+            minuteUtc: 0,
+            utcOffsetMinutes: 0,
+            daysOfWeek: ALL_DAYS,
+            ratingRanges: [{ min: 800, max: 3500 }],
+            tags: "",
+            roleId: null,
+            lastSentAt: null,
+          }),
+          clearSubscription: jest.fn().mockResolvedValue(true),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.clearSubscription).toHaveBeenCalledWith("guild-1");
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: expect.stringContaining("Removed practice reminders"),
+    });
+  });
+
+  it("refuses cleanup when channel is missing permissions without opt-in", async () => {
+    const channel = {
+      id: "channel-6",
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(false),
+      }),
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("cleanup"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getRole: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-3b",
+      client: createClient(channel),
+      services: {
+        practiceReminders: {
+          getSubscription: jest.fn().mockResolvedValue({
+            guildId: "guild-1",
+            channelId: "channel-6",
+            hourUtc: 9,
+            minuteUtc: 0,
+            utcOffsetMinutes: 0,
+            daysOfWeek: ALL_DAYS,
+            ratingRanges: [{ min: 800, max: 3500 }],
+            tags: "",
+            roleId: null,
+            lastSentAt: null,
+          }),
+          clearSubscription: jest.fn().mockResolvedValue(true),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.clearSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: expect.stringContaining("include_permissions:true"),
+    });
+  });
+
   it("sets practice reminders with a role mention", async () => {
     const channel = createSendableChannel("channel-2");
     const role = { id: "role-1" };

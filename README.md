@@ -226,9 +226,9 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   handles only). `preview` shows the next alert for linked handles, and `post` sends the latest
   rating change summary immediately (optionally `force` to resend).
 
-- **/practicereminders** `set|status|clear|preview|post`
+- **/practicereminders** `set|status|clear|cleanup|preview|post`
 
-  Configure practice problem reminders (admin only). Use `set` to choose a channel, time, optional `utc_offset` (e.g. `+02:00`, `-05:30`, `Z`), optional `days` (e.g. `mon,wed,fri`, `weekdays`, `weekends`), rating ranges, optional tags, and an optional role mention. If `utc_offset` is omitted the time is interpreted as UTC.
+  Configure practice problem reminders (admin only). Use `set` to choose a channel, time, optional `utc_offset` (e.g. `+02:00`, `-05:30`, `Z`), optional `days` (e.g. `mon,wed,fri`, `weekdays`, `weekends`), rating ranges, optional tags, and an optional role mention. If `utc_offset` is omitted the time is interpreted as UTC. Use `cleanup` to remove reminders pointing at deleted channels (add `include_permissions:true` to also remove ones missing bot permissions).
   Use `post` to send a practice problem immediately (optionally `force` to send even if one was posted today).
 
 - **/digest** `set|status|clear|preview|post`

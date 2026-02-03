@@ -163,6 +163,16 @@ export const practiceRemindersCommand: Command = {
       subcommand.setName("clear").setDescription("Disable daily practice reminders")
     )
     .addSubcommand((subcommand) =>
+      subcommand
+        .setName("cleanup")
+        .setDescription("Remove reminders pointing at missing channels")
+        .addBooleanOption((option) =>
+          option
+            .setName("include_permissions")
+            .setDescription("Also remove if the bot is missing channel permissions")
+        )
+    )
+    .addSubcommand((subcommand) =>
       subcommand.setName("preview").setDescription("Preview the next practice reminder")
     )
     .addSubcommand((subcommand) =>
@@ -292,6 +302,50 @@ export const practiceRemindersCommand: Command = {
         return;
       }
 
+      if (subcommand === "cleanup") {
+        const subscription = await context.services.practiceReminders.getSubscription(guildId);
+        if (!subscription) {
+          await interaction.reply({
+            content: "No practice reminders were configured for this server.",
+          });
+          return;
+        }
+
+        const channelStatus = await getSendableChannelStatus(
+          context.client,
+          subscription.channelId
+        );
+        if (channelStatus.status === "ok") {
+          await interaction.reply({
+            content: "Practice reminder channel looks healthy; nothing to clean.",
+          });
+          return;
+        }
+
+        if (channelStatus.status === "missing_permissions") {
+          const includePermissions =
+            interaction.options.getBoolean("include_permissions") ?? false;
+          if (!includePermissions) {
+            await interaction.reply({
+              content: `Practice reminders still point at <#${subscription.channelId}> (${describeSendableChannelStatus(
+                channelStatus
+              )}). Re-run with include_permissions:true or update the channel with /practicereminders set.`,
+            });
+            return;
+          }
+        }
+
+        const removed = await context.services.practiceReminders.clearSubscription(guildId);
+        await interaction.reply({
+          content: removed
+            ? `Removed practice reminders for <#${subscription.channelId}> (${describeSendableChannelStatus(
+                channelStatus
+              )}).`
+            : "Failed to remove practice reminders. Try again later.",
+        });
+        return;
+      }
+
       if (subcommand === "set") {
         const channel = interaction.options.getChannel("channel", true);
         if (
@@ -303,13 +357,13 @@ export const practiceRemindersCommand: Command = {
           });
           return;
         }
-      const status = await getSendableChannelStatus(context.client, channel.id);
-      if (status.status !== "ok") {
-        await interaction.reply({
-          content: formatCannotPostMessage(channel.id, status),
-        });
-        return;
-      }
+        const status = await getSendableChannelStatus(context.client, channel.id);
+        if (status.status !== "ok") {
+          await interaction.reply({
+            content: formatCannotPostMessage(channel.id, status),
+          });
+          return;
+        }
 
         const hourInput = interaction.options.getInteger("hour_utc") ?? DEFAULT_HOUR_UTC;
         const minuteInput = interaction.options.getInteger("minute_utc") ?? DEFAULT_MINUTE_UTC;
