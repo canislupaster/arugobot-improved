@@ -8,7 +8,7 @@ import { getErrorMessage } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
-import { resolveManualSendChannel } from "../utils/reminders.js";
+import { getManualSendFailure, resolveManualSendChannel } from "../utils/reminders.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -283,10 +283,7 @@ export class WeeklyDigestService {
       periodStartMs: weekStart,
     });
     if (manualCheck.status !== "ready") {
-      if (manualCheck.status === "already_sent") {
-        return { status: "already_sent", lastSentAt: manualCheck.lastSentAt };
-      }
-      return { status: "channel_missing", channelId: manualCheck.channelId };
+      return getManualSendFailure(manualCheck);
     }
     const channel = manualCheck.channel;
 

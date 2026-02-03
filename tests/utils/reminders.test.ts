@@ -1,6 +1,6 @@
 import { ChannelType, type Client } from "discord.js";
 
-import { resolveManualSendChannel } from "../../src/utils/reminders.js";
+import { getManualSendFailure, resolveManualSendChannel } from "../../src/utils/reminders.js";
 
 describe("resolveManualSendChannel", () => {
   it("returns already_sent when a reminder was sent in the period", async () => {
@@ -55,5 +55,25 @@ describe("resolveManualSendChannel", () => {
     });
 
     expect(result).toEqual({ status: "ready", channel });
+  });
+});
+
+describe("getManualSendFailure", () => {
+  it("returns already_sent payload", () => {
+    const result = getManualSendFailure({
+      status: "already_sent",
+      lastSentAt: "2024-01-01T00:00:00.000Z",
+    });
+
+    expect(result).toEqual({ status: "already_sent", lastSentAt: "2024-01-01T00:00:00.000Z" });
+  });
+
+  it("returns channel_missing payload", () => {
+    const result = getManualSendFailure({
+      status: "channel_missing",
+      channelId: "channel-2",
+    });
+
+    expect(result).toEqual({ status: "channel_missing", channelId: "channel-2" });
   });
 });

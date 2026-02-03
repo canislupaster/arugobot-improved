@@ -8,6 +8,10 @@ export type ManualSendCheckResult =
   | { status: "already_sent"; lastSentAt: string }
   | { status: "channel_missing"; channelId: string };
 
+export type ManualSendFailure =
+  | { status: "already_sent"; lastSentAt: string }
+  | { status: "channel_missing"; channelId: string };
+
 export async function resolveManualSendChannel(
   client: Client,
   params: {
@@ -30,4 +34,13 @@ export async function resolveManualSendChannel(
   }
 
   return { status: "ready", channel };
+}
+
+export function getManualSendFailure(
+  result: Exclude<ManualSendCheckResult, { status: "ready"; channel: SendableChannel }>
+): ManualSendFailure {
+  if (result.status === "already_sent") {
+    return { status: "already_sent", lastSentAt: result.lastSentAt };
+  }
+  return { status: "channel_missing", channelId: result.channelId };
 }

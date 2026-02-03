@@ -18,7 +18,7 @@ import {
   selectRandomProblem,
 } from "../utils/problemSelection.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
-import { resolveManualSendChannel } from "../utils/reminders.js";
+import { getManualSendFailure, resolveManualSendChannel } from "../utils/reminders.js";
 import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
@@ -375,10 +375,7 @@ export class PracticeReminderService {
       periodStartMs: todayStart,
     });
     if (manualCheck.status !== "ready") {
-      if (manualCheck.status === "already_sent") {
-        return { status: "already_sent", lastSentAt: manualCheck.lastSentAt };
-      }
-      return { status: "channel_missing", channelId: manualCheck.channelId };
+      return getManualSendFailure(manualCheck);
     }
     const channel = manualCheck.channel;
 
