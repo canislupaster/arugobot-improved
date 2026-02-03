@@ -38,6 +38,7 @@ import { streakCommand } from "./streak.js";
 import { suggestCommand } from "./suggest.js";
 import { tournamentCommand } from "./tournament.js";
 import { tournamentRecapsCommand } from "./tournamentRecaps.js";
+import { normalizeCommandData } from "../utils/commandData.js";
 import type { Command } from "./types.js";
 
 export const commandList: Command[] = [
@@ -87,4 +88,6 @@ export const commandList: Command[] = [
 
 export const commandMap = new Map(commandList.map((command) => [command.data.name, command]));
 
-export const commandData = commandList.map((command) => command.data.toJSON());
+export const commandData = commandList.map((command) =>
+  normalizeCommandData(command.data.toJSON())
+);
