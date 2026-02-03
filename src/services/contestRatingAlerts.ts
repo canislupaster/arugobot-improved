@@ -17,6 +17,10 @@ import { normalizeHandleFilter, normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
+import {
+  clearSubscriptionsWithNotifications,
+  removeSubscriptionWithNotifications,
+} from "../utils/subscriptionCleanup.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { ContestRatingChangesService } from "./contestRatingChanges.js";
@@ -252,44 +256,26 @@ export class ContestRatingAlertService {
   }
 
   async removeSubscription(guildId: string, subscriptionId: string): Promise<boolean> {
-    return this.db.transaction().execute(async (trx) => {
-      const result = await trx
-        .deleteFrom("contest_rating_alert_subscriptions")
-        .where("guild_id", "=", guildId)
-        .where("id", "=", subscriptionId)
-        .executeTakeFirst();
-      const removed = Number(result.numDeletedRows ?? 0) > 0;
-      if (removed) {
-        await trx
-          .deleteFrom("contest_rating_alert_notifications")
-          .where("subscription_id", "=", subscriptionId)
-          .execute();
-      }
-      return removed;
-    });
+    return removeSubscriptionWithNotifications(
+      this.db,
+      {
+        subscriptions: "contest_rating_alert_subscriptions",
+        notifications: "contest_rating_alert_notifications",
+      },
+      guildId,
+      subscriptionId
+    );
   }
 
   async clearSubscriptions(guildId: string): Promise<number> {
-    return this.db.transaction().execute(async (trx) => {
-      const subscriptions = await trx
-        .selectFrom("contest_rating_alert_subscriptions")
-        .select("id")
-        .where("guild_id", "=", guildId)
-        .execute();
-      if (subscriptions.length === 0) {
-        return 0;
-      }
-      const ids = subscriptions.map((subscription) => subscription.id);
-      await trx
-        .deleteFrom("contest_rating_alert_notifications")
-        .where("subscription_id", "in", ids)
-        .execute();
-      const result = await trx
-        .deleteFrom("contest_rating_alert_subscriptions")
-        .where("guild_id", "=", guildId)
-        .executeTakeFirst();
-      return Number(result.numDeletedRows ?? 0);
-    });
+    return clearSubscriptionsWithNotifications(
+      this.db,
+      {
+        subscriptions: "contest_rating_alert_subscriptions",
+        notifications: "contest_rating_alert_notifications",
+      },
+      guildId
+    );
   }
 
   async getPreview(subscription: ContestRatingAlertSubscription): Promise<AlertCandidateResult> {
