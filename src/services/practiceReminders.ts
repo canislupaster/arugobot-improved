@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database, PracticeRemindersTable } from "../db/types.js";
 import {
   buildChannelServiceError,
+  cleanupMissingChannelStatus,
   getSendableChannelStatusOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
@@ -468,20 +469,22 @@ export class PracticeReminderService {
           "Practice reminder channel missing or invalid.",
           { guildId: subscription.guildId }
         );
-        if (channelStatus.status === "missing") {
-          const removed = await this.clearSubscription(subscription.guildId);
-          if (removed) {
+        await cleanupMissingChannelStatus({
+          status: channelStatus,
+          remove: () => this.clearSubscription(subscription.guildId),
+          logRemoved: () => {
             logInfo("Practice reminder subscription removed (channel missing).", {
               guildId: subscription.guildId,
               channelId: subscription.channelId,
             });
-          } else {
+          },
+          logFailed: () => {
             logWarn("Practice reminder subscription cleanup failed.", {
               guildId: subscription.guildId,
               channelId: subscription.channelId,
             });
-          }
-        }
+          },
+        });
         if (channelStatus.status !== "ok") {
           this.lastError =
             buildChannelServiceError(

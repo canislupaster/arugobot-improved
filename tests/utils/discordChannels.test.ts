@@ -8,6 +8,7 @@ import {
 
 import {
   buildChannelServiceError,
+  cleanupMissingChannelStatus,
   describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
@@ -253,6 +254,44 @@ describe("resolveSendableChannel", () => {
 
     expect(logWarn).toHaveBeenCalledTimes(1);
     logWarn.mockRestore();
+  });
+});
+
+describe("cleanupMissingChannelStatus", () => {
+  it("removes and logs when the channel is missing", async () => {
+    const remove = jest.fn().mockResolvedValue(true);
+    const logRemoved = jest.fn();
+    const logFailed = jest.fn();
+
+    const result = await cleanupMissingChannelStatus({
+      status: { status: "missing", channelId: "channel-1" },
+      remove,
+      logRemoved,
+      logFailed,
+    });
+
+    expect(result).toBe(true);
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(logRemoved).toHaveBeenCalledTimes(1);
+    expect(logFailed).not.toHaveBeenCalled();
+  });
+
+  it("skips cleanup when the channel is not missing", async () => {
+    const remove = jest.fn().mockResolvedValue(true);
+    const logRemoved = jest.fn();
+    const logFailed = jest.fn();
+
+    const result = await cleanupMissingChannelStatus({
+      status: { status: "missing_permissions", channelId: "channel-2", missingPermissions: [] },
+      remove,
+      logRemoved,
+      logFailed,
+    });
+
+    expect(result).toBe(false);
+    expect(remove).not.toHaveBeenCalled();
+    expect(logRemoved).not.toHaveBeenCalled();
+    expect(logFailed).not.toHaveBeenCalled();
   });
 });
 

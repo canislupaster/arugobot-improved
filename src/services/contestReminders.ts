@@ -12,6 +12,7 @@ import {
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   buildChannelServiceError,
+  cleanupMissingChannelStatus,
   getSendableChannelStatusOrWarn,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -428,24 +429,26 @@ export class ContestReminderService {
             scope: subscription.scope,
           }
         );
-        if (channelStatus.status === "missing") {
-          const removed = await this.removeSubscription(subscription.guildId, subscription.id);
-          if (removed) {
+        await cleanupMissingChannelStatus({
+          status: channelStatus,
+          remove: () => this.removeSubscription(subscription.guildId, subscription.id),
+          logRemoved: () => {
             logInfo("Contest reminder subscription removed (channel missing).", {
               guildId: subscription.guildId,
               subscriptionId: subscription.id,
               channelId: subscription.channelId,
               scope: subscription.scope,
             });
-          } else {
+          },
+          logFailed: () => {
             logWarn("Contest reminder subscription cleanup failed.", {
               guildId: subscription.guildId,
               subscriptionId: subscription.id,
               channelId: subscription.channelId,
               scope: subscription.scope,
             });
-          }
-        }
+          },
+        });
         if (channelStatus.status !== "ok") {
           this.lastError =
             buildChannelServiceError(

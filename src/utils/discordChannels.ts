@@ -176,6 +176,24 @@ export async function resolveSendableChannelOrWarn(
   return status.status === "ok" ? status.channel : null;
 }
 
+export async function cleanupMissingChannelStatus(params: {
+  status: SendableChannelStatus;
+  remove: () => Promise<boolean>;
+  logRemoved: () => void;
+  logFailed: () => void;
+}): Promise<boolean> {
+  if (params.status.status !== "missing") {
+    return false;
+  }
+  const removed = await params.remove();
+  if (removed) {
+    params.logRemoved();
+  } else {
+    params.logFailed();
+  }
+  return true;
+}
+
 export function resetChannelWarningCache(): void {
   warningCache.clear();
 }
