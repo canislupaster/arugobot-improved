@@ -29,7 +29,7 @@ import {
   paginationTimeoutMs,
 } from "../utils/pagination.js";
 import { formatTime } from "../utils/rating.js";
-import { resolveRatingRanges } from "../utils/ratingRanges.js";
+import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
 import { capitalize } from "../utils/text.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 import {
@@ -872,10 +872,7 @@ export const tournamentCommand: Command = {
         const roundsOption = interaction.options.getInteger("rounds");
         const arenaProblemCount =
           interaction.options.getInteger("problem_count") ?? DEFAULT_ARENA_PROBLEM_COUNT;
-        const rating = interaction.options.getInteger("rating");
-        const minRatingOption = interaction.options.getInteger("min_rating");
-        const maxRatingOption = interaction.options.getInteger("max_rating");
-        const rangesRaw = interaction.options.getString("ranges");
+        const { rating, minRating, maxRating, rangesRaw } = readRatingRangeOptions(interaction);
         const tagsRaw = interaction.options.getString("tags") ?? "";
 
         if (!VALID_LENGTHS.has(length)) {
@@ -908,8 +905,8 @@ export const tournamentCommand: Command = {
 
         const rangeResult = resolveRatingRanges({
           rating,
-          minRating: minRatingOption,
-          maxRating: maxRatingOption,
+          minRating,
+          maxRating,
           rangesRaw,
           defaultMin: DEFAULT_MIN_RATING,
           defaultMax: DEFAULT_MAX_RATING,

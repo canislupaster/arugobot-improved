@@ -3,7 +3,11 @@ import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } f
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { formatRatingRangesWithDefaults, resolveRatingRanges } from "../utils/ratingRanges.js";
+import {
+  formatRatingRangesWithDefaults,
+  readRatingRangeOptions,
+  resolveRatingRanges,
+} from "../utils/ratingRanges.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -322,10 +326,7 @@ export const practiceRemindersCommand: Command = {
         const hourInput = interaction.options.getInteger("hour_utc") ?? DEFAULT_HOUR_UTC;
         const minuteInput = interaction.options.getInteger("minute_utc") ?? DEFAULT_MINUTE_UTC;
         const utcOffsetRaw = interaction.options.getString("utc_offset")?.trim() ?? "";
-        const rating = interaction.options.getInteger("rating");
-        const minRatingOption = interaction.options.getInteger("min_rating");
-        const maxRatingOption = interaction.options.getInteger("max_rating");
-        const rangesRaw = interaction.options.getString("ranges");
+        const { rating, minRating, maxRating, rangesRaw } = readRatingRangeOptions(interaction);
         const tags = interaction.options.getString("tags")?.trim() ?? "";
         const daysRaw = interaction.options.getString("days");
         const role = interaction.options.getRole("role");
@@ -339,8 +340,8 @@ export const practiceRemindersCommand: Command = {
 
         const rangeResult = resolveRatingRanges({
           rating,
-          minRating: minRatingOption,
-          maxRating: maxRatingOption,
+          minRating,
+          maxRating,
           rangesRaw,
           defaultMin: DEFAULT_MIN_RATING,
           defaultMax: DEFAULT_MAX_RATING,

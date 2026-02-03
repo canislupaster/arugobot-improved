@@ -5,7 +5,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getProblemId } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
-import { resolveRatingRanges } from "../utils/ratingRanges.js";
+import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
 
@@ -139,12 +139,9 @@ export const practiceCommand: Command = {
     const userOption = interaction.options.getUser("user");
     const tagsRaw = interaction.options.getString("tags");
     const tagsInput = tagsRaw?.trim() ?? "";
-    const rating = interaction.options.getInteger("rating");
-    const minRatingOption = interaction.options.getInteger("min_rating");
-    const maxRatingOption = interaction.options.getInteger("max_rating");
-    const rangesRaw = interaction.options.getString("ranges");
+    const { rating, minRating, maxRating, rangesRaw } = readRatingRangeOptions(interaction);
     const ratingInputProvided =
-      rating !== null || minRatingOption !== null || maxRatingOption !== null || rangesRaw !== null;
+      rating !== null || minRating !== null || maxRating !== null || rangesRaw !== null;
 
     if (handleInput && userOption) {
       await interaction.reply({
@@ -162,8 +159,8 @@ export const practiceCommand: Command = {
 
     const rangeResult = resolveRatingRanges({
       rating,
-      minRating: minRatingOption,
-      maxRating: maxRatingOption,
+      minRating,
+      maxRating,
       rangesRaw,
       defaultMin: DEFAULT_MIN_RATING,
       defaultMax: DEFAULT_MAX_RATING,

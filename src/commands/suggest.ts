@@ -10,7 +10,7 @@ import {
   selectRandomProblems,
 } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
-import { resolveRatingRanges } from "../utils/ratingRanges.js";
+import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
 
 import type { Command } from "./types.js";
 
@@ -133,16 +133,14 @@ export const suggestCommand: Command = {
         .setDescription(`Space or comma separated list of Codeforces handles (max ${MAX_HANDLES})`)
     ),
   async execute(interaction, context) {
-    const rating = interaction.options.getInteger("rating");
-    const minRatingOption = interaction.options.getInteger("min_rating");
-    const maxRatingOption = interaction.options.getInteger("max_rating");
-    const rangesRaw = interaction.options.getString("ranges");
+    const { rating, minRating: minRatingInput, maxRating: maxRatingInput, rangesRaw } =
+      readRatingRangeOptions(interaction);
     const tagsRaw = interaction.options.getString("tags");
     const rawHandles = interaction.options.getString("handles") ?? "";
     const rangeResult = resolveRatingRanges({
       rating,
-      minRating: minRatingOption,
-      maxRating: maxRatingOption,
+      minRating: minRatingInput,
+      maxRating: maxRatingInput,
       rangesRaw,
       defaultMin: DEFAULT_MIN_RATING,
       defaultMax: DEFAULT_MAX_RATING,

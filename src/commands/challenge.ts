@@ -21,7 +21,7 @@ import {
   selectRandomProblem,
 } from "../utils/problemSelection.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
-import { resolveRatingRanges } from "../utils/ratingRanges.js";
+import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -161,10 +161,9 @@ export const challengeCommand: Command = {
     }
     const guildId = interaction.guild.id;
     const problemIdRaw = interaction.options.getString("problem");
-    const rating = isRandomChallenge ? interaction.options.getInteger("rating") : null;
-    const minRatingOption = isRandomChallenge ? interaction.options.getInteger("min_rating") : null;
-    const maxRatingOption = isRandomChallenge ? interaction.options.getInteger("max_rating") : null;
-    const rangesRaw = isRandomChallenge ? interaction.options.getString("ranges") : null;
+    const ratingOptions = isRandomChallenge
+      ? readRatingRangeOptions(interaction)
+      : { rating: null, minRating: null, maxRating: null, rangesRaw: null };
     const tagsRaw = isRandomChallenge ? interaction.options.getString("tags") : null;
     const openLobby = interaction.options.getBoolean("open") ?? false;
     const maxParticipantsOption = interaction.options.getInteger("max_participants");
@@ -191,10 +190,10 @@ export const challengeCommand: Command = {
 
     const rangeResult = isRandomChallenge
       ? resolveRatingRanges({
-          rating,
-          minRating: minRatingOption,
-          maxRating: maxRatingOption,
-          rangesRaw,
+          rating: ratingOptions.rating,
+          minRating: ratingOptions.minRating,
+          maxRating: ratingOptions.maxRating,
+          rangesRaw: ratingOptions.rangesRaw,
           defaultMin: DEFAULT_MIN_RATING,
           defaultMax: DEFAULT_MAX_RATING,
         })

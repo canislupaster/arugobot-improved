@@ -32,6 +32,37 @@ type RatingRangeInput = {
   defaultMax: number;
 };
 
+type RatingRangeOptionSource = {
+  options: {
+    getInteger: (name: string) => number | null;
+    getString: (name: string) => string | null;
+  };
+};
+
+type RatingRangeOptionNames = {
+  rating?: string;
+  minRating?: string;
+  maxRating?: string;
+  ranges?: string;
+};
+
+export function readRatingRangeOptions(
+  source: RatingRangeOptionSource,
+  names: RatingRangeOptionNames = {}
+): Omit<RatingRangeInput, "defaultMin" | "defaultMax"> {
+  const ratingName = names.rating ?? "rating";
+  const minRatingName = names.minRating ?? "min_rating";
+  const maxRatingName = names.maxRating ?? "max_rating";
+  const rangesName = names.ranges ?? "ranges";
+
+  return {
+    rating: source.options.getInteger(ratingName),
+    minRating: source.options.getInteger(minRatingName),
+    maxRating: source.options.getInteger(maxRatingName),
+    rangesRaw: source.options.getString(rangesName),
+  };
+}
+
 type RatingRangeParseOptions = {
   defaultMax?: number;
 };

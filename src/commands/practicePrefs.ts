@@ -4,6 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   formatRatingRangesWithDefaults,
+  readRatingRangeOptions,
   resolveRatingRanges,
   type RatingRange,
 } from "../utils/ratingRanges.js";
@@ -104,10 +105,7 @@ export const practicePrefsCommand: Command = {
       }
 
       if (subcommand === "set") {
-        const rating = interaction.options.getInteger("rating");
-        const minRating = interaction.options.getInteger("min_rating");
-        const maxRating = interaction.options.getInteger("max_rating");
-        const rangesRaw = interaction.options.getString("ranges");
+        const { rating, minRating, maxRating, rangesRaw } = readRatingRangeOptions(interaction);
         const tagsRaw = interaction.options.getString("tags");
 
         const ratingInputProvided =
