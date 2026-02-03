@@ -1,6 +1,9 @@
 import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
-import { getNextWeeklyScheduledUtcMs } from "../services/weeklyDigest.js";
+import {
+  getNextWeeklyScheduledUtcMs,
+  type ManualWeeklyDigestResult,
+} from "../services/weeklyDigest.js";
 import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addScheduleOptions } from "../utils/commandOptions.js";
@@ -74,6 +77,23 @@ function formatScheduleLabel(
   return `${formatDayLabel(day)} at ${formatHourMinute(local.hour, local.minute)} ${formatUtcOffset(
     utcOffsetMinutes
   )} (${utcLabel})`;
+}
+
+function getManualDigestReply(result: ManualWeeklyDigestResult): string | null {
+  switch (result.status) {
+    case "no_subscription":
+      return "No weekly digests configured for this server.";
+    case "channel_missing_permissions":
+      return formatCannotPostPermissionsMessage(result.channelId, result.missingPermissions);
+    case "channel_missing":
+      return `Digest channel <#${result.channelId}> is missing. Update the configuration with /digest set.`;
+    case "already_sent":
+      return `A weekly digest was already sent this week (${result.lastSentAt}). Use force to send another.`;
+    case "error":
+      return `Failed to send digest: ${result.message}`;
+    case "sent":
+      return null;
+  }
 }
 
 export const digestCommand: Command = {
@@ -236,33 +256,8 @@ export const digestCommand: Command = {
           context.client,
           force
         );
-        if (result.status === "no_subscription") {
-          await interaction.editReply("No weekly digests configured for this server.");
-          return;
-        }
-        if (result.status === "channel_missing_permissions") {
-          await interaction.editReply(
-            formatCannotPostPermissionsMessage(result.channelId, result.missingPermissions)
-          );
-          return;
-        }
-        if (result.status === "channel_missing") {
-          await interaction.editReply(
-            `Digest channel <#${result.channelId}> is missing. Update the configuration with /digest set.`
-          );
-          return;
-        }
-        if (result.status === "already_sent") {
-          await interaction.editReply(
-            `A weekly digest was already sent this week (${result.lastSentAt}). Use force to send another.`
-          );
-          return;
-        }
-        if (result.status === "error") {
-          await interaction.editReply(`Failed to send digest: ${result.message}`);
-          return;
-        }
-        await interaction.editReply("Weekly digest sent.");
+        const reply = getManualDigestReply(result);
+        await interaction.editReply(reply ?? "Weekly digest sent.");
         return;
       }
 
