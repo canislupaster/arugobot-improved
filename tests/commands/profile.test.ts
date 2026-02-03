@@ -228,6 +228,40 @@ describe("profileCommand", () => {
     expect(interaction.editReply).toHaveBeenCalledWith("Invalid handle.");
   });
 
+  it("handles missing Codeforces profiles", async () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn().mockReturnValue("tourist"),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+    const getRecentSubmissions = jest.fn();
+    const context = {
+      correlationId: "corr-4",
+      services: {
+        ratingChanges: createRatingChangesService([]),
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: true,
+            canonicalHandle: "Tourist",
+            source: "api",
+          }),
+          getUserIdByHandle: jest.fn().mockResolvedValue(null),
+          getCodeforcesProfile: jest.fn().mockResolvedValue(null),
+          getRecentSubmissions,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await profileCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Unable to fetch Codeforces profile right now."
+    );
+    expect(getRecentSubmissions).not.toHaveBeenCalled();
+  });
+
   it("rejects handle and user together", async () => {
     const interaction = createInteraction({
       options: {

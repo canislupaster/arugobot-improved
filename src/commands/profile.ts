@@ -146,29 +146,29 @@ export const profileCommand: Command = {
       option.setName("handle").setDescription("Codeforces handle to inspect")
     ),
   async execute(interaction, context) {
-    const targetResolution = await resolveHandleTargetLabelsOrReply(interaction);
-    if (targetResolution.status === "replied") {
+    const labelResolution = await resolveHandleTargetLabelsOrReply(interaction);
+    if (labelResolution.status === "replied") {
       return;
     }
 
-    const { handleInput, targetId } = targetResolution;
-    const { displayName: targetName, mention: targetMention } = targetResolution.labels;
+    const { handleInput, targetId } = labelResolution;
+    const { displayName: targetName, mention: targetMention } = labelResolution.labels;
 
     await interaction.deferReply();
 
     try {
       const guildId = interaction.guild?.id;
-      const targetResolution = await resolveHandleTargetWithOptionalGuild(context.services.store, {
+      const handleResolution = await resolveHandleTargetWithOptionalGuild(context.services.store, {
         guildId,
         targetId,
         handleInput,
         includeLinkedUserId: true,
       });
-      if ("error" in targetResolution) {
-        await interaction.editReply(targetResolution.error);
+      if ("error" in handleResolution) {
+        await interaction.editReply(handleResolution.error);
         return;
       }
-      const { handle, linkedUserId } = targetResolution;
+      const { handle, linkedUserId } = handleResolution;
 
       const cfProfile = await context.services.store.getCodeforcesProfile(handle);
       if (!cfProfile) {
@@ -217,39 +217,33 @@ export const profileCommand: Command = {
         : "Unknown";
 
       const title = handleInput ? `Profile: ${displayHandle}` : `Profile: ${targetName}`;
+      const fields = [{ name: "Handle", value: displayHandle, inline: true }];
+      if (linkedUserId) {
+        fields.push(
+          {
+            name: "Linked user",
+            value: linkedUserId === targetId ? targetMention : `<@${linkedUserId}>`,
+            inline: true,
+          },
+          {
+            name: "Rating",
+            value: botRating !== null && botRating >= 0 ? String(botRating) : "Unknown",
+            inline: true,
+          },
+          { name: "Challenges", value: String(totalChallenges), inline: true },
+          { name: "Challenge streak", value: formatStreakSummary(streakSummary), inline: true }
+        );
+      }
+      fields.push(
+        { name: "CF rating", value: cfRating, inline: true },
+        { name: "CF max", value: cfMaxRating, inline: true },
+        { name: "CF last online", value: cfLastOnline, inline: true }
+      );
+
       const embed = new EmbedBuilder()
         .setTitle(title)
         .setColor(EMBED_COLORS.info)
-        .addFields(
-          { name: "Handle", value: displayHandle, inline: true },
-          ...(linkedUserId
-            ? [
-                {
-                  name: "Linked user",
-                  value: linkedUserId === targetId ? targetMention : `<@${linkedUserId}>`,
-                  inline: true,
-                },
-              ]
-            : []),
-          ...(linkedUserId
-            ? [
-                {
-                  name: "Rating",
-                  value: botRating !== null && botRating >= 0 ? String(botRating) : "Unknown",
-                  inline: true,
-                },
-                { name: "Challenges", value: String(totalChallenges), inline: true },
-                {
-                  name: "Challenge streak",
-                  value: formatStreakSummary(streakSummary),
-                  inline: true,
-                },
-              ]
-            : []),
-          { name: "CF rating", value: cfRating, inline: true },
-          { name: "CF max", value: cfMaxRating, inline: true },
-          { name: "CF last online", value: cfLastOnline, inline: true }
-        );
+        .addFields(fields);
 
       embed.addFields({ name: "Last rated contest", value: ratingChangeLine, inline: false });
 
