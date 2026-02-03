@@ -1,7 +1,7 @@
 import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
 
-import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   formatRatingRangesWithDefaults,

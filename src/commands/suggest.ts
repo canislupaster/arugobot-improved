@@ -1,8 +1,8 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Problem } from "../services/problems.js";
-import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
+import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import {
   filterProblemsByRatingRanges,
   filterProblemsByTags,
