@@ -36,6 +36,19 @@ export function getUserOptions(users: Array<User | null | undefined>): User[] {
   return users.filter((user): user is User => Boolean(user));
 }
 
+function dedupeUsersById(users: User[]): User[] {
+  const seen = new Set<string>();
+  const result: User[] = [];
+  for (const user of users) {
+    if (seen.has(user.id)) {
+      continue;
+    }
+    seen.add(user.id);
+    result.push(user);
+  }
+  return result;
+}
+
 function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, label: string) {
   const key = normalizeHandleKey(handle);
   if (!key || existing.has(key)) {
@@ -56,18 +69,19 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     store,
     maxLinkedHandles,
   } = params;
+  const uniqueUserOptions = dedupeUsersById(userOptions);
   const targets = new Map<string, TargetHandle>();
   const resolvedGuildId = guildId ?? guild?.id ?? "";
 
   const hasGuildContext = Boolean(guildId || guild);
-  if (userOptions.length > 0) {
+  if (uniqueUserOptions.length > 0) {
     if (!hasGuildContext) {
       return {
         status: "error",
         message: "Specify handles directly when using this command outside a server.",
       };
     }
-    for (const option of userOptions) {
+    for (const option of uniqueUserOptions) {
       const handle = await store.getHandle(resolvedGuildId, option.id);
       if (!handle) {
         return {
@@ -88,7 +102,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     addTargetHandle(targets, handle, handle);
   }
 
-  if (userOptions.length === 0 && handleInputs.length === 0) {
+  if (uniqueUserOptions.length === 0 && handleInputs.length === 0) {
     if (!hasGuildContext) {
       return {
         status: "error",
