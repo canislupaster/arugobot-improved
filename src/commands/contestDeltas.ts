@@ -6,10 +6,10 @@ import type {
 } from "../services/contestActivity.js";
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
 import { addContestScopeOption } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 

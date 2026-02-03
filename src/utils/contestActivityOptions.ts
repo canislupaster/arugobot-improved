@@ -1,4 +1,5 @@
 import type { ContestScopeFilter } from "../services/contests.js";
+
 import { parseContestScope } from "./contestScope.js";
 import { resolveBoundedIntegerOption } from "./interaction.js";
 
