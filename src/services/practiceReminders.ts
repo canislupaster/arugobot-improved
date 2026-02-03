@@ -7,7 +7,10 @@ import {
   type SendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { buildServiceErrorFromException, recordServiceError } from "../utils/errors.js";
+import {
+  buildServiceErrorFromException,
+  recordServiceErrorMessage,
+} from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
@@ -389,15 +392,15 @@ export class PracticeReminderService {
       const problemId = await this.sendReminderMessage(subscription, selection, channel, "manual");
       return { status: "sent", problemId, channelId: subscription.channelId };
     } catch (error) {
-      const serviceError = recordServiceError(error, (entry) => {
+      const message = recordServiceErrorMessage(error, (entry) => {
         this.lastError = entry;
       });
       logWarn("Manual practice reminder failed.", {
         guildId: subscription.guildId,
         channelId: subscription.channelId,
-        error: serviceError.message,
+        error: message,
       });
-      return { status: "error", message: serviceError.message };
+      return { status: "error", message };
     }
   }
 

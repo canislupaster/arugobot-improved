@@ -4,6 +4,7 @@ import {
   getErrorMessage,
   getErrorMessageForLog,
   recordServiceError,
+  recordServiceErrorMessage,
 } from "../../src/utils/errors.js";
 
 describe("getErrorMessage", () => {
@@ -79,5 +80,22 @@ describe("recordServiceError", () => {
       timestamp: "2024-04-01T00:00:00.000Z",
     });
     expect(record).toHaveBeenCalledWith(entry);
+  });
+});
+
+describe("recordServiceErrorMessage", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("records the error and returns the message", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-05-01T00:00:00.000Z"));
+    const record = jest.fn();
+    const message = recordServiceErrorMessage("boom", record);
+    expect(message).toBe("boom");
+    expect(record).toHaveBeenCalledWith({
+      message: "boom",
+      timestamp: "2024-05-01T00:00:00.000Z",
+    });
   });
 });

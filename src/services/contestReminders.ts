@@ -12,7 +12,10 @@ import {
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { resolveSendableChannel, resolveSendableChannelOrWarn } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { buildServiceErrorFromException, recordServiceError } from "../utils/errors.js";
+import {
+  buildServiceErrorFromException,
+  recordServiceErrorMessage,
+} from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
@@ -321,7 +324,7 @@ export class ContestReminderService {
         isStale,
       };
     } catch (error) {
-      const serviceError = recordServiceError(error, (entry) => {
+      const message = recordServiceErrorMessage(error, (entry) => {
         this.lastError = entry;
       });
       logWarn("Contest reminder send failed (manual).", {
@@ -330,9 +333,9 @@ export class ContestReminderService {
         channelId: subscription.channelId,
         contestId: contest.id,
         scope: subscription.scope,
-        error: serviceError.message,
+        error: message,
       });
-      return { status: "error", message: serviceError.message };
+      return { status: "error", message };
     }
   }
 

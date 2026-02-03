@@ -39,3 +39,10 @@ export function recordServiceError(
   record(serviceError);
   return serviceError;
 }
+
+export function recordServiceErrorMessage(
+  error: unknown,
+  record: (serviceError: ServiceError) => void
+): string {
+  return recordServiceError(error, record).message;
+}
