@@ -233,7 +233,9 @@ function addReminderChannelOptions(
         .setRequired(true)
         .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
     )
-    .addRoleOption((option) => option.setName("role").setDescription("Role to mention for reminders"))
+    .addRoleOption((option) =>
+      option.setName("role").setDescription("Role to mention for reminders")
+    )
     .addIntegerOption((option) =>
       option
         .setName("minutes_before")
@@ -253,9 +255,7 @@ function addReminderOptions(
         .setDescription("Only remind for contests matching keywords (comma-separated)")
     )
     .addStringOption((option) =>
-      option
-        .setName("exclude")
-        .setDescription("Skip contests matching keywords (comma-separated)")
+      option.setName("exclude").setDescription("Skip contests matching keywords (comma-separated)")
     )
     .addStringOption((option) => addContestScopeOption(option, "Which contests to include"));
 }
@@ -390,6 +390,11 @@ export const contestRemindersCommand: Command = {
       subcommand
         .setName("cleanup")
         .setDescription("Remove contest reminders targeting deleted channels")
+        .addBooleanOption((option) =>
+          option
+            .setName("include_permissions")
+            .setDescription("Also remove subscriptions where the bot lacks permissions")
+        )
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -433,10 +438,7 @@ export const contestRemindersCommand: Command = {
           return;
         }
 
-        const refreshState = await refreshContestScopes(
-          context.services.contests,
-          subscriptions
-        );
+        const refreshState = await refreshContestScopes(context.services.contests, subscriptions);
         const lastNotifiedMap = await context.services.contestReminders.getLastNotificationMap(
           subscriptions.map((subscription) => subscription.id)
         );
@@ -506,6 +508,8 @@ export const contestRemindersCommand: Command = {
           return;
         }
 
+        const includePermissions = interaction.options.getBoolean?.("include_permissions") ?? false;
+
         const channelStatuses = await Promise.all(
           subscriptions.map((subscription) =>
             getSendableChannelStatus(context.client, subscription.channelId)
@@ -513,9 +517,14 @@ export const contestRemindersCommand: Command = {
         );
 
         const removedIds: string[] = [];
+        const removedPermissionIds: string[] = [];
+        const failedPermissionIds: string[] = [];
         const failedIds: string[] = [];
-        const permissionIssues: Array<{ id: string; channelId: string; status: SendableChannelStatus }> =
-          [];
+        const permissionIssues: Array<{
+          id: string;
+          channelId: string;
+          status: SendableChannelStatus;
+        }> = [];
 
         for (const [index, subscription] of subscriptions.entries()) {
           const status = channelStatuses[index]!;
@@ -532,15 +541,33 @@ export const contestRemindersCommand: Command = {
             continue;
           }
           if (status.status === "missing_permissions") {
-            permissionIssues.push({
-              id: subscription.id,
-              channelId: subscription.channelId,
-              status,
-            });
+            if (includePermissions) {
+              const removed = await context.services.contestReminders.removeSubscription(
+                guildId,
+                subscription.id
+              );
+              if (removed) {
+                removedPermissionIds.push(subscription.id);
+              } else {
+                failedPermissionIds.push(subscription.id);
+              }
+            } else {
+              permissionIssues.push({
+                id: subscription.id,
+                channelId: subscription.channelId,
+                status,
+              });
+            }
           }
         }
 
-        if (removedIds.length === 0 && failedIds.length === 0 && permissionIssues.length === 0) {
+        if (
+          removedIds.length === 0 &&
+          removedPermissionIds.length === 0 &&
+          failedIds.length === 0 &&
+          failedPermissionIds.length === 0 &&
+          permissionIssues.length === 0
+        ) {
           await interaction.reply({
             content: "All contest reminder channels look good.",
           });
@@ -555,11 +582,25 @@ export const contestRemindersCommand: Command = {
             } with missing channels: ${formatIdList(removedIds)}.`
           );
         }
+        if (removedPermissionIds.length > 0) {
+          lines.push(
+            `Removed ${removedPermissionIds.length} contest reminder subscription${
+              removedPermissionIds.length === 1 ? "" : "s"
+            } with missing permissions: ${formatIdList(removedPermissionIds)}.`
+          );
+        }
         if (failedIds.length > 0) {
           lines.push(
             `Failed to remove ${failedIds.length} subscription${
               failedIds.length === 1 ? "" : "s"
             }: ${formatIdList(failedIds)}.`
+          );
+        }
+        if (failedPermissionIds.length > 0) {
+          lines.push(
+            `Failed to remove ${failedPermissionIds.length} subscription${
+              failedPermissionIds.length === 1 ? "" : "s"
+            } with missing permissions: ${formatIdList(failedPermissionIds)}.`
           );
         }
         if (permissionIssues.length > 0) {

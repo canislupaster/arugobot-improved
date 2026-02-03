@@ -227,6 +227,78 @@ describe("contestRemindersCommand", () => {
     });
   });
 
+  it("cleans up reminders with missing permissions when requested", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("cleanup"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(true),
+      },
+    });
+    const subscriptions = [
+      {
+        id: "sub-1",
+        guildId: "guild-1",
+        channelId: "channel-missing",
+        minutesBefore: 30,
+        roleId: null,
+        includeKeywords: [],
+        excludeKeywords: [],
+        scope: "official",
+      },
+      {
+        id: "sub-2",
+        guildId: "guild-1",
+        channelId: "channel-noperms",
+        minutesBefore: 30,
+        roleId: null,
+        includeKeywords: [],
+        excludeKeywords: [],
+        scope: "official",
+      },
+    ];
+    const removeSubscription = jest.fn().mockResolvedValue(true);
+    const client = {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockImplementation(async (channelId: string) => {
+          if (channelId === "channel-missing") {
+            return null;
+          }
+          return {
+            id: channelId,
+            type: ChannelType.GuildText,
+            permissionsFor: jest.fn().mockReturnValue({
+              has: jest.fn().mockReturnValue(false),
+            }),
+          };
+        }),
+      },
+    };
+    const context = {
+      correlationId: "corr-cleanup-perms",
+      client,
+      services: {
+        contestReminders: {
+          listSubscriptions: jest.fn().mockResolvedValue(subscriptions),
+          removeSubscription,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRemindersCommand.execute(interaction, context);
+
+    expect(removeSubscription).toHaveBeenCalledWith("guild-1", "sub-1");
+    expect(removeSubscription).toHaveBeenCalledWith("guild-1", "sub-2");
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        "Removed 1 contest reminder subscription with missing channels: `sub-1`.\n" +
+        "Removed 1 contest reminder subscription with missing permissions: `sub-2`.",
+    });
+  });
+
   it("adds reminders using a preset", async () => {
     const channel = {
       id: "channel-2",

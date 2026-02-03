@@ -213,7 +213,8 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   multiple subscriptions with distinct channel, lead time, role mention, and keyword filters
   (`include`/`exclude`, comma-separated) plus contest `scope` (official, gym, or all). Use
   `list`/`status` to see subscription ids, `remove` to delete one, `clear` to delete all, and
-  `cleanup` to remove subscriptions pointing at deleted channels.
+  `cleanup` to remove subscriptions pointing at deleted channels (use `include_permissions:true`
+  to also remove subscriptions where the bot lacks channel permissions).
   `preview`/`post` accept an optional subscription id when multiple are configured. `post` can
   `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 2,
   Div 3, Div 4, or Educational) with sensible keyword filters.
