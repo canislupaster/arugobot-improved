@@ -206,6 +206,9 @@ export const challengeCommand: Command = {
     await interaction.deferReply();
 
     let participantUsers = collectParticipantUsers(interaction);
+    const handleCache = new Map<string, string>();
+    const solvedCache = new Map<string, string[]>();
+    const ratingCache = new Map<string, number>();
 
     if (participantUsers.length > maxParticipants) {
       await interaction.editReply(`Too many users (limit is ${maxParticipants}).`);
@@ -222,11 +225,16 @@ export const challengeCommand: Command = {
       userId: string,
       reply: (content: string) => Promise<void>
     ) => {
+      const cached = handleCache.get(userId);
+      if (cached) {
+        return cached;
+      }
       const handle = await context.services.store.getHandle(guildId, userId);
       if (!handle) {
         await reply("Missing handle data. Try again in a bit.");
         return null;
       }
+      handleCache.set(userId, handle);
       return handle;
     };
     const getSolvedOrReply = async (
@@ -234,11 +242,16 @@ export const challengeCommand: Command = {
       reply: (content: string) => Promise<void>,
       message: string
     ) => {
+      const cached = solvedCache.get(handle);
+      if (cached) {
+        return cached;
+      }
       const solved = await context.services.store.getSolvedProblems(handle);
       if (!solved) {
         await reply(message);
         return null;
       }
+      solvedCache.set(handle, solved);
       return solved;
     };
     const getSolvedForUser = async (
@@ -251,6 +264,15 @@ export const challengeCommand: Command = {
         return null;
       }
       return getSolvedOrReply(handle, reply, message);
+    };
+    const getRatingForUser = async (userId: string) => {
+      const cached = ratingCache.get(userId);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const rating = await context.services.store.getRating(guildId, userId);
+      ratingCache.set(userId, rating);
+      return rating;
     };
 
     for (const user of participantUsers) {
@@ -392,7 +414,7 @@ export const challengeCommand: Command = {
     const buildUsersValue = async (users: User[]) => {
       let value = "";
       for (const user of users) {
-        const rating = await context.services.store.getRating(guildId, user.id);
+        const rating = await getRatingForUser(user.id);
         const [down, up] = getRatingChanges(rating, problem.rating!, length);
         value += `- ${user} (${rating}) (don't solve: ${down}, solve: ${up})\n`;
       }

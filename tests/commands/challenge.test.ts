@@ -127,4 +127,42 @@ describe("challengeCommand", () => {
       "Some participants have already solved this problem on Codeforces: <@user-1>."
     );
   });
+
+  it("warns when the problem cache is empty", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("random"),
+        getString: jest.fn().mockReturnValue(null),
+        getInteger: jest.fn((name: string) => {
+          if (name === "length") {
+            return 40;
+          }
+          return null;
+        }),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getUser: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      correlationId: "corr-4",
+      services: {
+        store: {
+          handleLinked: jest.fn().mockResolvedValue(true),
+        },
+        challenges: {
+          getActiveChallengesForUsers: jest.fn().mockResolvedValue(new Map()),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await challengeCommand.execute(interaction, context);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Problem cache not ready yet. Try again in a bit."
+    );
+  });
 });
