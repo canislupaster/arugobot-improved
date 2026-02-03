@@ -232,4 +232,15 @@ describe("getContestTargetContextError", () => {
       })
     ).toBeNull();
   });
+
+  it("treats a guild id as guild context", () => {
+    expect(
+      getContestTargetContextError({
+        guild: null,
+        guildId: "guild-1",
+        userOptions: [user],
+        handleInputs: [],
+      })
+    ).toBeNull();
+  });
 });

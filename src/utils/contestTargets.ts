@@ -44,13 +44,15 @@ export function getUserOptions(users: Array<User | null | undefined>): User[] {
 
 export function getContestTargetContextError(options: {
   guild: Guild | null;
+  guildId?: string | null;
   userOptions: User[];
   handleInputs: string[];
 }): string | null {
-  if (!options.guild && options.userOptions.length > 0) {
+  const hasGuildContext = Boolean(options.guild || options.guildId);
+  if (!hasGuildContext && options.userOptions.length > 0) {
     return "Specify handles directly when using this command outside a server.";
   }
-  if (!options.guild && options.handleInputs.length === 0) {
+  if (!hasGuildContext && options.handleInputs.length === 0) {
     return "Provide at least one handle or run this command in a server.";
   }
   return null;
@@ -94,10 +96,16 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   const resolvedGuildId = guildId ?? guild?.id ?? "";
 
   const hasGuildContext = Boolean(guildId || guild);
+  const contextError = getContestTargetContextError({
+    guild,
+    guildId,
+    userOptions: uniqueUserOptions,
+    handleInputs,
+  });
+  if (contextError) {
+    return errorResult(contextError);
+  }
   if (uniqueUserOptions.length > 0) {
-    if (!hasGuildContext) {
-      return errorResult("Specify handles directly when using this command outside a server.");
-    }
     for (const option of uniqueUserOptions) {
       const handle = await store.getHandle(resolvedGuildId, option.id);
       if (!handle) {
