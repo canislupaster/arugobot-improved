@@ -4,6 +4,15 @@ export type ServiceTickState = {
   setLastTickAt: (value: string) => void;
 };
 
+export type ServiceTickError = { message: string; timestamp: string };
+
+export type ServiceTickTracker = {
+  getLastTickAt: () => string | null;
+  getLastError: () => ServiceTickError | null;
+  setLastError: (value: ServiceTickError | null) => void;
+  tickState: ServiceTickState;
+};
+
 export function createServiceTickState(
   getIsTicking: () => boolean,
   setTicking: (value: boolean) => void,
@@ -13,6 +22,30 @@ export function createServiceTickState(
     getIsTicking,
     setTicking,
     setLastTickAt,
+  };
+}
+
+export function createServiceTickTracker(): ServiceTickTracker {
+  let isTicking = false;
+  let lastTickAt: string | null = null;
+  let lastError: ServiceTickError | null = null;
+  const tickState = createServiceTickState(
+    () => isTicking,
+    (value) => {
+      isTicking = value;
+    },
+    (value) => {
+      lastTickAt = value;
+    }
+  );
+
+  return {
+    getLastTickAt: () => lastTickAt,
+    getLastError: () => lastError,
+    setLastError: (value) => {
+      lastError = value;
+    },
+    tickState,
   };
 }
 

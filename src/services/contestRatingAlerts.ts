@@ -16,7 +16,7 @@ import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { resolveManualChannel } from "../utils/reminders.js";
-import { createServiceTickState, runServiceTick } from "../utils/serviceTicks.js";
+import { createServiceTickTracker, runServiceTick } from "../utils/serviceTicks.js";
 import {
   cleanupNotifications,
   clearSubscriptionsWithNotifications,
@@ -179,18 +179,7 @@ export function buildContestRatingAlertEmbed(preview: ContestRatingAlertPreview)
 }
 
 export class ContestRatingAlertService {
-  private lastTickAt: string | null = null;
-  private lastError: { message: string; timestamp: string } | null = null;
-  private isTicking = false;
-  private readonly tickState = createServiceTickState(
-    () => this.isTicking,
-    (value) => {
-      this.isTicking = value;
-    },
-    (value) => {
-      this.lastTickAt = value;
-    }
-  );
+  private readonly tickTracker = createServiceTickTracker();
 
   constructor(
     private db: Kysely<Database>,
@@ -200,11 +189,11 @@ export class ContestRatingAlertService {
   ) {}
 
   getLastTickAt(): string | null {
-    return this.lastTickAt;
+    return this.tickTracker.getLastTickAt();
   }
 
   getLastError(): { message: string; timestamp: string } | null {
-    return this.lastError;
+    return this.tickTracker.getLastError();
   }
 
   async getSubscriptionById(
@@ -372,14 +361,14 @@ export class ContestRatingAlertService {
   }
 
   async runTick(client: Client): Promise<void> {
-    await runServiceTick(this.tickState, async () => {
+    await runServiceTick(this.tickTracker.tickState, async () => {
       try {
         let subscriptions: ContestRatingAlertSubscription[] = [];
         try {
           subscriptions = await this.listSubscriptions();
         } catch (error) {
           const message = getErrorMessageForLog(error);
-          this.lastError = { message, timestamp: new Date().toISOString() };
+          this.tickTracker.setLastError({ message, timestamp: new Date().toISOString() });
           logError("Contest rating alert subscription load failed.", { error: message });
           return;
         }
@@ -435,7 +424,9 @@ export class ContestRatingAlertService {
             serviceLabel: "Contest rating alert",
           });
           if (!channel) {
-            this.lastError = serviceError ?? this.lastError;
+            if (serviceError) {
+              this.tickTracker.setLastError(serviceError);
+            }
             continue;
           }
 
@@ -453,7 +444,7 @@ export class ContestRatingAlertService {
         }
       } catch (error) {
         const message = getErrorMessageForLog(error);
-        this.lastError = { message, timestamp: new Date().toISOString() };
+        this.tickTracker.setLastError({ message, timestamp: new Date().toISOString() });
         logError("Contest rating alert tick failed.", { error: message });
       }
     });
@@ -478,7 +469,7 @@ export class ContestRatingAlertService {
     } catch (error) {
       isStale = true;
       const message = getErrorMessageForLog(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
+      this.tickTracker.setLastError({ message, timestamp: new Date().toISOString() });
       logWarn("Contest rating alert refresh failed; using cached contests.", { error: message });
     }
 
@@ -528,7 +519,7 @@ export class ContestRatingAlertService {
     } catch (error) {
       const message = getErrorMessageForLog(error);
       if (mode === "manual") {
-        this.lastError = { message, timestamp: new Date().toISOString() };
+        this.tickTracker.setLastError({ message, timestamp: new Date().toISOString() });
       }
       logWarn(logErrorLabel, {
         guildId: subscription.guildId,

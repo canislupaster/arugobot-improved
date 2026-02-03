@@ -21,7 +21,7 @@ import {
   recordReminderSendFailure,
   resolveManualChannel,
 } from "../utils/reminders.js";
-import { createServiceTickState, runServiceTick } from "../utils/serviceTicks.js";
+import { createServiceTickTracker, runServiceTick } from "../utils/serviceTicks.js";
 import {
   cleanupNotifications,
   clearSubscriptionsWithNotifications,
@@ -84,18 +84,7 @@ function getRefreshScopes(subscriptions: ContestReminder[]): ContestScope[] {
 }
 
 export class ContestReminderService {
-  private lastTickAt: string | null = null;
-  private lastError: { message: string; timestamp: string } | null = null;
-  private isTicking = false;
-  private readonly tickState = createServiceTickState(
-    () => this.isTicking,
-    (value) => {
-      this.isTicking = value;
-    },
-    (value) => {
-      this.lastTickAt = value;
-    }
-  );
+  private readonly tickTracker = createServiceTickTracker();
 
   constructor(
     private db: Kysely<Database>,
@@ -103,11 +92,11 @@ export class ContestReminderService {
   ) {}
 
   getLastTickAt(): string | null {
-    return this.lastTickAt;
+    return this.tickTracker.getLastTickAt();
   }
 
   getLastError(): { message: string; timestamp: string } | null {
-    return this.lastError;
+    return this.tickTracker.getLastError();
   }
 
   async getSubscriptionById(
@@ -255,7 +244,7 @@ export class ContestReminderService {
     } catch (error) {
       isStale = true;
       const serviceError = buildServiceErrorFromException(error);
-      this.lastError = serviceError;
+      this.tickTracker.setLastError(serviceError);
       logWarn("Contest reminder refresh failed; using cached contests.", {
         error: serviceError.message,
       });
@@ -321,7 +310,7 @@ export class ContestReminderService {
       return buildReminderSendErrorResult({
         error,
         record: (entry) => {
-          this.lastError = entry;
+          this.tickTracker.setLastError(entry);
         },
         log: logWarn,
         logMessage: "Contest reminder send failed (manual).",
@@ -338,7 +327,7 @@ export class ContestReminderService {
 
   async runTick(client: Client): Promise<void> {
     await runServiceTick(
-      this.tickState,
+      this.tickTracker.tickState,
       async () => {
         try {
           let subscriptions: ContestReminder[] = [];
@@ -346,7 +335,7 @@ export class ContestReminderService {
             subscriptions = await this.listSubscriptions();
           } catch (error) {
             const serviceError = buildServiceErrorFromException(error);
-            this.lastError = serviceError;
+            this.tickTracker.setLastError(serviceError);
             logError("Contest reminder subscription load failed.", {
               error: serviceError.message,
             });
@@ -361,7 +350,7 @@ export class ContestReminderService {
           const recordRefreshFailure = (error: unknown) => {
             refreshFailed = true;
             const serviceError = buildServiceErrorFromException(error);
-            this.lastError = serviceError;
+            this.tickTracker.setLastError(serviceError);
             logWarn("Contest reminder refresh failed; using cached contests.", {
               error: serviceError.message,
             });
@@ -448,7 +437,9 @@ export class ContestReminderService {
               serviceLabel: "Contest reminder",
             });
             if (!textChannel) {
-              this.lastError = serviceError ?? this.lastError;
+              if (serviceError) {
+                this.tickTracker.setLastError(serviceError);
+              }
               continue;
             }
             const scopedUpcoming = upcomingByScope.get(subscription.scope) ?? [];
@@ -488,7 +479,7 @@ export class ContestReminderService {
                 recordReminderSendFailure({
                   error,
                   record: (entry) => {
-                    this.lastError = entry;
+                    this.tickTracker.setLastError(entry);
                   },
                   log: logWarn,
                   logMessage: "Contest reminder send failed.",
@@ -506,7 +497,7 @@ export class ContestReminderService {
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          this.lastError = { message, timestamp: new Date().toISOString() };
+          this.tickTracker.setLastError({ message, timestamp: new Date().toISOString() });
           logError("Contest reminder refresh failed.", { error: message });
         }
       }

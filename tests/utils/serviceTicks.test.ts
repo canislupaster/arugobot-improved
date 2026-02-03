@@ -1,6 +1,7 @@
 import {
   beginServiceTick,
   createServiceTickState,
+  createServiceTickTracker,
   runServiceTick,
 } from "../../src/utils/serviceTicks.js";
 
@@ -113,5 +114,21 @@ describe("createServiceTickState", () => {
 
     expect(target.isTicking).toBe(true);
     expect(target.lastTickAt).toBe("2026-02-03T00:00:00.000Z");
+  });
+});
+
+describe("createServiceTickTracker", () => {
+  it("tracks last tick and error state", () => {
+    const tracker = createServiceTickTracker();
+    expect(tracker.getLastTickAt()).toBeNull();
+    expect(tracker.getLastError()).toBeNull();
+
+    const finish = beginServiceTick(tracker.tickState);
+    expect(tracker.getLastTickAt()).not.toBeNull();
+
+    tracker.setLastError({ message: "boom", timestamp: "2026-02-03T00:00:00.000Z" });
+    expect(tracker.getLastError()?.message).toBe("boom");
+
+    finish?.();
   });
 });

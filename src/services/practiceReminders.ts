@@ -22,7 +22,7 @@ import {
   recordReminderSendFailure,
   resolveManualSendChannel,
 } from "../utils/reminders.js";
-import { createServiceTickState, runServiceTick } from "../utils/serviceTicks.js";
+import { createServiceTickTracker, runServiceTick } from "../utils/serviceTicks.js";
 import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
@@ -227,18 +227,7 @@ function formatRatingRanges(ranges: RatingRange[]): string {
 }
 
 export class PracticeReminderService {
-  private lastTickAt: string | null = null;
-  private lastError: { message: string; timestamp: string } | null = null;
-  private isTicking = false;
-  private readonly tickState = createServiceTickState(
-    () => this.isTicking,
-    (value) => {
-      this.isTicking = value;
-    },
-    (value) => {
-      this.lastTickAt = value;
-    }
-  );
+  private readonly tickTracker = createServiceTickTracker();
 
   constructor(
     private db: Kysely<Database>,
@@ -247,11 +236,11 @@ export class PracticeReminderService {
   ) {}
 
   getLastTickAt(): string | null {
-    return this.lastTickAt;
+    return this.tickTracker.getLastTickAt();
   }
 
   getLastError(): { message: string; timestamp: string } | null {
-    return this.lastError;
+    return this.tickTracker.getLastError();
   }
 
   async getSubscription(guildId: string): Promise<PracticeReminder | null> {
@@ -409,7 +398,7 @@ export class PracticeReminderService {
       return buildReminderSendErrorResult({
         error,
         record: (entry) => {
-          this.lastError = entry;
+          this.tickTracker.setLastError(entry);
         },
         log: logWarn,
         logMessage: "Manual practice reminder failed.",
@@ -423,7 +412,7 @@ export class PracticeReminderService {
 
   async runTick(client: Client): Promise<void> {
     await runServiceTick(
-      this.tickState,
+      this.tickTracker.tickState,
       async () => {
         try {
           let subscriptions: PracticeReminder[] = [];
@@ -431,7 +420,7 @@ export class PracticeReminderService {
             subscriptions = await this.listSubscriptions();
           } catch (error) {
             const serviceError = buildServiceErrorFromException(error);
-            this.lastError = serviceError;
+            this.tickTracker.setLastError(serviceError);
             logError("Practice reminder subscription load failed.", {
               error: serviceError.message,
             });
@@ -494,7 +483,9 @@ export class PracticeReminderService {
               serviceLabel: "Practice reminder",
             });
             if (!channel) {
-              this.lastError = serviceError ?? this.lastError;
+              if (serviceError) {
+                this.tickTracker.setLastError(serviceError);
+              }
               continue;
             }
 
@@ -513,7 +504,7 @@ export class PracticeReminderService {
               recordReminderSendFailure({
                 error,
                 record: (entry) => {
-                  this.lastError = entry;
+                  this.tickTracker.setLastError(entry);
                 },
                 log: logWarn,
                 logMessage: "Practice reminder send failed.",
@@ -527,7 +518,7 @@ export class PracticeReminderService {
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          this.lastError = { message, timestamp: new Date().toISOString() };
+          this.tickTracker.setLastError({ message, timestamp: new Date().toISOString() });
           logError("Practice reminder tick failed.", { error: message });
         }
       }
