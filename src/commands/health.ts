@@ -72,9 +72,17 @@ async function getChannelIssues(
     return [];
   }
 
-  const statuses = await Promise.all(
-    targets.map((target) => getSendableChannelStatus(context.client, target.channelId))
-  );
+  const statusCache = new Map<string, Promise<SendableChannelStatus>>();
+  const getStatus = (channelId: string): Promise<SendableChannelStatus> => {
+    const cached = statusCache.get(channelId);
+    if (cached) {
+      return cached;
+    }
+    const pending = getSendableChannelStatus(context.client, channelId);
+    statusCache.set(channelId, pending);
+    return pending;
+  };
+  const statuses = await Promise.all(targets.map((target) => getStatus(target.channelId)));
 
   return targets
     .map((target, index) => ({

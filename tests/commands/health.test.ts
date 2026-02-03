@@ -240,4 +240,129 @@ describe("healthCommand", () => {
     expect(channelField?.value).toContain("Contest reminder");
     expect(channelField?.value).toContain("Practice reminder");
   });
+
+  it("dedupes channel status lookups across subscriptions", async () => {
+    const interaction = createInteraction();
+    const client = createClient();
+    const context = {
+      client,
+      webStatus: {
+        status: "listening",
+        host: "0.0.0.0",
+        requestedPort: 8787,
+        actualPort: 8787,
+        lastError: null,
+      },
+      services: {
+        metrics: {
+          getCommandCount: jest.fn().mockResolvedValue(0),
+          getUniqueCommandCount: jest.fn().mockResolvedValue(0),
+          getLastCommandAt: jest.fn().mockResolvedValue(null),
+          getCommandUsageSummary: jest.fn().mockResolvedValue([]),
+        },
+        store: { checkDb: jest.fn().mockResolvedValue(true) },
+        codeforces: {
+          getLastError: jest.fn().mockReturnValue(null),
+          getLastSuccessAt: jest.fn().mockReturnValue(null),
+        },
+        problems: {
+          getLastRefreshAt: jest.fn().mockReturnValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contests: {
+          getLastRefreshAt: jest.fn().mockReturnValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestRatingChanges: {
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        ratingChanges: {
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        databaseBackups: {
+          getBackupDir: jest.fn().mockReturnValue(null),
+          getLastBackupAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestReminders: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(2),
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-1",
+              guildId: "guild-1",
+              channelId: "channel-1",
+              minutesBefore: 30,
+              roleId: null,
+              includeKeywords: [],
+              excludeKeywords: [],
+              scope: "official",
+            },
+            {
+              id: "sub-2",
+              guildId: "guild-1",
+              channelId: "channel-1",
+              minutesBefore: 60,
+              roleId: null,
+              includeKeywords: [],
+              excludeKeywords: [],
+              scope: "official",
+            },
+          ]),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestRatingAlerts: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          listSubscriptions: jest.fn().mockResolvedValue([]),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        practiceReminders: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(1),
+          getSubscription: jest.fn().mockResolvedValue({
+            guildId: "guild-1",
+            channelId: "channel-1",
+            hourUtc: 9,
+            minuteUtc: 0,
+            utcOffsetMinutes: 0,
+            daysOfWeek: [1],
+            ratingRanges: [],
+            tags: "",
+            roleId: null,
+            lastSentAt: null,
+          }),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        weeklyDigest: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getSubscription: jest.fn().mockResolvedValue(null),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        challenges: {
+          getActiveCount: jest.fn().mockResolvedValue(0),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tournaments: {
+          getActiveCount: jest.fn().mockResolvedValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tournamentRecaps: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getSubscription: jest.fn().mockResolvedValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tokenUsage: {
+          getSnapshot: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await healthCommand.execute(interaction, context);
+
+    expect(client.channels.fetch).toHaveBeenCalledTimes(1);
+  });
 });
