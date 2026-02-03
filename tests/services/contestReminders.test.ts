@@ -230,6 +230,31 @@ describe("ContestReminderService", () => {
     expect(result.get(subscription.id)).toBe("2026-02-01T00:00:00.000Z");
   });
 
+  it("defaults invalid scopes to official when listing subscriptions", async () => {
+    const service = new ContestReminderService(db, contestService);
+    const timestamp = new Date().toISOString();
+    await db
+      .insertInto("contest_reminders")
+      .values({
+        id: "sub-unknown",
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        minutes_before: 15,
+        role_id: null,
+        include_keywords: "",
+        exclude_keywords: "",
+        scope: "unknown",
+        created_at: timestamp,
+        updated_at: timestamp,
+      })
+      .execute();
+
+    const subscriptions = await service.listSubscriptions("guild-1");
+
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]?.scope).toBe("official");
+  });
+
   it("scopes reminders to gym contests", async () => {
     const nowSeconds = 1_700_000_000;
     jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);

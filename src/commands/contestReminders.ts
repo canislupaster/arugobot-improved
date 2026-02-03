@@ -22,7 +22,11 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
-import { addContestScopeOption, refreshContestData } from "../utils/contestScope.js";
+import {
+  addContestScopeOption,
+  parseContestScope,
+  refreshContestData,
+} from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   describeSendableChannelStatus,
@@ -44,13 +48,6 @@ const DEFAULT_MINUTES = 30;
 const MIN_MINUTES = 5;
 const MAX_MINUTES = 24 * 60;
 const DEFAULT_SCOPE: ContestScopeFilter = "official";
-
-function normalizeScope(raw: string | null): ContestScopeFilter {
-  if (raw === "official" || raw === "gym" || raw === "all") {
-    return raw;
-  }
-  return DEFAULT_SCOPE;
-}
 
 function formatScope(scope: ContestScopeFilter): string {
   return scope === "official" ? "Official" : scope === "gym" ? "Gym" : "All";
@@ -497,7 +494,7 @@ export const contestRemindersCommand: Command = {
         const includeRaw = interaction.options.getString("include");
         const excludeRaw = interaction.options.getString("exclude");
         const filters = parseKeywordFilters(includeRaw, excludeRaw);
-        const scope = normalizeScope(interaction.options.getString("scope"));
+        const scope = parseContestScope(interaction.options.getString("scope"), DEFAULT_SCOPE);
 
         const subscription = await context.services.contestReminders.createSubscription(
           guildId,
@@ -538,7 +535,7 @@ export const contestRemindersCommand: Command = {
         const minutesBefore = interaction.options.getInteger("minutes_before") ?? DEFAULT_MINUTES;
         const role = interaction.options.getRole("role");
         const roleId = role?.id ?? null;
-        const scope = normalizeScope(interaction.options.getString("scope"));
+        const scope = parseContestScope(interaction.options.getString("scope"), DEFAULT_SCOPE);
         const subscription = await context.services.contestReminders.createSubscription(
           guildId,
           channel.id,

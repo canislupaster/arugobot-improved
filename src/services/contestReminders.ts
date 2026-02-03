@@ -10,6 +10,7 @@ import {
   serializeKeywords,
 } from "../utils/contestFilters.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { parseContestScope } from "../utils/contestScope.js";
 import { resolveSendableChannelForService } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
@@ -68,13 +69,6 @@ export type ManualContestReminderResult =
 type ContestProvider = Pick<ContestService, "refresh" | "getUpcomingContests">;
 
 const DEFAULT_SCOPE: ContestScopeFilter = "official";
-
-function normalizeScope(raw: string | null | undefined): ContestScopeFilter {
-  if (raw === "official" || raw === "gym" || raw === "all") {
-    return raw;
-  }
-  return DEFAULT_SCOPE;
-}
 
 function getRefreshScopes(subscriptions: ContestReminder[]): ContestScope[] {
   const scopes = new Set<ContestScope>();
@@ -138,7 +132,7 @@ export class ContestReminderService {
       roleId: row.role_id ?? null,
       includeKeywords: filters.includeKeywords,
       excludeKeywords: filters.excludeKeywords,
-      scope: normalizeScope(row.scope),
+      scope: parseContestScope(row.scope ?? null, DEFAULT_SCOPE),
     };
   }
 
@@ -167,7 +161,7 @@ export class ContestReminderService {
       minutesBefore: row.minutes_before,
       roleId: row.role_id ?? null,
       ...parseKeywordFilters(row.include_keywords, row.exclude_keywords),
-      scope: normalizeScope(row.scope),
+      scope: parseContestScope(row.scope ?? null, DEFAULT_SCOPE),
     }));
   }
 
