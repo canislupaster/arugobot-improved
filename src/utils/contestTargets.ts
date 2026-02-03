@@ -42,6 +42,20 @@ export function getUserOptions(users: Array<User | null | undefined>): User[] {
   return users.filter((user): user is User => Boolean(user));
 }
 
+export function getContestTargetContextError(options: {
+  guild: Guild | null;
+  userOptions: User[];
+  handleInputs: string[];
+}): string | null {
+  if (!options.guild && options.userOptions.length > 0) {
+    return "Specify handles directly when using this command outside a server.";
+  }
+  if (!options.guild && options.handleInputs.length === 0) {
+    return "Provide at least one handle or run this command in a server.";
+  }
+  return null;
+}
+
 function dedupeUsersById(users: User[]): User[] {
   const seen = new Set<string>();
   const result: User[] = [];

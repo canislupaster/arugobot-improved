@@ -15,7 +15,11 @@ import {
   shouldShowContestSolvesStale,
   buildContestSolvesSummaryFields,
 } from "../utils/contestSolvesData.js";
-import { getUserOptions, resolveContestTargetsOrReply } from "../utils/contestTargets.js";
+import {
+  getContestTargetContextError,
+  getUserOptions,
+  resolveContestTargetsOrReply,
+} from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
 
 import type { Command } from "./types.js";
@@ -64,17 +68,13 @@ export const contestSolvesCommand: Command = {
       interaction.options.getUser("user4"),
     ]);
 
-    if (!interaction.guild && userOptions.length > 0) {
-      await interaction.reply({
-        content: "Specify handles directly when using this command outside a server.",
-      });
-      return;
-    }
-
-    if (!interaction.guild && handleInputs.length === 0) {
-      await interaction.reply({
-        content: "Provide at least one handle or run this command in a server.",
-      });
+    const targetContextError = getContestTargetContextError({
+      guild: interaction.guild,
+      userOptions,
+      handleInputs,
+    });
+    if (targetContextError) {
+      await interaction.reply({ content: targetContextError });
       return;
     }
 

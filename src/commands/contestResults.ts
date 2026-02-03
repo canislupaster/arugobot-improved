@@ -9,6 +9,7 @@ import {
 } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
+  getContestTargetContextError,
   getUserOptions,
   resolveContestTargetsOrReply,
   type TargetHandle,
@@ -84,17 +85,13 @@ export const contestResultsCommand: Command = {
       interaction.options.getUser("user4"),
     ]);
 
-    if (!interaction.guild && userOptions.length > 0) {
-      await interaction.reply({
-        content: "Specify handles directly when using this command outside a server.",
-      });
-      return;
-    }
-
-    if (!interaction.guild && handleInputs.length === 0) {
-      await interaction.reply({
-        content: "Provide at least one handle or run this command in a server.",
-      });
+    const targetContextError = getContestTargetContextError({
+      guild: interaction.guild,
+      userOptions,
+      handleInputs,
+    });
+    if (targetContextError) {
+      await interaction.reply({ content: targetContextError });
       return;
     }
 
