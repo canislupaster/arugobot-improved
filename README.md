@@ -140,6 +140,10 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Admin-only log viewer for recent bot activity in the server.
 
+- **/metrics** `[command]` `[limit]`
+
+  Admin-only command usage metrics (summary list or per-command details).
+
 - **/refresh** `[scope]`
 
   Admin-only refresh of cached Codeforces data (problems, contests, and handle canonicalization).

@@ -38,4 +38,28 @@ describe("MetricsService", () => {
 
     await db.destroy();
   });
+
+  it("returns a single command summary when available", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const metrics = new MetricsService(db);
+
+    await metrics.recordCommandResult("ping", 120, true);
+    await metrics.recordCommandResult("ping", 80, false);
+
+    const summary = await metrics.getCommandSummary("ping");
+    expect(summary).toEqual({
+      name: "ping",
+      count: 2,
+      successRate: 50,
+      avgLatencyMs: 100,
+      maxLatencyMs: 120,
+      lastSeenAt: expect.any(String),
+    });
+
+    const missing = await metrics.getCommandSummary("missing");
+    expect(missing).toBeNull();
+
+    await db.destroy();
+  });
 });

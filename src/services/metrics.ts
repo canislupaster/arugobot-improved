@@ -13,6 +13,32 @@ export type CommandMetricSummary = {
   lastSeenAt: string;
 };
 
+type CommandMetricRow = {
+  command: string;
+  count: number | string;
+  success_count: number | string;
+  failure_count: number | string;
+  total_latency_ms: number | string;
+  max_latency_ms: number | string;
+  last_seen_at: string;
+};
+
+function toCommandMetricSummary(row: CommandMetricRow): CommandMetricSummary {
+  const count = Number(row.count ?? 0);
+  const successCount = Number(row.success_count ?? 0);
+  const totalLatencyMs = Number(row.total_latency_ms ?? 0);
+  const avgLatencyMs = count > 0 ? Math.round(totalLatencyMs / count) : 0;
+  const successRate = count > 0 ? Math.round((successCount / count) * 100) : 0;
+  return {
+    name: row.command,
+    count,
+    successRate,
+    avgLatencyMs,
+    maxLatencyMs: Number(row.max_latency_ms ?? 0),
+    lastSeenAt: row.last_seen_at,
+  };
+}
+
 export class MetricsService {
   constructor(private readonly db: Kysely<Database>) {}
 
@@ -98,21 +124,27 @@ export class MetricsService {
       .limit(limit)
       .execute();
 
-    return rows.map((row) => {
-      const count = Number(row.count ?? 0);
-      const successCount = Number(row.success_count ?? 0);
-      const totalLatencyMs = Number(row.total_latency_ms ?? 0);
-      const avgLatencyMs = count > 0 ? Math.round(totalLatencyMs / count) : 0;
-      const successRate = count > 0 ? Math.round((successCount / count) * 100) : 0;
-      return {
-        name: row.command,
-        count,
-        successRate,
-        avgLatencyMs,
-        maxLatencyMs: Number(row.max_latency_ms ?? 0),
-        lastSeenAt: row.last_seen_at,
-      };
-    });
+    return rows.map((row) => toCommandMetricSummary(row as CommandMetricRow));
+  }
+
+  async getCommandSummary(command: string): Promise<CommandMetricSummary | null> {
+    const row = await this.db
+      .selectFrom("command_metrics")
+      .select([
+        "command",
+        "count",
+        "success_count",
+        "failure_count",
+        "total_latency_ms",
+        "max_latency_ms",
+        "last_seen_at",
+      ])
+      .where("command", "=", command)
+      .executeTakeFirst();
+    if (!row) {
+      return null;
+    }
+    return toCommandMetricSummary(row as CommandMetricRow);
   }
 
   async resetCommandMetrics(): Promise<void> {
