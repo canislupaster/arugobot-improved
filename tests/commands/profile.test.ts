@@ -19,12 +19,40 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
 
+type RatingChange = {
+  contestId: number;
+  contestName: string;
+  rank: number;
+  oldRating: number;
+  newRating: number;
+  ratingUpdateTimeSeconds: number;
+};
+
+const createRatingChangesService = (changes: RatingChange[] = []) => ({
+  getRatingChanges: jest.fn().mockResolvedValue({
+    changes,
+    source: "api",
+    isStale: false,
+  }),
+});
+
 describe("profileCommand", () => {
   it("renders a profile for a linked handle", async () => {
     const interaction = createInteraction();
+    const ratingChanges = createRatingChangesService([
+      {
+        contestId: 1000,
+        contestName: "Codeforces Round #1000",
+        rank: 10,
+        oldRating: 3600,
+        newRating: 3650,
+        ratingUpdateTimeSeconds: 2000,
+      },
+    ]);
     const context = {
       correlationId: "corr-1",
       services: {
+        ratingChanges,
         store: {
           resolveHandle: jest.fn().mockResolvedValue({
             exists: true,
@@ -89,6 +117,7 @@ describe("profileCommand", () => {
 
     await profileCommand.execute(interaction, context);
 
+    expect(ratingChanges.getRatingChanges).toHaveBeenCalledWith("Tourist");
     expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: expect.any(Array) })
@@ -103,9 +132,11 @@ describe("profileCommand", () => {
         getMember: jest.fn().mockReturnValue(null),
       },
     });
+    const ratingChanges = createRatingChangesService([]);
     const context = {
       correlationId: "corr-2",
       services: {
+        ratingChanges,
         store: {
           resolveHandle: jest.fn().mockResolvedValue({
             exists: true,
@@ -166,6 +197,7 @@ describe("profileCommand", () => {
     const context = {
       correlationId: "corr-3",
       services: {
+        ratingChanges: createRatingChangesService([]),
         store: {
           resolveHandle: jest.fn().mockResolvedValue({
             exists: false,
@@ -232,9 +264,20 @@ describe("profileCommand", () => {
         getMember: jest.fn().mockReturnValue(null),
       },
     });
+    const ratingChanges = createRatingChangesService([
+      {
+        contestId: 1002,
+        contestName: "Codeforces Round #1002",
+        rank: 50,
+        oldRating: 2400,
+        newRating: 2450,
+        ratingUpdateTimeSeconds: 3000,
+      },
+    ]);
     const context = {
       correlationId: "corr-6",
       services: {
+        ratingChanges,
         store: {
           resolveHandle: jest.fn().mockResolvedValue({
             exists: true,
@@ -276,6 +319,7 @@ describe("profileCommand", () => {
 
     await profileCommand.execute(interaction, context);
 
+    expect(ratingChanges.getRatingChanges).toHaveBeenCalledWith("Tourist");
     expect(interaction.deferReply).toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: expect.any(Array) })

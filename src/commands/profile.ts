@@ -5,6 +5,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
 import { resolveHandleTargetLabels } from "../utils/interaction.js";
+import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatSubmissionLines } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -97,6 +98,22 @@ function formatRatingSummary(
   return fallbackValue;
 }
 
+function formatLastRatingChange(entry: {
+  contestId: number;
+  contestName: string;
+  rank: number;
+  oldRating: number;
+  newRating: number;
+  ratingUpdateTimeSeconds: number;
+} | null): string {
+  if (!entry) {
+    return "No rated contests yet.";
+  }
+  const delta = formatRatingDelta(entry.newRating - entry.oldRating);
+  const updatedAt = formatDiscordRelativeTime(entry.ratingUpdateTimeSeconds);
+  return `${entry.contestName}\nRank: ${entry.rank}\nRating: ${entry.oldRating} -> ${entry.newRating} (${delta})\nUpdated: ${updatedAt}`;
+}
+
 export const profileCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("profile")
@@ -140,11 +157,12 @@ export const profileCommand: Command = {
       const linkedGuildId = linkedUserId && guildId ? guildId : null;
       const hasLinkedUser = Boolean(linkedGuildId);
       const showSubmissions = handleInput.length > 0 || !linkedUserId;
-      const [challengeSummary, recentSubmissions] = await Promise.all([
+      const [challengeSummary, recentSubmissions, ratingChanges] = await Promise.all([
         linkedGuildId
           ? loadChallengeSummary(linkedGuildId, linkedUserId ?? "", context.services)
           : Promise.resolve(null),
         showSubmissions ? loadRecentSubmissions(handle, context.services) : Promise.resolve(null),
+        context.services.ratingChanges.getRatingChanges(handle),
       ]);
 
       const botRating = challengeSummary?.botRating ?? null;
@@ -152,6 +170,11 @@ export const profileCommand: Command = {
       const recentLines = challengeSummary?.recentLines ?? "";
       const recentSubmissionsLines = recentSubmissions?.lines ?? "";
       const submissionsStale = recentSubmissions?.isStale ?? false;
+      const lastRatingChange = ratingChanges?.changes.at(-1) ?? null;
+      const ratingChangeLine = ratingChanges
+        ? formatLastRatingChange(lastRatingChange)
+        : "Rating history unavailable.";
+      const ratingChangesStale = ratingChanges?.isStale ?? false;
 
       const displayHandle = cfProfile.profile.displayHandle;
       const cfRating = formatRatingSummary(
@@ -200,6 +223,8 @@ export const profileCommand: Command = {
           { name: "CF last online", value: cfLastOnline, inline: true }
         );
 
+      embed.addFields({ name: "Last rated contest", value: ratingChangeLine, inline: false });
+
       if (hasLinkedUser) {
         embed.addFields({
           name: "Recent problems",
@@ -216,7 +241,7 @@ export const profileCommand: Command = {
         });
       }
 
-      if (cfProfile.isStale || submissionsStale) {
+      if (cfProfile.isStale || submissionsStale || ratingChangesStale) {
         embed.setFooter({ text: "Some Codeforces data may be stale." });
       }
 
