@@ -8,7 +8,11 @@ import {
 
 import type { ContestReminder } from "../services/contestReminders.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
-import { cleanupChannelSubscriptions, formatIdList } from "../utils/channelCleanup.js";
+import {
+  cleanupChannelSubscriptions,
+  formatIdList,
+  formatPermissionIssueSummary,
+} from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   filterContestsByKeywords,
@@ -467,15 +471,10 @@ export const contestRemindersCommand: Command = {
           );
         }
         if (permissionIssues.length > 0) {
-          const issueLines = permissionIssues.map(
-            (issue) =>
-              `${formatIdList([issue.id])} (<#${issue.channelId}>): ${describeSendableChannelStatus(
-                issue.status
-              )}`
-          );
-          lines.push(
-            `Subscriptions with missing permissions (not removed): ${issueLines.join("; ")}.`
-          );
+          const summary = formatPermissionIssueSummary(permissionIssues);
+          if (summary) {
+            lines.push(summary);
+          }
         }
 
         await interaction.reply({ content: lines.join("\n") });

@@ -1,6 +1,7 @@
 import type { Client } from "discord.js";
 
 import {
+  describeSendableChannelStatus,
   getSendableChannelStatus,
   type SendableChannelStatus,
 } from "./discordChannels.js";
@@ -86,4 +87,19 @@ export async function cleanupChannelSubscriptions(
 
 export function formatIdList(ids: string[]): string {
   return ids.map((id) => `\`${id}\``).join(", ");
+}
+
+export function formatPermissionIssueSummary(
+  permissionIssues: ChannelCleanupIssue[]
+): string | null {
+  if (permissionIssues.length === 0) {
+    return null;
+  }
+  const issueLines = permissionIssues.map(
+    (issue) =>
+      `${formatIdList([issue.id])} (<#${issue.channelId}>): ${describeSendableChannelStatus(
+        issue.status
+      )}`
+  );
+  return `Subscriptions with missing permissions (not removed): ${issueLines.join("; ")}.`;
 }
