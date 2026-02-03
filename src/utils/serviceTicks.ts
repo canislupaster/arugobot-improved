@@ -12,3 +12,19 @@ export function beginServiceTick(state: ServiceTickState): (() => void) | null {
   state.setLastTickAt(new Date().toISOString());
   return () => state.setTicking(false);
 }
+
+export async function runServiceTick(
+  state: ServiceTickState,
+  handler: () => Promise<void>
+): Promise<boolean> {
+  const finish = beginServiceTick(state);
+  if (!finish) {
+    return false;
+  }
+  try {
+    await handler();
+  } finally {
+    finish();
+  }
+  return true;
+}

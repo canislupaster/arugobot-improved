@@ -24,7 +24,7 @@ import {
   recordReminderSendFailure,
   resolveManualChannel,
 } from "../utils/reminders.js";
-import { beginServiceTick } from "../utils/serviceTicks.js";
+import { runServiceTick } from "../utils/serviceTicks.js";
 import {
   cleanupNotifications,
   clearSubscriptionsWithNotifications,
@@ -338,191 +338,194 @@ export class ContestReminderService {
   }
 
   async runTick(client: Client): Promise<void> {
-    const finishTick = beginServiceTick({
-      isTicking: this.isTicking,
-      setTicking: (value) => {
-        this.isTicking = value;
+    await runServiceTick(
+      {
+        isTicking: this.isTicking,
+        setTicking: (value) => {
+          this.isTicking = value;
+        },
+        setLastTickAt: (value) => {
+          this.lastTickAt = value;
+        },
       },
-      setLastTickAt: (value) => {
-        this.lastTickAt = value;
-      },
-    });
-    if (!finishTick) {
-      return;
-    }
-    try {
-      let subscriptions: ContestReminder[] = [];
-      try {
-        subscriptions = await this.listSubscriptions();
-      } catch (error) {
-        const serviceError = buildServiceErrorFromException(error);
-        this.lastError = serviceError;
-        logError("Contest reminder subscription load failed.", {
-          error: serviceError.message,
-        });
-        return;
-      }
-
-      if (subscriptions.length === 0) {
-        return;
-      }
-
-      let refreshFailed = false;
-      const recordRefreshFailure = (error: unknown) => {
-        refreshFailed = true;
-        const serviceError = buildServiceErrorFromException(error);
-        this.lastError = serviceError;
-        logWarn("Contest reminder refresh failed; using cached contests.", {
-          error: serviceError.message,
-        });
-      };
-      try {
-        const refreshScopes = getRefreshScopes(subscriptions);
-        const results = await Promise.allSettled(
-          refreshScopes.map((scope) => this.contests.refresh(false, scope))
-        );
-        const rejected = results.filter(
-          (result): result is PromiseRejectedResult => result.status === "rejected"
-        );
-        if (rejected.length > 0) {
-          recordRefreshFailure(rejected[0]?.reason);
-        }
-      } catch (error) {
-        recordRefreshFailure(error);
-      }
-
-      const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
-      const requestedScopes = new Set(subscriptions.map((subscription) => subscription.scope));
-      if (requestedScopes.has("official")) {
-        upcomingByScope.set("official", this.contests.getUpcomingContests("official"));
-      }
-      if (requestedScopes.has("gym")) {
-        upcomingByScope.set("gym", this.contests.getUpcomingContests("gym"));
-      }
-      if (requestedScopes.has("all")) {
-        upcomingByScope.set("all", this.contests.getUpcomingContests("all"));
-      }
-
-      const totalUpcoming = Array.from(upcomingByScope.values()).reduce(
-        (count, entries) => count + entries.length,
-        0
-      );
-      if (totalUpcoming === 0) {
-        if (refreshFailed) {
-          logWarn("Contest reminders skipped: no cached contests available.");
-        }
-        return;
-      }
-
-      const nowSeconds = Math.floor(Date.now() / 1000);
-      const cutoff = new Date(
-        Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000
-      ).toISOString();
-      try {
-        await this.cleanupNotifications(cutoff);
-      } catch (error) {
-        logWarn("Contest reminder cleanup failed.", {
-          error: buildServiceErrorFromException(error).message,
-        });
-      }
-
-      for (const subscription of subscriptions) {
-        const channelStatus = await getSendableChannelStatusOrWarn(
-          client,
-          subscription.channelId,
-          "Contest reminder channel missing or invalid.",
-          {
-            guildId: subscription.guildId,
-            subscriptionId: subscription.id,
-            scope: subscription.scope,
-          }
-        );
-        await cleanupMissingChannelStatus({
-          status: channelStatus,
-          remove: () => this.removeSubscription(subscription.guildId, subscription.id),
-          logRemoved: () => {
-            logInfo("Contest reminder subscription removed (channel missing).", {
-              guildId: subscription.guildId,
-              subscriptionId: subscription.id,
-              channelId: subscription.channelId,
-              scope: subscription.scope,
-            });
-          },
-          logFailed: () => {
-            logWarn("Contest reminder subscription cleanup failed.", {
-              guildId: subscription.guildId,
-              subscriptionId: subscription.id,
-              channelId: subscription.channelId,
-              scope: subscription.scope,
-            });
-          },
-        });
-        if (channelStatus.status !== "ok") {
-          this.lastError =
-            buildChannelServiceError(
-              "Contest reminder",
-              subscription.channelId,
-              channelStatus
-            ) ?? this.lastError;
-          continue;
-        }
-        const textChannel = channelStatus.channel;
-        const scopedUpcoming = upcomingByScope.get(subscription.scope) ?? [];
-        const filtered = filterContestsByKeywords(scopedUpcoming, {
-          includeKeywords: subscription.includeKeywords,
-          excludeKeywords: subscription.excludeKeywords,
-        });
-        const contests = getUpcomingWithinWindow(filtered, nowSeconds, subscription.minutesBefore);
-        for (const contest of contests) {
-          const alreadyNotified = await this.wasNotified(subscription.id, contest.id);
-          if (alreadyNotified) {
-            continue;
-          }
-          const secondsUntil = contest.startTimeSeconds - nowSeconds;
-          const embed = buildReminderEmbed(contest, secondsUntil);
+      async () => {
+        try {
+          let subscriptions: ContestReminder[] = [];
           try {
-            const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
-            await textChannel.send({
-              content: mention,
-              allowedMentions,
-              embeds: [embed],
-            });
-            await this.markNotified(subscription.id, contest.id);
-            logInfo("Contest reminder sent.", {
-              guildId: subscription.guildId,
-              subscriptionId: subscription.id,
-              channelId: subscription.channelId,
-              contestId: contest.id,
-              minutesBefore: subscription.minutesBefore,
-              scope: subscription.scope,
-            });
+            subscriptions = await this.listSubscriptions();
           } catch (error) {
-            recordReminderSendFailure({
-              error,
-              record: (entry) => {
-                this.lastError = entry;
-              },
-              log: logWarn,
-              logMessage: "Contest reminder send failed.",
-              logContext: {
+            const serviceError = buildServiceErrorFromException(error);
+            this.lastError = serviceError;
+            logError("Contest reminder subscription load failed.", {
+              error: serviceError.message,
+            });
+            return;
+          }
+
+          if (subscriptions.length === 0) {
+            return;
+          }
+
+          let refreshFailed = false;
+          const recordRefreshFailure = (error: unknown) => {
+            refreshFailed = true;
+            const serviceError = buildServiceErrorFromException(error);
+            this.lastError = serviceError;
+            logWarn("Contest reminder refresh failed; using cached contests.", {
+              error: serviceError.message,
+            });
+          };
+          try {
+            const refreshScopes = getRefreshScopes(subscriptions);
+            const results = await Promise.allSettled(
+              refreshScopes.map((scope) => this.contests.refresh(false, scope))
+            );
+            const rejected = results.filter(
+              (result): result is PromiseRejectedResult => result.status === "rejected"
+            );
+            if (rejected.length > 0) {
+              recordRefreshFailure(rejected[0]?.reason);
+            }
+          } catch (error) {
+            recordRefreshFailure(error);
+          }
+
+          const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
+          const requestedScopes = new Set(subscriptions.map((subscription) => subscription.scope));
+          if (requestedScopes.has("official")) {
+            upcomingByScope.set("official", this.contests.getUpcomingContests("official"));
+          }
+          if (requestedScopes.has("gym")) {
+            upcomingByScope.set("gym", this.contests.getUpcomingContests("gym"));
+          }
+          if (requestedScopes.has("all")) {
+            upcomingByScope.set("all", this.contests.getUpcomingContests("all"));
+          }
+
+          const totalUpcoming = Array.from(upcomingByScope.values()).reduce(
+            (count, entries) => count + entries.length,
+            0
+          );
+          if (totalUpcoming === 0) {
+            if (refreshFailed) {
+              logWarn("Contest reminders skipped: no cached contests available.");
+            }
+            return;
+          }
+
+          const nowSeconds = Math.floor(Date.now() / 1000);
+          const cutoff = new Date(
+            Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000
+          ).toISOString();
+          try {
+            await this.cleanupNotifications(cutoff);
+          } catch (error) {
+            logWarn("Contest reminder cleanup failed.", {
+              error: buildServiceErrorFromException(error).message,
+            });
+          }
+
+          for (const subscription of subscriptions) {
+            const channelStatus = await getSendableChannelStatusOrWarn(
+              client,
+              subscription.channelId,
+              "Contest reminder channel missing or invalid.",
+              {
                 guildId: subscription.guildId,
                 subscriptionId: subscription.id,
-                channelId: subscription.channelId,
-                contestId: contest.id,
-                minutesBefore: subscription.minutesBefore,
                 scope: subscription.scope,
+              }
+            );
+            await cleanupMissingChannelStatus({
+              status: channelStatus,
+              remove: () => this.removeSubscription(subscription.guildId, subscription.id),
+              logRemoved: () => {
+                logInfo("Contest reminder subscription removed (channel missing).", {
+                  guildId: subscription.guildId,
+                  subscriptionId: subscription.id,
+                  channelId: subscription.channelId,
+                  scope: subscription.scope,
+                });
+              },
+              logFailed: () => {
+                logWarn("Contest reminder subscription cleanup failed.", {
+                  guildId: subscription.guildId,
+                  subscriptionId: subscription.id,
+                  channelId: subscription.channelId,
+                  scope: subscription.scope,
+                });
               },
             });
+            if (channelStatus.status !== "ok") {
+              this.lastError =
+                buildChannelServiceError(
+                  "Contest reminder",
+                  subscription.channelId,
+                  channelStatus
+                ) ?? this.lastError;
+              continue;
+            }
+            const textChannel = channelStatus.channel;
+            const scopedUpcoming = upcomingByScope.get(subscription.scope) ?? [];
+            const filtered = filterContestsByKeywords(scopedUpcoming, {
+              includeKeywords: subscription.includeKeywords,
+              excludeKeywords: subscription.excludeKeywords,
+            });
+            const contests = getUpcomingWithinWindow(
+              filtered,
+              nowSeconds,
+              subscription.minutesBefore
+            );
+            for (const contest of contests) {
+              const alreadyNotified = await this.wasNotified(subscription.id, contest.id);
+              if (alreadyNotified) {
+                continue;
+              }
+              const secondsUntil = contest.startTimeSeconds - nowSeconds;
+              const embed = buildReminderEmbed(contest, secondsUntil);
+              try {
+                const { mention, allowedMentions } = buildRoleMentionOptions(subscription.roleId);
+                await textChannel.send({
+                  content: mention,
+                  allowedMentions,
+                  embeds: [embed],
+                });
+                await this.markNotified(subscription.id, contest.id);
+                logInfo("Contest reminder sent.", {
+                  guildId: subscription.guildId,
+                  subscriptionId: subscription.id,
+                  channelId: subscription.channelId,
+                  contestId: contest.id,
+                  minutesBefore: subscription.minutesBefore,
+                  scope: subscription.scope,
+                });
+              } catch (error) {
+                recordReminderSendFailure({
+                  error,
+                  record: (entry) => {
+                    this.lastError = entry;
+                  },
+                  log: logWarn,
+                  logMessage: "Contest reminder send failed.",
+                  logContext: {
+                    guildId: subscription.guildId,
+                    subscriptionId: subscription.id,
+                    channelId: subscription.channelId,
+                    contestId: contest.id,
+                    minutesBefore: subscription.minutesBefore,
+                    scope: subscription.scope,
+                  },
+                });
+              }
+            }
           }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.lastError = { message, timestamp: new Date().toISOString() };
+          logError("Contest reminder refresh failed.", { error: message });
         }
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logError("Contest reminder refresh failed.", { error: message });
-    } finally {
-      finishTick();
-    }
+    );
   }
 
   async getLastNotificationMap(subscriptionIds: string[]): Promise<Map<string, string>> {

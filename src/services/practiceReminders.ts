@@ -26,7 +26,7 @@ import {
   recordReminderSendFailure,
   resolveManualSendChannel,
 } from "../utils/reminders.js";
-import { beginServiceTick } from "../utils/serviceTicks.js";
+import { runServiceTick } from "../utils/serviceTicks.js";
 import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
@@ -414,122 +414,120 @@ export class PracticeReminderService {
   }
 
   async runTick(client: Client): Promise<void> {
-    const finishTick = beginServiceTick({
-      isTicking: this.isTicking,
-      setTicking: (value) => {
-        this.isTicking = value;
+    await runServiceTick(
+      {
+        isTicking: this.isTicking,
+        setTicking: (value) => {
+          this.isTicking = value;
+        },
+        setLastTickAt: (value) => {
+          this.lastTickAt = value;
+        },
       },
-      setLastTickAt: (value) => {
-        this.lastTickAt = value;
-      },
-    });
-    if (!finishTick) {
-      return;
-    }
-
-    try {
-      const subscriptions = await this.listSubscriptions();
-      if (subscriptions.length === 0) {
-        return;
-      }
-
-      try {
-        await this.cleanupPosts();
-      } catch (error) {
-        logWarn("Practice reminder cleanup failed.", {
-          error: buildServiceErrorFromException(error).message,
-        });
-      }
-
-      const problems = await this.problems.ensureProblemsLoaded();
-      if (problems.length === 0) {
-        logWarn("Practice reminders skipped: problem cache empty.");
-        return;
-      }
-
-      const now = new Date();
-
-      for (const subscription of subscriptions) {
-        const todayStart = getLocalDayStartUtcMs(now, subscription.utcOffsetMinutes);
-        const scheduleMs = getUtcScheduleMs(now, subscription.hourUtc, subscription.minuteUtc);
-        const scheduleDay = getLocalDayForUtcMs(scheduleMs, subscription.utcOffsetMinutes);
-        if (!subscription.daysOfWeek.includes(scheduleDay)) {
-          continue;
-        }
-        if (now.getTime() < scheduleMs) {
-          continue;
-        }
-        if (wasSentSince(subscription.lastSentAt, todayStart)) {
-          continue;
-        }
-
-        const channelStatus = await getSendableChannelStatusOrWarn(
-          client,
-          subscription.channelId,
-          "Practice reminder channel missing or invalid.",
-          { guildId: subscription.guildId }
-        );
-        await cleanupMissingChannelStatus({
-          status: channelStatus,
-          remove: () => this.clearSubscription(subscription.guildId),
-          logRemoved: () => {
-            logInfo("Practice reminder subscription removed (channel missing).", {
-              guildId: subscription.guildId,
-              channelId: subscription.channelId,
-            });
-          },
-          logFailed: () => {
-            logWarn("Practice reminder subscription cleanup failed.", {
-              guildId: subscription.guildId,
-              channelId: subscription.channelId,
-            });
-          },
-        });
-        if (channelStatus.status !== "ok") {
-          this.lastError =
-            buildChannelServiceError(
-              "Practice reminder",
-              subscription.channelId,
-              channelStatus
-            ) ?? this.lastError;
-          continue;
-        }
-        const channel = channelStatus.channel;
-
-        const selection = await this.selectProblem(subscription);
-        if (!selection.problem) {
-          logWarn("Practice reminder skipped: no suitable problem.", {
-            guildId: subscription.guildId,
-            candidateCount: selection.candidateCount,
-          });
-          continue;
-        }
-
+      async () => {
         try {
-          await this.sendReminderMessage(subscription, selection, channel, "scheduled");
+          const subscriptions = await this.listSubscriptions();
+          if (subscriptions.length === 0) {
+            return;
+          }
+
+          try {
+            await this.cleanupPosts();
+          } catch (error) {
+            logWarn("Practice reminder cleanup failed.", {
+              error: buildServiceErrorFromException(error).message,
+            });
+          }
+
+          const problems = await this.problems.ensureProblemsLoaded();
+          if (problems.length === 0) {
+            logWarn("Practice reminders skipped: problem cache empty.");
+            return;
+          }
+
+          const now = new Date();
+
+          for (const subscription of subscriptions) {
+            const todayStart = getLocalDayStartUtcMs(now, subscription.utcOffsetMinutes);
+            const scheduleMs = getUtcScheduleMs(now, subscription.hourUtc, subscription.minuteUtc);
+            const scheduleDay = getLocalDayForUtcMs(scheduleMs, subscription.utcOffsetMinutes);
+            if (!subscription.daysOfWeek.includes(scheduleDay)) {
+              continue;
+            }
+            if (now.getTime() < scheduleMs) {
+              continue;
+            }
+            if (wasSentSince(subscription.lastSentAt, todayStart)) {
+              continue;
+            }
+
+            const channelStatus = await getSendableChannelStatusOrWarn(
+              client,
+              subscription.channelId,
+              "Practice reminder channel missing or invalid.",
+              { guildId: subscription.guildId }
+            );
+            await cleanupMissingChannelStatus({
+              status: channelStatus,
+              remove: () => this.clearSubscription(subscription.guildId),
+              logRemoved: () => {
+                logInfo("Practice reminder subscription removed (channel missing).", {
+                  guildId: subscription.guildId,
+                  channelId: subscription.channelId,
+                });
+              },
+              logFailed: () => {
+                logWarn("Practice reminder subscription cleanup failed.", {
+                  guildId: subscription.guildId,
+                  channelId: subscription.channelId,
+                });
+              },
+            });
+            if (channelStatus.status !== "ok") {
+              this.lastError =
+                buildChannelServiceError(
+                  "Practice reminder",
+                  subscription.channelId,
+                  channelStatus
+                ) ?? this.lastError;
+              continue;
+            }
+            const channel = channelStatus.channel;
+
+            const selection = await this.selectProblem(subscription);
+            if (!selection.problem) {
+              logWarn("Practice reminder skipped: no suitable problem.", {
+                guildId: subscription.guildId,
+                candidateCount: selection.candidateCount,
+              });
+              continue;
+            }
+
+            try {
+              await this.sendReminderMessage(subscription, selection, channel, "scheduled");
+            } catch (error) {
+              recordReminderSendFailure({
+                error,
+                record: (entry) => {
+                  this.lastError = entry;
+                },
+                log: logWarn,
+                logMessage: "Practice reminder send failed.",
+                logContext: {
+                  guildId: subscription.guildId,
+                  channelId: subscription.channelId,
+                  problemId: selection.problem ? getProblemId(selection.problem) : undefined,
+                },
+              });
+            }
+          }
         } catch (error) {
-          recordReminderSendFailure({
-            error,
-            record: (entry) => {
-              this.lastError = entry;
-            },
-            log: logWarn,
-            logMessage: "Practice reminder send failed.",
-            logContext: {
-              guildId: subscription.guildId,
-              channelId: subscription.channelId,
-              problemId: selection.problem ? getProblemId(selection.problem) : undefined,
-            },
-          });
+          const message = error instanceof Error ? error.message : String(error);
+          this.lastError = { message, timestamp: new Date().toISOString() };
+          logError("Practice reminder tick failed.", { error: message });
         }
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logError("Practice reminder tick failed.", { error: message });
-    } finally {
-      finishTick();
-    }
+    );
   }
 
   private async selectProblem(subscription: PracticeReminder): Promise<PracticeSelectionResult> {
