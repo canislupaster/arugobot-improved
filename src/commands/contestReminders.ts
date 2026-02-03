@@ -7,7 +7,7 @@ import {
 } from "discord.js";
 
 import type { ContestReminder } from "../services/contestReminders.js";
-import type { ContestScopeFilter } from "../services/contests.js";
+import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   filterContestsByKeywords,
@@ -17,7 +17,8 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
-import { addContestScopeOption } from "../utils/contestScope.js";
+import { addContestScopeOption, refreshContestData } from "../utils/contestScope.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -50,6 +51,81 @@ function formatSubscriptionSummary(subscription: ContestReminder): string {
   return `Channel: <#${subscription.channelId}>\nLead time: ${
     subscription.minutesBefore
   } minutes\nScope: ${formatScope(subscription.scope)}\nRole: ${role}\nInclude: ${include}\nExclude: ${exclude}\nID: \`${subscription.id}\``;
+}
+
+type NextReminderInfo = {
+  contest: Contest;
+  reminderTimeSeconds: number;
+  reminderWindowOpen: boolean;
+};
+
+type ScopeRefreshState = {
+  stale: boolean;
+  scopeErrors: Map<ContestScopeFilter, string>;
+};
+
+async function refreshContestScopes(
+  contests: {
+    refresh: (force: boolean, scope: "official" | "gym") => Promise<void>;
+    getLastRefreshAt: (scope: ContestScopeFilter) => number;
+  },
+  subscriptions: ContestReminder[]
+): Promise<ScopeRefreshState> {
+  const scopes = new Set(subscriptions.map((subscription) => subscription.scope));
+  const scopeErrors = new Map<ContestScopeFilter, string>();
+  let stale = false;
+
+  for (const scope of scopes) {
+    const result = await refreshContestData(contests, scope);
+    if ("error" in result) {
+      scopeErrors.set(scope, result.error);
+      continue;
+    }
+    if (result.stale) {
+      stale = true;
+    }
+  }
+
+  return { stale, scopeErrors };
+}
+
+function getNextReminderInfo(
+  subscription: ContestReminder,
+  upcomingByScope: Map<ContestScopeFilter, Contest[]>,
+  nowSeconds: number
+): NextReminderInfo | null {
+  const contests = upcomingByScope.get(subscription.scope) ?? [];
+  const filtered = filterContestsByKeywords(contests, {
+    includeKeywords: subscription.includeKeywords,
+    excludeKeywords: subscription.excludeKeywords,
+  });
+  if (filtered.length === 0) {
+    return null;
+  }
+  const contest = filtered[0]!;
+  const reminderTimeSeconds = contest.startTimeSeconds - subscription.minutesBefore * 60;
+  return {
+    contest,
+    reminderTimeSeconds,
+    reminderWindowOpen: reminderTimeSeconds <= nowSeconds,
+  };
+}
+
+function formatNextReminderLine(
+  subscription: ContestReminder,
+  info: NextReminderInfo | null,
+  scopeErrors: Map<ContestScopeFilter, string>
+): string {
+  if (!info) {
+    return scopeErrors.has(subscription.scope) ? "Next: Contest data unavailable" : "Next: None";
+  }
+  const contestLabel = `[${info.contest.name}](${buildContestUrl(info.contest)})`;
+  const reminderLabel = info.reminderWindowOpen
+    ? "Reminder window open"
+    : `${formatDiscordTimestamp(info.reminderTimeSeconds)} (${formatDiscordRelativeTime(
+        info.reminderTimeSeconds
+      )})`;
+  return `Next: ${contestLabel} (${formatDiscordRelativeTime(info.contest.startTimeSeconds)})\nReminder: ${reminderLabel}`;
 }
 
 function addReminderOptions(
@@ -267,16 +343,42 @@ export const contestRemindersCommand: Command = {
           return;
         }
 
+        const refreshState = await refreshContestScopes(
+          context.services.contests,
+          subscriptions
+        );
+        const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
+        const scopeSet = new Set(subscriptions.map((subscription) => subscription.scope));
+        for (const scope of scopeSet) {
+          upcomingByScope.set(scope, context.services.contests.getUpcomingContests(scope));
+        }
+        const nowSeconds = Math.floor(Date.now() / 1000);
+
         const embed = new EmbedBuilder()
           .setTitle("Contest reminder subscriptions")
           .setColor(EMBED_COLORS.info)
           .addFields(
             subscriptions.map((subscription, index) => ({
               name: `Subscription ${index + 1}`,
-              value: formatSubscriptionSummary(subscription),
+              value: `${formatSubscriptionSummary(subscription)}\n${formatNextReminderLine(
+                subscription,
+                getNextReminderInfo(subscription, upcomingByScope, nowSeconds),
+                refreshState.scopeErrors
+              )}`,
               inline: false,
             }))
           );
+
+        if (refreshState.stale || refreshState.scopeErrors.size > 0) {
+          const footerParts: string[] = [];
+          if (refreshState.stale) {
+            footerParts.push("Showing cached contest data due to a temporary error.");
+          }
+          if (refreshState.scopeErrors.size > 0) {
+            footerParts.push("Contest data unavailable for one or more scopes.");
+          }
+          embed.setFooter({ text: footerParts.join(" ") });
+        }
 
         await interaction.reply({ embeds: [embed] });
         return;

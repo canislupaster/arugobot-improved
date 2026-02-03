@@ -174,6 +174,57 @@ describe("contestRemindersCommand", () => {
     });
   });
 
+  it("shows next reminder info in the status list", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("status"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-status",
+      services: {
+        contestReminders: {
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-1",
+              guildId: "guild-1",
+              channelId: "channel-1",
+              minutesBefore: 30,
+              roleId: null,
+              includeKeywords: [],
+              excludeKeywords: [],
+              scope: "official",
+            },
+          ]),
+        },
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1_700_000_000),
+          getUpcomingContests: jest.fn().mockReturnValue([
+            {
+              id: 303,
+              name: "CF Reminder Round",
+              phase: "BEFORE",
+              startTimeSeconds: 1_700_000_000,
+              durationSeconds: 7200,
+            },
+          ]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRemindersCommand.execute(interaction, context);
+
+    const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
+    const fieldValue = payload.embeds[0].data.fields[0].value as string;
+    expect(fieldValue).toContain("Next:");
+    expect(fieldValue).toContain("CF Reminder Round");
+    expect(fieldValue).toContain("Reminder:");
+  });
+
   it("removes a reminder subscription by id", async () => {
     const interaction = createInteraction({
       options: {
