@@ -1,0 +1,23 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Create source archive
+        run: git archive --format=tar.gz -o arugobot-${{ github.ref_name }}.tar.gz HEAD
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: arugobot-${{ github.ref_name }}.tar.gz

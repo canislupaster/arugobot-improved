@@ -268,6 +268,11 @@ pnpm approve-builds
 pnpm run dev
 ```
 
+## Releases
+
+Tagged releases (`v*`) publish a source archive on GitHub Releases. You can download the latest
+release archive from the Releases page and follow the installation steps above.
+
 The bot runs database migrations on startup.
 Problem and contest caches are persisted in the database to keep basic functionality available during Codeforces outages.
 Structured logs are appended to the database (`log_entries`) and cleaned up automatically based on
