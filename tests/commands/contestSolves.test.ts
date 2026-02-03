@@ -166,7 +166,7 @@ describe("contestSolvesCommand", () => {
     await contestSolvesCommand.execute(interaction, context);
 
     expect(interaction.editReply).toHaveBeenCalledWith(
-      "No linked handles found in this server yet."
+      "No linked handles yet. Use /register to link a Codeforces handle."
     );
   });
 

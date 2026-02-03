@@ -37,6 +37,10 @@ type TargetResolution =
   | { status: "error"; message: string };
 
 const errorResult = (message: string): TargetResolution => ({ status: "error", message });
+const NO_LINKED_HANDLES_MESSAGE =
+  "No linked handles yet. Use /register to link a Codeforces handle.";
+const NO_CURRENT_MEMBERS_MESSAGE =
+  "No linked handles found for current server members. Use /handles to review linked accounts.";
 
 export function getUserOptions(users: Array<User | null | undefined>): User[] {
   return users.filter((user): user is User => Boolean(user));
@@ -125,6 +129,9 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
 
   if (uniqueUserOptions.length === 0 && handleInputs.length === 0) {
     const linkedUsers = await store.getLinkedUsers(resolvedGuildId);
+    if (linkedUsers.length === 0) {
+      return errorResult(NO_LINKED_HANDLES_MESSAGE);
+    }
     const filteredLinkedUsers = guild
       ? await filterEntriesByGuildMembers(guild, linkedUsers, {
           correlationId,
@@ -134,7 +141,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
         })
       : linkedUsers;
     if (filteredLinkedUsers.length === 0) {
-      return errorResult("No linked handles found in this server yet.");
+      return errorResult(NO_CURRENT_MEMBERS_MESSAGE);
     }
     if (maxLinkedHandles && filteredLinkedUsers.length > maxLinkedHandles) {
       return errorResult(

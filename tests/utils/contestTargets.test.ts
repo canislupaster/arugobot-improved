@@ -92,7 +92,35 @@ describe("resolveContestTargets", () => {
 
     expect(result).toEqual({
       status: "error",
-      message: "No linked handles found in this server yet.",
+      message: "No linked handles yet. Use /register to link a Codeforces handle.",
+    });
+  });
+
+  it("returns an error when no current members are linked", async () => {
+    const store = {
+      getHandle: jest.fn(),
+      resolveHandle: jest.fn(),
+      getLinkedUsers: jest.fn().mockResolvedValue([{ userId: "user-2", handle: "tourist" }]),
+    };
+    const guild = {
+      id: "guild-1",
+      members: {
+        fetch: jest.fn().mockResolvedValue(new Map()),
+        cache: new Map(),
+      },
+    } as unknown as Guild;
+
+    const result = await resolveContestTargets({
+      ...baseParams,
+      guild,
+      userOptions: [],
+      handleInputs: [],
+      store,
+    });
+
+    expect(result).toEqual({
+      status: "error",
+      message: "No linked handles found for current server members. Use /handles to review linked accounts.",
     });
   });
 
@@ -179,7 +207,7 @@ describe("resolveContestTargets", () => {
 
     expect(result).toEqual({ status: "replied" });
     expect(interaction.editReply).toHaveBeenCalledWith(
-      "No linked handles found in this server yet."
+      "No linked handles yet. Use /register to link a Codeforces handle."
     );
   });
 
