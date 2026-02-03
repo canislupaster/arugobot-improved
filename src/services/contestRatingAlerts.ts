@@ -6,9 +6,7 @@ import type { Kysely } from "kysely";
 import type { ContestRatingAlertSubscriptionsTable, Database } from "../db/types.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
-  buildChannelServiceError,
-  cleanupMissingChannelStatus,
-  getSendableChannelStatusOrWarn,
+  resolveSendableChannelForService,
   type SendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -403,43 +401,37 @@ export class ContestRatingAlertService {
       }
 
       for (const subscription of subscriptions) {
-        const channelStatus = await getSendableChannelStatusOrWarn(
+        const { channel, serviceError } = await resolveSendableChannelForService({
           client,
-          subscription.channelId,
-          "Contest rating alert channel missing or invalid.",
-          {
+          channelId: subscription.channelId,
+          warnMessage: "Contest rating alert channel missing or invalid.",
+          warnContext: {
             guildId: subscription.guildId,
             subscriptionId: subscription.id,
-          }
-        );
-        await cleanupMissingChannelStatus({
-          status: channelStatus,
-          remove: () => this.removeSubscription(subscription.guildId, subscription.id),
-          logRemoved: () => {
-            logInfo("Contest rating alert subscription removed (channel missing).", {
-              guildId: subscription.guildId,
-              subscriptionId: subscription.id,
-              channelId: subscription.channelId,
-            });
           },
-          logFailed: () => {
-            logWarn("Contest rating alert subscription cleanup failed.", {
-              guildId: subscription.guildId,
-              subscriptionId: subscription.id,
-              channelId: subscription.channelId,
-            });
+          cleanup: {
+            remove: () => this.removeSubscription(subscription.guildId, subscription.id),
+            logRemoved: () => {
+              logInfo("Contest rating alert subscription removed (channel missing).", {
+                guildId: subscription.guildId,
+                subscriptionId: subscription.id,
+                channelId: subscription.channelId,
+              });
+            },
+            logFailed: () => {
+              logWarn("Contest rating alert subscription cleanup failed.", {
+                guildId: subscription.guildId,
+                subscriptionId: subscription.id,
+                channelId: subscription.channelId,
+              });
+            },
           },
+          serviceLabel: "Contest rating alert",
         });
-        if (channelStatus.status !== "ok") {
-          this.lastError =
-            buildChannelServiceError(
-              "Contest rating alert",
-              subscription.channelId,
-              channelStatus
-            ) ?? this.lastError;
+        if (!channel) {
+          this.lastError = serviceError ?? this.lastError;
           continue;
         }
-        const channel = channelStatus.channel;
 
         const candidate = await this.findCandidate(subscription, contests, isStale, {
           skipNotified: true,

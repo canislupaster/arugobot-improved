@@ -194,6 +194,41 @@ export async function cleanupMissingChannelStatus(params: {
   return true;
 }
 
+export async function resolveSendableChannelForService(params: {
+  client: Client;
+  channelId: string;
+  warnMessage: string;
+  warnContext?: LogContext;
+  cleanup?: {
+    remove: () => Promise<boolean>;
+    logRemoved: () => void;
+    logFailed: () => void;
+  };
+  serviceLabel: string;
+}): Promise<{ channel: SendableChannel | null; serviceError: ServiceError | null }> {
+  const status = await getSendableChannelStatusOrWarn(
+    params.client,
+    params.channelId,
+    params.warnMessage,
+    params.warnContext
+  );
+  if (params.cleanup) {
+    await cleanupMissingChannelStatus({
+      status,
+      remove: params.cleanup.remove,
+      logRemoved: params.cleanup.logRemoved,
+      logFailed: params.cleanup.logFailed,
+    });
+  }
+  if (status.status !== "ok") {
+    return {
+      channel: null,
+      serviceError: buildChannelServiceError(params.serviceLabel, params.channelId, status),
+    };
+  }
+  return { channel: status.channel, serviceError: null };
+}
+
 export function resetChannelWarningCache(): void {
   warningCache.clear();
 }

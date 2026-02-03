@@ -10,11 +10,7 @@ import {
   serializeKeywords,
 } from "../utils/contestFilters.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
-import {
-  buildChannelServiceError,
-  cleanupMissingChannelStatus,
-  getSendableChannelStatusOrWarn,
-} from "../utils/discordChannels.js";
+import { resolveSendableChannelForService } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
@@ -426,46 +422,40 @@ export class ContestReminderService {
           }
 
           for (const subscription of subscriptions) {
-            const channelStatus = await getSendableChannelStatusOrWarn(
+            const { channel: textChannel, serviceError } = await resolveSendableChannelForService({
               client,
-              subscription.channelId,
-              "Contest reminder channel missing or invalid.",
-              {
+              channelId: subscription.channelId,
+              warnMessage: "Contest reminder channel missing or invalid.",
+              warnContext: {
                 guildId: subscription.guildId,
                 subscriptionId: subscription.id,
                 scope: subscription.scope,
-              }
-            );
-            await cleanupMissingChannelStatus({
-              status: channelStatus,
-              remove: () => this.removeSubscription(subscription.guildId, subscription.id),
-              logRemoved: () => {
-                logInfo("Contest reminder subscription removed (channel missing).", {
-                  guildId: subscription.guildId,
-                  subscriptionId: subscription.id,
-                  channelId: subscription.channelId,
-                  scope: subscription.scope,
-                });
               },
-              logFailed: () => {
-                logWarn("Contest reminder subscription cleanup failed.", {
-                  guildId: subscription.guildId,
-                  subscriptionId: subscription.id,
-                  channelId: subscription.channelId,
-                  scope: subscription.scope,
-                });
+              cleanup: {
+                remove: () => this.removeSubscription(subscription.guildId, subscription.id),
+                logRemoved: () => {
+                  logInfo("Contest reminder subscription removed (channel missing).", {
+                    guildId: subscription.guildId,
+                    subscriptionId: subscription.id,
+                    channelId: subscription.channelId,
+                    scope: subscription.scope,
+                  });
+                },
+                logFailed: () => {
+                  logWarn("Contest reminder subscription cleanup failed.", {
+                    guildId: subscription.guildId,
+                    subscriptionId: subscription.id,
+                    channelId: subscription.channelId,
+                    scope: subscription.scope,
+                  });
+                },
               },
+              serviceLabel: "Contest reminder",
             });
-            if (channelStatus.status !== "ok") {
-              this.lastError =
-                buildChannelServiceError(
-                  "Contest reminder",
-                  subscription.channelId,
-                  channelStatus
-                ) ?? this.lastError;
+            if (!textChannel) {
+              this.lastError = serviceError ?? this.lastError;
               continue;
             }
-            const textChannel = channelStatus.channel;
             const scopedUpcoming = upcomingByScope.get(subscription.scope) ?? [];
             const filtered = filterContestsByKeywords(scopedUpcoming, {
               includeKeywords: subscription.includeKeywords,

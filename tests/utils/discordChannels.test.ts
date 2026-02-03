@@ -13,6 +13,7 @@ import {
   formatCannotPostMessage,
   getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
+  resolveSendableChannelForService,
   resolveSendableChannel,
   resolveSendableChannelOrReply,
   resolveSendableChannelOrWarn,
@@ -253,6 +254,117 @@ describe("resolveSendableChannel", () => {
     });
 
     expect(logWarn).toHaveBeenCalledTimes(1);
+    logWarn.mockRestore();
+  });
+});
+
+describe("resolveSendableChannelForService", () => {
+  beforeEach(() => {
+    resetChannelWarningCache();
+  });
+
+  it("returns channel when sendable", async () => {
+    const channel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({ has: () => true }),
+    };
+    const client = {
+      user: { id: "user-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+
+    const remove = jest.fn().mockResolvedValue(true);
+
+    const result = await resolveSendableChannelForService({
+      client,
+      channelId: "channel-10",
+      warnMessage: "Missing channel",
+      warnContext: { guildId: "guild-10" },
+      cleanup: {
+        remove,
+        logRemoved: jest.fn(),
+        logFailed: jest.fn(),
+      },
+      serviceLabel: "Practice reminder",
+    });
+
+    expect(result.channel).toBe(channel);
+    expect(result.serviceError).toBeNull();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("cleans up missing channels and returns a service error", async () => {
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(null),
+      },
+    } as unknown as Client;
+    const logWarn = jest.spyOn(logger, "logWarn").mockImplementation(() => {});
+
+    const remove = jest.fn().mockResolvedValue(true);
+    const logRemoved = jest.fn();
+    const logFailed = jest.fn();
+
+    const result = await resolveSendableChannelForService({
+      client,
+      channelId: "channel-11",
+      warnMessage: "Missing channel",
+      warnContext: { guildId: "guild-11" },
+      cleanup: {
+        remove,
+        logRemoved,
+        logFailed,
+      },
+      serviceLabel: "Contest reminder",
+    });
+
+    expect(result.channel).toBeNull();
+    expect(result.serviceError?.message).toBe(
+      "Contest reminder channel channel-11: Missing or deleted"
+    );
+    expect(remove).toHaveBeenCalled();
+    expect(logRemoved).toHaveBeenCalled();
+    expect(logFailed).not.toHaveBeenCalled();
+    logWarn.mockRestore();
+  });
+
+  it("returns a service error when missing permissions", async () => {
+    const channel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: (flag: bigint) => flag === PermissionFlagsBits.ViewChannel,
+      }),
+    };
+    const client = {
+      user: { id: "user-2" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+    const logWarn = jest.spyOn(logger, "logWarn").mockImplementation(() => {});
+
+    const remove = jest.fn().mockResolvedValue(true);
+
+    const result = await resolveSendableChannelForService({
+      client,
+      channelId: "channel-12",
+      warnMessage: "Missing channel",
+      warnContext: { guildId: "guild-12" },
+      cleanup: {
+        remove,
+        logRemoved: jest.fn(),
+        logFailed: jest.fn(),
+      },
+      serviceLabel: "Contest rating alert",
+    });
+
+    expect(result.channel).toBeNull();
+    expect(result.serviceError?.message).toBe(
+      "Contest rating alert channel channel-12: Missing permissions (SendMessages)"
+    );
+    expect(remove).not.toHaveBeenCalled();
     logWarn.mockRestore();
   });
 });

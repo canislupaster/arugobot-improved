@@ -2,12 +2,7 @@ import { EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database, PracticeRemindersTable } from "../db/types.js";
-import {
-  buildChannelServiceError,
-  cleanupMissingChannelStatus,
-  getSendableChannelStatusOrWarn,
-  type SendableChannel,
-} from "../utils/discordChannels.js";
+import { resolveSendableChannelForService, type SendableChannel } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
@@ -461,38 +456,32 @@ export class PracticeReminderService {
               continue;
             }
 
-            const channelStatus = await getSendableChannelStatusOrWarn(
+            const { channel, serviceError } = await resolveSendableChannelForService({
               client,
-              subscription.channelId,
-              "Practice reminder channel missing or invalid.",
-              { guildId: subscription.guildId }
-            );
-            await cleanupMissingChannelStatus({
-              status: channelStatus,
-              remove: () => this.clearSubscription(subscription.guildId),
-              logRemoved: () => {
-                logInfo("Practice reminder subscription removed (channel missing).", {
-                  guildId: subscription.guildId,
-                  channelId: subscription.channelId,
-                });
+              channelId: subscription.channelId,
+              warnMessage: "Practice reminder channel missing or invalid.",
+              warnContext: { guildId: subscription.guildId },
+              cleanup: {
+                remove: () => this.clearSubscription(subscription.guildId),
+                logRemoved: () => {
+                  logInfo("Practice reminder subscription removed (channel missing).", {
+                    guildId: subscription.guildId,
+                    channelId: subscription.channelId,
+                  });
+                },
+                logFailed: () => {
+                  logWarn("Practice reminder subscription cleanup failed.", {
+                    guildId: subscription.guildId,
+                    channelId: subscription.channelId,
+                  });
+                },
               },
-              logFailed: () => {
-                logWarn("Practice reminder subscription cleanup failed.", {
-                  guildId: subscription.guildId,
-                  channelId: subscription.channelId,
-                });
-              },
+              serviceLabel: "Practice reminder",
             });
-            if (channelStatus.status !== "ok") {
-              this.lastError =
-                buildChannelServiceError(
-                  "Practice reminder",
-                  subscription.channelId,
-                  channelStatus
-                ) ?? this.lastError;
+            if (!channel) {
+              this.lastError = serviceError ?? this.lastError;
               continue;
             }
-            const channel = channelStatus.channel;
 
             const selection = await this.selectProblem(subscription);
             if (!selection.problem) {
