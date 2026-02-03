@@ -235,6 +235,8 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   Digests include challenge activity, top contests by participation, and rating delta highlights.
   Use `post` to send a digest immediately (optionally `force` to send even if one was already posted this week).
 
+Reminder and digest channels must grant the bot View Channel + Send Messages permissions; the `set` flows will warn if the bot cannot post.
+
 ## Installation
 
 To try the bot, join the Purdue CPU Discord: https://purduecpu.com/discord

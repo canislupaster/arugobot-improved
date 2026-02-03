@@ -302,6 +302,15 @@ export const practiceRemindersCommand: Command = {
           });
           return;
         }
+        const status = await getSendableChannelStatus(context.client, channel.id);
+        if (status.status !== "ok") {
+          await interaction.reply({
+            content: `I can't post in <#${channel.id}> (${describeSendableChannelStatus(
+              status
+            )}). Check the bot permissions and try again.`,
+          });
+          return;
+        }
 
         const hourInput = interaction.options.getInteger("hour_utc") ?? DEFAULT_HOUR_UTC;
         const minuteInput = interaction.options.getInteger("minute_utc") ?? DEFAULT_MINUTE_UTC;

@@ -5,6 +5,21 @@ import type { CommandContext } from "../../src/types/commandContext.js";
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
+const createSendableChannel = (id: string) => ({
+  id,
+  type: ChannelType.GuildText,
+  permissionsFor: jest.fn().mockReturnValue({
+    has: jest.fn().mockReturnValue(true),
+  }),
+});
+
+const createClient = (channel: unknown) => ({
+  user: { id: "bot-1" },
+  channels: {
+    fetch: jest.fn().mockResolvedValue(channel),
+  },
+});
+
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
     commandName: "practicereminders",
@@ -53,10 +68,7 @@ describe("practiceRemindersCommand", () => {
   });
 
   it("sets practice reminders with defaults", async () => {
-    const channel = {
-      id: "channel-1",
-      type: ChannelType.GuildText,
-    };
+    const channel = createSendableChannel("channel-1");
     const interaction = createInteraction({
       options: {
         getSubcommand: jest.fn().mockReturnValue("set"),
@@ -69,6 +81,7 @@ describe("practiceRemindersCommand", () => {
     });
     const context = {
       correlationId: "corr-2",
+      client: createClient(channel),
       services: {
         practiceReminders: {
           setSubscription: jest.fn().mockResolvedValue(undefined),
@@ -95,10 +108,7 @@ describe("practiceRemindersCommand", () => {
   });
 
   it("sets practice reminders with custom days", async () => {
-    const channel = {
-      id: "channel-1",
-      type: ChannelType.GuildText,
-    };
+    const channel = createSendableChannel("channel-1");
     const interaction = createInteraction({
       options: {
         getSubcommand: jest.fn().mockReturnValue("set"),
@@ -116,6 +126,7 @@ describe("practiceRemindersCommand", () => {
     });
     const context = {
       correlationId: "corr-2b",
+      client: createClient(channel),
       services: {
         practiceReminders: {
           setSubscription: jest.fn().mockResolvedValue(undefined),
@@ -169,10 +180,7 @@ describe("practiceRemindersCommand", () => {
   });
 
   it("sets practice reminders with a role mention", async () => {
-    const channel = {
-      id: "channel-2",
-      type: ChannelType.GuildText,
-    };
+    const channel = createSendableChannel("channel-2");
     const role = { id: "role-1" };
     const interaction = createInteraction({
       options: {
@@ -194,6 +202,7 @@ describe("practiceRemindersCommand", () => {
     });
     const context = {
       correlationId: "corr-3b",
+      client: createClient(channel),
       services: {
         practiceReminders: {
           setSubscription: jest.fn().mockResolvedValue(undefined),
@@ -221,10 +230,7 @@ describe("practiceRemindersCommand", () => {
   });
 
   it("accepts a UTC offset and converts local time to UTC", async () => {
-    const channel = {
-      id: "channel-3",
-      type: ChannelType.GuildText,
-    };
+    const channel = createSendableChannel("channel-3");
     const interaction = createInteraction({
       options: {
         getSubcommand: jest.fn().mockReturnValue("set"),
@@ -250,6 +256,7 @@ describe("practiceRemindersCommand", () => {
     });
     const context = {
       correlationId: "corr-3c",
+      client: createClient(channel),
       services: {
         practiceReminders: {
           setSubscription: jest.fn().mockResolvedValue(undefined),
@@ -277,10 +284,7 @@ describe("practiceRemindersCommand", () => {
   });
 
   it("rejects invalid UTC offsets", async () => {
-    const channel = {
-      id: "channel-4",
-      type: ChannelType.GuildText,
-    };
+    const channel = createSendableChannel("channel-4");
     const interaction = createInteraction({
       options: {
         getSubcommand: jest.fn().mockReturnValue("set"),
@@ -298,6 +302,7 @@ describe("practiceRemindersCommand", () => {
     });
     const context = {
       correlationId: "corr-3d",
+      client: createClient(channel),
       services: {
         practiceReminders: {
           setSubscription: jest.fn().mockResolvedValue(undefined),
@@ -310,6 +315,42 @@ describe("practiceRemindersCommand", () => {
     expect(context.services.practiceReminders.setSubscription).not.toHaveBeenCalled();
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "UTC offset must be between -12:00 and +14:00.",
+    });
+  });
+
+  it("rejects channels without send permissions", async () => {
+    const channel = {
+      id: "channel-5",
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(false),
+      }),
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockReturnValue(null),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      correlationId: "corr-3e",
+      client: createClient(channel),
+      services: {
+        practiceReminders: {
+          setSubscription: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.setSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: expect.stringContaining("Missing permissions"),
     });
   });
 

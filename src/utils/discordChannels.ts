@@ -55,15 +55,8 @@ export async function getSendableChannelStatus(
   client: Client,
   channelId: string
 ): Promise<SendableChannelStatus> {
-  const channel = await fetchSendableChannel(client, channelId);
-  if (!channel) {
-    return { status: "missing", channelId };
-  }
-  const missingPermissions = getMissingSendPermissions(channel, client);
-  if (missingPermissions) {
-    return { status: "missing_permissions", channelId, missingPermissions };
-  }
-  return { status: "ok", channel };
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  return getSendableChannelStatusForChannel(client, channel, channelId);
 }
 
 export async function getSendableChannelStatusOrWarn(
@@ -72,15 +65,32 @@ export async function getSendableChannelStatusOrWarn(
   message: string,
   context: LogContext = {}
 ): Promise<SendableChannelStatus> {
-  const channel = await fetchSendableChannel(client, channelId);
-  if (!channel) {
-    logChannelWarning(message, channelId, { ...context, channelId });
-    return { status: "missing", channelId };
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  const status = getSendableChannelStatusForChannel(client, channel, channelId);
+  if (status.status !== "ok") {
+    logChannelWarning(message, channelId, {
+      ...context,
+      channelId,
+      ...(status.status === "missing_permissions"
+        ? { missingPermissions: status.missingPermissions }
+        : {}),
+    });
+  }
+  return status;
+}
+
+export function getSendableChannelStatusForChannel(
+  client: Client,
+  channel: Channel | null,
+  channelId?: string
+): SendableChannelStatus {
+  const resolvedChannelId = channelId ?? channel?.id ?? "unknown";
+  if (!channel || !isSendableChannel(channel)) {
+    return { status: "missing", channelId: resolvedChannelId };
   }
   const missingPermissions = getMissingSendPermissions(channel, client);
   if (missingPermissions) {
-    logChannelWarning(message, channelId, { ...context, channelId, missingPermissions });
-    return { status: "missing_permissions", channelId, missingPermissions };
+    return { status: "missing_permissions", channelId: resolvedChannelId, missingPermissions };
   }
   return { status: "ok", channel };
 }

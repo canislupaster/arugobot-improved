@@ -22,6 +22,21 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
 
+const createSendableChannel = (id: string) => ({
+  id,
+  type: ChannelType.GuildText,
+  permissionsFor: jest.fn().mockReturnValue({
+    has: jest.fn().mockReturnValue(true),
+  }),
+});
+
+const createClient = (channel: unknown) => ({
+  user: { id: "bot-1" },
+  channels: {
+    fetch: jest.fn().mockResolvedValue(channel),
+  },
+});
+
 describe("digestCommand", () => {
   it("shows status when no subscription exists", async () => {
     const interaction = createInteraction({
@@ -50,7 +65,7 @@ describe("digestCommand", () => {
   });
 
   it("sets a digest with defaults", async () => {
-    const channel = { id: "channel-1", type: ChannelType.GuildText };
+    const channel = createSendableChannel("channel-1");
     const interaction = createInteraction({
       options: {
         getSubcommand: jest.fn().mockReturnValue("set"),
@@ -62,6 +77,7 @@ describe("digestCommand", () => {
       },
     });
     const context = {
+      client: createClient(channel),
       services: {
         weeklyDigest: {
           setSubscription: jest.fn().mockResolvedValue(undefined),
@@ -132,5 +148,40 @@ describe("digestCommand", () => {
     await digestCommand.execute(interaction, context);
 
     expect(interaction.editReply).toHaveBeenCalledWith("Weekly digest sent.");
+  });
+
+  it("rejects channels without send permissions", async () => {
+    const channel = {
+      id: "channel-2",
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(false),
+      }),
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockReturnValue(null),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      client: createClient(channel),
+      services: {
+        weeklyDigest: {
+          setSubscription: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await digestCommand.execute(interaction, context);
+
+    expect(context.services.weeklyDigest.setSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: expect.stringContaining("Missing permissions"),
+    });
   });
 });

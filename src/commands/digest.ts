@@ -3,6 +3,10 @@ import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } f
 import { getNextWeeklyScheduledUtcMs } from "../services/weeklyDigest.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addScheduleOptions } from "../utils/commandOptions.js";
+import {
+  describeSendableChannelStatus,
+  getSendableChannelStatus,
+} from "../utils/discordChannels.js";
 import { requireGuild } from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,
@@ -224,6 +228,15 @@ export const digestCommand: Command = {
       ) {
         await interaction.reply({
           content: "Select a text or announcement channel.",
+        });
+        return;
+      }
+      const status = await getSendableChannelStatus(context.client, channel.id);
+      if (status.status !== "ok") {
+        await interaction.reply({
+          content: `I can't post in <#${channel.id}> (${describeSendableChannelStatus(
+            status
+          )}). Check the bot permissions and try again.`,
         });
         return;
       }
