@@ -92,7 +92,9 @@ describe("contestDeltasCommand", () => {
       correlationId: "corr-2",
       services: {
         store: {
-          getServerRoster: jest.fn().mockResolvedValue([]),
+          getServerRoster: jest.fn().mockResolvedValue([
+            { userId: "user-1", handle: "Alice" },
+          ]),
         },
         contestActivity: {
           getRatingChangeSummaryForRoster: jest.fn().mockResolvedValue({
@@ -113,6 +115,64 @@ describe("contestDeltasCommand", () => {
     expect((interaction.editReply as jest.Mock).mock.calls[0][0]).toContain(
       "No rating changes"
     );
+  });
+
+  it("replies when no handles are linked", async () => {
+    const interaction = createInteraction();
+    const context = {
+      correlationId: "corr-3",
+      services: {
+        store: {
+          getServerRoster: jest.fn().mockResolvedValue([]),
+        },
+        contestActivity: {
+          getRatingChangeSummaryForRoster: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestDeltasCommand.execute(interaction, context);
+
+    expect((interaction.editReply as jest.Mock).mock.calls[0][0]).toContain(
+      "No linked handles"
+    );
+    expect(
+      (context.services.contestActivity.getRatingChangeSummaryForRoster as jest.Mock)
+    ).not.toHaveBeenCalled();
+  });
+
+  it("replies when no linked handles are in the guild", async () => {
+    const interaction = createInteraction({
+      guild: {
+        id: "guild-1",
+        members: {
+          fetch: jest.fn().mockResolvedValue(new Map()),
+          cache: new Map(),
+        },
+      },
+    });
+    const context = {
+      correlationId: "corr-4",
+      services: {
+        store: {
+          getServerRoster: jest.fn().mockResolvedValue([
+            { userId: "user-1", handle: "Alice" },
+          ]),
+        },
+        contestActivity: {
+          getRatingChangeSummaryForRoster: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestDeltasCommand.execute(interaction, context);
+
+    expect((interaction.editReply as jest.Mock).mock.calls[0][0]).toContain(
+      "No linked handles found"
+    );
+    expect(
+      (context.services.contestActivity.getRatingChangeSummaryForRoster as jest.Mock)
+    ).not.toHaveBeenCalled();
   });
 
   it("rejects invalid lookback windows", async () => {
