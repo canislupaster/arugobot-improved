@@ -173,4 +173,20 @@ describe("WeeklyDigestService", () => {
     expect(sendFail).toHaveBeenCalledTimes(1);
     expect(sendOk).toHaveBeenCalledTimes(1);
   });
+
+  it("cleans up missing channels during scheduled ticks", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2024-01-08T09:05:00.000Z"));
+
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(null),
+      },
+    } as never;
+
+    await service.runTick(client);
+
+    const subscription = await service.getSubscription("guild-1");
+    expect(subscription).toBeNull();
+  });
 });

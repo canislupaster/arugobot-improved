@@ -3,9 +3,8 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import {
-  buildChannelServiceError,
-  getSendableChannelStatusOrWarn,
   resolveSendableChannel,
+  resolveSendableChannelForService,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getErrorMessage } from "../utils/errors.js";
@@ -245,8 +244,12 @@ export class WeeklyDigestService {
       .execute();
   }
 
-  async clearSubscription(guildId: string): Promise<void> {
-    await this.db.deleteFrom("weekly_digests").where("guild_id", "=", guildId).execute();
+  async clearSubscription(guildId: string): Promise<boolean> {
+    const result = await this.db
+      .deleteFrom("weekly_digests")
+      .where("guild_id", "=", guildId)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0) > 0;
   }
 
   async getPreview(guildId: string): Promise<WeeklyDigestPreview | null> {
@@ -329,22 +332,32 @@ export class WeeklyDigestService {
           continue;
         }
 
-        const channelStatus = await getSendableChannelStatusOrWarn(
+        const { channel, serviceError } = await resolveSendableChannelForService({
           client,
-          subscription.channelId,
-          "Weekly digest channel missing.",
-          { guildId: subscription.guildId }
-        );
-        if (channelStatus.status !== "ok") {
-          this.lastError =
-            buildChannelServiceError(
-              "Weekly digest",
-              subscription.channelId,
-              channelStatus
-            ) ?? this.lastError;
+          channelId: subscription.channelId,
+          warnMessage: "Weekly digest channel missing.",
+          warnContext: { guildId: subscription.guildId },
+          cleanup: {
+            remove: () => this.clearSubscription(subscription.guildId),
+            logRemoved: () => {
+              logInfo("Weekly digest subscription removed (channel missing).", {
+                guildId: subscription.guildId,
+                channelId: subscription.channelId,
+              });
+            },
+            logFailed: () => {
+              logWarn("Weekly digest subscription cleanup failed.", {
+                guildId: subscription.guildId,
+                channelId: subscription.channelId,
+              });
+            },
+          },
+          serviceLabel: "Weekly digest",
+        });
+        if (!channel) {
+          this.lastError = serviceError ?? this.lastError;
           continue;
         }
-        const channel = channelStatus.channel;
 
         await this.trySendDigest(subscription, channel, "scheduled");
       }

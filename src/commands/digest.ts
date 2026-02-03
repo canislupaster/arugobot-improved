@@ -3,7 +3,12 @@ import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } f
 import { getNextWeeklyScheduledUtcMs } from "../services/weeklyDigest.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addScheduleOptions } from "../utils/commandOptions.js";
-import { formatCannotPostMessage, getSendableChannelStatus } from "../utils/discordChannels.js";
+import {
+  describeSendableChannelStatus,
+  formatCannotPostMessage,
+  getSendableChannelStatus,
+  resolveChannelCleanupDecision,
+} from "../utils/discordChannels.js";
 import { requireGuild } from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,
@@ -102,6 +107,16 @@ export const digestCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("cleanup")
+        .setDescription("Remove digests pointing at missing channels")
+        .addBooleanOption((option) =>
+          option
+            .setName("include_permissions")
+            .setDescription("Also remove if the bot is missing channel permissions")
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("preview")
         .setDescription("Show a preview of the weekly digest for this server")
     )
@@ -159,8 +174,46 @@ export const digestCommand: Command = {
       }
 
       if (subcommand === "clear") {
-        await context.services.weeklyDigest.clearSubscription(guildId);
-        await interaction.reply({ content: "Weekly digests disabled." });
+        const removed = await context.services.weeklyDigest.clearSubscription(guildId);
+        await interaction.reply({
+          content: removed
+            ? "Weekly digests disabled."
+            : "No weekly digests were configured for this server.",
+        });
+        return;
+      }
+
+      if (subcommand === "cleanup") {
+        const subscription = await context.services.weeklyDigest.getSubscription(guildId);
+        if (!subscription) {
+          await interaction.reply({ content: "No weekly digests configured for this server." });
+          return;
+        }
+
+        const includePermissions = interaction.options.getBoolean("include_permissions") ?? false;
+        const cleanupDecision = await resolveChannelCleanupDecision({
+          client: context.client,
+          channelId: subscription.channelId,
+          includePermissions,
+          healthyMessage: "Weekly digest channel looks healthy; nothing to clean.",
+          missingPermissionsMessage: (status) =>
+            `Weekly digest still points at <#${subscription.channelId}> (${describeSendableChannelStatus(
+              status
+            )}). Re-run with include_permissions:true or update the channel with /digest set.`,
+        });
+        if (cleanupDecision.replyMessage) {
+          await interaction.reply({ content: cleanupDecision.replyMessage });
+          return;
+        }
+
+        const removed = await context.services.weeklyDigest.clearSubscription(guildId);
+        await interaction.reply({
+          content: removed
+            ? `Removed weekly digest for <#${subscription.channelId}> (${describeSendableChannelStatus(
+                cleanupDecision.status
+              )}).`
+            : "Failed to remove weekly digest. Try again later.",
+        });
         return;
       }
 

@@ -235,10 +235,11 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   Use `post` to send a practice problem immediately (optionally `force` to send even if one was posted today).
   Reminders are automatically cleared if the target channel is deleted.
 
-- **/digest** `set|status|clear|preview|post`
+- **/digest** `set|status|clear|cleanup|preview|post`
 
   Configure a weekly digest for the server (admin only). Use `set` to choose a channel, day, time, optional `utc_offset`, and optional role mention.
   Digests include challenge activity, top contests by participation, and rating delta highlights.
+  Use `cleanup` to remove digests pointing at deleted channels (add `include_permissions:true` to also remove ones missing bot permissions).
   Use `post` to send a digest immediately (optionally `force` to send even if one was already posted this week).
 
 Reminder and digest channels must grant the bot View Channel + Send Messages permissions; the `set` flows will warn if the bot cannot post.

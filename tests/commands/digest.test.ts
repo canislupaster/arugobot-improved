@@ -98,6 +98,42 @@ describe("digestCommand", () => {
     );
   });
 
+  it("warns on cleanup when permissions are missing", async () => {
+    const channel = {
+      id: "channel-3",
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(false),
+      }),
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("cleanup"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getRole: jest.fn(),
+      },
+    });
+    const context = {
+      client: createClient(channel),
+      services: {
+        weeklyDigest: {
+          getSubscription: jest.fn().mockResolvedValue({ channelId: "channel-3" }),
+          clearSubscription: jest.fn().mockResolvedValue(true),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await digestCommand.execute(interaction, context);
+
+    expect(context.services.weeklyDigest.clearSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: expect.stringContaining("include_permissions:true"),
+    });
+  });
+
   it("previews the digest", async () => {
     const interaction = createInteraction({
       options: {
