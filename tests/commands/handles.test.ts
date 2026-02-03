@@ -49,6 +49,7 @@ describe("handlesCommand", () => {
     expect(payload.embeds[0].data.title).toBe("Linked handles");
     expect(payload.embeds[0].data.fields?.[0]?.value ?? "").toContain("tourist");
     expect(payload.embeds[0].data.fields?.[0]?.value ?? "").not.toContain("petr");
+    expect(payload.embeds[0].data.footer?.text ?? "").toContain("1 linked handle excluded");
     expect(payload.components).toHaveLength(1);
   });
 });

@@ -3,7 +3,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { resolveBoundedIntegerOption } from "../utils/interaction.js";
+import { requireGuild, resolveBoundedIntegerOption } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
@@ -35,10 +35,10 @@ export const handlesCommand: Command = {
       option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+    });
+    if (!guild) {
       return;
     }
     const pageResult = resolveBoundedIntegerOption(interaction, {
@@ -57,11 +57,11 @@ export const handlesCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const roster = await context.services.store.getServerRoster(interaction.guild.id);
-      const filteredRoster = await filterEntriesByGuildMembers(interaction.guild, roster, {
+      const roster = await context.services.store.getServerRoster(guild.id);
+      const filteredRoster = await filterEntriesByGuildMembers(guild, roster, {
         correlationId: context.correlationId,
         command: interaction.commandName,
-        guildId: interaction.guild.id,
+        guildId: guild.id,
         userId: interaction.user.id,
       });
       if (filteredRoster.length === 0) {
@@ -69,6 +69,7 @@ export const handlesCommand: Command = {
         return;
       }
 
+      const excludedCount = Math.max(0, roster.length - filteredRoster.length);
       const totalPages = Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE));
       if (page > totalPages) {
         await interaction.editReply("Empty page.");
@@ -92,6 +93,11 @@ export const handlesCommand: Command = {
           fieldValue: lines || "No entries.",
           color: EMBED_COLORS.info,
         });
+        if (excludedCount > 0) {
+          embed.setFooter({
+            text: `${excludedCount} linked handle${excludedCount === 1 ? "" : "s"} excluded (not in server).`,
+          });
+        }
         return { embed };
       };
 

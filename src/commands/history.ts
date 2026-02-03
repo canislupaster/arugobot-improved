@@ -4,7 +4,7 @@ import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildProblemLink } from "../utils/contestProblems.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolvePageOption } from "../utils/interaction.js";
+import { requireGuild, resolvePageOption } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
@@ -86,13 +86,13 @@ export const historyCommand: Command = {
       option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+    });
+    if (!guild) {
       return;
     }
-    const guildId = interaction.guild.id;
+    const guildId = guild.id;
     const pageResult = resolvePageOption(interaction);
     if ("error" in pageResult) {
       await interaction.reply({ content: pageResult.error });

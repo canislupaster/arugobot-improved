@@ -3,7 +3,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { resolvePageOption } from "../utils/interaction.js";
+import { requireGuild, resolvePageOption } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
@@ -32,13 +32,12 @@ export const leaderboardCommand: Command = {
       option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+    });
+    if (!guild) {
       return;
     }
-    const guild = interaction.guild;
     const pageResult = resolvePageOption(interaction);
     if ("error" in pageResult) {
       await interaction.reply({ content: pageResult.error });
@@ -124,7 +123,7 @@ export const leaderboardCommand: Command = {
 
     try {
       if (metric === "solves") {
-        const leaderboard = await context.services.store.getSolveLeaderboard(interaction.guild.id);
+        const leaderboard = await context.services.store.getSolveLeaderboard(guild.id);
         const rows = await ensureRows(
           leaderboard?.map((entry) => ({ userId: entry.userId, value: entry.solvedCount })) ?? [],
           "No solves recorded yet.",
@@ -138,7 +137,7 @@ export const leaderboardCommand: Command = {
       }
 
       if (metric === "streak" || metric === "longest_streak") {
-        const leaderboard = await context.services.store.getStreakLeaderboard(interaction.guild.id);
+        const leaderboard = await context.services.store.getStreakLeaderboard(guild.id);
         const entries =
           leaderboard?.map((entry) => ({
             userId: entry.userId,
@@ -165,7 +164,7 @@ export const leaderboardCommand: Command = {
         return;
       }
 
-      const leaderboard = await context.services.store.getLeaderboard(interaction.guild.id);
+      const leaderboard = await context.services.store.getLeaderboard(guild.id);
       const rows = await ensureRows(
         leaderboard?.map((entry) => ({ userId: entry.userId, value: entry.rating })) ?? [],
         "No leaderboard entries yet.",
