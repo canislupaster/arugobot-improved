@@ -1,6 +1,7 @@
 import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
 
 import {
+  buildChannelServiceError,
   describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
@@ -113,6 +114,21 @@ describe("formatCannotPostMessage", () => {
     ).toBe(
       "I can't post in <#channel-1> (Missing permissions (SendMessages)). Check the bot permissions and try again."
     );
+  });
+});
+
+describe("buildChannelServiceError", () => {
+  it("formats a consistent service error message", () => {
+    const error = buildChannelServiceError("Weekly digest", "channel-9", {
+      status: "missing_permissions",
+      channelId: "channel-9",
+      missingPermissions: ["SendMessages"],
+    });
+
+    expect(error).toEqual({
+      message: "Weekly digest channel channel-9: Missing permissions (SendMessages)",
+      timestamp: expect.any(String),
+    });
   });
 });
 

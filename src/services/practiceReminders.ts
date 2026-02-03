@@ -3,12 +3,12 @@ import type { Kysely } from "kysely";
 
 import type { Database, PracticeRemindersTable } from "../db/types.js";
 import {
-  describeSendableChannelStatus,
+  buildChannelServiceError,
   getSendableChannelStatusOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { buildServiceError, buildServiceErrorFromException } from "../utils/errors.js";
+import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
@@ -462,10 +462,10 @@ export class PracticeReminderService {
         );
         if (channelStatus.status !== "ok") {
           this.lastError =
-            buildServiceError(
-              `Practice reminder channel ${subscription.channelId}: ${describeSendableChannelStatus(
-                channelStatus
-              )}`
+            buildChannelServiceError(
+              "Practice reminder",
+              subscription.channelId,
+              channelStatus
             ) ?? this.lastError;
           continue;
         }

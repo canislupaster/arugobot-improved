@@ -6,13 +6,13 @@ import type { Kysely } from "kysely";
 import type { ContestRatingAlertSubscriptionsTable, Database } from "../db/types.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
-  describeSendableChannelStatus,
+  buildChannelServiceError,
   getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { buildServiceError, getErrorMessageForLog } from "../utils/errors.js";
+import { getErrorMessageForLog } from "../utils/errors.js";
 import { normalizeHandleFilter, normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
@@ -413,10 +413,10 @@ export class ContestRatingAlertService {
         );
         if (channelStatus.status !== "ok") {
           this.lastError =
-            buildServiceError(
-              `Contest rating alert channel ${subscription.channelId}: ${describeSendableChannelStatus(
-                channelStatus
-              )}`
+            buildChannelServiceError(
+              "Contest rating alert",
+              subscription.channelId,
+              channelStatus
             ) ?? this.lastError;
           continue;
         }

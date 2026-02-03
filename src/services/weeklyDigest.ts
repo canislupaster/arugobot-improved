@@ -3,12 +3,12 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import {
-  describeSendableChannelStatus,
+  buildChannelServiceError,
   getSendableChannelStatusOrWarn,
   resolveSendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { buildServiceError, getErrorMessage } from "../utils/errors.js";
+import { getErrorMessage } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
@@ -337,10 +337,10 @@ export class WeeklyDigestService {
         );
         if (channelStatus.status !== "ok") {
           this.lastError =
-            buildServiceError(
-              `Weekly digest channel ${subscription.channelId}: ${describeSendableChannelStatus(
-                channelStatus
-              )}`
+            buildChannelServiceError(
+              "Weekly digest",
+              subscription.channelId,
+              channelStatus
             ) ?? this.lastError;
           continue;
         }

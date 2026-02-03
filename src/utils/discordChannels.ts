@@ -7,6 +7,7 @@ import {
   type TextChannel,
 } from "discord.js";
 
+import { buildServiceError, type ServiceError } from "./errors.js";
 import { logWarn, type LogContext } from "./logger.js";
 
 export type SendableChannel = TextChannel | NewsChannel;
@@ -112,6 +113,14 @@ export function formatCannotPostMessage(
   return `I can't post in <#${channelId}> (${describeSendableChannelStatus(
     status
   )}). Check the bot permissions and try again.`;
+}
+
+export function buildChannelServiceError(
+  label: string,
+  channelId: string,
+  status: SendableChannelStatus
+): ServiceError | null {
+  return buildServiceError(`${label} channel ${channelId}: ${describeSendableChannelStatus(status)}`);
 }
 
 export async function resolveSendableChannel(

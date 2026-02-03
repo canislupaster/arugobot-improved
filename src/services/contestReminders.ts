@@ -11,12 +11,12 @@ import {
 } from "../utils/contestFilters.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
-  describeSendableChannelStatus,
+  buildChannelServiceError,
   getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { buildServiceError, buildServiceErrorFromException } from "../utils/errors.js";
+import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { recordReminderSendFailure } from "../utils/reminders.js";
@@ -428,10 +428,10 @@ export class ContestReminderService {
         );
         if (channelStatus.status !== "ok") {
           this.lastError =
-            buildServiceError(
-              `Contest reminder channel ${subscription.channelId}: ${describeSendableChannelStatus(
-                channelStatus
-              )}`
+            buildChannelServiceError(
+              "Contest reminder",
+              subscription.channelId,
+              channelStatus
             ) ?? this.lastError;
           continue;
         }
