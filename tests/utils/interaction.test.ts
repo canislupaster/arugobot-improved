@@ -5,6 +5,7 @@ import {
   resolveHandleTargetLabels,
   resolveHandleTargetLabelsOrReply,
   resolveHandleUserOptions,
+  resolvePageOption,
   resolveTargetLabels,
   requireGuild,
   safeInteractionDefer,
@@ -259,6 +260,39 @@ describe("resolveHandleTargetLabels", () => {
       targetId: "user-1",
       labels: { displayName: "Nickname", mention: "<@!1>" },
     });
+  });
+});
+
+describe("resolvePageOption", () => {
+  const createInteraction = (value: number | null) =>
+    ({
+      options: {
+        getInteger: jest.fn().mockReturnValue(value),
+      },
+    }) as never;
+
+  it("uses default value when option is missing", () => {
+    const interaction = createInteraction(null);
+
+    const result = resolvePageOption(interaction);
+
+    expect(result).toEqual({ value: 1 });
+  });
+
+  it("returns an error when below the minimum", () => {
+    const interaction = createInteraction(0);
+
+    const result = resolvePageOption(interaction);
+
+    expect(result).toEqual({ error: "Invalid page." });
+  });
+
+  it("respects a custom max value", () => {
+    const interaction = createInteraction(3);
+
+    const result = resolvePageOption(interaction, { max: 2 });
+
+    expect(result).toEqual({ error: "Invalid page." });
   });
 });
 

@@ -4,7 +4,7 @@ import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildProblemLink } from "../utils/contestProblems.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolveBoundedIntegerOption } from "../utils/interaction.js";
+import { resolvePageOption } from "../utils/interaction.js";
 import { buildPaginationIds, runPaginatedInteraction } from "../utils/pagination.js";
 import { formatTime } from "../utils/rating.js";
 
@@ -101,13 +101,7 @@ export const historyCommand: Command = {
       return;
     }
     const guildId = interaction.guild.id;
-    const pageResult = resolveBoundedIntegerOption(interaction, {
-      name: "page",
-      min: 1,
-      max: Number.MAX_SAFE_INTEGER,
-      defaultValue: 1,
-      errorMessage: "Invalid page.",
-    });
+    const pageResult = resolvePageOption(interaction);
     if ("error" in pageResult) {
       await interaction.reply({ content: pageResult.error });
       return;

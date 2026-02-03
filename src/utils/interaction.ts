@@ -273,3 +273,16 @@ export function resolveBoundedIntegerOption(
   }
   return { value };
 }
+
+export function resolvePageOption(
+  interaction: IntegerOptionResolver,
+  options: { defaultValue?: number; max?: number; errorMessage?: string } = {}
+): { value: number } | { error: string } {
+  return resolveBoundedIntegerOption(interaction, {
+    name: "page",
+    min: 1,
+    max: options.max ?? Number.MAX_SAFE_INTEGER,
+    defaultValue: options.defaultValue ?? 1,
+    errorMessage: options.errorMessage ?? "Invalid page.",
+  });
+}

@@ -3,7 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { resolveBoundedIntegerOption } from "../utils/interaction.js";
+import { resolvePageOption } from "../utils/interaction.js";
 import {
   buildPaginationIds,
   runPaginatedInteraction,
@@ -38,13 +38,7 @@ export const leaderboardCommand: Command = {
       return;
     }
     const guild = interaction.guild;
-    const pageResult = resolveBoundedIntegerOption(interaction, {
-      name: "page",
-      min: 1,
-      max: Number.MAX_SAFE_INTEGER,
-      defaultValue: 1,
-      errorMessage: "Invalid page.",
-    });
+    const pageResult = resolvePageOption(interaction);
     if ("error" in pageResult) {
       await interaction.reply({ content: pageResult.error });
       return;
