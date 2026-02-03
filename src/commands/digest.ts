@@ -2,6 +2,7 @@ import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } f
 
 import { getNextWeeklyScheduledUtcMs } from "../services/weeklyDigest.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { requireGuild } from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,
   formatHourMinute,
@@ -141,15 +142,15 @@ export const digestCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+      flags: MessageFlags.Ephemeral,
+    });
+    if (!guild) {
       return;
     }
 
-    const guildId = interaction.guild.id;
+    const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
 
     try {

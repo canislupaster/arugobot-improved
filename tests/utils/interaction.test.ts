@@ -1,9 +1,12 @@
+import type { ChatInputCommandInteraction } from "discord.js";
+
 import {
   resolveBoundedIntegerOption,
   resolveHandleTargetLabels,
   resolveHandleTargetLabelsOrReply,
   resolveHandleUserOptions,
   resolveTargetLabels,
+  requireGuild,
   safeInteractionDefer,
   safeInteractionEdit,
   safeInteractionReply,
@@ -120,6 +123,39 @@ describe("safe interaction helpers", () => {
     await expect(safeInteractionDefer(interaction as never)).resolves.toBe(false);
 
     expect(interaction.deferReply).toHaveBeenCalled();
+  });
+});
+
+describe("requireGuild", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      guild: { id: "guild-1" },
+      reply: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    }) as unknown as { guild: { id: string } | null; reply: jest.Mock };
+
+  it("replies and returns null when no guild", async () => {
+    const interaction = createInteraction({ guild: null });
+
+    await expect(
+      requireGuild(interaction as unknown as ChatInputCommandInteraction, {
+        content: "Server only.",
+      })
+    ).resolves.toBeNull();
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Server only." });
+  });
+
+  it("returns the guild when present", async () => {
+    const interaction = createInteraction();
+
+    await expect(
+      requireGuild(interaction as unknown as ChatInputCommandInteraction, {
+        content: "Server only.",
+      })
+    ).resolves.toEqual({ id: "guild-1" });
+
+    expect(interaction.reply).not.toHaveBeenCalled();
   });
 });
 

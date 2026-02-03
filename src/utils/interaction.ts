@@ -81,6 +81,17 @@ export async function safeInteractionDefer(
   );
 }
 
+export async function requireGuild(
+  interaction: ChatInputCommandInteraction,
+  options: InteractionReplyOptions
+): Promise<NonNullable<ChatInputCommandInteraction["guild"]> | null> {
+  if (interaction.guild) {
+    return interaction.guild;
+  }
+  await interaction.reply(options);
+  return null;
+}
+
 async function safeInteractionAction(
   action: () => Promise<unknown>,
   labels: { skipMessage: string; errorMessage: string },
