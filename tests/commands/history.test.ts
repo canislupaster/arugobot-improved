@@ -13,6 +13,7 @@ const createInteraction = (overrides: Record<string, unknown> = {}) => {
     guild: { id: "guild-1" },
     options: {
       getInteger: jest.fn().mockReturnValue(1),
+      getUser: jest.fn().mockReturnValue(null),
     },
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(response),
@@ -90,5 +91,43 @@ describe("historyCommand", () => {
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds).toBeDefined();
     expect(payload.components).toHaveLength(1);
+  });
+
+  it("uses the selected user when provided", async () => {
+    const interaction = createInteraction({
+      options: {
+        getInteger: jest.fn().mockReturnValue(1),
+        getUser: jest.fn().mockReturnValue({ id: "user-2" }),
+      },
+    });
+    const getChallengeHistoryPage = jest.fn().mockResolvedValue({
+      total: 1,
+      entries: [
+        {
+          challengeId: "challenge-1",
+          problemId: "1000A",
+          contestId: 1000,
+          index: "A",
+          name: "Test Problem",
+          rating: 1200,
+          startedAt: 1000,
+          endsAt: 2000,
+          solvedAt: 1500,
+          ratingDelta: 25,
+        },
+      ],
+    });
+    const context = {
+      correlationId: "corr-3",
+      services: {
+        store: {
+          getChallengeHistoryPage,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await historyCommand.execute(interaction, context);
+
+    expect(getChallengeHistoryPage).toHaveBeenCalledWith("guild-1", "user-2", 1, 10);
   });
 });

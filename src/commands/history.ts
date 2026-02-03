@@ -77,14 +77,27 @@ const renderLegacyHistoryLines = (
   return lines;
 };
 
+type TargetInfo = {
+  id: string;
+  title: string;
+  mention: string;
+};
+
+function getTargetInfo(viewerId: string, targetId: string): TargetInfo {
+  const isSelf = viewerId === targetId;
+  const mention = isSelf ? "you" : `<@${targetId}>`;
+  const title = `History: ${isSelf ? "You" : `<@${targetId}>`}`;
+  return { id: targetId, title, mention };
+}
 
 export const historyCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("history")
-    .setDescription("Shows your challenge history")
+    .setDescription("Shows challenge history for you or another user")
     .addIntegerOption((option) =>
       option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
-    ),
+    )
+    .addUserOption((option) => option.setName("user").setDescription("User to inspect")),
   async execute(interaction, context) {
     const guild = await requireGuild(interaction, {
       content: "This command can only be used in a server.",
@@ -99,6 +112,8 @@ export const historyCommand: Command = {
       return;
     }
     const page = pageResult.value;
+    const targetUser = interaction.options.getUser("user") ?? interaction.user;
+    const targetInfo = getTargetInfo(interaction.user.id, targetUser.id);
 
     await interaction.deferReply();
 
@@ -106,7 +121,7 @@ export const historyCommand: Command = {
       const paginationIds = buildPaginationIds("history", interaction.id);
       const initialPage = await context.services.store.getChallengeHistoryPage(
         guildId,
-        interaction.user.id,
+        targetInfo.id,
         page,
         PAGE_SIZE
       );
@@ -132,7 +147,7 @@ export const historyCommand: Command = {
           }
           const lines = renderChallengeHistoryLines(pageData.entries);
           const embed = buildPageEmbed({
-            title: "History",
+            title: targetInfo.title,
             pageNumber,
             totalPages,
             fieldName: "Challenges",
@@ -154,10 +169,10 @@ export const historyCommand: Command = {
 
       const historyData = await context.services.store.getHistoryWithRatings(
         guildId,
-        interaction.user.id
+        targetInfo.id
       );
       if (!historyData) {
-        await interaction.editReply("No history yet.");
+        await interaction.editReply(`No history yet for ${targetInfo.mention}.`);
         return;
       }
       const problemDict = context.services.problems.getProblemDict();
@@ -179,7 +194,7 @@ export const historyCommand: Command = {
 
         const lines = renderLegacyHistoryLines(historyData, problemDict, start, PAGE_SIZE);
         const embed = buildPageEmbed({
-          title: "History",
+          title: targetInfo.title,
           pageNumber,
           totalPages,
           fieldName: "Problems",

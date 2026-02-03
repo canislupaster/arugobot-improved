@@ -49,7 +49,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Shows your (or other user's) rating graph.
 
-- **/history** `[page]`
+- **/history** `[page]` `[user]`
 
   Shows a page of your completed challenge history (result + rating delta).
 
