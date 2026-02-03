@@ -78,6 +78,7 @@ export type ManualReminderResult =
   | { status: "no_subscription" }
   | { status: "already_sent"; lastSentAt: string }
   | { status: "channel_missing"; channelId: string }
+  | { status: "channel_missing_permissions"; channelId: string; missingPermissions: string[] }
   | { status: "no_problem"; candidateCount: number }
   | { status: "error"; message: string };
 

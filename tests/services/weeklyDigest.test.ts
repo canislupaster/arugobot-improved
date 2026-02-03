@@ -127,6 +127,25 @@ describe("WeeklyDigestService", () => {
     expect(send).toHaveBeenCalled();
   });
 
+  it("returns channel_missing_permissions when manual digest channel lacks permissions", async () => {
+    const result = await service.sendManualDigest("guild-1", {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue({
+          type: ChannelType.GuildText,
+          permissionsFor: jest.fn().mockReturnValue({
+            has: jest.fn().mockReturnValue(false),
+          }),
+        }),
+      },
+    } as never);
+    expect(result).toEqual({
+      status: "channel_missing_permissions",
+      channelId: "channel-1",
+      missingPermissions: ["ViewChannel", "SendMessages"],
+    });
+  });
+
   it("keeps sending when a scheduled digest fails", async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date("2024-01-08T09:05:00.000Z"));

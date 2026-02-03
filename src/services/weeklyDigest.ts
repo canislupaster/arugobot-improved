@@ -46,6 +46,7 @@ export type ManualWeeklyDigestResult =
   | { status: "no_subscription" }
   | { status: "already_sent"; lastSentAt: string }
   | { status: "channel_missing"; channelId: string }
+  | { status: "channel_missing_permissions"; channelId: string; missingPermissions: string[] }
   | { status: "error"; message: string };
 
 const DEFAULT_LOOKBACK_DAYS = 7;

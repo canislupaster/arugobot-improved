@@ -43,6 +43,35 @@ describe("resolveManualSendChannel", () => {
     expect(result).toEqual({ status: "channel_missing", channelId: "channel-2" });
   });
 
+  it("returns channel_missing_permissions when permissions are missing", async () => {
+    const channel = {
+      id: "channel-2",
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(false),
+      }),
+    };
+    const client = {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+
+    const result = await resolveManualSendChannel(client, {
+      channelId: "channel-2",
+      lastSentAt: null,
+      force: true,
+      periodStartMs: Date.now(),
+    });
+
+    expect(result).toEqual({
+      status: "channel_missing_permissions",
+      channelId: "channel-2",
+      missingPermissions: ["ViewChannel", "SendMessages"],
+    });
+  });
+
   it("returns ready with the resolved channel", async () => {
     const channel = { id: "channel-3", type: ChannelType.GuildText };
     const client = {
@@ -79,6 +108,20 @@ describe("getManualSendFailure", () => {
     });
 
     expect(result).toEqual({ status: "channel_missing", channelId: "channel-2" });
+  });
+
+  it("returns channel_missing_permissions payload", () => {
+    const result = getManualSendFailure({
+      status: "channel_missing_permissions",
+      channelId: "channel-2",
+      missingPermissions: ["SendMessages"],
+    });
+
+    expect(result).toEqual({
+      status: "channel_missing_permissions",
+      channelId: "channel-2",
+      missingPermissions: ["SendMessages"],
+    });
   });
 });
 

@@ -12,8 +12,8 @@ import {
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   describeSendableChannelStatus,
+  getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
-  resolveSendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceError, buildServiceErrorFromException } from "../utils/errors.js";
@@ -47,6 +47,7 @@ export type ContestReminder = {
 
 export type ManualContestReminderResult =
   | { status: "channel_missing"; channelId: string }
+  | { status: "channel_missing_permissions"; channelId: string; missingPermissions: string[] }
   | { status: "no_contest" }
   | { status: "already_notified"; contestId: number; contestName: string; notifiedAt: string }
   | {
@@ -233,10 +234,18 @@ export class ContestReminderService {
     client: Client,
     force = false
   ): Promise<ManualContestReminderResult> {
-    const channel = await resolveSendableChannel(client, subscription.channelId);
-    if (!channel) {
+    const channelStatus = await getSendableChannelStatus(client, subscription.channelId);
+    if (channelStatus.status === "missing") {
       return { status: "channel_missing", channelId: subscription.channelId };
     }
+    if (channelStatus.status === "missing_permissions") {
+      return {
+        status: "channel_missing_permissions",
+        channelId: subscription.channelId,
+        missingPermissions: channelStatus.missingPermissions,
+      };
+    }
+    const channel = channelStatus.channel;
 
     let isStale = false;
     try {

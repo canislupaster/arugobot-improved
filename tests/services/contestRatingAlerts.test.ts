@@ -236,4 +236,93 @@ describe("ContestRatingAlertService", () => {
     expect(result).toEqual({ status: "channel_missing", channelId: "missing-channel" });
     expect(contestService.refresh).not.toHaveBeenCalled();
   });
+
+  it("returns channel_missing_permissions when the manual alert channel lacks permissions", async () => {
+    const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
+    const subscription = await service.createSubscription("guild-1", "channel-1", null);
+    const client = {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue({
+          type: ChannelType.GuildText,
+          permissionsFor: jest.fn().mockReturnValue({
+            has: jest.fn().mockReturnValue(false),
+          }),
+        }),
+      },
+    } as unknown as Client;
+
+    const result = await service.sendManualAlert(subscription, client, false);
+
+    expect(result).toEqual({
+      status: "channel_missing_permissions",
+      channelId: "channel-1",
+      missingPermissions: ["ViewChannel", "SendMessages"],
+    });
+    expect(contestService.refresh).not.toHaveBeenCalled();
+  });
+
+  it("returns error when manual sending fails", async () => {
+    contestService.getFinished.mockReturnValue([
+      {
+        id: 501,
+        name: "CF Round",
+        phase: "FINISHED",
+        startTimeSeconds: 1_700_000_000,
+        durationSeconds: 7200,
+      },
+    ]);
+    ratingChanges.getContestRatingChanges.mockResolvedValue({
+      changes: [
+        {
+          handle: "tourist",
+          contestId: 501,
+          contestName: "CF Round",
+          rank: 10,
+          oldRating: 2000,
+          newRating: 2100,
+          ratingUpdateTimeSeconds: 1_700_000_100,
+        },
+      ],
+      source: "api",
+      isStale: false,
+    });
+    store.getLinkedUsers.mockResolvedValue([{ userId: "user-1", handle: "tourist" }]);
+
+    const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
+    const subscription = await service.createSubscription("guild-1", "channel-1", null);
+    const send = jest.fn().mockRejectedValue(new Error("boom"));
+    const client = createMockClient(send);
+
+    const result = await service.sendManualAlert(subscription, client, false);
+
+    expect(result).toEqual({ status: "error", message: "boom" });
+    expect(service.getLastError()?.message).toBe("boom");
+    const notifications = await db
+      .selectFrom("contest_rating_alert_notifications")
+      .selectAll()
+      .execute();
+    expect(notifications).toHaveLength(0);
+  });
+
+  it("lists subscriptions with normalized handle filters", async () => {
+    const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
+    await service.createSubscription("guild-1", "channel-1", null, {
+      minDelta: 50,
+      includeHandles: ["Tourist", "tourist", "Petr"],
+    });
+    await service.createSubscription("guild-2", "channel-2", null);
+
+    const subscriptions = await service.listSubscriptions("guild-1");
+
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]).toEqual(
+      expect.objectContaining({
+        guildId: "guild-1",
+        channelId: "channel-1",
+        minDelta: 50,
+        includeHandles: ["tourist", "petr"],
+      })
+    );
+  });
 });

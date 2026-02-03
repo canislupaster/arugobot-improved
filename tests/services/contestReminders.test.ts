@@ -474,6 +474,41 @@ describe("ContestReminderService", () => {
     expect(contestService.refresh).not.toHaveBeenCalled();
   });
 
+  it("returns channel_missing_permissions when the manual reminder channel lacks permissions", async () => {
+    contestService.getUpcomingContests.mockReturnValue([]);
+
+    const service = new ContestReminderService(db, contestService);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      30,
+      null,
+      [],
+      [],
+      "official"
+    );
+    const client = {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue({
+          type: ChannelType.GuildText,
+          permissionsFor: jest.fn().mockReturnValue({
+            has: jest.fn().mockReturnValue(false),
+          }),
+        }),
+      },
+    } as unknown as Client;
+
+    const result = await service.sendManualReminder(subscription, client, false);
+
+    expect(result).toEqual({
+      status: "channel_missing_permissions",
+      channelId: "channel-1",
+      missingPermissions: ["ViewChannel", "SendMessages"],
+    });
+    expect(contestService.refresh).not.toHaveBeenCalled();
+  });
+
   it("reports already-notified contests when posting manually", async () => {
     const nowSeconds = 1_700_000_000;
     jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);

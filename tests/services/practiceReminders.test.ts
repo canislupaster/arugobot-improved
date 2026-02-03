@@ -395,6 +395,54 @@ describe("PracticeReminderService", () => {
     expect(result).toEqual({ status: "channel_missing", channelId: "missing-channel" });
   });
 
+  it("returns channel_missing_permissions when manual reminder channel lacks permissions", async () => {
+    const nowMs = Date.UTC(2024, 0, 1, 10, 0, 0);
+    jest.useFakeTimers().setSystemTime(new Date(nowMs));
+
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue([]),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      ALL_DAYS,
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
+
+    const client = {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue({
+          type: ChannelType.GuildText,
+          permissionsFor: jest.fn().mockReturnValue({
+            has: jest.fn().mockReturnValue(false),
+          }),
+        }),
+      },
+    } as unknown as Client;
+
+    const result = await service.sendManualReminder("guild-1", client, false);
+    expect(result).toEqual({
+      status: "channel_missing_permissions",
+      channelId: "channel-1",
+      missingPermissions: ["ViewChannel", "SendMessages"],
+    });
+  });
+
   it("builds a preview when configured", async () => {
     const nowMs = Date.UTC(2024, 0, 1, 8, 0, 0);
     jest.useFakeTimers().setSystemTime(new Date(nowMs));

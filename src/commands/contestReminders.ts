@@ -743,6 +743,17 @@ export const contestRemindersCommand: Command = {
           force
         );
 
+        if (result.status === "channel_missing_permissions") {
+          await interaction.editReply(
+            `I can't post in <#${result.channelId}> (${describeSendableChannelStatus({
+              status: "missing_permissions",
+              channelId: result.channelId,
+              missingPermissions: result.missingPermissions,
+            })}). Check the bot permissions and try again.`
+          );
+          return;
+        }
+
         if (result.status === "channel_missing") {
           await interaction.editReply(
             "Configured channel is missing or invalid. Use /contestreminders list + remove, then add a new subscription."

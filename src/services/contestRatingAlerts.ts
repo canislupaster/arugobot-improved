@@ -7,8 +7,8 @@ import type { ContestRatingAlertSubscriptionsTable, Database } from "../db/types
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   describeSendableChannelStatus,
+  getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
-  resolveSendableChannel,
   type SendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -57,6 +57,7 @@ export type ContestRatingAlertPreview = {
 
 export type ManualContestRatingAlertResult =
   | { status: "channel_missing"; channelId: string }
+  | { status: "channel_missing_permissions"; channelId: string; missingPermissions: string[] }
   | { status: "no_handles" }
   | { status: "no_matching_handles" }
   | { status: "no_contest" }
@@ -294,10 +295,18 @@ export class ContestRatingAlertService {
     client: Client,
     force = false
   ): Promise<ManualContestRatingAlertResult> {
-    const channel = await resolveSendableChannel(client, subscription.channelId);
-    if (!channel) {
+    const channelStatus = await getSendableChannelStatus(client, subscription.channelId);
+    if (channelStatus.status === "missing") {
       return { status: "channel_missing", channelId: subscription.channelId };
     }
+    if (channelStatus.status === "missing_permissions") {
+      return {
+        status: "channel_missing_permissions",
+        channelId: subscription.channelId,
+        missingPermissions: channelStatus.missingPermissions,
+      };
+    }
+    const channel = channelStatus.channel;
 
     const { contests, isStale, error } = await this.loadContestContext();
     if (error) {

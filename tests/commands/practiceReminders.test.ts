@@ -441,4 +441,36 @@ describe("practiceRemindersCommand", () => {
       "Posted a practice problem in <#channel-1>."
     );
   });
+
+  it("reports missing permissions when posting a practice reminder", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("post"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getRole: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-6",
+      client: { user: { id: "bot-1" } },
+      services: {
+        practiceReminders: {
+          sendManualReminder: jest.fn().mockResolvedValue({
+            status: "channel_missing_permissions",
+            channelId: "channel-2",
+            missingPermissions: ["ViewChannel", "SendMessages"],
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "I can't post in <#channel-2> (Missing permissions (ViewChannel, SendMessages)). Check the bot permissions and try again."
+    );
+  });
 });
