@@ -16,6 +16,7 @@ import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { resolveManualChannel } from "../utils/reminders.js";
+import { createServiceTickState, runServiceTick } from "../utils/serviceTicks.js";
 import {
   cleanupNotifications,
   clearSubscriptionsWithNotifications,
@@ -24,7 +25,6 @@ import {
   markNotification,
   removeSubscriptionWithNotifications,
 } from "../utils/subscriptionCleanup.js";
-import { createServiceTickState, runServiceTick } from "../utils/serviceTicks.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { ContestRatingChangesService } from "./contestRatingChanges.js";
