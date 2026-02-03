@@ -171,12 +171,22 @@ export const contestActivityCommand: Command = {
 
     try {
       const roster = await context.services.store.getServerRoster(interaction.guild.id);
+      if (roster.length === 0) {
+        await interaction.editReply(
+          "No linked handles yet. Use /register to link a Codeforces handle."
+        );
+        return;
+      }
       const filteredRoster = await filterEntriesByGuildMembers(interaction.guild, roster, {
         correlationId: context.correlationId,
         command: interaction.commandName,
         guildId: interaction.guild.id,
         userId: interaction.user.id,
       });
+      if (filteredRoster.length === 0) {
+        await interaction.editReply("No linked handles found for current server members.");
+        return;
+      }
       const activity = await context.services.contestActivity.getContestActivityForRoster(
         filteredRoster,
         { lookbackDays: days, participantLimit: limit }

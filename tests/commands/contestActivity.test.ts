@@ -188,7 +188,7 @@ describe("contestActivityCommand", () => {
     const context = {
       services: {
         store: {
-          getServerRoster: jest.fn().mockResolvedValue([]),
+          getServerRoster: jest.fn().mockResolvedValue([{ userId: "user-1", handle: "Alice" }]),
         },
         contestActivity: {
           getContestActivityForRoster: jest.fn().mockResolvedValue({
@@ -210,5 +210,57 @@ describe("contestActivityCommand", () => {
     await contestActivityCommand.execute(interaction, context);
 
     expect((interaction.editReply as jest.Mock).mock.calls[0][0]).toContain("No contest activity");
+  });
+
+  it("reports when no linked handles exist", async () => {
+    const interaction = createInteraction();
+    const context = {
+      services: {
+        store: {
+          getServerRoster: jest.fn().mockResolvedValue([]),
+        },
+        contestActivity: {
+          getContestActivityForRoster: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestActivityCommand.execute(interaction, context);
+
+    expect((interaction.editReply as jest.Mock).mock.calls[0][0]).toContain(
+      "No linked handles yet."
+    );
+    expect(context.services.contestActivity.getContestActivityForRoster).not.toHaveBeenCalled();
+  });
+
+  it("reports when no current members have linked handles", async () => {
+    const interaction = createInteraction({
+      guild: {
+        id: "guild-1",
+        members: {
+          fetch: jest.fn().mockResolvedValue(new Map()),
+          cache: new Map(),
+        },
+      },
+    });
+    const context = {
+      services: {
+        store: {
+          getServerRoster: jest
+            .fn()
+            .mockResolvedValue([{ userId: "user-1", handle: "Alice" }]),
+        },
+        contestActivity: {
+          getContestActivityForRoster: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestActivityCommand.execute(interaction, context);
+
+    expect((interaction.editReply as jest.Mock).mock.calls[0][0]).toContain(
+      "No linked handles found for current server members."
+    );
+    expect(context.services.contestActivity.getContestActivityForRoster).not.toHaveBeenCalled();
   });
 });
