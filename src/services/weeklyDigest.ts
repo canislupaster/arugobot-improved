@@ -7,8 +7,8 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getErrorMessage } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
-import { resolveManualSendChannel } from "../utils/reminders.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
+import { resolveManualSendChannel } from "../utils/reminders.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
