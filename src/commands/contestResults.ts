@@ -118,6 +118,12 @@ export const contestResultsCommand: Command = {
         case "missing_latest":
           await interaction.editReply("No finished contests found yet.");
           return;
+        case "missing_upcoming":
+          await interaction.editReply("No upcoming contests found yet.");
+          return;
+        case "missing_ongoing":
+          await interaction.editReply("No ongoing contests found right now.");
+          return;
         case "missing_id":
           await interaction.editReply("No contest found with that ID.");
           return;

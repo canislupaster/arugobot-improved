@@ -168,7 +168,8 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
 - **/contest** `query` `[scope]`
 
-  Shows details for a contest by id, URL, name, or `latest` (most recent finished contest).
+  Shows details for a contest by id, URL, name, `latest` (most recent finished contest),
+  `next`/`upcoming` (soonest upcoming contest), or `ongoing` (current contest if any).
   Use `scope` to search `official`, `gym`, or `all` contests.
 
 - **/contestresults** `query` `[limit]` `[user1..user4]` `[handles]` `[scope]`

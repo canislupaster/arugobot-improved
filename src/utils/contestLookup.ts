@@ -12,6 +12,8 @@ import {
 } from "./time.js";
 
 const LATEST_CONTEST_QUERIES = new Set(["latest", "last", "recent"]);
+const UPCOMING_CONTEST_QUERIES = new Set(["next", "upcoming", "soon"]);
+const ONGOING_CONTEST_QUERIES = new Set(["ongoing", "live", "current", "now"]);
 
 type ContestMatchEmbedOptions = {
   query: string;
@@ -23,12 +25,26 @@ type ContestMatchEmbedOptions = {
 export type ContestLookupResult =
   | { status: "ok"; contest: Contest }
   | { status: "ambiguous"; matches: Contest[] }
-  | { status: "missing_latest" | "missing_id" | "missing_name" };
+  | {
+      status:
+        | "missing_latest"
+        | "missing_upcoming"
+        | "missing_ongoing"
+        | "missing_id"
+        | "missing_name";
+    };
 
 export type ContestLookupService = {
   getLatestFinished: (scopeFilter: ContestScopeFilter) => Contest | null;
+  getUpcoming: (limit: number, scopeFilter: ContestScopeFilter) => Contest[];
+  getOngoing: (scopeFilter: ContestScopeFilter) => Contest[];
   getContestById: (contestId: number, scopeFilter: ContestScopeFilter) => Contest | null;
   searchContests: (query: string, limit: number, scopeFilter: ContestScopeFilter) => Contest[];
+};
+
+export type ContestLookupOptions = {
+  allowUpcoming?: boolean;
+  allowOngoing?: boolean;
 };
 
 export type ContestLookupReplyResult =
@@ -60,12 +76,37 @@ export function isLatestQuery(raw: string): boolean {
   return LATEST_CONTEST_QUERIES.has(raw.trim().toLowerCase());
 }
 
+export function isUpcomingQuery(raw: string): boolean {
+  return UPCOMING_CONTEST_QUERIES.has(raw.trim().toLowerCase());
+}
+
+export function isOngoingQuery(raw: string): boolean {
+  return ONGOING_CONTEST_QUERIES.has(raw.trim().toLowerCase());
+}
+
 export function resolveContestLookup(
   queryRaw: string,
   scope: ContestScopeFilter,
   contests: ContestLookupService,
-  maxMatches = 5
+  maxMatches = 5,
+  options: ContestLookupOptions = {}
 ): ContestLookupResult {
+  const wantsUpcoming = options.allowUpcoming && isUpcomingQuery(queryRaw);
+  const wantsOngoing = options.allowOngoing && isOngoingQuery(queryRaw);
+  if (wantsUpcoming) {
+    const contest = contests.getUpcoming(1, scope)[0] ?? null;
+    if (!contest) {
+      return { status: "missing_upcoming" };
+    }
+    return { status: "ok", contest };
+  }
+  if (wantsOngoing) {
+    const contest = contests.getOngoing(scope)[0] ?? null;
+    if (!contest) {
+      return { status: "missing_ongoing" };
+    }
+    return { status: "ok", contest };
+  }
   const wantsLatest = isLatestQuery(queryRaw);
   const contestId = parseContestId(queryRaw);
   if (wantsLatest) {
@@ -96,7 +137,11 @@ type ContestLookupReplyOptions = {
   maxMatches?: number;
   footerText: string;
   refreshWasStale: boolean;
+  allowUpcoming?: boolean;
+  allowOngoing?: boolean;
   missingLatestMessage?: string;
+  missingUpcomingMessage?: string;
+  missingOngoingMessage?: string;
   missingIdMessage?: string;
   missingNameMessage?: string;
 };
@@ -108,7 +153,10 @@ export async function resolveContestOrReply(
   contests: ContestLookupService,
   options: ContestLookupReplyOptions
 ): Promise<ContestLookupReplyResult> {
-  const lookup = resolveContestLookup(queryRaw, scope, contests, options.maxMatches ?? 5);
+  const lookup = resolveContestLookup(queryRaw, scope, contests, options.maxMatches ?? 5, {
+    allowUpcoming: options.allowUpcoming,
+    allowOngoing: options.allowOngoing,
+  });
   if (lookup.status === "ok") {
     return { status: "ok", contest: lookup.contest };
   }
@@ -127,11 +175,17 @@ export async function resolveContestOrReply(
   }
 
   const missingLatestMessage = options.missingLatestMessage ?? "No finished contests found yet.";
+  const missingUpcomingMessage = options.missingUpcomingMessage ?? "No upcoming contests found.";
+  const missingOngoingMessage = options.missingOngoingMessage ?? "No ongoing contests found.";
   const missingIdMessage = options.missingIdMessage ?? "No contest found with that ID.";
   const missingNameMessage = options.missingNameMessage ?? "No contests found matching that name.";
   const errorMessage =
     lookup.status === "missing_latest"
       ? missingLatestMessage
+      : lookup.status === "missing_upcoming"
+        ? missingUpcomingMessage
+        : lookup.status === "missing_ongoing"
+          ? missingOngoingMessage
       : lookup.status === "missing_id"
         ? missingIdMessage
         : missingNameMessage;

@@ -5,6 +5,8 @@ import {
   formatContestPhase,
   formatContestTag,
   isLatestQuery,
+  isOngoingQuery,
+  isUpcomingQuery,
   parseContestId,
   resolveContestLookup,
 } from "../../src/utils/contestLookup.js";
@@ -23,6 +25,17 @@ describe("contestLookup helpers", () => {
     expect(isLatestQuery("LAST")).toBe(true);
     expect(isLatestQuery("recent")).toBe(true);
     expect(isLatestQuery("older")).toBe(false);
+  });
+
+  it("detects upcoming and ongoing contest queries", () => {
+    expect(isUpcomingQuery("next")).toBe(true);
+    expect(isUpcomingQuery("Upcoming")).toBe(true);
+    expect(isUpcomingQuery("soon")).toBe(true);
+    expect(isUpcomingQuery("later")).toBe(false);
+    expect(isOngoingQuery("ongoing")).toBe(true);
+    expect(isOngoingQuery("LIVE")).toBe(true);
+    expect(isOngoingQuery("current")).toBe(true);
+    expect(isOngoingQuery("done")).toBe(false);
   });
 
   it("formats contest phases and tags", () => {
@@ -91,6 +104,8 @@ describe("contestLookup helpers", () => {
     ];
     const contestService = {
       getLatestFinished: (_scope: ContestScopeFilter) => contests[1] ?? null,
+      getUpcoming: (_limit: number, _scope: ContestScopeFilter) => [],
+      getOngoing: (_scope: ContestScopeFilter) => [],
       getContestById: (contestId: number, _scope: ContestScopeFilter) =>
         contests.find((contest) => contest.id === contestId) ?? null,
       searchContests: (query: string, _limit: number, _scope: ContestScopeFilter) =>
@@ -116,6 +131,48 @@ describe("contestLookup helpers", () => {
     expect(ambiguousLookup.status).toBe("ambiguous");
     if (ambiguousLookup.status === "ambiguous") {
       expect(ambiguousLookup.matches).toHaveLength(2);
+    }
+  });
+
+  it("resolves upcoming and ongoing contest queries when enabled", () => {
+    const upcomingContest: Contest = {
+      id: 303,
+      name: "Upcoming Contest",
+      phase: "BEFORE",
+      startTimeSeconds: 1_800_000_000,
+      durationSeconds: 7200,
+      isGym: false,
+    };
+    const ongoingContest: Contest = {
+      id: 404,
+      name: "Ongoing Contest",
+      phase: "CODING",
+      startTimeSeconds: 1_700_500_000,
+      durationSeconds: 7200,
+      isGym: false,
+    };
+    const contestService = {
+      getLatestFinished: (_scope: ContestScopeFilter) => null,
+      getUpcoming: (_limit: number, _scope: ContestScopeFilter) => [upcomingContest],
+      getOngoing: (_scope: ContestScopeFilter) => [ongoingContest],
+      getContestById: (_contestId: number, _scope: ContestScopeFilter) => null,
+      searchContests: (_query: string, _limit: number, _scope: ContestScopeFilter) => [],
+    };
+
+    const upcomingLookup = resolveContestLookup("next", "official", contestService, 5, {
+      allowUpcoming: true,
+    });
+    expect(upcomingLookup.status).toBe("ok");
+    if (upcomingLookup.status === "ok") {
+      expect(upcomingLookup.contest.id).toBe(303);
+    }
+
+    const ongoingLookup = resolveContestLookup("ongoing", "official", contestService, 5, {
+      allowOngoing: true,
+    });
+    expect(ongoingLookup.status).toBe("ok");
+    if (ongoingLookup.status === "ok") {
+      expect(ongoingLookup.contest.id).toBe(404);
     }
   });
 });

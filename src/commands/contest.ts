@@ -22,7 +22,10 @@ export const contestCommand: Command = {
     .setName("contest")
     .setDescription("Shows details for a Codeforces contest")
     .addStringOption((option) =>
-      option.setName("query").setDescription("Contest id, URL, or name").setRequired(true)
+      option
+        .setName("query")
+        .setDescription("Contest id, URL, name, or latest/next/ongoing")
+        .setRequired(true)
     )
     .addStringOption((option) => addContestScopeOption(option)),
   async execute(interaction, context) {
@@ -47,6 +50,10 @@ export const contestCommand: Command = {
           maxMatches: MAX_MATCHES,
           footerText: MATCH_FOOTER,
           refreshWasStale: stale,
+          allowUpcoming: true,
+          allowOngoing: true,
+          missingUpcomingMessage: "No upcoming contests found yet.",
+          missingOngoingMessage: "No ongoing contests found right now.",
         }
       );
       if (lookup.status === "replied") {

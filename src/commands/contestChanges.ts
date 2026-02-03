@@ -148,15 +148,21 @@ export const contestChangesCommand: Command = {
         MAX_MATCHES
       );
       if (lookup.status !== "ok") {
-        switch (lookup.status) {
-          case "missing_latest":
-            await interaction.editReply("No finished contests found yet.");
-            return;
-          case "missing_id":
-            await interaction.editReply("No contest found with that ID.");
-            return;
-          case "missing_name":
-            await interaction.editReply("No contests found matching that name.");
+      switch (lookup.status) {
+        case "missing_latest":
+          await interaction.editReply("No finished contests found yet.");
+          return;
+        case "missing_upcoming":
+          await interaction.editReply("No upcoming contests found yet.");
+          return;
+        case "missing_ongoing":
+          await interaction.editReply("No ongoing contests found right now.");
+          return;
+        case "missing_id":
+          await interaction.editReply("No contest found with that ID.");
+          return;
+        case "missing_name":
+          await interaction.editReply("No contests found matching that name.");
             return;
           case "ambiguous": {
             const embed = buildContestMatchEmbed({
