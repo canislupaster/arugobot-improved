@@ -146,6 +146,8 @@ describe("TournamentRecapService", () => {
 
     expect(result.status).toBe("channel_missing");
     expect(send).not.toHaveBeenCalled();
+    const subscription = await service.getSubscription("guild-1");
+    expect(subscription).toBeNull();
   });
 
   it("returns channel_missing_permissions when the bot cannot post in the channel", async () => {

@@ -7,6 +7,7 @@ import type { ContestRatingAlertSubscriptionsTable, Database } from "../db/types
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   buildChannelServiceError,
+  cleanupMissingChannelStatus,
   getSendableChannelStatusOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
@@ -411,6 +412,24 @@ export class ContestRatingAlertService {
             subscriptionId: subscription.id,
           }
         );
+        await cleanupMissingChannelStatus({
+          status: channelStatus,
+          remove: () => this.removeSubscription(subscription.guildId, subscription.id),
+          logRemoved: () => {
+            logInfo("Contest rating alert subscription removed (channel missing).", {
+              guildId: subscription.guildId,
+              subscriptionId: subscription.id,
+              channelId: subscription.channelId,
+            });
+          },
+          logFailed: () => {
+            logWarn("Contest rating alert subscription cleanup failed.", {
+              guildId: subscription.guildId,
+              subscriptionId: subscription.id,
+              channelId: subscription.channelId,
+            });
+          },
+        });
         if (channelStatus.status !== "ok") {
           this.lastError =
             buildChannelServiceError(

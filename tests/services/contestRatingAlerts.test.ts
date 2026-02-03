@@ -262,6 +262,43 @@ describe("ContestRatingAlertService", () => {
     expect(contestService.refresh).not.toHaveBeenCalled();
   });
 
+  it("removes subscriptions when the alert channel is missing during ticks", async () => {
+    contestService.getFinished.mockReturnValue([
+      {
+        id: 701,
+        name: "CF Round",
+        phase: "FINISHED",
+        startTimeSeconds: 1_700_000_000,
+        durationSeconds: 7200,
+      },
+    ]);
+    ratingChanges.getContestRatingChanges.mockResolvedValue({
+      changes: [
+        {
+          handle: "tourist",
+          contestId: 701,
+          contestName: "CF Round",
+          rank: 10,
+          oldRating: 2000,
+          newRating: 2100,
+          ratingUpdateTimeSeconds: 1_700_000_100,
+        },
+      ],
+      source: "api",
+      isStale: false,
+    });
+    store.getLinkedUsers.mockResolvedValue([{ userId: "user-1", handle: "tourist" }]);
+
+    const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
+    await service.createSubscription("guild-1", "missing-channel", null);
+    const client = createMissingChannelClient();
+
+    await service.runTick(client);
+
+    const subscriptions = await service.listSubscriptions();
+    expect(subscriptions).toHaveLength(0);
+  });
+
   it("returns channel_missing_permissions when the manual alert channel lacks permissions", async () => {
     const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
     const subscription = await service.createSubscription("guild-1", "channel-1", null);

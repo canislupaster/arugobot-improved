@@ -4,6 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import {
   buildChannelServiceError,
+  cleanupMissingChannelStatus,
   getSendableChannelStatusOrWarn,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -215,6 +216,24 @@ export class TournamentRecapService {
         tournamentId,
       }
     );
+    await cleanupMissingChannelStatus({
+      status: channelStatus,
+      remove: () => this.clearSubscription(subscription.guildId),
+      logRemoved: () => {
+        logInfo("Tournament recap subscription removed (channel missing).", {
+          guildId: subscription.guildId,
+          channelId: subscription.channelId,
+          tournamentId,
+        });
+      },
+      logFailed: () => {
+        logWarn("Tournament recap subscription cleanup failed.", {
+          guildId: subscription.guildId,
+          channelId: subscription.channelId,
+          tournamentId,
+        });
+      },
+    });
     if (channelStatus.status !== "ok") {
       this.lastError =
         buildChannelServiceError(
