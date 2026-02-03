@@ -234,7 +234,10 @@ describe("resolveHandleTargetLabelsOrReply", () => {
         getUser: jest.fn().mockReturnValue(null),
         getMember: jest.fn().mockReturnValue(null),
       },
+      deferred: false,
+      replied: false,
       reply: jest.fn().mockResolvedValue(undefined),
+      followUp: jest.fn().mockResolvedValue(undefined),
       user: { id: "user-1", username: "Aru", toString: () => "<@1>" },
       guild: { id: "guild-1" },
       ...overrides,
@@ -256,6 +259,29 @@ describe("resolveHandleTargetLabelsOrReply", () => {
     expect(reply).toHaveBeenCalledWith({
       content: "Provide either a handle or a user, not both.",
     });
+    expect(result).toEqual({ status: "replied" });
+  });
+
+  it("follows up when the interaction was already deferred", async () => {
+    const followUp = jest.fn().mockResolvedValue(undefined);
+    const reply = jest.fn().mockResolvedValue(undefined);
+    const interaction = createInteraction({
+      deferred: true,
+      followUp,
+      reply,
+      options: {
+        getString: jest.fn().mockReturnValue("tourist"),
+        getUser: jest.fn().mockReturnValue({ id: "user-2" }),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+
+    const result = await resolveHandleTargetLabelsOrReply(interaction);
+
+    expect(followUp).toHaveBeenCalledWith({
+      content: "Provide either a handle or a user, not both.",
+    });
+    expect(reply).not.toHaveBeenCalled();
     expect(result).toEqual({ status: "replied" });
   });
 

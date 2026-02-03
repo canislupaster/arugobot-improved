@@ -234,7 +234,7 @@ export async function resolveHandleTargetLabelsOrReply(
 ): Promise<HandleTargetLabelsReplyResult> {
   const result = resolveHandleTargetLabels(interaction, options);
   if (result.status === "error") {
-    await interaction.reply({ content: result.error });
+    await safeInteractionReply(interaction, { content: result.error });
     return { status: "replied" };
   }
   return result;
