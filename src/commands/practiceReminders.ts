@@ -1,13 +1,13 @@
 import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
+import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addRatingRangeOptions, addScheduleOptions, addTagOptions } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
   getSendableChannelStatus,
-  resolveChannelCleanupDecision,
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -314,7 +314,7 @@ export const practiceRemindersCommand: Command = {
         }
 
         const includePermissions = interaction.options.getBoolean("include_permissions") ?? false;
-        const cleanupDecision = await resolveChannelCleanupDecision({
+        const replyMessage = await cleanupSingleChannelSubscription({
           client: context.client,
           channelId: subscription.channelId,
           includePermissions,
@@ -323,20 +323,14 @@ export const practiceRemindersCommand: Command = {
             `Practice reminders still point at <#${subscription.channelId}> (${describeSendableChannelStatus(
               status
             )}). Re-run with include_permissions:true or update the channel with /practicereminders set.`,
+          remove: () => context.services.practiceReminders.clearSubscription(guildId),
+          removedMessage: (status) =>
+            `Removed practice reminders for <#${subscription.channelId}> (${describeSendableChannelStatus(
+              status
+            )}).`,
+          failedMessage: "Failed to remove practice reminders. Try again later.",
         });
-        if (cleanupDecision.replyMessage) {
-          await interaction.reply({ content: cleanupDecision.replyMessage });
-          return;
-        }
-
-        const removed = await context.services.practiceReminders.clearSubscription(guildId);
-        await interaction.reply({
-          content: removed
-            ? `Removed practice reminders for <#${subscription.channelId}> (${describeSendableChannelStatus(
-                cleanupDecision.status
-              )}).`
-            : "Failed to remove practice reminders. Try again later.",
-        });
+        await interaction.reply({ content: replyMessage });
         return;
       }
 

@@ -5,12 +5,12 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 
+import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
-  resolveChannelCleanupDecision,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 
@@ -122,7 +122,7 @@ export const tournamentRecapsCommand: Command = {
           }
           const includePermissions =
             interaction.options.getBoolean("include_permissions") ?? false;
-          const cleanupDecision = await resolveChannelCleanupDecision({
+          const replyMessage = await cleanupSingleChannelSubscription({
             client: context.client,
             channelId: subscription.channelId,
             includePermissions,
@@ -131,19 +131,14 @@ export const tournamentRecapsCommand: Command = {
               `Tournament recaps still point at <#${subscription.channelId}> (${describeSendableChannelStatus(
                 status
               )}). Re-run with include_permissions:true or update the channel with /tournamentrecaps set.`,
+            remove: () => context.services.tournamentRecaps.clearSubscription(guildId),
+            removedMessage: (status) =>
+              `Removed tournament recap settings for <#${subscription.channelId}> (${describeSendableChannelStatus(
+                status
+              )}).`,
+            failedMessage: "Failed to remove tournament recap settings. Try again later.",
           });
-          if (cleanupDecision.replyMessage) {
-            await replyWithContent(cleanupDecision.replyMessage);
-            return;
-          }
-          const removed = await context.services.tournamentRecaps.clearSubscription(guildId);
-          await replyWithContent(
-            removed
-              ? `Removed tournament recap settings for <#${subscription.channelId}> (${describeSendableChannelStatus(
-                  cleanupDecision.status
-                )}).`
-              : "Failed to remove tournament recap settings. Try again later."
-          );
+          await replyWithContent(replyMessage);
           return;
         }
         case "set": {

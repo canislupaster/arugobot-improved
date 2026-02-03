@@ -1,13 +1,13 @@
 import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextWeeklyScheduledUtcMs } from "../services/weeklyDigest.js";
+import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addScheduleOptions } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
-  resolveChannelCleanupDecision,
 } from "../utils/discordChannels.js";
 import { requireGuild } from "../utils/interaction.js";
 import {
@@ -191,7 +191,7 @@ export const digestCommand: Command = {
         }
 
         const includePermissions = interaction.options.getBoolean("include_permissions") ?? false;
-        const cleanupDecision = await resolveChannelCleanupDecision({
+        const replyMessage = await cleanupSingleChannelSubscription({
           client: context.client,
           channelId: subscription.channelId,
           includePermissions,
@@ -200,20 +200,14 @@ export const digestCommand: Command = {
             `Weekly digest still points at <#${subscription.channelId}> (${describeSendableChannelStatus(
               status
             )}). Re-run with include_permissions:true or update the channel with /digest set.`,
+          remove: () => context.services.weeklyDigest.clearSubscription(guildId),
+          removedMessage: (status) =>
+            `Removed weekly digest for <#${subscription.channelId}> (${describeSendableChannelStatus(
+              status
+            )}).`,
+          failedMessage: "Failed to remove weekly digest. Try again later.",
         });
-        if (cleanupDecision.replyMessage) {
-          await interaction.reply({ content: cleanupDecision.replyMessage });
-          return;
-        }
-
-        const removed = await context.services.weeklyDigest.clearSubscription(guildId);
-        await interaction.reply({
-          content: removed
-            ? `Removed weekly digest for <#${subscription.channelId}> (${describeSendableChannelStatus(
-                cleanupDecision.status
-              )}).`
-            : "Failed to remove weekly digest. Try again later.",
-        });
+        await interaction.reply({ content: replyMessage });
         return;
       }
 

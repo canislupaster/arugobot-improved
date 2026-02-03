@@ -2,6 +2,7 @@ import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
 
 import {
   cleanupChannelSubscriptions,
+  cleanupSingleChannelSubscription,
   formatPermissionIssueSummary,
 } from "../../src/utils/channelCleanup.js";
 
@@ -100,5 +101,75 @@ describe("formatPermissionIssueSummary", () => {
     expect(summary).toBe(
       "Subscriptions with missing permissions (not removed): `sub-1` (<#channel-1>): Missing permissions (SendMessages)."
     );
+  });
+});
+
+describe("cleanupSingleChannelSubscription", () => {
+  it("returns healthy message without removing", async () => {
+    const okChannel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({ has: () => true }),
+    };
+    const client = createClient({ "channel-ok": okChannel });
+    const remove = jest.fn().mockResolvedValue(true);
+
+    const message = await cleanupSingleChannelSubscription({
+      client,
+      channelId: "channel-ok",
+      includePermissions: false,
+      healthyMessage: "Healthy channel.",
+      missingPermissionsMessage: () => "Missing perms.",
+      remove,
+      removedMessage: () => "Removed.",
+      failedMessage: "Failed.",
+    });
+
+    expect(message).toBe("Healthy channel.");
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("returns missing permission guidance without removing", async () => {
+    const missingPermChannel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: (flag: bigint) => flag === PermissionFlagsBits.ViewChannel,
+      }),
+    };
+    const client = createClient({ "channel-perms": missingPermChannel });
+    const remove = jest.fn().mockResolvedValue(true);
+
+    const message = await cleanupSingleChannelSubscription({
+      client,
+      channelId: "channel-perms",
+      includePermissions: false,
+      healthyMessage: "Healthy channel.",
+      missingPermissionsMessage: (status) =>
+        `Missing: ${status.missingPermissions.join(", ")}`,
+      remove,
+      removedMessage: () => "Removed.",
+      failedMessage: "Failed.",
+    });
+
+    expect(message).toBe("Missing: SendMessages");
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("removes missing channels and reports removal", async () => {
+    const client = createClient({});
+    const remove = jest.fn().mockResolvedValue(true);
+
+    const message = await cleanupSingleChannelSubscription({
+      client,
+      channelId: "channel-missing",
+      includePermissions: false,
+      healthyMessage: "Healthy channel.",
+      missingPermissionsMessage: () => "Missing perms.",
+      remove,
+      removedMessage: (status) => `Removed (${status.status}).`,
+      failedMessage: "Failed.",
+    });
+
+    expect(message).toBe("Removed (missing).");
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 });

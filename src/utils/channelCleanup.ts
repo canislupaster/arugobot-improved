@@ -3,6 +3,7 @@ import type { Client } from "discord.js";
 import {
   describeSendableChannelStatus,
   getSendableChannelStatus,
+  resolveChannelCleanupDecision,
   type SendableChannelStatus,
 } from "./discordChannels.js";
 
@@ -83,6 +84,32 @@ export async function cleanupChannelSubscriptions(
     failedPermissionIds,
     permissionIssues,
   };
+}
+
+export async function cleanupSingleChannelSubscription(params: {
+  client: Client;
+  channelId: string;
+  includePermissions: boolean;
+  healthyMessage: string;
+  missingPermissionsMessage: (
+    status: Extract<SendableChannelStatus, { status: "missing_permissions" }>
+  ) => string;
+  remove: () => Promise<boolean>;
+  removedMessage: (status: SendableChannelStatus) => string;
+  failedMessage: string;
+}): Promise<string> {
+  const decision = await resolveChannelCleanupDecision({
+    client: params.client,
+    channelId: params.channelId,
+    includePermissions: params.includePermissions,
+    healthyMessage: params.healthyMessage,
+    missingPermissionsMessage: params.missingPermissionsMessage,
+  });
+  if (decision.replyMessage) {
+    return decision.replyMessage;
+  }
+  const removed = await params.remove();
+  return removed ? params.removedMessage(decision.status) : params.failedMessage;
 }
 
 export function formatIdList(ids: string[]): string {
