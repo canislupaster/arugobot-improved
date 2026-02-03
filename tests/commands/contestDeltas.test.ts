@@ -79,6 +79,7 @@ describe("contestDeltasCommand", () => {
 
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     const embed = payload.embeds[0];
+    expect(embed.data.description).toContain("Scope: All");
     const fields = embed.data.fields ?? [];
     const fieldText = JSON.stringify(fields);
     expect(fieldText).toContain("Top gainers");

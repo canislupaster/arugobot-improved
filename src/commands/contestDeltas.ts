@@ -44,14 +44,19 @@ function formatParticipantSection(
   return entries.map((entry, index) => `${index + 1}. ${formatParticipantLine(entry)}`).join("\n");
 }
 
+function formatScope(scope: ContestScopeFilter): string {
+  return scope === "official" ? "Official" : scope === "gym" ? "Gym" : "All";
+}
+
 function buildSummaryEmbed(
   summary: GuildRatingChangeSummary,
-  days: number
+  days: number,
+  scope: ContestScopeFilter
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle("Contest rating deltas")
     .setColor(EMBED_COLORS.info)
-    .setDescription(`Last ${days} days`)
+    .setDescription(`Last ${days} days • Scope: ${formatScope(scope)}`)
     .addFields(
       { name: "Contests", value: String(summary.contestCount), inline: true },
       { name: "Participants", value: String(summary.participantCount), inline: true },
@@ -165,7 +170,7 @@ export const contestDeltasCommand: Command = {
         return;
       }
 
-      const embed = buildSummaryEmbed(summary, days);
+      const embed = buildSummaryEmbed(summary, days, scope);
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       logCommandError(
