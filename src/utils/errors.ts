@@ -30,3 +30,12 @@ export function buildServiceErrorFromException(error: unknown): ServiceError {
     timestamp: new Date().toISOString(),
   };
 }
+
+export function recordServiceError(
+  error: unknown,
+  record: (serviceError: ServiceError) => void
+): ServiceError {
+  const serviceError = buildServiceErrorFromException(error);
+  record(serviceError);
+  return serviceError;
+}

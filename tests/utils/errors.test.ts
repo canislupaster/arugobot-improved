@@ -3,6 +3,7 @@ import {
   buildServiceErrorFromException,
   getErrorMessage,
   getErrorMessageForLog,
+  recordServiceError,
 } from "../../src/utils/errors.js";
 
 describe("getErrorMessage", () => {
@@ -61,5 +62,22 @@ describe("buildServiceErrorFromException", () => {
       message: "boom",
       timestamp: "2024-03-01T00:00:00.000Z",
     });
+  });
+});
+
+describe("recordServiceError", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("records the error and returns the same entry", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-04-01T00:00:00.000Z"));
+    const record = jest.fn();
+    const entry = recordServiceError("boom", record);
+    expect(entry).toEqual({
+      message: "boom",
+      timestamp: "2024-04-01T00:00:00.000Z",
+    });
+    expect(record).toHaveBeenCalledWith(entry);
   });
 });
