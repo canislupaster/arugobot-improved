@@ -1,10 +1,11 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { resolvePageOption } from "../utils/interaction.js";
 import {
+  buildPageEmbed,
   buildPaginationIds,
   runPaginatedInteraction,
 } from "../utils/pagination.js";
@@ -101,11 +102,14 @@ export const leaderboardCommand: Command = {
           content += `${index + 1}. ${mention} (${formatValue(entry.value)})${medal}\n`;
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle(title)
-          .setDescription(`Page ${pageNumber} of ${totalPages}`)
-          .setColor(EMBED_COLORS.info)
-          .addFields({ name: fieldName, value: content || "No entries.", inline: false });
+        const embed = buildPageEmbed({
+          title,
+          pageNumber,
+          totalPages,
+          fieldName,
+          fieldValue: content || "No entries.",
+          color: EMBED_COLORS.info,
+        });
         return { embed };
       };
 

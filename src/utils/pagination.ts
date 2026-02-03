@@ -49,6 +49,26 @@ export type PaginatedRender = {
   embed: EmbedBuilder;
 };
 
+export type PageEmbedOptions = {
+  title: string;
+  pageNumber: number;
+  totalPages: number;
+  fieldName: string;
+  fieldValue: string;
+  color?: number;
+};
+
+export function buildPageEmbed(options: PageEmbedOptions): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle(options.title)
+    .setDescription(`Page ${options.pageNumber} of ${options.totalPages}`)
+    .addFields({ name: options.fieldName, value: options.fieldValue, inline: false });
+  if (options.color !== undefined) {
+    embed.setColor(options.color);
+  }
+  return embed;
+}
+
 export async function runPaginatedInteraction(options: {
   interaction: ChatInputCommandInteraction;
   paginationIds: PaginationIds;

@@ -1,10 +1,14 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { resolveBoundedIntegerOption } from "../utils/interaction.js";
-import { buildPaginationIds, runPaginatedInteraction } from "../utils/pagination.js";
+import {
+  buildPageEmbed,
+  buildPaginationIds,
+  runPaginatedInteraction,
+} from "../utils/pagination.js";
 
 import type { Command } from "./types.js";
 
@@ -80,11 +84,14 @@ export const handlesCommand: Command = {
 
         const lines = buildRosterLines(filteredRoster, start, PAGE_SIZE);
 
-        const embed = new EmbedBuilder()
-          .setTitle("Linked handles")
-          .setDescription(`Page ${pageNumber} of ${totalPages}`)
-          .setColor(EMBED_COLORS.info)
-          .addFields({ name: "Users", value: lines || "No entries.", inline: false });
+        const embed = buildPageEmbed({
+          title: "Linked handles",
+          pageNumber,
+          totalPages,
+          fieldName: "Users",
+          fieldValue: lines || "No entries.",
+          color: EMBED_COLORS.info,
+        });
         return { embed };
       };
 

@@ -1,11 +1,15 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 
 import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildProblemLink } from "../utils/contestProblems.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolvePageOption } from "../utils/interaction.js";
-import { buildPaginationIds, runPaginatedInteraction } from "../utils/pagination.js";
+import {
+  buildPageEmbed,
+  buildPaginationIds,
+  runPaginatedInteraction,
+} from "../utils/pagination.js";
 import { formatTime } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
@@ -26,18 +30,6 @@ type LegacyHistoryData = {
   history: string[];
   ratingHistory: number[];
 };
-
-const buildHistoryEmbed = (
-  pageNumber: number,
-  totalPages: number,
-  fieldName: string,
-  fieldValue: string
-) =>
-  new EmbedBuilder()
-    .setTitle("History")
-    .setDescription(`Page ${pageNumber} of ${totalPages}`)
-    .setColor(EMBED_COLORS.info)
-    .addFields({ name: fieldName, value: fieldValue, inline: false });
 
 const formatChallengeDelta = (ratingDelta: number | null) => {
   if (ratingDelta === null) {
@@ -139,12 +131,14 @@ export const historyCommand: Command = {
             return null;
           }
           const lines = renderChallengeHistoryLines(pageData.entries);
-          const embed = buildHistoryEmbed(
+          const embed = buildPageEmbed({
+            title: "History",
             pageNumber,
             totalPages,
-            "Challenges",
-            lines.join("\n")
-          );
+            fieldName: "Challenges",
+            fieldValue: lines.join("\n"),
+            color: EMBED_COLORS.info,
+          });
           return { embed };
         };
 
@@ -184,12 +178,14 @@ export const historyCommand: Command = {
         }
 
         const lines = renderLegacyHistoryLines(historyData, problemDict, start, PAGE_SIZE);
-        const embed = buildHistoryEmbed(
+        const embed = buildPageEmbed({
+          title: "History",
           pageNumber,
           totalPages,
-          "Problems",
-          lines.length > 0 ? lines.join("\n") : "No entries."
-        );
+          fieldName: "Problems",
+          fieldValue: lines.length > 0 ? lines.join("\n") : "No entries.",
+          color: EMBED_COLORS.info,
+        });
         return { embed };
       };
       await runPaginatedInteraction({
