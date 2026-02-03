@@ -121,6 +121,17 @@ export function formatCannotPostMessage(
   )}). Check the bot permissions and try again.`;
 }
 
+export function formatCannotPostPermissionsMessage(
+  channelId: string,
+  missingPermissions: string[]
+): string {
+  return formatCannotPostMessage(channelId, {
+    status: "missing_permissions",
+    channelId,
+    missingPermissions,
+  });
+}
+
 export function buildChannelServiceError(
   label: string,
   channelId: string,

@@ -5,7 +5,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { addRatingRangeOptions, addScheduleOptions, addTagOptions } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
-  formatCannotPostMessage,
+  formatCannotPostPermissionsMessage,
   getSendableChannelStatus,
   resolveChannelCleanupDecision,
   resolveSendableChannelOrReply,
@@ -535,11 +535,7 @@ export const practiceRemindersCommand: Command = {
 
         if (result.status === "channel_missing_permissions") {
           await interaction.editReply(
-            formatCannotPostMessage(result.channelId, {
-              status: "missing_permissions",
-              channelId: result.channelId,
-              missingPermissions: result.missingPermissions,
-            })
+            formatCannotPostPermissionsMessage(result.channelId, result.missingPermissions)
           );
           return;
         }

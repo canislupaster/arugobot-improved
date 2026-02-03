@@ -11,6 +11,7 @@ import {
   cleanupMissingChannelStatus,
   describeSendableChannelStatus,
   formatCannotPostMessage,
+  formatCannotPostPermissionsMessage,
   getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
   resolveChannelCleanupDecision,
@@ -123,6 +124,16 @@ describe("formatCannotPostMessage", () => {
       })
     ).toBe(
       "I can't post in <#channel-1> (Missing permissions (SendMessages)). Check the bot permissions and try again."
+    );
+  });
+});
+
+describe("formatCannotPostPermissionsMessage", () => {
+  it("wraps missing permissions into a consistent reply", () => {
+    expect(
+      formatCannotPostPermissionsMessage("channel-2", ["SendMessages"])
+    ).toBe(
+      "I can't post in <#channel-2> (Missing permissions (SendMessages)). Check the bot permissions and try again."
     );
   });
 });
