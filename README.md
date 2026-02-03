@@ -207,12 +207,13 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Shows recent contest rating deltas for the server's linked handles, including top gainers/losers.
 
-- **/contestreminders** `add|set|list|status|preset|remove|clear|preview|post`
+- **/contestreminders** `add|set|list|status|preset|remove|clear|cleanup|preview|post`
 
   Configure contest reminders for the server (admin only). Use `add` (or legacy `set`) to create
   multiple subscriptions with distinct channel, lead time, role mention, and keyword filters
   (`include`/`exclude`, comma-separated) plus contest `scope` (official, gym, or all). Use
-  `list`/`status` to see subscription ids, `remove` to delete one, and `clear` to delete all.
+  `list`/`status` to see subscription ids, `remove` to delete one, `clear` to delete all, and
+  `cleanup` to remove subscriptions pointing at deleted channels.
   `preview`/`post` accept an optional subscription id when multiple are configured. `post` can
   `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 2,
   Div 3, Div 4, or Educational) with sensible keyword filters.

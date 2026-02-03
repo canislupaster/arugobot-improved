@@ -72,3 +72,14 @@ export function recordReminderSendFailure(params: {
   params.log(params.logMessage, { ...params.logContext, error: message });
   return message;
 }
+
+export function buildReminderSendErrorResult(params: {
+  error: unknown;
+  record: (serviceError: ServiceError) => void;
+  log: (message: string, context?: Record<string, unknown>) => void;
+  logMessage: string;
+  logContext: Record<string, unknown>;
+}): { status: "error"; message: string } {
+  const message = recordReminderSendFailure(params);
+  return { status: "error", message };
+}

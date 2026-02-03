@@ -1,6 +1,7 @@
 import { ChannelType, type Client } from "discord.js";
 
 import {
+  buildReminderSendErrorResult,
   getManualSendFailure,
   recordReminderSendFailure,
   resolveManualSendChannel,
@@ -149,6 +150,30 @@ describe("recordReminderSendFailure", () => {
         channelId: "channel-1",
         error: "boom",
       })
+    );
+  });
+});
+
+describe("buildReminderSendErrorResult", () => {
+  it("wraps the reminder send failure in an error result", () => {
+    const record = jest.fn();
+    const log = jest.fn();
+
+    const result = buildReminderSendErrorResult({
+      error: new Error("nope"),
+      record,
+      log,
+      logMessage: "Reminder failed.",
+      logContext: { guildId: "guild-1" },
+    });
+
+    expect(result).toEqual({ status: "error", message: "nope" });
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "nope", timestamp: expect.any(String) })
+    );
+    expect(log).toHaveBeenCalledWith(
+      "Reminder failed.",
+      expect.objectContaining({ guildId: "guild-1", error: "nope" })
     );
   });
 });

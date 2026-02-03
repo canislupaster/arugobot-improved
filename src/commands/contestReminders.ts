@@ -143,6 +143,10 @@ function formatSubscriptionSummary(
   return lines.join("\n");
 }
 
+function formatIdList(ids: string[]): string {
+  return ids.map((id) => `\`${id}\``).join(", ");
+}
+
 type NextReminderInfo = {
   contest: Contest;
   reminderTimeSeconds: number;
@@ -384,6 +388,11 @@ export const contestRemindersCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("cleanup")
+        .setDescription("Remove contest reminders targeting deleted channels")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("preview")
         .setDescription("Preview the next scheduled reminder")
         .addStringOption((option) =>
@@ -484,6 +493,88 @@ export const contestRemindersCommand: Command = {
             ? `Removed ${removed} contest reminder subscription${removed === 1 ? "" : "s"}.`
             : "No contest reminders were configured for this server.",
         });
+        return;
+      }
+
+      if (subcommand === "cleanup") {
+        const subscriptions = await getSubscriptionsOrReply(
+          interaction,
+          context.services.contestReminders,
+          guildId
+        );
+        if (!subscriptions) {
+          return;
+        }
+
+        const channelStatuses = await Promise.all(
+          subscriptions.map((subscription) =>
+            getSendableChannelStatus(context.client, subscription.channelId)
+          )
+        );
+
+        const removedIds: string[] = [];
+        const failedIds: string[] = [];
+        const permissionIssues: Array<{ id: string; channelId: string; status: SendableChannelStatus }> =
+          [];
+
+        for (const [index, subscription] of subscriptions.entries()) {
+          const status = channelStatuses[index]!;
+          if (status.status === "missing") {
+            const removed = await context.services.contestReminders.removeSubscription(
+              guildId,
+              subscription.id
+            );
+            if (removed) {
+              removedIds.push(subscription.id);
+            } else {
+              failedIds.push(subscription.id);
+            }
+            continue;
+          }
+          if (status.status === "missing_permissions") {
+            permissionIssues.push({
+              id: subscription.id,
+              channelId: subscription.channelId,
+              status,
+            });
+          }
+        }
+
+        if (removedIds.length === 0 && failedIds.length === 0 && permissionIssues.length === 0) {
+          await interaction.reply({
+            content: "All contest reminder channels look good.",
+          });
+          return;
+        }
+
+        const lines: string[] = [];
+        if (removedIds.length > 0) {
+          lines.push(
+            `Removed ${removedIds.length} contest reminder subscription${
+              removedIds.length === 1 ? "" : "s"
+            } with missing channels: ${formatIdList(removedIds)}.`
+          );
+        }
+        if (failedIds.length > 0) {
+          lines.push(
+            `Failed to remove ${failedIds.length} subscription${
+              failedIds.length === 1 ? "" : "s"
+            }: ${formatIdList(failedIds)}.`
+          );
+        }
+        if (permissionIssues.length > 0) {
+          const issueLines = permissionIssues.map(
+            (issue) =>
+              `${formatIdList([issue.id])} (<#${issue.channelId}>): ${describeSendableChannelStatus(
+                issue.status
+              )}`
+          );
+          lines.push(
+            `Subscriptions with missing permissions (not removed): ${issueLines.join("; ")}.`
+          );
+        }
+
+        await interaction.reply({ content: lines.join("\n") });
         return;
       }
 

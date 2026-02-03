@@ -20,6 +20,7 @@ import {
 } from "../utils/problemSelection.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
 import {
+  buildReminderSendErrorResult,
   getManualSendFailure,
   recordReminderSendFailure,
   resolveManualSendChannel,
@@ -395,7 +396,7 @@ export class PracticeReminderService {
       const problemId = await this.sendReminderMessage(subscription, selection, channel, "manual");
       return { status: "sent", problemId, channelId: subscription.channelId };
     } catch (error) {
-      const message = recordReminderSendFailure({
+      return buildReminderSendErrorResult({
         error,
         record: (entry) => {
           this.lastError = entry;
@@ -407,7 +408,6 @@ export class PracticeReminderService {
           channelId: subscription.channelId,
         },
       });
-      return { status: "error", message };
     }
   }
 

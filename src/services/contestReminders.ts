@@ -19,7 +19,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
-import { recordReminderSendFailure } from "../utils/reminders.js";
+import { buildReminderSendErrorResult, recordReminderSendFailure } from "../utils/reminders.js";
 import {
   clearSubscriptionsWithNotifications,
   removeSubscriptionWithNotifications,
@@ -318,7 +318,7 @@ export class ContestReminderService {
         isStale,
       };
     } catch (error) {
-      const message = recordReminderSendFailure({
+      return buildReminderSendErrorResult({
         error,
         record: (entry) => {
           this.lastError = entry;
@@ -333,7 +333,6 @@ export class ContestReminderService {
           scope: subscription.scope,
         },
       });
-      return { status: "error", message };
     }
   }
 
