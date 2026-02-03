@@ -87,6 +87,7 @@ describe("ContestRatingAlertService", () => {
     await service.runTick(client);
 
     expect(send).toHaveBeenCalledTimes(1);
+    expect(service.getLastTickAt()).not.toBeNull();
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "<@&role-1>",

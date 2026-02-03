@@ -24,6 +24,7 @@ import {
   markNotification,
   removeSubscriptionWithNotifications,
 } from "../utils/subscriptionCleanup.js";
+import { createServiceTickState, runServiceTick } from "../utils/serviceTicks.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { ContestRatingChangesService } from "./contestRatingChanges.js";
@@ -181,6 +182,15 @@ export class ContestRatingAlertService {
   private lastTickAt: string | null = null;
   private lastError: { message: string; timestamp: string } | null = null;
   private isTicking = false;
+  private readonly tickState = createServiceTickState(
+    () => this.isTicking,
+    (value) => {
+      this.isTicking = value;
+    },
+    (value) => {
+      this.lastTickAt = value;
+    }
+  );
 
   constructor(
     private db: Kysely<Database>,
@@ -362,96 +372,91 @@ export class ContestRatingAlertService {
   }
 
   async runTick(client: Client): Promise<void> {
-    if (this.isTicking) {
-      return;
-    }
-    this.isTicking = true;
-    this.lastTickAt = new Date().toISOString();
-    try {
-      let subscriptions: ContestRatingAlertSubscription[] = [];
+    await runServiceTick(this.tickState, async () => {
       try {
-        subscriptions = await this.listSubscriptions();
+        let subscriptions: ContestRatingAlertSubscription[] = [];
+        try {
+          subscriptions = await this.listSubscriptions();
+        } catch (error) {
+          const message = getErrorMessageForLog(error);
+          this.lastError = { message, timestamp: new Date().toISOString() };
+          logError("Contest rating alert subscription load failed.", { error: message });
+          return;
+        }
+
+        if (subscriptions.length === 0) {
+          return;
+        }
+
+        const { contests, isStale, error } = await this.loadContestContext();
+        if (error) {
+          return;
+        }
+        if (contests.length === 0) {
+          return;
+        }
+
+        const cutoff = new Date(
+          Date.now() - ALERT_RETENTION_DAYS * 24 * 60 * 60 * 1000
+        ).toISOString();
+        try {
+          await this.cleanupNotifications(cutoff);
+        } catch (error) {
+          const message = getErrorMessageForLog(error);
+          logWarn("Contest rating alert cleanup failed.", { error: message });
+        }
+
+        for (const subscription of subscriptions) {
+          const { channel, serviceError } = await resolveSendableChannelForService({
+            client,
+            channelId: subscription.channelId,
+            warnMessage: "Contest rating alert channel missing or invalid.",
+            warnContext: {
+              guildId: subscription.guildId,
+              subscriptionId: subscription.id,
+            },
+            cleanup: {
+              remove: () => this.removeSubscription(subscription.guildId, subscription.id),
+              logRemoved: () => {
+                logInfo("Contest rating alert subscription removed (channel missing).", {
+                  guildId: subscription.guildId,
+                  subscriptionId: subscription.id,
+                  channelId: subscription.channelId,
+                });
+              },
+              logFailed: () => {
+                logWarn("Contest rating alert subscription cleanup failed.", {
+                  guildId: subscription.guildId,
+                  subscriptionId: subscription.id,
+                  channelId: subscription.channelId,
+                });
+              },
+            },
+            serviceLabel: "Contest rating alert",
+          });
+          if (!channel) {
+            this.lastError = serviceError ?? this.lastError;
+            continue;
+          }
+
+          const candidate = await this.findCandidate(subscription, contests, isStale, {
+            skipNotified: true,
+            force: false,
+            maxContests: MAX_CONTESTS_TO_CHECK,
+          });
+
+          if (candidate.status !== "ready") {
+            continue;
+          }
+
+          await this.sendAlert(subscription, channel, candidate.preview, "scheduled");
+        }
       } catch (error) {
         const message = getErrorMessageForLog(error);
         this.lastError = { message, timestamp: new Date().toISOString() };
-        logError("Contest rating alert subscription load failed.", { error: message });
-        return;
+        logError("Contest rating alert tick failed.", { error: message });
       }
-
-      if (subscriptions.length === 0) {
-        return;
-      }
-
-      const { contests, isStale, error } = await this.loadContestContext();
-      if (error) {
-        return;
-      }
-      if (contests.length === 0) {
-        return;
-      }
-
-      const cutoff = new Date(
-        Date.now() - ALERT_RETENTION_DAYS * 24 * 60 * 60 * 1000
-      ).toISOString();
-      try {
-        await this.cleanupNotifications(cutoff);
-      } catch (error) {
-        const message = getErrorMessageForLog(error);
-        logWarn("Contest rating alert cleanup failed.", { error: message });
-      }
-
-      for (const subscription of subscriptions) {
-        const { channel, serviceError } = await resolveSendableChannelForService({
-          client,
-          channelId: subscription.channelId,
-          warnMessage: "Contest rating alert channel missing or invalid.",
-          warnContext: {
-            guildId: subscription.guildId,
-            subscriptionId: subscription.id,
-          },
-          cleanup: {
-            remove: () => this.removeSubscription(subscription.guildId, subscription.id),
-            logRemoved: () => {
-              logInfo("Contest rating alert subscription removed (channel missing).", {
-                guildId: subscription.guildId,
-                subscriptionId: subscription.id,
-                channelId: subscription.channelId,
-              });
-            },
-            logFailed: () => {
-              logWarn("Contest rating alert subscription cleanup failed.", {
-                guildId: subscription.guildId,
-                subscriptionId: subscription.id,
-                channelId: subscription.channelId,
-              });
-            },
-          },
-          serviceLabel: "Contest rating alert",
-        });
-        if (!channel) {
-          this.lastError = serviceError ?? this.lastError;
-          continue;
-        }
-
-        const candidate = await this.findCandidate(subscription, contests, isStale, {
-          skipNotified: true,
-          force: false,
-          maxContests: MAX_CONTESTS_TO_CHECK,
-        });
-
-        if (candidate.status !== "ready") {
-          continue;
-        }
-
-        await this.sendAlert(subscription, channel, candidate.preview, "scheduled");
-      }
-    } catch (error) {
-      const message = getErrorMessageForLog(error);
-      this.lastError = { message, timestamp: new Date().toISOString() };
-      logError("Contest rating alert tick failed.", { error: message });
-    } finally {
-      this.isTicking = false;
-    }
+    });
   }
 
   async getLastNotificationMap(subscriptionIds: string[]): Promise<Map<string, string>> {
