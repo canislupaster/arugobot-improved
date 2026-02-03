@@ -22,6 +22,18 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
 
+const createClient = (channel: { id: string; type: ChannelType }, canSend = true) => ({
+  user: { id: "bot-1" },
+  channels: {
+    fetch: jest.fn().mockResolvedValue({
+      ...channel,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(canSend),
+      }),
+    }),
+  },
+});
+
 describe("contestRemindersCommand", () => {
   it("shows status when no reminders are configured", async () => {
     const interaction = createInteraction({
@@ -68,6 +80,7 @@ describe("contestRemindersCommand", () => {
     });
     const context = {
       correlationId: "corr-2",
+      client: createClient(channel),
       services: {
         contestReminders: {
           createSubscription: jest.fn().mockResolvedValue({
@@ -141,6 +154,7 @@ describe("contestRemindersCommand", () => {
     });
     const context = {
       correlationId: "corr-3a",
+      client: createClient(channel),
       services: {
         contestReminders: {
           createSubscription: jest.fn().mockResolvedValue({
@@ -171,6 +185,40 @@ describe("contestRemindersCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         'Contest reminder preset "Div 2" enabled in <#channel-2> (45 minutes before, Official) (include: div. 2, div.2, div 2, exclude: none). Subscription id: `sub-10`.',
+    });
+  });
+
+  it("rejects reminders for channels without permissions", async () => {
+    const channel = {
+      id: "channel-3",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("add"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn().mockReturnValue(null),
+        getRole: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockReturnValue(null),
+      },
+    });
+    const createSubscription = jest.fn();
+    const context = {
+      correlationId: "corr-3b",
+      client: createClient(channel, false),
+      services: {
+        contestReminders: {
+          createSubscription,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRemindersCommand.execute(interaction, context);
+
+    expect(createSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        "I can't post in <#channel-3> (Missing permissions (ViewChannel, SendMessages)). Check the bot permissions and try again.",
     });
   });
 

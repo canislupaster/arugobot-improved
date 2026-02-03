@@ -5,6 +5,7 @@ import {
   type ContestRatingAlertSubscription,
 } from "../services/contestRatingAlerts.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { describeSendableChannelStatus, getSendableChannelStatus } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
 
@@ -191,6 +192,15 @@ export const contestRatingAlertsCommand: Command = {
         ) {
           await interaction.reply({
             content: "Pick a text channel for contest rating alerts.",
+          });
+          return;
+        }
+        const status = await getSendableChannelStatus(context.client, channel.id);
+        if (status.status !== "ok") {
+          await interaction.reply({
+            content: `I can't post in <#${channel.id}> (${describeSendableChannelStatus(
+              status
+            )}). Check the bot permissions and try again.`,
           });
           return;
         }

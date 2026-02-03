@@ -1,5 +1,6 @@
 import {
   ChannelType,
+  type Client,
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -60,11 +61,21 @@ function isReminderChannel(channel: ChannelLike): channel is ReminderChannel {
 
 async function resolveReminderChannelOrReply(
   interaction: Parameters<Command["execute"]>[0],
+  client: Client,
   channel: ChannelLike
 ): Promise<ReminderChannel | null> {
   if (!isReminderChannel(channel)) {
     await interaction.reply({
       content: "Pick a text channel for contest reminders.",
+    });
+    return null;
+  }
+  const status = await getSendableChannelStatus(client, channel.id);
+  if (status.status !== "ok") {
+    await interaction.reply({
+      content: `I can't post in <#${channel.id}> (${describeSendableChannelStatus(
+        status
+      )}). Check the bot permissions and try again.`,
     });
     return null;
   }
@@ -482,6 +493,7 @@ export const contestRemindersCommand: Command = {
       if (subcommand === "set" || subcommand === "add") {
         const channel = await resolveReminderChannelOrReply(
           interaction,
+          context.client,
           interaction.options.getChannel("channel", true)
         );
         if (!channel) {
@@ -522,6 +534,7 @@ export const contestRemindersCommand: Command = {
       if (subcommand === "preset") {
         const channel = await resolveReminderChannelOrReply(
           interaction,
+          context.client,
           interaction.options.getChannel("channel", true)
         );
         if (!channel) {

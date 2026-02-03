@@ -22,6 +22,18 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   }) as unknown as ChatInputCommandInteraction;
 
+const createClient = (channel: { id: string; type: ChannelType }, canSend = true) => ({
+  user: { id: "bot-1" },
+  channels: {
+    fetch: jest.fn().mockResolvedValue({
+      ...channel,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(canSend),
+      }),
+    }),
+  },
+});
+
 describe("contestRatingAlertsCommand", () => {
   it("shows status when no alerts are configured", async () => {
     const interaction = createInteraction({
@@ -64,6 +76,7 @@ describe("contestRatingAlertsCommand", () => {
     });
     const context = {
       correlationId: "corr-2",
+      client: createClient(channel),
       services: {
         contestRatingAlerts: {
           createSubscription: jest.fn().mockResolvedValue({
@@ -89,6 +102,40 @@ describe("contestRatingAlertsCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         "Contest rating alerts enabled in <#channel-1> (mentioning <@&role-1>). Subscription id: `sub-1`.",
+    });
+  });
+
+  it("rejects alerts for channels without permissions", async () => {
+    const channel = {
+      id: "channel-2",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getRole: jest.fn().mockReturnValue(null),
+        getInteger: jest.fn().mockReturnValue(0),
+        getString: jest.fn().mockReturnValue(null),
+      },
+    });
+    const createSubscription = jest.fn();
+    const context = {
+      correlationId: "corr-2b",
+      client: createClient(channel, false),
+      services: {
+        contestRatingAlerts: {
+          createSubscription,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRatingAlertsCommand.execute(interaction, context);
+
+    expect(createSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        "I can't post in <#channel-2> (Missing permissions (ViewChannel, SendMessages)). Check the bot permissions and try again.",
     });
   });
 
