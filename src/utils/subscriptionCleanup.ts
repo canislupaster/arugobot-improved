@@ -88,3 +88,44 @@ export async function getLastNotificationMap(
       .map((row) => [row.subscription_id, row.last_notified_at!])
   );
 }
+
+export async function getNotification(
+  db: Kysely<Database>,
+  table: NotificationTable,
+  subscriptionId: string,
+  contestId: number
+): Promise<{ notified_at: string } | null> {
+  const row = await db
+    .selectFrom(table)
+    .select("notified_at")
+    .where("subscription_id", "=", subscriptionId)
+    .where("contest_id", "=", contestId)
+    .executeTakeFirst();
+  return row ?? null;
+}
+
+export async function markNotification(
+  db: Kysely<Database>,
+  table: NotificationTable,
+  subscriptionId: string,
+  contestId: number,
+  notifiedAt?: string
+): Promise<void> {
+  await db
+    .insertInto(table)
+    .values({
+      subscription_id: subscriptionId,
+      contest_id: contestId,
+      notified_at: notifiedAt ?? new Date().toISOString(),
+    })
+    .onConflict((oc) => oc.columns(["subscription_id", "contest_id"]).doNothing())
+    .execute();
+}
+
+export async function cleanupNotifications(
+  db: Kysely<Database>,
+  table: NotificationTable,
+  cutoffIso: string
+): Promise<void> {
+  await db.deleteFrom(table).where("notified_at", "<", cutoffIso).execute();
+}

@@ -18,8 +18,11 @@ import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { resolveManualChannel } from "../utils/reminders.js";
 import {
+  cleanupNotifications,
   clearSubscriptionsWithNotifications,
+  getNotification,
   getLastNotificationMap,
+  markNotification,
   removeSubscriptionWithNotifications,
 } from "../utils/subscriptionCleanup.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
@@ -557,7 +560,12 @@ export class ContestRatingAlertService {
 
     for (const contest of recent) {
       if (!options.force) {
-        const notification = await this.getNotification(subscription.id, contest.id);
+        const notification = await getNotification(
+          this.db,
+          "contest_rating_alert_notifications",
+          subscription.id,
+          contest.id
+        );
         if (notification) {
           if (options.skipNotified) {
             continue;
@@ -612,36 +620,17 @@ export class ContestRatingAlertService {
     return { status: "no_changes", contest: firstContest };
   }
 
-  private async getNotification(
-    subscriptionId: string,
-    contestId: number
-  ): Promise<{ notified_at: string } | null> {
-    const row = await this.db
-      .selectFrom("contest_rating_alert_notifications")
-      .select("notified_at")
-      .where("subscription_id", "=", subscriptionId)
-      .where("contest_id", "=", contestId)
-      .executeTakeFirst();
-    return row ?? null;
-  }
-
   private async markNotified(subscriptionId: string, contestId: number): Promise<void> {
-    await this.db
-      .insertInto("contest_rating_alert_notifications")
-      .values({
-        subscription_id: subscriptionId,
-        contest_id: contestId,
-        notified_at: new Date().toISOString(),
-      })
-      .onConflict((oc) => oc.columns(["subscription_id", "contest_id"]).doNothing())
-      .execute();
+    await markNotification(
+      this.db,
+      "contest_rating_alert_notifications",
+      subscriptionId,
+      contestId
+    );
   }
 
   private async cleanupNotifications(cutoffIso: string): Promise<void> {
-    await this.db
-      .deleteFrom("contest_rating_alert_notifications")
-      .where("notified_at", "<", cutoffIso)
-      .execute();
+    await cleanupNotifications(this.db, "contest_rating_alert_notifications", cutoffIso);
   }
 }
 

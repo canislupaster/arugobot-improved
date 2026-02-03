@@ -5,7 +5,10 @@ import { migrateToLatest } from "../../src/db/migrator.js";
 import type { Database } from "../../src/db/types.js";
 import {
   clearSubscriptionsWithNotifications,
+  cleanupNotifications,
+  getNotification,
   getLastNotificationMap,
+  markNotification,
   removeSubscriptionWithNotifications,
 } from "../../src/utils/subscriptionCleanup.js";
 
@@ -181,5 +184,19 @@ describe("subscriptionCleanup", () => {
     ]);
 
     expect(alertMap.get("alert-1")).toBe("2024-02-01T00:00:00Z");
+  });
+
+  it("marks and cleans up notifications for a subscription", async () => {
+    await markNotification(db, "contest_notifications", "sub-1", 123, "2024-03-01T00:00:00Z");
+
+    const notification = await getNotification(db, "contest_notifications", "sub-1", 123);
+
+    expect(notification).toEqual({ notified_at: "2024-03-01T00:00:00Z" });
+
+    await cleanupNotifications(db, "contest_notifications", "2024-03-02T00:00:00Z");
+
+    const cleared = await getNotification(db, "contest_notifications", "sub-1", 123);
+
+    expect(cleared).toBeNull();
   });
 });

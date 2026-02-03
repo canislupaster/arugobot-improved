@@ -26,8 +26,11 @@ import {
 } from "../utils/reminders.js";
 import { beginServiceTick } from "../utils/serviceTicks.js";
 import {
+  cleanupNotifications,
   clearSubscriptionsWithNotifications,
+  getNotification,
   getLastNotificationMap,
+  markNotification,
   removeSubscriptionWithNotifications,
 } from "../utils/subscriptionCleanup.js";
 import {
@@ -271,7 +274,12 @@ export class ContestReminderService {
 
     const contest = filtered[0]!;
     if (!force) {
-      const notification = await this.getNotification(subscription.id, contest.id);
+      const notification = await getNotification(
+        this.db,
+        "contest_notifications",
+        subscription.id,
+        contest.id
+      );
       if (notification) {
         return {
           status: "already_notified",
@@ -522,40 +530,21 @@ export class ContestReminderService {
   }
 
   private async wasNotified(subscriptionId: string, contestId: number): Promise<boolean> {
-    const notification = await this.getNotification(subscriptionId, contestId);
+    const notification = await getNotification(
+      this.db,
+      "contest_notifications",
+      subscriptionId,
+      contestId
+    );
     return Boolean(notification);
   }
 
-  private async getNotification(
-    subscriptionId: string,
-    contestId: number
-  ): Promise<{ notified_at: string } | null> {
-    const row = await this.db
-      .selectFrom("contest_notifications")
-      .select("notified_at")
-      .where("subscription_id", "=", subscriptionId)
-      .where("contest_id", "=", contestId)
-      .executeTakeFirst();
-    return row ?? null;
-  }
-
   private async markNotified(subscriptionId: string, contestId: number): Promise<void> {
-    await this.db
-      .insertInto("contest_notifications")
-      .values({
-        subscription_id: subscriptionId,
-        contest_id: contestId,
-        notified_at: new Date().toISOString(),
-      })
-      .onConflict((oc) => oc.columns(["subscription_id", "contest_id"]).doNothing())
-      .execute();
+    await markNotification(this.db, "contest_notifications", subscriptionId, contestId);
   }
 
   private async cleanupNotifications(cutoffIso: string): Promise<void> {
-    await this.db
-      .deleteFrom("contest_notifications")
-      .where("notified_at", "<", cutoffIso)
-      .execute();
+    await cleanupNotifications(this.db, "contest_notifications", cutoffIso);
   }
 }
 
