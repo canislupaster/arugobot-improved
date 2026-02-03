@@ -494,7 +494,7 @@ export class PracticeReminderService {
               continue;
             }
 
-            const selection = await this.selectProblem(subscription);
+            const selection = await this.selectProblem(subscription, problems);
             if (!selection.problem) {
               logWarn("Practice reminder skipped: no suitable problem.", {
                 guildId: subscription.guildId,
@@ -530,14 +530,17 @@ export class PracticeReminderService {
     );
   }
 
-  private async selectProblem(subscription: PracticeReminder): Promise<PracticeSelectionResult> {
-    const problems = await this.problems.ensureProblemsLoaded();
-    if (problems.length === 0) {
+  private async selectProblem(
+    subscription: PracticeReminder,
+    problems?: Problem[]
+  ): Promise<PracticeSelectionResult> {
+    const loadedProblems = problems ?? (await this.problems.ensureProblemsLoaded());
+    if (loadedProblems.length === 0) {
       return { problem: null, skippedHandles: 0, staleHandles: 0, candidateCount: 0 };
     }
 
     const tagFilters = parseTagFilters(subscription.tags);
-    const rated = filterProblemsByRatingRanges(problems, subscription.ratingRanges);
+    const rated = filterProblemsByRatingRanges(loadedProblems, subscription.ratingRanges);
     const candidates = filterProblemsByTags(rated, tagFilters);
 
     const { excludedIds, skippedHandles, staleHandles } = await this.getExcludedIds(

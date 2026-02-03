@@ -92,6 +92,64 @@ describe("PracticeReminderService", () => {
     expect(posts[0]?.problem_id).toBe("100A");
   });
 
+  it("loads problems once for multiple subscriptions", async () => {
+    const nowMs = Date.UTC(2024, 0, 1, 10, 0, 0);
+    jest.useFakeTimers().setSystemTime(new Date(nowMs));
+
+    const problems = [
+      {
+        contestId: 100,
+        index: "A",
+        name: "Sample",
+        rating: 1200,
+        tags: ["dp"],
+      },
+    ];
+    const ensureProblemsLoaded = jest.fn().mockResolvedValue(problems);
+
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded,
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      ALL_DAYS,
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
+    await service.setSubscription(
+      "guild-2",
+      "channel-2",
+      9,
+      0,
+      0,
+      ALL_DAYS,
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(ensureProblemsLoaded).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   it("records an error when sending a reminder fails", async () => {
     const nowMs = Date.UTC(2024, 0, 1, 10, 0, 0);
     jest.useFakeTimers().setSystemTime(new Date(nowMs));
