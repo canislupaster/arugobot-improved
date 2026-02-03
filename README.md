@@ -134,7 +134,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
 - **/health**
 
-  Admin-only diagnostics (uptime, memory, DB status, last error, command usage/latency).
+  Admin-only diagnostics (uptime, memory, DB status, reminder channel issues, last error, command usage/latency).
 
 - **/logs** `[limit]` `[level]` `[command]` `[correlation]` `[message]` `[user]`
 

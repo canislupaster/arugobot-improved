@@ -6,6 +6,11 @@ import {
   version as discordJsVersion,
 } from "discord.js";
 
+import {
+  describeSendableChannelStatus,
+  getSendableChannelStatus,
+  type SendableChannelStatus,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getLastError } from "../utils/logger.js";
 
@@ -15,6 +20,69 @@ const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 
 
 function formatNumber(value: number): string {
   return numberFormatter.format(value);
+}
+
+type ChannelIssue = {
+  label: string;
+  channelId: string;
+  status: SendableChannelStatus;
+};
+
+function formatChannelIssueLine(issue: ChannelIssue): string {
+  return `${issue.label}: <#${issue.channelId}> - ${describeSendableChannelStatus(issue.status)}`;
+}
+
+async function getChannelIssues(
+  context: Parameters<Command["execute"]>[1],
+  guildId: string
+): Promise<ChannelIssue[]> {
+  const [
+    contestReminders,
+    ratingAlerts,
+    practiceReminder,
+    weeklyDigest,
+    tournamentRecap,
+  ] = await Promise.all([
+    context.services.contestReminders.listSubscriptions(guildId),
+    context.services.contestRatingAlerts.listSubscriptions(guildId),
+    context.services.practiceReminders.getSubscription(guildId),
+    context.services.weeklyDigest.getSubscription(guildId),
+    context.services.tournamentRecaps.getSubscription(guildId),
+  ]);
+
+  const targets: Array<{ label: string; channelId: string }> = [
+    ...contestReminders.map((subscription) => ({
+      label: `Contest reminder (ID: ${subscription.id})`,
+      channelId: subscription.channelId,
+    })),
+    ...ratingAlerts.map((subscription) => ({
+      label: `Contest rating alert (ID: ${subscription.id})`,
+      channelId: subscription.channelId,
+    })),
+    ...(practiceReminder
+      ? [{ label: "Practice reminder", channelId: practiceReminder.channelId }]
+      : []),
+    ...(weeklyDigest ? [{ label: "Weekly digest", channelId: weeklyDigest.channelId }] : []),
+    ...(tournamentRecap
+      ? [{ label: "Tournament recaps", channelId: tournamentRecap.channelId }]
+      : []),
+  ];
+
+  if (targets.length === 0) {
+    return [];
+  }
+
+  const statuses = await Promise.all(
+    targets.map((target) => getSendableChannelStatus(context.client, target.channelId))
+  );
+
+  return targets
+    .map((target, index) => ({
+      label: target.label,
+      channelId: target.channelId,
+      status: statuses[index]!,
+    }))
+    .filter((issue) => issue.status.status !== "ok");
 }
 
 export const healthCommand: Command = {
@@ -82,6 +150,7 @@ export const healthCommand: Command = {
       context.services.metrics.getLastCommandAt(),
       context.services.metrics.getCommandUsageSummary(5),
     ]);
+    const channelIssues = await getChannelIssues(context, interaction.guild.id);
 
     const reminderLastTick = context.services.contestReminders.getLastTickAt();
     const reminderLastError = context.services.contestReminders.getLastError();
@@ -167,6 +236,19 @@ export const healthCommand: Command = {
         )
         .join("\n");
       embed.addFields({ name: "Top commands", value: lines, inline: false });
+    }
+
+    if (channelIssues.length > 0) {
+      const previewLimit = 6;
+      const lines = channelIssues.slice(0, previewLimit).map(formatChannelIssueLine);
+      if (channelIssues.length > previewLimit) {
+        lines.push(`...and ${channelIssues.length - previewLimit} more`);
+      }
+      embed.addFields({
+        name: "Channel issues",
+        value: lines.join("\n"),
+        inline: false,
+      });
     }
 
     const errorFields = [
