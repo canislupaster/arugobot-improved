@@ -1,4 +1,3 @@
-import { MessageFlags } from "discord.js";
 import type {
   ChatInputCommandInteraction,
   InteractionDeferReplyOptions,
@@ -7,7 +6,7 @@ import type {
   RepliableInteraction,
   User,
 } from "discord.js";
-import { DiscordAPIError } from "discord.js";
+import { DiscordAPIError, MessageFlags } from "discord.js";
 
 import { getErrorMessage } from "./errors.js";
 import type { LogContext } from "./logger.js";
