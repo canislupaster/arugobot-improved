@@ -132,7 +132,7 @@ export const healthCommand: Command = {
         ? `Listening on ${webStatus.host}:${webPort ?? "unknown"}`
         : webStatus.status === "starting"
           ? "Starting"
-          : "Disabled";
+          : "Failed (see last error)";
     const [
       reminderCount,
       ratingAlertCount,

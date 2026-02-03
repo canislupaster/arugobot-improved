@@ -123,6 +123,101 @@ describe("healthCommand", () => {
     expect(names).toContain("Commands handled");
   });
 
+  it("labels failed web status distinctly", async () => {
+    const interaction = createInteraction();
+    const context = {
+      client: createClient(),
+      webStatus: {
+        status: "failed",
+        host: "0.0.0.0",
+        requestedPort: 8787,
+        actualPort: null,
+        lastError: { message: "listen EADDRINUSE", timestamp: new Date().toISOString() },
+      },
+      services: {
+        metrics: {
+          getCommandCount: jest.fn().mockResolvedValue(0),
+          getUniqueCommandCount: jest.fn().mockResolvedValue(0),
+          getLastCommandAt: jest.fn().mockResolvedValue(null),
+          getCommandUsageSummary: jest.fn().mockResolvedValue([]),
+        },
+        store: { checkDb: jest.fn().mockResolvedValue(true) },
+        codeforces: {
+          getLastError: jest.fn().mockReturnValue(null),
+          getLastSuccessAt: jest.fn().mockReturnValue(null),
+        },
+        problems: {
+          getLastRefreshAt: jest.fn().mockReturnValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contests: {
+          getLastRefreshAt: jest.fn().mockReturnValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestRatingChanges: {
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        ratingChanges: {
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        databaseBackups: {
+          getBackupDir: jest.fn().mockReturnValue(null),
+          getLastBackupAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestReminders: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          listSubscriptions: jest.fn().mockResolvedValue([]),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        contestRatingAlerts: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          listSubscriptions: jest.fn().mockResolvedValue([]),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        practiceReminders: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getSubscription: jest.fn().mockResolvedValue(null),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        weeklyDigest: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getSubscription: jest.fn().mockResolvedValue(null),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        challenges: {
+          getActiveCount: jest.fn().mockResolvedValue(0),
+          getLastTickAt: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tournaments: {
+          getActiveCount: jest.fn().mockResolvedValue(0),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tournamentRecaps: {
+          getSubscriptionCount: jest.fn().mockResolvedValue(0),
+          getSubscription: jest.fn().mockResolvedValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+        tokenUsage: {
+          getSnapshot: jest.fn().mockReturnValue(null),
+          getLastError: jest.fn().mockReturnValue(null),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await healthCommand.execute(interaction, context);
+
+    const replyArg = (interaction.reply as jest.Mock).mock.calls[0]?.[0];
+    const fields = replyArg.embeds[0].data.fields ?? [];
+    const webField = fields.find((field: { name: string }) => field.name === "Web dashboard");
+    expect(webField?.value).toBe("Failed (see last error)");
+  });
+
   it("includes misconfigured reminder channels", async () => {
     const interaction = createInteraction();
     const context = {
