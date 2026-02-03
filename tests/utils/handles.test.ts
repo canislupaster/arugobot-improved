@@ -1,6 +1,7 @@
 import {
   normalizeHandleInput,
   normalizeHandleKey,
+  dedupeHandles,
   parseHandleList,
   resolveHandleTarget,
   resolveHandleTargetWithOptionalGuild,
@@ -47,6 +48,19 @@ describe("parseHandleList", () => {
 
   it("returns an empty array for whitespace", () => {
     expect(parseHandleList("   ")).toEqual([]);
+  });
+});
+
+describe("dedupeHandles", () => {
+  it("dedupes handles case-insensitively while preserving the first casing", () => {
+    expect(dedupeHandles([" Tourist ", "tourist", "Petr", "petr"])).toEqual([
+      "Tourist",
+      "Petr",
+    ]);
+  });
+
+  it("skips empty handles", () => {
+    expect(dedupeHandles([" ", "", "neal"])).toEqual(["neal"]);
   });
 });
 

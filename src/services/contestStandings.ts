@@ -4,7 +4,7 @@ import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
 import { isCacheFresh } from "../utils/cache.js";
-import { normalizeHandleKey } from "../utils/handles.js";
+import { dedupeHandles, normalizeHandleKey } from "../utils/handles.js";
 import { logError, logWarn } from "../utils/logger.js";
 
 import type { CodeforcesClient } from "./codeforces.js";
@@ -56,27 +56,6 @@ export function hashHandles(handles: string[], showUnofficial = false): string {
     .sort();
   const payload = `${normalized.join("|")}|unofficial:${showUnofficial ? "1" : "0"}`;
   return createHash("sha1").update(payload).digest("hex");
-}
-
-function dedupeHandles(handles: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const handle of handles) {
-    const trimmed = handle.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const key = normalizeHandleKey(trimmed);
-    if (!key) {
-      continue;
-    }
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(trimmed);
-  }
-  return result;
 }
 
 function mapEntries(rows: ContestStandingsResponse["rows"]): ContestStandingEntry[] {

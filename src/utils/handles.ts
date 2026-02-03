@@ -43,6 +43,24 @@ export function normalizeHandleKey(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+export function dedupeHandles(handles: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const handle of handles) {
+    const trimmed = handle.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const key = normalizeHandleKey(trimmed);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}
+
 export function parseHandleList(raw: string): string[] {
   if (!raw.trim()) {
     return [];
