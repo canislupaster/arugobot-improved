@@ -1,4 +1,10 @@
-import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import {
+  ChannelType,
+  type ChatInputCommandInteraction,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+} from "discord.js";
 
 import {
   buildContestRatingAlertEmbed,
@@ -96,6 +102,37 @@ function selectSubscription(
   const subscription =
     subscriptions.find((entry) => entry.id === resolution.id) ?? subscriptions[0]!;
   return { status: "ok", subscription };
+}
+
+async function resolveSubscriptionSelection(
+  interaction: ChatInputCommandInteraction,
+  subscriptions: ContestRatingAlertSubscription[],
+  inputId: string | null
+): Promise<ContestRatingAlertSubscription | null> {
+  const selection = selectSubscription(subscriptions, inputId);
+  if (selection.status === "none") {
+    await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
+    return null;
+  }
+  if (selection.status === "needs_id") {
+    await interaction.reply({ content: MULTIPLE_SUBSCRIPTIONS_MESSAGE });
+    return null;
+  }
+  if (selection.status === "not_found") {
+    await interaction.reply({
+      content: "Subscription id not found. Use /contestratingalerts list to see current ids.",
+    });
+    return null;
+  }
+  if (selection.status === "ambiguous") {
+    await interaction.reply({
+      content: `Subscription id matches multiple entries. Use the full id. Matches: ${selection.matches.join(
+        ", "
+      )}`,
+    });
+    return null;
+  }
+  return selection.subscription;
 }
 
 export const contestRatingAlertsCommand: Command = {
@@ -400,30 +437,10 @@ export const contestRatingAlertsCommand: Command = {
       if (subcommand === "preview") {
         const id = interaction.options.getString("id");
         const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const selection = selectSubscription(subscriptions, id);
-        if (selection.status === "none") {
-          await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
+        const subscription = await resolveSubscriptionSelection(interaction, subscriptions, id);
+        if (!subscription) {
           return;
         }
-        if (selection.status === "needs_id") {
-          await interaction.reply({ content: MULTIPLE_SUBSCRIPTIONS_MESSAGE });
-          return;
-        }
-        if (selection.status === "not_found") {
-          await interaction.reply({
-            content: "Subscription id not found. Use /contestratingalerts list to see current ids.",
-          });
-          return;
-        }
-        if (selection.status === "ambiguous") {
-          await interaction.reply({
-            content: `Subscription id matches multiple entries. Use the full id. Matches: ${selection.matches.join(
-              ", "
-            )}`,
-          });
-          return;
-        }
-        const { subscription } = selection;
 
         const preview = await context.services.contestRatingAlerts.getPreview(subscription);
         if (preview.status === "no_handles") {
@@ -477,30 +494,10 @@ export const contestRatingAlertsCommand: Command = {
         const force = interaction.options.getBoolean("force") ?? false;
         const id = interaction.options.getString("id");
         const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const selection = selectSubscription(subscriptions, id);
-        if (selection.status === "none") {
-          await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
+        const subscription = await resolveSubscriptionSelection(interaction, subscriptions, id);
+        if (!subscription) {
           return;
         }
-        if (selection.status === "needs_id") {
-          await interaction.reply({ content: MULTIPLE_SUBSCRIPTIONS_MESSAGE });
-          return;
-        }
-        if (selection.status === "not_found") {
-          await interaction.reply({
-            content: "Subscription id not found. Use /contestratingalerts list to see current ids.",
-          });
-          return;
-        }
-        if (selection.status === "ambiguous") {
-          await interaction.reply({
-            content: `Subscription id matches multiple entries. Use the full id. Matches: ${selection.matches.join(
-              ", "
-            )}`,
-          });
-          return;
-        }
-        const { subscription } = selection;
 
         await interaction.deferReply();
         const result = await context.services.contestRatingAlerts.sendManualAlert(
