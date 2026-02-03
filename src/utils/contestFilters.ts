@@ -3,7 +3,7 @@ export type KeywordFilters = {
   excludeKeywords: string[];
 };
 
-export type ContestReminderPreset = "div2" | "div3" | "educational";
+export type ContestReminderPreset = "div2" | "div3" | "div4" | "educational";
 
 type ContestReminderPresetConfig = KeywordFilters & { label: string };
 
@@ -18,6 +18,7 @@ function buildPreset(
 const CONTEST_REMINDER_PRESETS: Record<ContestReminderPreset, ContestReminderPresetConfig> = {
   div2: buildPreset("Div 2", ["div. 2", "div.2", "div 2"]),
   div3: buildPreset("Div 3", ["div. 3", "div.3", "div 3"]),
+  div4: buildPreset("Div 4", ["div. 4", "div.4", "div 4"]),
   educational: buildPreset("Educational", ["educational"]),
 };
 

@@ -215,7 +215,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   `list`/`status` to see subscription ids, `remove` to delete one, and `clear` to delete all.
   `preview`/`post` accept an optional subscription id when multiple are configured. `post` can
   `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 2,
-  Div 3, or Educational) with sensible keyword filters.
+  Div 3, Div 4, or Educational) with sensible keyword filters.
 
 - **/contestratingalerts** `set|status|list|remove|clear|preview|post`
 
