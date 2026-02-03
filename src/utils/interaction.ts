@@ -220,6 +220,26 @@ export function resolveHandleTargetLabels(
   };
 }
 
+export type HandleTargetLabelsReplyResult =
+  | { status: "replied" }
+  | Extract<HandleTargetLabelsResult, { status: "ok" }>;
+
+export async function resolveHandleTargetLabelsOrReply(
+  interaction: ChatInputCommandInteraction,
+  options: {
+    handleOptionName?: string;
+    userOptionName?: string;
+    contextMessages?: HandleTargetContextMessages;
+  } = {}
+): Promise<HandleTargetLabelsReplyResult> {
+  const result = resolveHandleTargetLabels(interaction, options);
+  if (result.status === "error") {
+    await interaction.reply({ content: result.error });
+    return { status: "replied" };
+  }
+  return result;
+}
+
 type IntegerOptionResolver = {
   options: { getInteger: (name: string) => number | null };
 };

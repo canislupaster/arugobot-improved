@@ -1,6 +1,7 @@
 import {
   resolveBoundedIntegerOption,
   resolveHandleTargetLabels,
+  resolveHandleTargetLabelsOrReply,
   resolveHandleUserOptions,
   resolveTargetLabels,
   safeInteractionDefer,
@@ -222,6 +223,57 @@ describe("resolveHandleTargetLabels", () => {
       targetId: "user-1",
       labels: { displayName: "Nickname", mention: "<@!1>" },
     });
+  });
+});
+
+describe("resolveHandleTargetLabelsOrReply", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      options: {
+        getString: jest.fn().mockReturnValue(null),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+      reply: jest.fn().mockResolvedValue(undefined),
+      user: { id: "user-1", username: "Aru", toString: () => "<@1>" },
+      guild: { id: "guild-1" },
+      ...overrides,
+    }) as never;
+
+  it("replies with errors and returns replied status", async () => {
+    const reply = jest.fn().mockResolvedValue(undefined);
+    const interaction = createInteraction({
+      reply,
+      options: {
+        getString: jest.fn().mockReturnValue("tourist"),
+        getUser: jest.fn().mockReturnValue({ id: "user-2" }),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+
+    const result = await resolveHandleTargetLabelsOrReply(interaction);
+
+    expect(reply).toHaveBeenCalledWith({
+      content: "Provide either a handle or a user, not both.",
+    });
+    expect(result).toEqual({ status: "replied" });
+  });
+
+  it("returns labels on success without replying", async () => {
+    const reply = jest.fn().mockResolvedValue(undefined);
+    const interaction = createInteraction({
+      reply,
+      options: {
+        getString: jest.fn().mockReturnValue(""),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+
+    const result = await resolveHandleTargetLabelsOrReply(interaction);
+
+    expect(reply).not.toHaveBeenCalled();
+    expect(result.status).toBe("ok");
   });
 });
 

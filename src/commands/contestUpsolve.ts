@@ -16,9 +16,7 @@ import {
   formatContestSolvesSummary,
 } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
-import {
-  resolveHandleTargetLabels,
-} from "../utils/interaction.js";
+import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -45,14 +43,13 @@ export const contestUpsolveCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     ),
   async execute(interaction, context) {
-    const targetResolution = resolveHandleTargetLabels(interaction, {
+    const targetResolution = await resolveHandleTargetLabelsOrReply(interaction, {
       contextMessages: {
         userInDm: "Specify handles directly when using this command outside a server.",
         missingHandleInDm: "Run this command in a server or provide a handle.",
       },
     });
-    if (targetResolution.status === "error") {
-      await interaction.reply({ content: targetResolution.error });
+    if (targetResolution.status === "replied") {
       return;
     }
 

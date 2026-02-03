@@ -3,9 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
-import {
-  resolveHandleTargetLabels,
-} from "../utils/interaction.js";
+import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
 import {
   filterSubmissionsByResult,
   formatSubmissionLines,
@@ -49,9 +47,8 @@ export const recentCommand: Command = {
         )
     ),
   async execute(interaction, context) {
-    const targetResolution = resolveHandleTargetLabels(interaction);
-    if (targetResolution.status === "error") {
-      await interaction.reply({ content: targetResolution.error });
+    const targetResolution = await resolveHandleTargetLabelsOrReply(interaction);
+    if (targetResolution.status === "replied") {
       return;
     }
 

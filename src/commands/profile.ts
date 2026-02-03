@@ -4,7 +4,7 @@ import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
-import { resolveHandleTargetLabels } from "../utils/interaction.js";
+import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatSubmissionLines } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -123,9 +123,8 @@ export const profileCommand: Command = {
       option.setName("handle").setDescription("Codeforces handle to inspect")
     ),
   async execute(interaction, context) {
-    const targetResolution = resolveHandleTargetLabels(interaction);
-    if (targetResolution.status === "error") {
-      await interaction.reply({ content: targetResolution.error });
+    const targetResolution = await resolveHandleTargetLabelsOrReply(interaction);
+    if (targetResolution.status === "replied") {
       return;
     }
 
