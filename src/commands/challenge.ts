@@ -14,6 +14,7 @@ import {
 import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, type LogContext } from "../utils/logger.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import {
   filterProblemsByRatingRanges,
   filterProblemsByTags,
@@ -84,7 +85,7 @@ function addParticipantOptions(subcommand: SlashCommandSubcommandBuilder) {
 }
 
 function buildProblemLink(contestId: number, index: string, name: string) {
-  return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
+  return `[${index}. ${name}](${buildProblemUrl(contestId, index)})`;
 }
 
 function uniqueUsers(users: User[]): User[] {

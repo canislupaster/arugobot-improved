@@ -5,7 +5,7 @@ import type { StoreService } from "../services/store.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { parseProblemReference } from "../utils/problemReference.js";
+import { buildProblemUrl, parseProblemReference } from "../utils/problemReference.js";
 import { getColor } from "../utils/rating.js";
 
 import type { Command } from "./types.js";
@@ -23,7 +23,7 @@ type SolvedSummary = {
 };
 
 function buildProblemLink(problem: Problem): string {
-  return `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
+  return buildProblemUrl(problem.contestId, problem.index);
 }
 
 function normalizeHandle(handle: string): string {

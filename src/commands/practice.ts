@@ -4,6 +4,7 @@ import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import { getProblemId } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
 import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
@@ -24,7 +25,7 @@ type PracticeTarget =
   | { status: "invalid_handle" | "missing_handle" };
 
 function buildProblemLink(contestId: number, index: string, name: string): string {
-  return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
+  return `[${index}. ${name}](${buildProblemUrl(contestId, index)})`;
 }
 
 function applyPreferenceFilters(

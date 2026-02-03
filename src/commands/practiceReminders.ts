@@ -17,6 +17,7 @@ import {
   readRatingRangeOptions,
   resolveRatingRanges,
 } from "../utils/ratingRanges.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,
@@ -474,7 +475,10 @@ export const practiceRemindersCommand: Command = {
         if (preview.problem) {
           embed.addFields({
             name: "Sample problem",
-            value: `[${preview.problem.index}. ${preview.problem.name}](https://codeforces.com/problemset/problem/${preview.problem.contestId}/${preview.problem.index})`,
+            value: `[${preview.problem.index}. ${preview.problem.name}](${buildProblemUrl(
+              preview.problem.contestId,
+              preview.problem.index
+            )})`,
             inline: false,
           });
         } else {

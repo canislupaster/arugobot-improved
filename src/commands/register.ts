@@ -14,6 +14,7 @@ import {
 import { waitForCompilationError } from "../services/verification.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, type LogContext } from "../utils/logger.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 
 import type { Command } from "./types.js";
 
@@ -187,7 +188,10 @@ async function verifyHandleOwnership(
   );
 
   const promptMessage = await interaction.editReply({
-    content: `Submit a compilation error to the following problem in the next ${timeoutSeconds} seconds:\nhttps://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}\nI will confirm as soon as I see it.`,
+    content: `Submit a compilation error to the following problem in the next ${timeoutSeconds} seconds:\n${buildProblemUrl(
+      problem.contestId,
+      problem.index
+    )}\nI will confirm as soon as I see it.`,
     components: [row],
   });
 

@@ -10,6 +10,7 @@ import {
   parseTagFilters,
   selectRandomProblems,
 } from "../utils/problemSelection.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import { getColor } from "../utils/rating.js";
 import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
 
@@ -49,7 +50,10 @@ function buildSuggestionDescription(suggestions: Problem[]): string {
   for (const problem of suggestions) {
     const id = getProblemId(problem);
     lines.push(
-      `- [${id}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index})`
+      `- [${id}. ${problem.name}](${buildProblemUrl(
+        problem.contestId,
+        problem.index
+      )})`
     );
   }
   return lines.join("\n");

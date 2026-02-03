@@ -1,4 +1,5 @@
 import { formatDiscordRelativeTime } from "./time.js";
+import { buildProblemUrl } from "./problemReference.js";
 
 export type SubmissionSummary = {
   contestId: number | null;
@@ -27,7 +28,10 @@ export function formatSubmissionLine(submission: SubmissionSummary): string {
   const verdict = submission.verdict ?? "UNKNOWN";
   const when = formatDiscordRelativeTime(submission.creationTimeSeconds);
   if (submission.contestId) {
-    return `- [${submission.index}. ${submission.name}](https://codeforces.com/problemset/problem/${submission.contestId}/${submission.index}) • ${verdict} • ${when}`;
+    return `- [${submission.index}. ${submission.name}](${buildProblemUrl(
+      submission.contestId,
+      submission.index
+    )}) • ${verdict} • ${when}`;
   }
   return `- ${submission.index}. ${submission.name} • ${verdict} • ${when}`;
 }

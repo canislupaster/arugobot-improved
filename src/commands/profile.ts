@@ -5,6 +5,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
 import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatSubmissionLines } from "../utils/submissions.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -30,7 +31,10 @@ type ChallengeStreakSummary = {
 
 function buildProblemLine(entry: ChallengeProblemEntry) {
   if (entry.name && entry.contestId && entry.index) {
-    return `- [${entry.problemId}. ${entry.name}](https://codeforces.com/problemset/problem/${entry.contestId}/${entry.index})`;
+    return `- [${entry.problemId}. ${entry.name}](${buildProblemUrl(
+      entry.contestId,
+      entry.index
+    )})`;
   }
   return `- ${entry.problemId}`;
 }

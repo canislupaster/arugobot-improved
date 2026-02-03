@@ -14,6 +14,7 @@ import {
   parseTagFilters,
   selectRandomProblem,
 } from "../utils/problemSelection.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
 import {
   buildReminderSendErrorResult,
@@ -213,7 +214,10 @@ export function getNextScheduledUtcMs(
 }
 
 function formatProblemLink(problem: Problem): string {
-  return `[${problem.index}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index})`;
+  return `[${problem.index}. ${problem.name}](${buildProblemUrl(
+    problem.contestId,
+    problem.index
+  )})`;
 }
 
 function formatRatingRanges(ranges: RatingRange[]): string {

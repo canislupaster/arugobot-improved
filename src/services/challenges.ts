@@ -6,6 +6,7 @@ import { type Kysely } from "kysely";
 import type { Database } from "../db/types.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import { formatTime, getRatingChanges } from "../utils/rating.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 
@@ -90,7 +91,10 @@ type ContestStatusResponse = Array<{
 const UPDATE_INTERVAL_SECONDS = 30;
 
 function buildProblemLink(problem: ChallengeProblem): string {
-  return `[${problem.index}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index})`;
+  return `[${problem.index}. ${problem.name}](${buildProblemUrl(
+    problem.contestId,
+    problem.index
+  )})`;
 }
 
 function parseIsoToSeconds(value: string | null | undefined): number | null {

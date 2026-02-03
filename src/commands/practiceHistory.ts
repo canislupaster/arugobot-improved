@@ -8,7 +8,7 @@ import type { Problem } from "../services/problems.js";
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { parseProblemReference } from "../utils/problemReference.js";
+import { buildProblemUrl, parseProblemReference } from "../utils/problemReference.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -25,7 +25,10 @@ function formatWhen(iso: string): string {
 }
 
 function buildProblemLink(problem: Problem): string {
-  return `[${problem.index}. ${problem.name}](https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index})`;
+  return `[${problem.index}. ${problem.name}](${buildProblemUrl(
+    problem.contestId,
+    problem.index
+  )})`;
 }
 
 function buildProblemLinkFromId(problemId: string): string {
@@ -33,7 +36,7 @@ function buildProblemLinkFromId(problemId: string): string {
   if (!reference) {
     return problemId;
   }
-  return `[${reference.id}](https://codeforces.com/problemset/problem/${reference.contestId}/${reference.index})`;
+  return `[${reference.id}](${buildProblemUrl(reference.contestId, reference.index)})`;
 }
 
 function formatProblemLine(

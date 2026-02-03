@@ -1,6 +1,7 @@
 import type { Problem } from "../services/problems.js";
 
 import { normalizeHandleKey } from "./handles.js";
+import { buildProblemUrl } from "./problemReference.js";
 
 export type ContestSolveEntry = {
   handle: string;
@@ -28,7 +29,7 @@ export function getContestProblems(problems: Problem[], contestId: number): Prob
 }
 
 export function buildProblemLink(problem: Pick<Problem, "contestId" | "index">): string {
-  return `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
+  return buildProblemUrl(problem.contestId, problem.index);
 }
 
 export function formatContestProblemLine(

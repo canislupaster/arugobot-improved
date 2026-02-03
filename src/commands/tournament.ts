@@ -30,6 +30,7 @@ import {
 } from "../utils/pagination.js";
 import { formatTime } from "../utils/rating.js";
 import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import { capitalize } from "../utils/text.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 import {
@@ -628,7 +629,7 @@ export const tournamentCommand: Command = {
           const problemLines = arena.problems
             .map((problem) => {
               const ratingLabel = problem.rating ? ` (${problem.rating})` : "";
-              const url = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
+              const url = buildProblemUrl(problem.contestId, problem.index);
               return `[${problem.contestId}${problem.index}](${url})${ratingLabel} • ${problem.name}`;
             })
             .join("\n");
@@ -1116,7 +1117,7 @@ export const tournamentCommand: Command = {
         if (result.kind === "arena") {
           const problemsList = result.problems
             .map((problem) => {
-              const url = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
+              const url = buildProblemUrl(problem.contestId, problem.index);
               const ratingLabel = problem.rating ? ` (${problem.rating})` : "";
               return `- [${problem.contestId}${problem.index}](${url})${ratingLabel} • ${problem.name}`;
             })

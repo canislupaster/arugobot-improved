@@ -1,4 +1,4 @@
-import { parseProblemReference } from "../../src/utils/problemReference.js";
+import { buildProblemUrl, parseProblemReference } from "../../src/utils/problemReference.js";
 
 describe("parseProblemReference", () => {
   it("parses raw ids", () => {
@@ -48,5 +48,11 @@ describe("parseProblemReference", () => {
     expect(parseProblemReference("")).toBeNull();
     expect(parseProblemReference("invalid")).toBeNull();
     expect(parseProblemReference("1000")).toBeNull();
+  });
+});
+
+describe("buildProblemUrl", () => {
+  it("builds Codeforces problem links", () => {
+    expect(buildProblemUrl(1000, "A")).toBe("https://codeforces.com/problemset/problem/1000/A");
   });
 });

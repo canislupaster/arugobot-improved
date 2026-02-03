@@ -10,6 +10,7 @@ import {
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import { formatTime } from "../utils/rating.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -47,7 +48,7 @@ function truncateLabel(value: string, maxLength: number): string {
 }
 
 function buildProblemLink(contestId: number, index: string, name: string): string {
-  return `[${index}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
+  return `[${index}. ${name}](${buildProblemUrl(contestId, index)})`;
 }
 
 function formatActiveChallengeLine(
