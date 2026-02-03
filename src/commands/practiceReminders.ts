@@ -1,10 +1,4 @@
-import {
-  ChannelType,
-  type Client,
-  EmbedBuilder,
-  PermissionFlagsBits,
-  SlashCommandBuilder,
-} from "discord.js";
+import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
@@ -13,6 +7,7 @@ import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
+  resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
@@ -40,36 +35,6 @@ const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKENDS = [0, 6];
-
-type ChannelLike = { id: string; type: ChannelType };
-type ReminderChannel = ChannelLike & {
-  type: ChannelType.GuildText | ChannelType.GuildAnnouncement;
-};
-
-function isReminderChannel(channel: ChannelLike): channel is ReminderChannel {
-  return channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement;
-}
-
-async function resolveReminderChannelOrReply(
-  interaction: Parameters<Command["execute"]>[0],
-  client: Client,
-  channel: ChannelLike
-): Promise<ReminderChannel | null> {
-  if (!isReminderChannel(channel)) {
-    await interaction.reply({
-      content: "Pick a text channel for practice reminders.",
-    });
-    return null;
-  }
-  const status = await getSendableChannelStatus(client, channel.id);
-  if (status.status !== "ok") {
-    await interaction.reply({
-      content: formatCannotPostMessage(channel.id, status),
-    });
-    return null;
-  }
-  return channel;
-}
 
 function formatDaysLabel(days: number[]): string {
   const normalized = Array.from(new Set(days)).sort((a, b) => a - b);
@@ -383,10 +348,11 @@ export const practiceRemindersCommand: Command = {
       }
 
       if (subcommand === "set") {
-        const channel = await resolveReminderChannelOrReply(
+        const channel = await resolveSendableChannelOrReply(
           interaction,
           context.client,
-          interaction.options.getChannel("channel", true)
+          interaction.options.getChannel("channel", true),
+          { invalidTypeMessage: "Pick a text channel for practice reminders." }
         );
         if (!channel) {
           return;

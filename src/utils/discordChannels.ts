@@ -4,6 +4,7 @@ import {
   type Channel,
   type Client,
   type NewsChannel,
+  type RepliableInteraction,
   type TextChannel,
 } from "discord.js";
 
@@ -15,6 +16,11 @@ export type SendableChannelStatus =
   | { status: "ok"; channel: SendableChannel }
   | { status: "missing"; channelId: string }
   | { status: "missing_permissions"; channelId: string; missingPermissions: string[] };
+type ChannelLike = {
+  id: string;
+  type: ChannelType;
+  permissionsFor?: unknown;
+};
 
 const REQUIRED_SEND_PERMISSIONS = [
   { flag: PermissionFlagsBits.ViewChannel, name: "ViewChannel" },
@@ -133,6 +139,31 @@ export async function resolveSendableChannel(
   }
   const missingPermissions = getMissingSendPermissions(channel, client);
   return missingPermissions ? null : channel;
+}
+
+export async function resolveSendableChannelOrReply(
+  interaction: RepliableInteraction,
+  client: Client,
+  channel: Channel | ChannelLike | null,
+  options: { invalidTypeMessage: string }
+): Promise<SendableChannel | null> {
+  if (
+    !channel ||
+    (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
+  ) {
+    await interaction.reply({ content: options.invalidTypeMessage });
+    return null;
+  }
+  const hasPermissionsFor =
+    "permissionsFor" in channel && typeof (channel as ChannelLike).permissionsFor === "function";
+  const status = hasPermissionsFor
+    ? getSendableChannelStatusForChannel(client, channel as Channel, channel.id)
+    : await getSendableChannelStatus(client, channel.id);
+  if (status.status !== "ok") {
+    await interaction.reply({ content: formatCannotPostMessage(channel.id, status) });
+    return null;
+  }
+  return channel as SendableChannel;
 }
 
 export async function resolveSendableChannelOrWarn(

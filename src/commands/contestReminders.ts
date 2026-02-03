@@ -1,6 +1,5 @@
 import {
   ChannelType,
-  type Client,
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -25,6 +24,7 @@ import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
+  resolveSendableChannelOrReply,
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -36,11 +36,6 @@ const DEFAULT_MINUTES = 30;
 const MIN_MINUTES = 5;
 const MAX_MINUTES = 24 * 60;
 const DEFAULT_SCOPE: ContestScopeFilter = "official";
-
-type ChannelLike = { id: string; type: ChannelType };
-type ReminderChannel = ChannelLike & {
-  type: ChannelType.GuildText | ChannelType.GuildAnnouncement;
-};
 
 function normalizeScope(raw: string | null): ContestScopeFilter {
   if (raw === "official" || raw === "gym" || raw === "all") {
@@ -55,31 +50,6 @@ function formatScope(scope: ContestScopeFilter): string {
 
 function formatKeywordList(keywords: string[]): string {
   return keywords.length > 0 ? keywords.join(", ") : "None";
-}
-
-function isReminderChannel(channel: ChannelLike): channel is ReminderChannel {
-  return channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement;
-}
-
-async function resolveReminderChannelOrReply(
-  interaction: Parameters<Command["execute"]>[0],
-  client: Client,
-  channel: ChannelLike
-): Promise<ReminderChannel | null> {
-  if (!isReminderChannel(channel)) {
-    await interaction.reply({
-      content: "Pick a text channel for contest reminders.",
-    });
-    return null;
-  }
-  const status = await getSendableChannelStatus(client, channel.id);
-  if (status.status !== "ok") {
-    await interaction.reply({
-      content: formatCannotPostMessage(channel.id, status),
-    });
-    return null;
-  }
-  return channel;
 }
 
 function formatFilterLabel(includeKeywords: string[], excludeKeywords: string[]): string {
@@ -580,10 +550,11 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "set" || subcommand === "add") {
-        const channel = await resolveReminderChannelOrReply(
+        const channel = await resolveSendableChannelOrReply(
           interaction,
           context.client,
-          interaction.options.getChannel("channel", true)
+          interaction.options.getChannel("channel", true),
+          { invalidTypeMessage: "Pick a text channel for contest reminders." }
         );
         if (!channel) {
           return;
@@ -621,10 +592,11 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "preset") {
-        const channel = await resolveReminderChannelOrReply(
+        const channel = await resolveSendableChannelOrReply(
           interaction,
           context.client,
-          interaction.options.getChannel("channel", true)
+          interaction.options.getChannel("channel", true),
+          { invalidTypeMessage: "Pick a text channel for contest reminders." }
         );
         if (!channel) {
           return;

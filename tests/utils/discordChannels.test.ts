@@ -1,4 +1,10 @@
-import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
+import {
+  ChannelType,
+  PermissionFlagsBits,
+  type Channel,
+  type Client,
+  type RepliableInteraction,
+} from "discord.js";
 
 import {
   buildChannelServiceError,
@@ -7,6 +13,7 @@ import {
   getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
   resolveSendableChannel,
+  resolveSendableChannelOrReply,
   resolveSendableChannelOrWarn,
   resetChannelWarningCache,
 } from "../../src/utils/discordChannels.js";
@@ -246,5 +253,70 @@ describe("resolveSendableChannel", () => {
 
     expect(logWarn).toHaveBeenCalledTimes(1);
     logWarn.mockRestore();
+  });
+});
+
+describe("resolveSendableChannelOrReply", () => {
+  it("replies when the channel type is invalid", async () => {
+    const channel = { id: "channel-1", type: ChannelType.GuildVoice };
+    const interaction = { reply: jest.fn().mockResolvedValue(undefined) };
+    const client = { channels: { fetch: jest.fn() } } as unknown as Client;
+
+    const result = await resolveSendableChannelOrReply(
+      interaction as unknown as RepliableInteraction,
+      client,
+      channel as unknown as Channel,
+      { invalidTypeMessage: "Pick a text channel." }
+    );
+
+    expect(result).toBeNull();
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Pick a text channel." });
+  });
+
+  it("replies when missing permissions", async () => {
+    const channel = {
+      id: "channel-2",
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: (flag: bigint) => flag === PermissionFlagsBits.ViewChannel,
+      }),
+    };
+    const interaction = { reply: jest.fn().mockResolvedValue(undefined) };
+    const client = { user: { id: "user-1" } } as unknown as Client;
+
+    const result = await resolveSendableChannelOrReply(
+      interaction as unknown as RepliableInteraction,
+      client,
+      channel as unknown as Channel,
+      { invalidTypeMessage: "Pick a text channel." }
+    );
+
+    expect(result).toBeNull();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        "I can't post in <#channel-2> (Missing permissions (SendMessages)). Check the bot permissions and try again.",
+    });
+  });
+
+  it("returns the channel when sendable", async () => {
+    const channel = {
+      id: "channel-3",
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: () => true,
+      }),
+    };
+    const interaction = { reply: jest.fn().mockResolvedValue(undefined) };
+    const client = { user: { id: "user-1" } } as unknown as Client;
+
+    const result = await resolveSendableChannelOrReply(
+      interaction as unknown as RepliableInteraction,
+      client,
+      channel as unknown as Channel,
+      { invalidTypeMessage: "Pick a text channel." }
+    );
+
+    expect(result).toBe(channel);
+    expect(interaction.reply).not.toHaveBeenCalled();
   });
 });
