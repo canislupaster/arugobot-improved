@@ -219,12 +219,14 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 2,
   Div 3, Div 4, or Educational) with sensible keyword filters.
 
-- **/contestratingalerts** `set|status|list|remove|clear|preview|post`
+- **/contestratingalerts** `set|status|list|remove|clear|cleanup|preview|post`
 
   Configure rating change alerts for finished contests (admin only). Use `set` to choose a channel
   and optional role mention, `min_delta` filter, and `handles` filter (comma-separated, linked
-  handles only). `preview` shows the next alert for linked handles, and `post` sends the latest
-  rating change summary immediately (optionally `force` to resend).
+  handles only). `cleanup` removes subscriptions pointing at deleted channels (add
+  `include_permissions:true` to also remove ones missing bot permissions). `preview` shows the next
+  alert for linked handles, and `post` sends the latest rating change summary immediately (optionally
+  `force` to resend).
 
 - **/practicereminders** `set|status|clear|cleanup|preview|post`
 

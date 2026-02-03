@@ -9,6 +9,7 @@ import {
 
 import type { ContestReminder } from "../services/contestReminders.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
+import { cleanupChannelSubscriptions, formatIdList } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   filterContestsByKeywords,
@@ -141,10 +142,6 @@ function formatSubscriptionSummary(
     `ID: \`${subscription.id}\``,
   ];
   return lines.join("\n");
-}
-
-function formatIdList(ids: string[]): string {
-  return ids.map((id) => `\`${id}\``).join(", ");
 }
 
 type NextReminderInfo = {
@@ -509,57 +506,20 @@ export const contestRemindersCommand: Command = {
         }
 
         const includePermissions = interaction.options.getBoolean?.("include_permissions") ?? false;
-
-        const channelStatuses = await Promise.all(
-          subscriptions.map((subscription) =>
-            getSendableChannelStatus(context.client, subscription.channelId)
-          )
-        );
-
-        const removedIds: string[] = [];
-        const removedPermissionIds: string[] = [];
-        const failedPermissionIds: string[] = [];
-        const failedIds: string[] = [];
-        const permissionIssues: Array<{
-          id: string;
-          channelId: string;
-          status: SendableChannelStatus;
-        }> = [];
-
-        for (const [index, subscription] of subscriptions.entries()) {
-          const status = channelStatuses[index]!;
-          if (status.status === "missing") {
-            const removed = await context.services.contestReminders.removeSubscription(
-              guildId,
-              subscription.id
-            );
-            if (removed) {
-              removedIds.push(subscription.id);
-            } else {
-              failedIds.push(subscription.id);
-            }
-            continue;
-          }
-          if (status.status === "missing_permissions") {
-            if (includePermissions) {
-              const removed = await context.services.contestReminders.removeSubscription(
-                guildId,
-                subscription.id
-              );
-              if (removed) {
-                removedPermissionIds.push(subscription.id);
-              } else {
-                failedPermissionIds.push(subscription.id);
-              }
-            } else {
-              permissionIssues.push({
-                id: subscription.id,
-                channelId: subscription.channelId,
-                status,
-              });
-            }
-          }
-        }
+        const cleanup = await cleanupChannelSubscriptions({
+          client: context.client,
+          subscriptions,
+          includePermissions,
+          removeSubscription: (id) =>
+            context.services.contestReminders.removeSubscription(guildId, id),
+        });
+        const {
+          removedIds,
+          removedPermissionIds,
+          failedIds,
+          failedPermissionIds,
+          permissionIssues,
+        } = cleanup;
 
         if (
           removedIds.length === 0 &&

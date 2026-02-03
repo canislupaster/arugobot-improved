@@ -4,6 +4,7 @@ import {
   buildContestRatingAlertEmbed,
   type ContestRatingAlertSubscription,
 } from "../services/contestRatingAlerts.js";
+import { cleanupChannelSubscriptions, formatIdList } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   describeSendableChannelStatus,
@@ -147,6 +148,16 @@ export const contestRatingAlertsCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("cleanup")
+        .setDescription("Remove rating alerts targeting deleted channels")
+        .addBooleanOption((option) =>
+          option
+            .setName("include_permissions")
+            .setDescription("Also remove subscriptions where the bot lacks permissions")
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("preview")
         .setDescription("Preview the next contest rating change alert")
         .addStringOption((option) =>
@@ -223,6 +234,89 @@ export const contestRatingAlertsCommand: Command = {
         return;
       }
 
+      if (subcommand === "cleanup") {
+        const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
+        if (subscriptions.length === 0) {
+          await interaction.reply({
+            content: NO_SUBSCRIPTIONS_MESSAGE,
+          });
+          return;
+        }
+
+        const includePermissions = interaction.options.getBoolean?.("include_permissions") ?? false;
+        const cleanup = await cleanupChannelSubscriptions({
+          client: context.client,
+          subscriptions,
+          includePermissions,
+          removeSubscription: (id) =>
+            context.services.contestRatingAlerts.removeSubscription(guildId, id),
+        });
+        const {
+          removedIds,
+          removedPermissionIds,
+          failedIds,
+          failedPermissionIds,
+          permissionIssues,
+        } = cleanup;
+
+        if (
+          removedIds.length === 0 &&
+          removedPermissionIds.length === 0 &&
+          failedIds.length === 0 &&
+          failedPermissionIds.length === 0 &&
+          permissionIssues.length === 0
+        ) {
+          await interaction.reply({
+            content: "All contest rating alert channels look good.",
+          });
+          return;
+        }
+
+        const lines: string[] = [];
+        if (removedIds.length > 0) {
+          lines.push(
+            `Removed ${removedIds.length} contest rating alert subscription${
+              removedIds.length === 1 ? "" : "s"
+            } with missing channels: ${formatIdList(removedIds)}.`
+          );
+        }
+        if (removedPermissionIds.length > 0) {
+          lines.push(
+            `Removed ${removedPermissionIds.length} contest rating alert subscription${
+              removedPermissionIds.length === 1 ? "" : "s"
+            } with missing permissions: ${formatIdList(removedPermissionIds)}.`
+          );
+        }
+        if (failedIds.length > 0) {
+          lines.push(
+            `Failed to remove ${failedIds.length} subscription${failedIds.length === 1 ? "" : "s"}: ${formatIdList(
+              failedIds
+            )}.`
+          );
+        }
+        if (failedPermissionIds.length > 0) {
+          lines.push(
+            `Failed to remove ${failedPermissionIds.length} subscription${
+              failedPermissionIds.length === 1 ? "" : "s"
+            } with missing permissions: ${formatIdList(failedPermissionIds)}.`
+          );
+        }
+        if (permissionIssues.length > 0) {
+          const issueLines = permissionIssues.map(
+            (issue) =>
+              `${formatIdList([issue.id])} (<#${issue.channelId}>): ${describeSendableChannelStatus(
+                issue.status
+              )}`
+          );
+          lines.push(
+            `Subscriptions with missing permissions (not removed): ${issueLines.join("; ")}.`
+          );
+        }
+
+        await interaction.reply({ content: lines.join("\n") });
+        return;
+      }
+
       if (subcommand === "set") {
         const channel = interaction.options.getChannel("channel", true);
         if (
@@ -234,13 +328,13 @@ export const contestRatingAlertsCommand: Command = {
           });
           return;
         }
-      const status = await getSendableChannelStatus(context.client, channel.id);
-      if (status.status !== "ok") {
-        await interaction.reply({
-          content: formatCannotPostMessage(channel.id, status),
-        });
-        return;
-      }
+        const status = await getSendableChannelStatus(context.client, channel.id);
+        if (status.status !== "ok") {
+          await interaction.reply({
+            content: formatCannotPostMessage(channel.id, status),
+          });
+          return;
+        }
         const role = interaction.options.getRole("role");
         const roleId = role?.id ?? null;
         const minDelta = interaction.options.getInteger("min_delta") ?? 0;

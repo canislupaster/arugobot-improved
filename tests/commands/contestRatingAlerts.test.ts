@@ -181,6 +181,157 @@ describe("contestRatingAlertsCommand", () => {
     expect(fieldValue).toContain("Last sent: 2026-02-01T00:00:00.000Z");
   });
 
+  it("cleans up alerts with missing channels and reports permission issues", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("cleanup"),
+        getChannel: jest.fn(),
+        getRole: jest.fn(),
+        getString: jest.fn(),
+      },
+    });
+    const subscriptions = [
+      {
+        id: "sub-1",
+        guildId: "guild-1",
+        channelId: "channel-missing",
+        roleId: null,
+        minDelta: 0,
+        includeHandles: [],
+      },
+      {
+        id: "sub-2",
+        guildId: "guild-1",
+        channelId: "channel-noperms",
+        roleId: null,
+        minDelta: 0,
+        includeHandles: [],
+      },
+      {
+        id: "sub-3",
+        guildId: "guild-1",
+        channelId: "channel-ok",
+        roleId: null,
+        minDelta: 0,
+        includeHandles: [],
+      },
+    ];
+    const removeSubscription = jest.fn().mockResolvedValue(true);
+    const client = {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockImplementation(async (channelId: string) => {
+          if (channelId === "channel-missing") {
+            return null;
+          }
+          if (channelId === "channel-noperms") {
+            return {
+              id: channelId,
+              type: ChannelType.GuildText,
+              permissionsFor: jest.fn().mockReturnValue({
+                has: jest.fn().mockReturnValue(false),
+              }),
+            };
+          }
+          return {
+            id: channelId,
+            type: ChannelType.GuildText,
+            permissionsFor: jest.fn().mockReturnValue({
+              has: jest.fn().mockReturnValue(true),
+            }),
+          };
+        }),
+      },
+    };
+    const context = {
+      correlationId: "corr-cleanup",
+      client,
+      services: {
+        contestRatingAlerts: {
+          listSubscriptions: jest.fn().mockResolvedValue(subscriptions),
+          removeSubscription,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRatingAlertsCommand.execute(interaction, context);
+
+    expect(removeSubscription).toHaveBeenCalledWith("guild-1", "sub-1");
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        "Removed 1 contest rating alert subscription with missing channels: `sub-1`.\n" +
+        "Subscriptions with missing permissions (not removed): `sub-2` (<#channel-noperms>): Missing permissions (ViewChannel, SendMessages).",
+    });
+  });
+
+  it("cleans up alerts with missing permissions when requested", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("cleanup"),
+        getChannel: jest.fn(),
+        getRole: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(true),
+      },
+    });
+    const subscriptions = [
+      {
+        id: "sub-1",
+        guildId: "guild-1",
+        channelId: "channel-missing",
+        roleId: null,
+        minDelta: 0,
+        includeHandles: [],
+      },
+      {
+        id: "sub-2",
+        guildId: "guild-1",
+        channelId: "channel-noperms",
+        roleId: null,
+        minDelta: 0,
+        includeHandles: [],
+      },
+    ];
+    const removeSubscription = jest.fn().mockResolvedValue(true);
+    const client = {
+      user: { id: "bot-1" },
+      channels: {
+        fetch: jest.fn().mockImplementation(async (channelId: string) => {
+          if (channelId === "channel-missing") {
+            return null;
+          }
+          return {
+            id: channelId,
+            type: ChannelType.GuildText,
+            permissionsFor: jest.fn().mockReturnValue({
+              has: jest.fn().mockReturnValue(false),
+            }),
+          };
+        }),
+      },
+    };
+    const context = {
+      correlationId: "corr-cleanup-perms",
+      client,
+      services: {
+        contestRatingAlerts: {
+          listSubscriptions: jest.fn().mockResolvedValue(subscriptions),
+          removeSubscription,
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRatingAlertsCommand.execute(interaction, context);
+
+    expect(removeSubscription).toHaveBeenCalledWith("guild-1", "sub-1");
+    expect(removeSubscription).toHaveBeenCalledWith("guild-1", "sub-2");
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content:
+        "Removed 1 contest rating alert subscription with missing channels: `sub-1`.\n" +
+        "Removed 1 contest rating alert subscription with missing permissions: `sub-2`.",
+    });
+  });
+
   it("previews the next rating change alert when configured", async () => {
     const interaction = createInteraction({
       options: {
