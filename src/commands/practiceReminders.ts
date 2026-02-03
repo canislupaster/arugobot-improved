@@ -1,6 +1,7 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
+import { addScheduleOptions } from "../utils/commandOptions.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
@@ -133,38 +134,13 @@ export const practiceRemindersCommand: Command = {
     .setDescription("Configure practice problem reminders")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("set")
-        .setDescription("Enable practice reminders")
-        .addChannelOption((option) =>
-          option
-            .setName("channel")
-            .setDescription("Channel to post practice problems in")
-            .setRequired(true)
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-        )
-        .addRoleOption((option) =>
-          option.setName("role").setDescription("Role to mention for practice reminders")
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("hour_utc")
-            .setDescription("Hour to post (uses utc_offset if set; defaults to UTC)")
-            .setMinValue(0)
-            .setMaxValue(23)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("minute_utc")
-            .setDescription("Minute to post (uses utc_offset if set; defaults to UTC)")
-            .setMinValue(0)
-            .setMaxValue(59)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("utc_offset")
-            .setDescription("UTC offset for local time (e.g. +02:00, -05:30, Z)")
-        )
+      addScheduleOptions(
+        subcommand.setName("set").setDescription("Enable practice reminders"),
+        {
+          channelDescription: "Channel to post practice problems in",
+          roleDescription: "Role to mention for practice reminders",
+        }
+      )
         .addIntegerOption((option) =>
           option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
         )

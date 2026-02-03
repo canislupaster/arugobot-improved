@@ -1,6 +1,7 @@
 import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextWeeklyScheduledUtcMs } from "../services/weeklyDigest.js";
+import { addScheduleOptions } from "../utils/commandOptions.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { requireGuild } from "../utils/interaction.js";
 import {
@@ -74,52 +75,29 @@ export const digestCommand: Command = {
     .setDescription("Configure weekly digest posts")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("set")
-        .setDescription("Enable weekly digests")
-        .addChannelOption((option) =>
-          option
-            .setName("channel")
-            .setDescription("Channel to post the digest in")
-            .setRequired(true)
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("day")
-            .setDescription("Day of the week to post")
-            .addChoices(
-              { name: "Sunday", value: "sun" },
-              { name: "Monday", value: "mon" },
-              { name: "Tuesday", value: "tue" },
-              { name: "Wednesday", value: "wed" },
-              { name: "Thursday", value: "thu" },
-              { name: "Friday", value: "fri" },
-              { name: "Saturday", value: "sat" }
-            )
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("hour_utc")
-            .setDescription("Hour to post (uses utc_offset if set; defaults to UTC)")
-            .setMinValue(0)
-            .setMaxValue(23)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("minute_utc")
-            .setDescription("Minute to post (uses utc_offset if set; defaults to UTC)")
-            .setMinValue(0)
-            .setMaxValue(59)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("utc_offset")
-            .setDescription("UTC offset for local time (e.g. +02:00, -05:30, Z)")
-        )
-        .addRoleOption((option) =>
-          option.setName("role").setDescription("Role to mention for weekly digests")
-        )
+      addScheduleOptions(
+        subcommand
+          .setName("set")
+          .setDescription("Enable weekly digests")
+          .addStringOption((option) =>
+            option
+              .setName("day")
+              .setDescription("Day of the week to post")
+              .addChoices(
+                { name: "Sunday", value: "sun" },
+                { name: "Monday", value: "mon" },
+                { name: "Tuesday", value: "tue" },
+                { name: "Wednesday", value: "wed" },
+                { name: "Thursday", value: "thu" },
+                { name: "Friday", value: "fri" },
+                { name: "Saturday", value: "sat" }
+              )
+          ),
+        {
+          channelDescription: "Channel to post the digest in",
+          roleDescription: "Role to mention for weekly digests",
+        }
+      )
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("status").setDescription("Show the current digest schedule")
