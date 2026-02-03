@@ -7,12 +7,18 @@ import type { Database } from "../../src/db/types.js";
 import { TournamentRecapService } from "../../src/services/tournamentRecaps.js";
 import type { TournamentRecap, TournamentService } from "../../src/services/tournaments.js";
 
-const createMockClient = (send: jest.Mock, channelType = ChannelType.GuildText) =>
+const createMockClient = (
+  send: jest.Mock,
+  channelType = ChannelType.GuildText,
+  permissions: { has: jest.Mock } | null = { has: jest.fn().mockReturnValue(true) }
+) =>
   ({
+    user: { id: "bot-1" },
     channels: {
       fetch: jest.fn().mockResolvedValue({
         type: channelType,
         send,
+        permissionsFor: jest.fn().mockReturnValue(permissions),
       }),
     },
   }) as unknown as Client;
@@ -139,6 +145,39 @@ describe("TournamentRecapService", () => {
     const result = await service.postLatestCompletedRecap("guild-1", client);
 
     expect(result.status).toBe("channel_missing");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("returns channel_missing_permissions when the bot cannot post in the channel", async () => {
+    await db
+      .insertInto("tournaments")
+      .values({
+        id: "tournament-1",
+        guild_id: "guild-1",
+        channel_id: "channel-1",
+        host_user_id: "host-1",
+        format: "swiss",
+        status: "completed",
+        length_minutes: 40,
+        round_count: 3,
+        current_round: 3,
+        rating_ranges: "[]",
+        tags: "",
+        created_at: "2026-01-24T10:00:00.000Z",
+        updated_at: "2026-01-24T12:00:00.000Z",
+      })
+      .execute();
+
+    const service = new TournamentRecapService(db, tournaments);
+    await service.setSubscription("guild-1", "channel-1", null);
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send, ChannelType.GuildText, {
+      has: jest.fn().mockReturnValue(false),
+    });
+
+    const result = await service.postLatestCompletedRecap("guild-1", client);
+
+    expect(result.status).toBe("channel_missing_permissions");
     expect(send).not.toHaveBeenCalled();
   });
 });

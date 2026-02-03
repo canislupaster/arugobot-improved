@@ -1,6 +1,16 @@
-import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import {
+  ChannelType,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+} from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import {
+  describeSendableChannelStatus,
+  formatCannotPostMessage,
+  getSendableChannelStatus,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 
 import type { Command } from "./types.js";
@@ -30,6 +40,16 @@ export const tournamentRecapsCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("clear").setDescription("Disable automatic recap posts")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("cleanup")
+        .setDescription("Remove recap settings pointing at missing channels")
+        .addBooleanOption((option) =>
+          option
+            .setName("include_permissions")
+            .setDescription("Also remove if the bot is missing channel permissions")
+        )
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("post").setDescription("Post the latest completed tournament recap")
@@ -93,6 +113,42 @@ export const tournamentRecapsCommand: Command = {
           );
           return;
         }
+        case "cleanup": {
+          const subscription = await context.services.tournamentRecaps.getSubscription(guildId);
+          if (!subscription) {
+            await replyWithContent(noSubscriptionMessage);
+            return;
+          }
+          const channelStatus = await getSendableChannelStatus(
+            context.client,
+            subscription.channelId
+          );
+          if (channelStatus.status === "ok") {
+            await replyWithContent("Tournament recap channel looks healthy; nothing to clean.");
+            return;
+          }
+          if (channelStatus.status === "missing_permissions") {
+            const includePermissions =
+              interaction.options.getBoolean("include_permissions") ?? false;
+            if (!includePermissions) {
+              await replyWithContent(
+                `Tournament recaps still point at <#${subscription.channelId}> (${describeSendableChannelStatus(
+                  channelStatus
+                )}). Re-run with include_permissions:true or update the channel with /tournamentrecaps set.`
+              );
+              return;
+            }
+          }
+          const removed = await context.services.tournamentRecaps.clearSubscription(guildId);
+          await replyWithContent(
+            removed
+              ? `Removed tournament recap settings for <#${subscription.channelId}> (${describeSendableChannelStatus(
+                  channelStatus
+                )}).`
+              : "Failed to remove tournament recap settings. Try again later."
+          );
+          return;
+        }
         case "set": {
           const channel = interaction.options.getChannel("channel", true);
           if (
@@ -100,6 +156,11 @@ export const tournamentRecapsCommand: Command = {
             channel.type !== ChannelType.GuildAnnouncement
           ) {
             await replyWithContent("Pick a text channel for tournament recaps.");
+            return;
+          }
+          const status = await getSendableChannelStatus(context.client, channel.id);
+          if (status.status !== "ok") {
+            await replyWithContent(formatCannotPostMessage(channel.id, status));
             return;
           }
           const role = interaction.options.getRole("role");
@@ -119,6 +180,16 @@ export const tournamentRecapsCommand: Command = {
           );
           if (result.status === "error") {
             await interaction.editReply(`Failed to post recap: ${result.message}`);
+            return;
+          }
+          if (result.status === "channel_missing_permissions") {
+            await interaction.editReply(
+              formatCannotPostMessage(result.channelId, {
+                status: "missing_permissions",
+                channelId: result.channelId,
+                missingPermissions: result.missingPermissions,
+              })
+            );
             return;
           }
           if (result.status !== "sent") {

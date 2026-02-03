@@ -35,7 +35,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   `history` lists recently completed or cancelled tournaments for the server (select a tournament for a recap
   and export CSV/markdown results).
 
-- **/tournamentrecaps** `set|status|clear|post`
+- **/tournamentrecaps** `set|status|clear|cleanup|post`
 
   Configure automatic tournament recap posts. Use `set` to choose a channel and optional role mention.
   `post` sends the latest completed tournament recap immediately.

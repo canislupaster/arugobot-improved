@@ -1,7 +1,11 @@
-import { AttachmentBuilder, ChannelType, EmbedBuilder, type Client } from "discord.js";
+import { AttachmentBuilder, EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
+import {
+  buildChannelServiceError,
+  getSendableChannelStatusOrWarn,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
@@ -28,6 +32,7 @@ export type TournamentRecapPostResult =
   | { status: "no_completed" }
   | { status: "recap_missing"; tournamentId: string }
   | { status: "channel_missing"; channelId: string }
+  | { status: "channel_missing_permissions"; channelId: string; missingPermissions: string[] }
   | { status: "sent"; channelId: string; tournamentId: string }
   | { status: "error"; message: string };
 
@@ -200,18 +205,33 @@ export class TournamentRecapService {
       return { status: "recap_missing", tournamentId };
     }
 
-    const channel = await client.channels.fetch(subscription.channelId).catch(() => null);
-    if (
-      !channel ||
-      (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
-    ) {
-      logWarn("Tournament recap channel missing.", {
+    const channelStatus = await getSendableChannelStatusOrWarn(
+      client,
+      subscription.channelId,
+      "Tournament recap channel missing or invalid.",
+      {
         guildId: subscription.guildId,
         channelId: subscription.channelId,
         tournamentId,
-      });
+      }
+    );
+    if (channelStatus.status !== "ok") {
+      this.lastError =
+        buildChannelServiceError(
+          "Tournament recap",
+          subscription.channelId,
+          channelStatus
+        ) ?? this.lastError;
+      if (channelStatus.status === "missing_permissions") {
+        return {
+          status: "channel_missing_permissions",
+          channelId: subscription.channelId,
+          missingPermissions: channelStatus.missingPermissions,
+        };
+      }
       return { status: "channel_missing", channelId: subscription.channelId };
     }
+    const channel = channelStatus.channel;
 
     const embed = buildRecapEmbed(recap);
     const markdown = formatTournamentRecapMarkdown(recap);

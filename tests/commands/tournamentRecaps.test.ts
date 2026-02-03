@@ -3,6 +3,14 @@ import { ChannelType, type ChatInputCommandInteraction } from "discord.js";
 import { tournamentRecapsCommand } from "../../src/commands/tournamentRecaps.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
+const createClient = (channel: unknown) =>
+  ({
+    user: { id: "bot-1" },
+    channels: {
+      fetch: jest.fn().mockResolvedValue(channel),
+    },
+  }) as unknown as CommandContext["client"];
+
 const createInteraction = (overrides: Record<string, unknown> = {}) =>
   ({
     commandName: "tournamentrecaps",
@@ -46,6 +54,9 @@ describe("tournamentRecapsCommand", () => {
     const channel = {
       id: "channel-1",
       type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(true),
+      }),
     };
     const interaction = createInteraction({
       options: {
@@ -56,6 +67,7 @@ describe("tournamentRecapsCommand", () => {
     });
     const context = {
       correlationId: "corr-2",
+      client: createClient(channel),
       services: {
         tournamentRecaps: {
           setSubscription: jest.fn().mockResolvedValue(undefined),
@@ -96,5 +108,32 @@ describe("tournamentRecapsCommand", () => {
     await tournamentRecapsCommand.execute(interaction, context);
 
     expect(interaction.editReply).toHaveBeenCalledWith("No completed tournaments to recap.");
+  });
+
+  it("cleans up missing recap channels", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("cleanup"),
+        getBoolean: jest.fn().mockReturnValue(false),
+      },
+    });
+    const context = {
+      correlationId: "corr-4",
+      client: createClient(null),
+      services: {
+        tournamentRecaps: {
+          getSubscription: jest.fn().mockResolvedValue({
+            channelId: "channel-1",
+          }),
+          clearSubscription: jest.fn().mockResolvedValue(true),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await tournamentRecapsCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Removed tournament recap settings for <#channel-1> (Missing or deleted).",
+    });
   });
 });
