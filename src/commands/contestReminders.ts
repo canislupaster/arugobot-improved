@@ -17,6 +17,7 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
+import { getSendableChannelStatus, type SendableChannelStatus } from "../utils/discordChannels.js";
 import { addContestScopeOption, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -44,13 +45,35 @@ function formatKeywordList(keywords: string[]): string {
   return keywords.length > 0 ? keywords.join(", ") : "None";
 }
 
-function formatSubscriptionSummary(subscription: ContestReminder): string {
+function formatChannelStatus(status?: SendableChannelStatus | null): string | null {
+  if (!status || status.status === "ok") {
+    return null;
+  }
+  if (status.status === "missing") {
+    return "Channel status: Missing or deleted";
+  }
+  return `Channel status: Missing permissions (${status.missingPermissions.join(", ")})`;
+}
+
+function formatSubscriptionSummary(
+  subscription: ContestReminder,
+  channelStatus?: SendableChannelStatus | null
+): string {
   const include = formatKeywordList(subscription.includeKeywords);
   const exclude = formatKeywordList(subscription.excludeKeywords);
   const role = subscription.roleId ? `<@&${subscription.roleId}>` : "None";
-  return `Channel: <#${subscription.channelId}>\nLead time: ${
-    subscription.minutesBefore
-  } minutes\nScope: ${formatScope(subscription.scope)}\nRole: ${role}\nInclude: ${include}\nExclude: ${exclude}\nID: \`${subscription.id}\``;
+  const statusLine = formatChannelStatus(channelStatus);
+  const lines = [
+    `Channel: <#${subscription.channelId}>`,
+    ...(statusLine ? [statusLine] : []),
+    `Lead time: ${subscription.minutesBefore} minutes`,
+    `Scope: ${formatScope(subscription.scope)}`,
+    `Role: ${role}`,
+    `Include: ${include}`,
+    `Exclude: ${exclude}`,
+    `ID: \`${subscription.id}\``,
+  ];
+  return lines.join("\n");
 }
 
 type NextReminderInfo = {
@@ -347,6 +370,11 @@ export const contestRemindersCommand: Command = {
           context.services.contests,
           subscriptions
         );
+        const channelStatuses = await Promise.all(
+          subscriptions.map((subscription) =>
+            getSendableChannelStatus(context.client, subscription.channelId)
+          )
+        );
         const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
         const scopeSet = new Set(subscriptions.map((subscription) => subscription.scope));
         for (const scope of scopeSet) {
@@ -360,7 +388,10 @@ export const contestRemindersCommand: Command = {
           .addFields(
             subscriptions.map((subscription, index) => ({
               name: `Subscription ${index + 1}`,
-              value: `${formatSubscriptionSummary(subscription)}\n${formatNextReminderLine(
+              value: `${formatSubscriptionSummary(
+                subscription,
+                channelStatuses[index]
+              )}\n${formatNextReminderLine(
                 subscription,
                 getNextReminderInfo(subscription, upcomingByScope, nowSeconds),
                 refreshState.scopeErrors

@@ -10,6 +10,10 @@ import {
 import { logWarn, type LogContext } from "./logger.js";
 
 export type SendableChannel = TextChannel | NewsChannel;
+export type SendableChannelStatus =
+  | { status: "ok"; channel: SendableChannel }
+  | { status: "missing"; channelId: string }
+  | { status: "missing_permissions"; channelId: string; missingPermissions: string[] };
 
 const REQUIRED_SEND_PERMISSIONS = [
   { flag: PermissionFlagsBits.ViewChannel, name: "ViewChannel" },
@@ -45,6 +49,21 @@ async function fetchSendableChannel(
 ): Promise<SendableChannel | null> {
   const channel = await client.channels.fetch(channelId).catch(() => null);
   return isSendableChannel(channel) ? channel : null;
+}
+
+export async function getSendableChannelStatus(
+  client: Client,
+  channelId: string
+): Promise<SendableChannelStatus> {
+  const channel = await fetchSendableChannel(client, channelId);
+  if (!channel) {
+    return { status: "missing", channelId };
+  }
+  const missingPermissions = getMissingSendPermissions(channel, client);
+  if (missingPermissions) {
+    return { status: "missing_permissions", channelId, missingPermissions };
+  }
+  return { status: "ok", channel };
 }
 
 export async function resolveSendableChannel(

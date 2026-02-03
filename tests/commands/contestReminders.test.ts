@@ -185,6 +185,11 @@ describe("contestRemindersCommand", () => {
     });
     const context = {
       correlationId: "corr-status",
+      client: {
+        channels: {
+          fetch: jest.fn().mockResolvedValue({ type: ChannelType.GuildText }),
+        },
+      },
       services: {
         contestReminders: {
           listSubscriptions: jest.fn().mockResolvedValue([

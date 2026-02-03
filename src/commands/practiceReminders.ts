@@ -3,6 +3,7 @@ import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } f
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addScheduleOptions } from "../utils/commandOptions.js";
+import { getSendableChannelStatus } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   formatRatingRangesWithDefaults,
@@ -201,6 +202,10 @@ export const practiceRemindersCommand: Command = {
           return;
         }
 
+        const channelStatus = await getSendableChannelStatus(
+          context.client,
+          subscription.channelId
+        );
         const nextScheduledMs = getNextScheduledUtcMs(
           new Date(),
           subscription.hourUtc,
@@ -262,6 +267,17 @@ export const practiceRemindersCommand: Command = {
             }
           );
 
+        if (channelStatus.status !== "ok") {
+          const statusLabel =
+            channelStatus.status === "missing"
+              ? "Missing or deleted"
+              : `Missing permissions (${channelStatus.missingPermissions.join(", ")})`;
+          embed.addFields({
+            name: "Channel status",
+            value: statusLabel,
+            inline: false,
+          });
+        }
         if (subscription.lastSentAt) {
           embed.addFields({
             name: "Last sent",

@@ -1,11 +1,62 @@
 import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
 
 import {
+  getSendableChannelStatus,
   resolveSendableChannel,
   resolveSendableChannelOrWarn,
   resetChannelWarningCache,
 } from "../../src/utils/discordChannels.js";
 import * as logger from "../../src/utils/logger.js";
+
+describe("getSendableChannelStatus", () => {
+  it("returns ok when the channel is sendable", async () => {
+    const channel = { type: ChannelType.GuildText };
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+
+    const result = await getSendableChannelStatus(client, "channel-1");
+
+    expect(result).toEqual({ status: "ok", channel });
+  });
+
+  it("returns missing when the channel does not exist", async () => {
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(null),
+      },
+    } as unknown as Client;
+
+    const result = await getSendableChannelStatus(client, "channel-2");
+
+    expect(result).toEqual({ status: "missing", channelId: "channel-2" });
+  });
+
+  it("returns missing_permissions when permissions are incomplete", async () => {
+    const channel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: (flag: bigint) => flag === PermissionFlagsBits.ViewChannel,
+      }),
+    };
+    const client = {
+      user: { id: "user-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+
+    const result = await getSendableChannelStatus(client, "channel-3");
+
+    expect(result).toEqual({
+      status: "missing_permissions",
+      channelId: "channel-3",
+      missingPermissions: ["SendMessages"],
+    });
+  });
+});
 
 describe("resolveSendableChannel", () => {
   beforeEach(() => {
