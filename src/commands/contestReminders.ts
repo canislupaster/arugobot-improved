@@ -34,6 +34,11 @@ const MIN_MINUTES = 5;
 const MAX_MINUTES = 24 * 60;
 const DEFAULT_SCOPE: ContestScopeFilter = "official";
 
+type ChannelLike = { id: string; type: ChannelType };
+type ReminderChannel = ChannelLike & {
+  type: ChannelType.GuildText | ChannelType.GuildAnnouncement;
+};
+
 function normalizeScope(raw: string | null): ContestScopeFilter {
   if (raw === "official" || raw === "gym" || raw === "all") {
     return raw;
@@ -47,6 +52,54 @@ function formatScope(scope: ContestScopeFilter): string {
 
 function formatKeywordList(keywords: string[]): string {
   return keywords.length > 0 ? keywords.join(", ") : "None";
+}
+
+function isReminderChannel(channel: ChannelLike): channel is ReminderChannel {
+  return channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement;
+}
+
+async function resolveReminderChannelOrReply(
+  interaction: Parameters<Command["execute"]>[0],
+  channel: ChannelLike
+): Promise<ReminderChannel | null> {
+  if (!isReminderChannel(channel)) {
+    await interaction.reply({
+      content: "Pick a text channel for contest reminders.",
+    });
+    return null;
+  }
+  return channel;
+}
+
+function formatFilterLabel(includeKeywords: string[], excludeKeywords: string[]): string {
+  if (includeKeywords.length === 0 && excludeKeywords.length === 0) {
+    return "";
+  }
+  return ` (include: ${serializeKeywords(includeKeywords) || "none"}, exclude: ${
+    serializeKeywords(excludeKeywords) || "none"
+  })`;
+}
+
+function formatRoleMention(roleId: string | null): string {
+  return roleId ? ` (mentioning <@&${roleId}>)` : "";
+}
+
+function buildSubscriptionResponse(input: {
+  intro: string;
+  channelId: string;
+  minutesBefore: number;
+  scope: ContestScopeFilter;
+  roleId: string | null;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  subscriptionId: string;
+}): string {
+  return `${input.intro} in <#${input.channelId}> (${input.minutesBefore} minutes before, ${formatScope(
+    input.scope
+  )})${formatRoleMention(input.roleId)}${formatFilterLabel(
+    input.includeKeywords,
+    input.excludeKeywords
+  )}. Subscription id: \`${input.subscriptionId}\`.`;
 }
 
 function formatChannelStatus(status?: SendableChannelStatus | null): string | null {
@@ -427,14 +480,11 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "set" || subcommand === "add") {
-        const channel = interaction.options.getChannel("channel", true);
-        if (
-          channel.type !== ChannelType.GuildText &&
-          channel.type !== ChannelType.GuildAnnouncement
-        ) {
-          await interaction.reply({
-            content: "Pick a text channel for contest reminders.",
-          });
+        const channel = await resolveReminderChannelOrReply(
+          interaction,
+          interaction.options.getChannel("channel", true)
+        );
+        if (!channel) {
           return;
         }
         const minutesBefore = interaction.options.getInteger("minutes_before") ?? DEFAULT_MINUTES;
@@ -454,30 +504,27 @@ export const contestRemindersCommand: Command = {
           filters.excludeKeywords,
           scope
         );
-        const filterLabel =
-          filters.includeKeywords.length > 0 || filters.excludeKeywords.length > 0
-            ? ` (include: ${serializeKeywords(filters.includeKeywords) || "none"}, exclude: ${
-                serializeKeywords(filters.excludeKeywords) || "none"
-              })`
-            : "";
-        const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
         await interaction.reply({
-          content: `Contest reminders enabled in <#${channel.id}> (${minutesBefore} minutes before, ${formatScope(
-            scope
-          )})${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
+          content: buildSubscriptionResponse({
+            intro: "Contest reminders enabled",
+            channelId: channel.id,
+            minutesBefore,
+            scope,
+            roleId,
+            includeKeywords: filters.includeKeywords,
+            excludeKeywords: filters.excludeKeywords,
+            subscriptionId: subscription.id,
+          }),
         });
         return;
       }
 
       if (subcommand === "preset") {
-        const channel = interaction.options.getChannel("channel", true);
-        if (
-          channel.type !== ChannelType.GuildText &&
-          channel.type !== ChannelType.GuildAnnouncement
-        ) {
-          await interaction.reply({
-            content: "Pick a text channel for contest reminders.",
-          });
+        const channel = await resolveReminderChannelOrReply(
+          interaction,
+          interaction.options.getChannel("channel", true)
+        );
+        if (!channel) {
           return;
         }
         const presetKey = interaction.options.getString("preset", true) as ContestReminderPreset;
@@ -495,17 +542,17 @@ export const contestRemindersCommand: Command = {
           preset.excludeKeywords,
           scope
         );
-        const filterLabel =
-          preset.includeKeywords.length > 0 || preset.excludeKeywords.length > 0
-            ? ` (include: ${serializeKeywords(preset.includeKeywords) || "none"}, exclude: ${
-                serializeKeywords(preset.excludeKeywords) || "none"
-              })`
-            : "";
-        const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
         await interaction.reply({
-          content: `Contest reminder preset "${preset.label}" enabled in <#${channel.id}> (${minutesBefore} minutes before, ${formatScope(
-            scope
-          )})${roleMention}${filterLabel}. Subscription id: \`${subscription.id}\`.`,
+          content: buildSubscriptionResponse({
+            intro: `Contest reminder preset "${preset.label}" enabled`,
+            channelId: channel.id,
+            minutesBefore,
+            scope,
+            roleId,
+            includeKeywords: preset.includeKeywords,
+            excludeKeywords: preset.excludeKeywords,
+            subscriptionId: subscription.id,
+          }),
         });
         return;
       }
