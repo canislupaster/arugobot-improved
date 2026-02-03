@@ -8,6 +8,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
+import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -47,14 +48,30 @@ type ContestDeltaOptions =
 function getContestDeltaOptions(interaction: {
   options: { getInteger: (name: string) => number | null };
 }): ContestDeltaOptions {
-  const days = interaction.options.getInteger("days") ?? DEFAULT_DAYS;
-  const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-  if (!Number.isInteger(days) || days < MIN_DAYS || days > MAX_DAYS) {
-    return { status: "error", message: "Invalid lookback window." };
+  const daysResult = resolveBoundedIntegerOption(interaction, {
+    name: "days",
+    min: MIN_DAYS,
+    max: MAX_DAYS,
+    defaultValue: DEFAULT_DAYS,
+    errorMessage: "Invalid lookback window.",
+  });
+  if ("error" in daysResult) {
+    return { status: "error", message: daysResult.error };
   }
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-    return { status: "error", message: "Invalid limit." };
+
+  const limitResult = resolveBoundedIntegerOption(interaction, {
+    name: "limit",
+    min: 1,
+    max: MAX_LIMIT,
+    defaultValue: DEFAULT_LIMIT,
+    errorMessage: "Invalid limit.",
+  });
+  if ("error" in limitResult) {
+    return { status: "error", message: limitResult.error };
   }
+
+  const days = daysResult.value;
+  const limit = limitResult.value;
   return { status: "ok", days, limit };
 }
 

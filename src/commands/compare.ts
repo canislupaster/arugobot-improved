@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { normalizeHandleKey, parseHandleList } from "../utils/handles.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -18,20 +19,6 @@ type TargetResolution = {
   targets: CompareTarget[];
   error?: string;
 };
-
-function parseHandleList(raw: string): string[] {
-  if (!raw.trim()) {
-    return [];
-  }
-  return raw
-    .split(/[\s,]+/u)
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function normalizeHandleKey(handle: string): string {
-  return handle.trim().toLowerCase();
-}
 
 function addTarget(targets: CompareTarget[], seenHandles: Set<string>, target: CompareTarget) {
   const normalized = normalizeHandleKey(target.handle);

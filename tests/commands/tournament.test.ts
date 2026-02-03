@@ -38,6 +38,27 @@ const createHistoryInteraction = (collectors?: {
   } as unknown as ChatInputCommandInteraction;
 };
 
+const createDeferredInteraction = (subcommand: string, userId = "user-1") => {
+  const interaction = {
+    deferred: false,
+    replied: false,
+    options: {
+      getSubcommand: jest.fn().mockReturnValue(subcommand),
+      getInteger: jest.fn(),
+      getString: jest.fn(),
+    },
+    guild: { id: "guild-1" },
+    user: { id: userId },
+    deferReply: jest.fn().mockImplementation(async () => {
+      interaction.deferred = true;
+    }),
+    editReply: jest.fn().mockResolvedValue(undefined),
+    reply: jest.fn().mockResolvedValue(undefined),
+    followUp: jest.fn().mockResolvedValue(undefined),
+  } as unknown as ChatInputCommandInteraction & { deferred: boolean; replied: boolean };
+  return interaction;
+};
+
 describe("tournamentCommand", () => {
   it("shows round summaries and tiebreak standings", async () => {
     const interaction = createInteraction();
@@ -302,5 +323,77 @@ describe("tournamentCommand", () => {
     const fields = (embed.fields ?? []) as Array<{ name: string; value: string }>;
     const participantField = fields.find((field) => field.name === "Participants");
     expect(participantField?.value).toContain("<@host-1>");
+  });
+
+  it("defers and reports when no tournament lobby exists for join", async () => {
+    const interaction = createDeferredInteraction("join");
+    const context = {
+      services: {
+        tournaments: {
+          getActiveTournament: jest.fn().mockResolvedValue(null),
+          getLobby: jest.fn().mockResolvedValue(null),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await tournamentCommand.execute(interaction, context);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No tournament lobby is open. Use /tournament create first."
+    );
+  });
+
+  it("joins a lobby after deferring", async () => {
+    const interaction = createDeferredInteraction("join");
+    const context = {
+      services: {
+        tournaments: {
+          getActiveTournament: jest.fn().mockResolvedValue(null),
+          getLobby: jest.fn().mockResolvedValue({
+            id: "lobby-1",
+            maxParticipants: 4,
+          }),
+          listLobbyParticipants: jest.fn().mockResolvedValue(["user-2"]),
+          addLobbyParticipant: jest.fn().mockResolvedValue(undefined),
+        },
+        challenges: {
+          getActiveChallengesForUsers: jest.fn().mockResolvedValue(new Map()),
+        },
+        store: {
+          handleLinked: jest.fn().mockResolvedValue(true),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await tournamentCommand.execute(interaction, context);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(context.services.tournaments.addLobbyParticipant).toHaveBeenCalledWith(
+      "lobby-1",
+      "user-1"
+    );
+    expect(interaction.editReply).toHaveBeenCalledWith("Joined the lobby (2/4).");
+  });
+
+  it("blocks lobby hosts from leaving after deferring", async () => {
+    const interaction = createDeferredInteraction("leave", "host-1");
+    const context = {
+      services: {
+        tournaments: {
+          getLobby: jest.fn().mockResolvedValue({
+            id: "lobby-1",
+            hostUserId: "host-1",
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await tournamentCommand.execute(interaction, context);
+
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "The host cannot leave. Use /tournament cancel to close the lobby."
+    );
   });
 });

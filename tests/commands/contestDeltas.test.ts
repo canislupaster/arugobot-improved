@@ -129,4 +129,19 @@ describe("contestDeltasCommand", () => {
       content: "Invalid lookback window.",
     });
   });
+
+  it("rejects invalid limit", async () => {
+    const interaction = createInteraction({
+      options: {
+        getInteger: jest.fn((name: string) => (name === "limit" ? 99 : null)),
+      },
+    });
+    const context = {} as CommandContext;
+
+    await contestDeltasCommand.execute(interaction, context);
+
+    expect((interaction.reply as jest.Mock).mock.calls[0][0]).toEqual({
+      content: "Invalid limit.",
+    });
+  });
 });
