@@ -1,8 +1,8 @@
 import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextWeeklyScheduledUtcMs } from "../services/weeklyDigest.js";
-import { addScheduleOptions } from "../utils/commandOptions.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { addScheduleOptions } from "../utils/commandOptions.js";
 import { requireGuild } from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,

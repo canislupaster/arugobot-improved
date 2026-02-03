@@ -1,8 +1,8 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
-import { addScheduleOptions } from "../utils/commandOptions.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { addScheduleOptions } from "../utils/commandOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   formatRatingRangesWithDefaults,
