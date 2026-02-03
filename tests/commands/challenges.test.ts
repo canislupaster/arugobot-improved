@@ -56,6 +56,29 @@ describe("challengesCommand", () => {
     );
   });
 
+  it("returns a message when there are no active challenges to list", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("list"),
+        getInteger: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-1b",
+      services: {
+        challenges: {
+          listActiveChallenges: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await challengesCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "No active challenges right now.",
+    });
+  });
+
   it("shows the caller's active challenges", async () => {
     const interaction = createInteraction({
       options: {
@@ -92,6 +115,29 @@ describe("challengesCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: expect.any(Array) })
     );
+  });
+
+  it("returns a message when the caller has no active challenges", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("mine"),
+        getInteger: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-2b",
+      services: {
+        challenges: {
+          listActiveChallengesForUser: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await challengesCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "You have no active challenges right now.",
+    });
   });
 
   it("returns a message when there are no active challenges to cancel", async () => {

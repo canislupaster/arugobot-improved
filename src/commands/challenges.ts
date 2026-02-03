@@ -65,6 +65,25 @@ function formatActiveChallengeLine(
   )} left`;
 }
 
+function buildActiveChallengesEmbed(
+  title: string,
+  challenges: ActiveChallengeSummary[],
+  options: { nowSeconds: number; limit?: number }
+): EmbedBuilder {
+  const limit = options.limit ?? challenges.length;
+  const lines = challenges
+    .slice(0, limit)
+    .map((challenge) => formatActiveChallengeLine(challenge, options.nowSeconds));
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setColor(EMBED_COLORS.info)
+    .setDescription(lines.join("\n"));
+  if (options.limit && challenges.length > limit) {
+    embed.setFooter({ text: `Showing ${limit} of ${challenges.length} active challenges.` });
+  }
+  return embed;
+}
+
 function getFirstSolveSummary(challenge: RecentChallengeSummary): string {
   const solved = challenge.participants.filter((participant) => participant.solvedAt !== null);
   if (solved.length === 0) {
@@ -86,6 +105,36 @@ function getFirstSolveSummary(challenge: RecentChallengeSummary): string {
 
   const duration = formatTime(Math.max(0, firstSolvedAt - challenge.startedAt));
   return `<@${firstSolverId}> in ${duration}`;
+}
+
+function buildRecentChallengeField(
+  challenge: RecentChallengeSummary
+): { name: string; value: string; inline: boolean } {
+  const solved = challenge.participants.filter((participant) => participant.solvedAt !== null);
+  const total = challenge.participants.length;
+  const firstSolve = getFirstSolveSummary(challenge);
+  const completedAt = challenge.completedAt ?? challenge.endsAt;
+  const problemLabel = truncateLabel(
+    `${challenge.problem.index}. ${challenge.problem.name}`,
+    80
+  );
+  const link = buildProblemLink(
+    challenge.problem.contestId,
+    challenge.problem.index,
+    truncateLabel(challenge.problem.name, 80)
+  );
+  return {
+    name: problemLabel,
+    value: [
+      `Problem: ${link}`,
+      `Channel: <#${challenge.channelId}>`,
+      `Host: <@${challenge.hostUserId}>`,
+      `Solved: ${solved.length}/${total}`,
+      `Completed: ${formatDiscordRelativeTime(completedAt)}`,
+      `First solve: ${firstSolve}`,
+    ].join("\n"),
+    inline: false,
+  };
 }
 
 export const challengesCommand: Command = {
@@ -146,18 +195,10 @@ export const challengesCommand: Command = {
 
         const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
         const nowSeconds = Math.floor(Date.now() / 1000);
-        const lines = challenges
-          .slice(0, limit)
-          .map((challenge) => formatActiveChallengeLine(challenge, nowSeconds));
-
-        const embed = new EmbedBuilder()
-          .setTitle("Active challenges")
-          .setColor(EMBED_COLORS.info)
-          .setDescription(lines.join("\n"));
-
-        if (challenges.length > limit) {
-          embed.setFooter({ text: `Showing ${limit} of ${challenges.length} active challenges.` });
-        }
+        const embed = buildActiveChallengesEmbed("Active challenges", challenges, {
+          nowSeconds,
+          limit,
+        });
 
         await interaction.reply({ embeds: [embed] });
         return;
@@ -176,14 +217,9 @@ export const challengesCommand: Command = {
         }
 
         const nowSeconds = Math.floor(Date.now() / 1000);
-        const lines = challenges.map((challenge) =>
-          formatActiveChallengeLine(challenge, nowSeconds)
-        );
-
-        const embed = new EmbedBuilder()
-          .setTitle("Your active challenges")
-          .setColor(EMBED_COLORS.info)
-          .setDescription(lines.join("\n"));
+        const embed = buildActiveChallengesEmbed("Your active challenges", challenges, {
+          nowSeconds,
+        });
 
         await interaction.reply({ embeds: [embed] });
         return;
@@ -204,36 +240,7 @@ export const challengesCommand: Command = {
 
         const embed = new EmbedBuilder().setTitle("Recent challenges").setColor(EMBED_COLORS.info);
 
-        for (const challenge of challenges) {
-          const solved = challenge.participants.filter(
-            (participant) => participant.solvedAt !== null
-          );
-          const total = challenge.participants.length;
-          const firstSolve = getFirstSolveSummary(challenge);
-
-          const completedAt = challenge.completedAt ?? challenge.endsAt;
-          const link = buildProblemLink(
-            challenge.problem.contestId,
-            challenge.problem.index,
-            truncateLabel(challenge.problem.name, 80)
-          );
-          const problemLabel = truncateLabel(
-            `${challenge.problem.index}. ${challenge.problem.name}`,
-            80
-          );
-          embed.addFields({
-            name: problemLabel,
-            value: [
-              `Problem: ${link}`,
-              `Channel: <#${challenge.channelId}>`,
-              `Host: <@${challenge.hostUserId}>`,
-              `Solved: ${solved.length}/${total}`,
-              `Completed: ${formatDiscordRelativeTime(completedAt)}`,
-              `First solve: ${firstSolve}`,
-            ].join("\n"),
-            inline: false,
-          });
-        }
+        embed.addFields(challenges.map((challenge) => buildRecentChallengeField(challenge)));
 
         await interaction.reply({ embeds: [embed] });
         return;
