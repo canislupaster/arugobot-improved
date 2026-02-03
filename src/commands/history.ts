@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { buildProblemLink } from "../utils/contestProblems.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 import { buildPaginationIds, runPaginatedInteraction } from "../utils/pagination.js";
@@ -25,13 +26,6 @@ type LegacyHistoryData = {
   history: string[];
   ratingHistory: number[];
 };
-
-const buildProblemLink = (
-  problemId: string,
-  contestId: number,
-  index: string,
-  name: string
-) => `[${problemId}. ${name}](https://codeforces.com/problemset/problem/${contestId}/${index})`;
 
 const buildHistoryEmbed = (
   pageNumber: number,
@@ -59,8 +53,9 @@ const renderChallengeHistoryLines = (entries: ChallengeHistoryEntry[]) =>
         ? "Not solved"
         : `Solved in ${formatTime(Math.max(0, entry.solvedAt - entry.startedAt))}`;
     const delta = formatChallengeDelta(entry.ratingDelta);
-    const link = buildProblemLink(entry.problemId, entry.contestId, entry.index, entry.name);
-    return `- ${link} • ${duration} • ${delta}`;
+    const link = buildProblemLink({ contestId: entry.contestId, index: entry.index });
+    const label = `[${entry.problemId}. ${entry.name}](${link})`;
+    return `- ${label} • ${duration} • ${delta}`;
   });
 
 const renderLegacyHistoryLines = (
@@ -84,8 +79,8 @@ const renderLegacyHistoryLines = (
     const next = historyData.ratingHistory[index + 1];
     const delta = Number.isFinite(previous) && Number.isFinite(next) ? next - previous : null;
     const deltaLabel = delta === null ? "N/A" : String(delta);
-    const link = buildProblemLink(problemId, problem.contestId, problem.index, problem.name);
-    lines.push(`- ${link} (rating change: ${deltaLabel})`);
+    const link = buildProblemLink(problem);
+    lines.push(`- [${problemId}. ${problem.name}](${link}) (rating change: ${deltaLabel})`);
   }
   return lines;
 };

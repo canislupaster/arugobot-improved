@@ -27,7 +27,7 @@ export function getContestProblems(problems: Problem[], contestId: number): Prob
   return problems.filter((problem) => problem.contestId === contestId).sort(compareProblemIndex);
 }
 
-export function buildProblemLink(problem: Problem): string {
+export function buildProblemLink(problem: Pick<Problem, "contestId" | "index">): string {
   return `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
 }
 
