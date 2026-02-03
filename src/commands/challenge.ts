@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import { logError, type LogContext } from "../utils/logger.js";
 import {
   filterProblemsByRatingRanges,
@@ -122,26 +123,13 @@ export const challengeCommand: Command = {
     .addSubcommand((subcommand) =>
       addParticipantOptions(
         addLobbyOptions(
-          addLengthOption(
-            subcommand.setName("random").setDescription("Challenge a random unsolved problem")
+          addTagOptions(
+            addRatingRangeOptions(
+              addLengthOption(
+                subcommand.setName("random").setDescription("Challenge a random unsolved problem")
+              )
+            )
           )
-            .addIntegerOption((option) =>
-              option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
-            )
-            .addIntegerOption((option) =>
-              option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
-            )
-            .addIntegerOption((option) =>
-              option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
-            )
-            .addStringOption((option) =>
-              option
-                .setName("ranges")
-                .setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
-            )
-            .addStringOption((option) =>
-              option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
-            )
         )
       )
     ),
