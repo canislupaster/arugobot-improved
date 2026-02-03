@@ -245,6 +245,39 @@ describe("contestUpsolveCommand", () => {
     );
   });
 
+  it("returns a message when contest problems are missing", async () => {
+    const interaction = createInteraction({ query: "1234" });
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([]),
+        },
+        store: {
+          getHandle: jest.fn().mockResolvedValue("tourist"),
+          getContestSolvesResult: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestUpsolveCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No contest problems found in the cache yet."
+    );
+  });
+
   it("allows handle input outside a server", async () => {
     const interaction = createInteraction({ query: "1234", handle: "tourist", guildId: null });
     const context = {

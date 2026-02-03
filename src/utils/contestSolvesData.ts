@@ -163,3 +163,22 @@ export async function loadContestSolvesData(
 
   return { status: "ok", contestProblems, contestSolves };
 }
+
+export async function loadContestSolvesDataOrReply(
+  interaction: Pick<ChatInputCommandInteraction, "editReply">,
+  problems: Pick<ProblemService, "ensureProblemsLoaded">,
+  store: Pick<StoreService, "getContestSolvesResult">,
+  contestId: number
+): Promise<
+  | { status: "ok"; contestProblems: Problem[]; contestSolves: ContestSolvesResult }
+  | { status: "replied" }
+> {
+  const contestData = await loadContestSolvesData(problems, store, contestId);
+  if (contestData.status !== "ok") {
+    await interaction.editReply(
+      getContestSolvesDataMessage(contestData) ?? "No contest data available."
+    );
+    return { status: "replied" };
+  }
+  return contestData;
+}

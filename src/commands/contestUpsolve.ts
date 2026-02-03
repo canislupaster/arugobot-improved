@@ -8,8 +8,7 @@ import {
 } from "../utils/contestProblems.js";
 import { addContestScopeOption } from "../utils/contestScope.js";
 import {
-  getContestSolvesDataMessage,
-  loadContestSolvesData,
+  loadContestSolvesDataOrReply,
   resolveContestSolvesContext,
   resolveContestSolvesOptionsOrReply,
   shouldShowContestSolvesStale,
@@ -91,15 +90,13 @@ export const contestUpsolveCommand: Command = {
       const handle = handleResult.handle;
 
       const contest = contestResult.contest;
-      const contestData = await loadContestSolvesData(
+      const contestData = await loadContestSolvesDataOrReply(
+        interaction,
         context.services.problems,
         context.services.store,
         contest.id
       );
-      if (contestData.status !== "ok") {
-        await interaction.editReply(
-          getContestSolvesDataMessage(contestData) ?? "No contest data available."
-        );
+      if (contestData.status === "replied") {
         return;
       }
       const { contestProblems, contestSolves } = contestData;
