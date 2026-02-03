@@ -31,6 +31,23 @@ type CompilationErrorCheckOptions = {
   signal?: AbortSignal;
 };
 
+function isAborted(signal?: AbortSignal): boolean {
+  return !!signal?.aborted;
+}
+
+function createAbortPromise(signal?: AbortSignal): Promise<void> | null {
+  if (!signal) {
+    return null;
+  }
+  return new Promise<void>((resolve) => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    signal.addEventListener("abort", () => resolve(), { once: true });
+  });
+}
+
 async function hasCompilationError(
   contestId: number,
   handle: string,
@@ -62,6 +79,20 @@ async function hasCompilationError(
   return false;
 }
 
+async function waitForNextPoll(
+  waitMs: number,
+  timer: VerificationClock,
+  signal?: AbortSignal,
+  abortPromise?: Promise<void> | null
+): Promise<boolean> {
+  if (abortPromise) {
+    await Promise.race([timer.sleep(waitMs), abortPromise]);
+    return !isAborted(signal);
+  }
+  await timer.sleep(waitMs);
+  return !isAborted(signal);
+}
+
 export async function waitForCompilationError({
   contestId,
   handle,
@@ -76,18 +107,10 @@ export async function waitForCompilationError({
 }: CompilationErrorCheckOptions): Promise<boolean> {
   const timer = clock ?? { now: Date.now, sleep };
   const deadline = timer.now() + timeoutMs;
-  const abortPromise =
-    signal &&
-    new Promise<void>((resolve) => {
-      if (signal.aborted) {
-        resolve();
-        return;
-      }
-      signal.addEventListener("abort", () => resolve(), { once: true });
-    });
+  const abortPromise = createAbortPromise(signal);
 
   while (timer.now() < deadline) {
-    if (signal?.aborted) {
+    if (isAborted(signal)) {
       return false;
     }
     const found = await hasCompilationError(
@@ -101,7 +124,7 @@ export async function waitForCompilationError({
     if (found) {
       return true;
     }
-    if (signal?.aborted) {
+    if (isAborted(signal)) {
       return false;
     }
 
@@ -110,13 +133,9 @@ export async function waitForCompilationError({
       break;
     }
     const waitMs = Math.min(pollIntervalMs, remainingMs);
-    if (abortPromise) {
-      await Promise.race([timer.sleep(waitMs), abortPromise]);
-      if (signal?.aborted) {
-        return false;
-      }
-    } else {
-      await timer.sleep(waitMs);
+    const shouldContinue = await waitForNextPoll(waitMs, timer, signal, abortPromise);
+    if (!shouldContinue) {
+      return false;
     }
   }
 

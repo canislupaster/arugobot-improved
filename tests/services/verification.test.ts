@@ -96,4 +96,25 @@ describe("waitForCompilationError", () => {
     expect(result).toBe(false);
     expect(request).toHaveBeenCalledTimes(1);
   });
+
+  it("returns false immediately when already aborted", async () => {
+    const request = jest.fn().mockResolvedValue([]);
+    const controller = new AbortController();
+    controller.abort();
+    const result = await waitForCompilationError({
+      contestId: 555,
+      handle: "tourist",
+      index: "A",
+      startTimeSeconds: 100,
+      timeoutMs: 20000,
+      pollIntervalMs: 5000,
+      logContext: { correlationId: "test-4" },
+      request: request as RequestFn,
+      clock: { now: () => 0, sleep: async () => {} },
+      signal: controller.signal,
+    });
+
+    expect(result).toBe(false);
+    expect(request).not.toHaveBeenCalled();
+  });
 });
