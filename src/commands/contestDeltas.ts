@@ -7,8 +7,8 @@ import type {
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { resolveBoundedIntegerOption } from "../utils/interaction.js";
+import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
