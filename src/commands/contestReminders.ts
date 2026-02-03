@@ -28,11 +28,11 @@ import {
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 import {
   resolveSubscriptionId,
   resolveSubscriptionSelectionOrReply,
 } from "../utils/subscriptionSelection.js";
+import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
