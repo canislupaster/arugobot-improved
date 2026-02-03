@@ -165,6 +165,12 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   Lists ongoing and upcoming Codeforces contests. Use `include`/`exclude` to filter by keywords
   (comma-separated, matched against the contest name). Use `scope` to show `official`, `gym`,
   or `all` contests.
+  If you set default filters with `/contestfilters`, `/contests` uses them when you omit filters.
+
+- **/contestfilters** `set|status|clear`
+
+  Configure default filters for `/contests` (admin only). Use `set` to store default include/exclude
+  keywords and scope for this server, `status` to show the current defaults, and `clear` to reset.
 
 - **/contest** `query` `[scope]`
 

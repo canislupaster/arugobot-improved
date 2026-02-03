@@ -50,7 +50,11 @@ function buildFilterSummary(filters: ReturnType<typeof parseKeywordFilters>) {
   return `Filters: ${parts.join(" • ")}`;
 }
 
-function buildFooterText(stale: boolean, filters: ReturnType<typeof parseKeywordFilters>) {
+function buildFooterText(
+  stale: boolean,
+  filters: ReturnType<typeof parseKeywordFilters>,
+  usingDefaults: boolean
+) {
   const parts: string[] = [];
   if (stale) {
     parts.push("Showing cached data due to a temporary Codeforces error.");
@@ -58,6 +62,9 @@ function buildFooterText(stale: boolean, filters: ReturnType<typeof parseKeyword
   const filterSummary = buildFilterSummary(filters);
   if (filterSummary) {
     parts.push(filterSummary);
+  }
+  if (usingDefaults) {
+    parts.push("Defaults applied.");
   }
   if (parts.length === 0) {
     return null;
@@ -91,11 +98,21 @@ export const contestsCommand: Command = {
     .addStringOption((option) => addContestScopeOption(option, "Which contests to show")),
   async execute(interaction, context) {
     const limit = interaction.options.getInteger("limit") ?? MAX_CONTESTS;
-    const filters = parseKeywordFilters(
-      interaction.options.getString("include"),
-      interaction.options.getString("exclude")
-    );
-    const scope = parseContestScope(interaction.options.getString("scope"));
+    const includeRaw = interaction.options.getString("include");
+    const excludeRaw = interaction.options.getString("exclude");
+    const scopeRaw = interaction.options.getString("scope");
+    const hasUserFilters = Boolean(includeRaw || excludeRaw || scopeRaw);
+    let filters = parseKeywordFilters(includeRaw, excludeRaw);
+    let scope = parseContestScope(scopeRaw);
+    let usingDefaults = false;
+    if (!hasUserFilters && interaction.guild) {
+      const settings = await context.services.contestFilters.getSettings(interaction.guild.id);
+      if (settings) {
+        filters = parseKeywordFilters(settings.includeKeywords, settings.excludeKeywords);
+        scope = parseContestScope(settings.scope, scope);
+        usingDefaults = true;
+      }
+    }
     await interaction.deferReply();
 
     const refreshResult = await refreshContestData(context.services.contests, scope);
@@ -148,7 +165,7 @@ export const contestsCommand: Command = {
       embed.addFields({ name: "Upcoming", value: upcomingLines, inline: false });
     }
 
-    const footerText = buildFooterText(stale, filters);
+    const footerText = buildFooterText(stale, filters, usingDefaults);
     if (footerText) {
       embed.setFooter({ text: footerText });
     }

@@ -325,6 +325,15 @@ export type GuildSettingsTable = {
   updated_at: Generated<string>;
 };
 
+export type ContestFiltersTable = {
+  guild_id: string;
+  include_keywords: string | null;
+  exclude_keywords: string | null;
+  scope: string | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+};
+
 export type WeeklyDigestsTable = {
   guild_id: string;
   channel_id: string;
@@ -372,5 +381,6 @@ export type Database = {
   command_metrics: CommandMetricsTable;
   log_entries: LogEntriesTable;
   guild_settings: GuildSettingsTable;
+  contest_filters: ContestFiltersTable;
   weekly_digests: WeeklyDigestsTable;
 };

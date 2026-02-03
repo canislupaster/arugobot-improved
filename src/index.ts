@@ -13,6 +13,7 @@ import { ChallengeService, challengeUpdateIntervalMs } from "./services/challeng
 import { CodeforcesClient } from "./services/codeforces.js";
 import { CodeforcesCacheService } from "./services/codeforcesCache.js";
 import { ContestActivityService } from "./services/contestActivity.js";
+import { ContestFilterService } from "./services/contestFilters.js";
 import {
   ContestRatingAlertService,
   contestRatingAlertIntervalMs,
@@ -77,6 +78,7 @@ async function main() {
   const contests = new ContestService(codeforces, cache);
   const contestRatingChanges = new ContestRatingChangesService(db, codeforces);
   const contestStandings = new ContestStandingsService(db, codeforces);
+  const contestFilters = new ContestFilterService(db);
   const databaseBackups = new DatabaseBackupService(
     config.databaseUrl,
     config.databaseBackupDir ?? null,
@@ -345,6 +347,7 @@ async function main() {
         contestRatingAlerts,
         contestStandings,
         contestActivity,
+        contestFilters,
         guildSettings,
         databaseBackups,
         logs,

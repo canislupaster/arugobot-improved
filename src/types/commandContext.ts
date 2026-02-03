@@ -4,6 +4,7 @@ import type { AppConfig } from "../config/env.js";
 import type { ChallengeService } from "../services/challenges.js";
 import type { CodeforcesClient } from "../services/codeforces.js";
 import type { ContestActivityService } from "../services/contestActivity.js";
+import type { ContestFilterService } from "../services/contestFilters.js";
 import type { ContestRatingAlertService } from "../services/contestRatingAlerts.js";
 import type { ContestRatingChangesService } from "../services/contestRatingChanges.js";
 import type { ContestReminderService } from "../services/contestReminders.js";
@@ -35,6 +36,7 @@ export type CommandContext = {
     challenges: ChallengeService;
     contests: ContestService;
     contestActivity: ContestActivityService;
+    contestFilters: ContestFilterService;
     contestReminders: ContestReminderService;
     contestRatingChanges: ContestRatingChangesService;
     contestRatingAlerts: ContestRatingAlertService;

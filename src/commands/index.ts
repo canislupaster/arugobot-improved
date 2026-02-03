@@ -8,6 +8,7 @@ import { contestCommand } from "./contest.js";
 import { contestActivityCommand } from "./contestActivity.js";
 import { contestChangesCommand } from "./contestChanges.js";
 import { contestDeltasCommand } from "./contestDeltas.js";
+import { contestFiltersCommand } from "./contestFilters.js";
 import { contestHistoryCommand } from "./contestHistory.js";
 import { contestRatingAlertsCommand } from "./contestRatingAlerts.js";
 import { contestRemindersCommand } from "./contestReminders.js";
@@ -50,6 +51,7 @@ export const commandList: Command[] = [
   contestActivityCommand,
   contestChangesCommand,
   contestDeltasCommand,
+  contestFiltersCommand,
   contestCommand,
   contestHistoryCommand,
   contestRatingAlertsCommand,
