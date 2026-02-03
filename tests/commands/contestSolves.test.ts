@@ -154,7 +154,11 @@ describe("contestSolvesCommand", () => {
         },
         store: {
           getLinkedUsers: jest.fn().mockResolvedValue([]),
-          getContestSolvesResult: jest.fn(),
+          getContestSolvesResult: jest.fn().mockResolvedValue({
+            solves: [],
+            source: "api",
+            isStale: false,
+          }),
         },
       },
     } as unknown as CommandContext;
@@ -164,6 +168,48 @@ describe("contestSolvesCommand", () => {
     expect(interaction.editReply).toHaveBeenCalledWith(
       "No linked handles found in this server yet."
     );
+  });
+
+  it("returns a message when contest solves cache is missing", async () => {
+    const interaction = createInteraction("1234");
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([
+            {
+              contestId: 1234,
+              index: "A",
+              name: "Problem A",
+              rating: 800,
+              tags: [],
+            },
+          ]),
+        },
+        store: {
+          getLinkedUsers: jest.fn(),
+          getContestSolvesResult: jest.fn().mockResolvedValue(null),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestSolvesCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Contest submissions cache not ready yet. Try again soon."
+    );
+    expect(context.services.store.getLinkedUsers).not.toHaveBeenCalled();
   });
 
   it("accepts explicit handles outside a guild", async () => {
@@ -244,7 +290,11 @@ describe("contestSolvesCommand", () => {
             exists: false,
             canonicalHandle: null,
           }),
-          getContestSolvesResult: jest.fn(),
+          getContestSolvesResult: jest.fn().mockResolvedValue({
+            solves: [],
+            source: "api",
+            isStale: false,
+          }),
         },
       },
     } as unknown as CommandContext;

@@ -101,7 +101,7 @@ export const contestSolvesCommand: Command = {
         context.services.store,
         contest.id
       );
-      if (contestData.status === "no_problems") {
+      if (contestData.status !== "ok") {
         await interaction.editReply(
           getContestSolvesDataMessage(contestData) ?? "No contest data available."
         );
@@ -124,12 +124,6 @@ export const contestSolvesCommand: Command = {
       }
       const targets = targetResult.targets;
 
-      if (contestData.status === "no_solves") {
-        await interaction.editReply(
-          getContestSolvesDataMessage(contestData) ?? "No contest data available."
-        );
-        return;
-      }
       const { contestProblems, contestSolves } = contestData;
 
       const handleToUserId = new Map(targets.map((target) => [target.handle, target.label]));
