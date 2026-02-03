@@ -2,6 +2,7 @@ import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
 
 import {
   describeSendableChannelStatus,
+  formatCannotPostMessage,
   getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
   resolveSendableChannel,
@@ -98,6 +99,20 @@ describe("describeSendableChannelStatus", () => {
         missingPermissions: ["SendMessages"],
       })
     ).toBe("Missing permissions (SendMessages)");
+  });
+});
+
+describe("formatCannotPostMessage", () => {
+  it("renders a consistent reply for missing permissions", () => {
+    expect(
+      formatCannotPostMessage("channel-1", {
+        status: "missing_permissions",
+        channelId: "channel-1",
+        missingPermissions: ["SendMessages"],
+      })
+    ).toBe(
+      "I can't post in <#channel-1> (Missing permissions (SendMessages)). Check the bot permissions and try again."
+    );
   });
 });
 

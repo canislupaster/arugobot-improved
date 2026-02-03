@@ -5,7 +5,10 @@ import {
   type ContestRatingAlertSubscription,
 } from "../services/contestRatingAlerts.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { describeSendableChannelStatus, getSendableChannelStatus } from "../utils/discordChannels.js";
+import {
+  formatCannotPostMessage,
+  getSendableChannelStatus,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
 
@@ -195,15 +198,13 @@ export const contestRatingAlertsCommand: Command = {
           });
           return;
         }
-        const status = await getSendableChannelStatus(context.client, channel.id);
-        if (status.status !== "ok") {
-          await interaction.reply({
-            content: `I can't post in <#${channel.id}> (${describeSendableChannelStatus(
-              status
-            )}). Check the bot permissions and try again.`,
-          });
-          return;
-        }
+      const status = await getSendableChannelStatus(context.client, channel.id);
+      if (status.status !== "ok") {
+        await interaction.reply({
+          content: formatCannotPostMessage(channel.id, status),
+        });
+        return;
+      }
         const role = interaction.options.getRole("role");
         const roleId = role?.id ?? null;
         const minDelta = interaction.options.getInteger("min_delta") ?? 0;
@@ -380,11 +381,11 @@ export const contestRatingAlertsCommand: Command = {
 
         if (result.status === "channel_missing_permissions") {
           await interaction.editReply(
-            `I can't post in <#${result.channelId}> (${describeSendableChannelStatus({
+            formatCannotPostMessage(result.channelId, {
               status: "missing_permissions",
               channelId: result.channelId,
               missingPermissions: result.missingPermissions,
-            })}). Check the bot permissions and try again.`
+            })
           );
           return;
         }

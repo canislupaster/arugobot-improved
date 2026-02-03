@@ -22,6 +22,7 @@ import { addContestScopeOption, refreshContestData } from "../utils/contestScope
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   describeSendableChannelStatus,
+  formatCannotPostMessage,
   getSendableChannelStatus,
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
@@ -73,9 +74,7 @@ async function resolveReminderChannelOrReply(
   const status = await getSendableChannelStatus(client, channel.id);
   if (status.status !== "ok") {
     await interaction.reply({
-      content: `I can't post in <#${channel.id}> (${describeSendableChannelStatus(
-        status
-      )}). Check the bot permissions and try again.`,
+      content: formatCannotPostMessage(channel.id, status),
     });
     return null;
   }
@@ -736,11 +735,11 @@ export const contestRemindersCommand: Command = {
 
         if (result.status === "channel_missing_permissions") {
           await interaction.editReply(
-            `I can't post in <#${result.channelId}> (${describeSendableChannelStatus({
+            formatCannotPostMessage(result.channelId, {
               status: "missing_permissions",
               channelId: result.channelId,
               missingPermissions: result.missingPermissions,
-            })}). Check the bot permissions and try again.`
+            })
           );
           return;
         }

@@ -105,6 +105,15 @@ export function describeSendableChannelStatus(status: SendableChannelStatus): st
   return "OK";
 }
 
+export function formatCannotPostMessage(
+  channelId: string,
+  status: SendableChannelStatus
+): string {
+  return `I can't post in <#${channelId}> (${describeSendableChannelStatus(
+    status
+  )}). Check the bot permissions and try again.`;
+}
+
 export async function resolveSendableChannel(
   client: Client,
   channelId: string

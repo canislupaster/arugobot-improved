@@ -5,6 +5,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { addRatingRangeOptions, addScheduleOptions, addTagOptions } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
+  formatCannotPostMessage,
   getSendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -302,15 +303,13 @@ export const practiceRemindersCommand: Command = {
           });
           return;
         }
-        const status = await getSendableChannelStatus(context.client, channel.id);
-        if (status.status !== "ok") {
-          await interaction.reply({
-            content: `I can't post in <#${channel.id}> (${describeSendableChannelStatus(
-              status
-            )}). Check the bot permissions and try again.`,
-          });
-          return;
-        }
+      const status = await getSendableChannelStatus(context.client, channel.id);
+      if (status.status !== "ok") {
+        await interaction.reply({
+          content: formatCannotPostMessage(channel.id, status),
+        });
+        return;
+      }
 
         const hourInput = interaction.options.getInteger("hour_utc") ?? DEFAULT_HOUR_UTC;
         const minuteInput = interaction.options.getInteger("minute_utc") ?? DEFAULT_MINUTE_UTC;
@@ -496,11 +495,11 @@ export const practiceRemindersCommand: Command = {
 
         if (result.status === "channel_missing_permissions") {
           await interaction.editReply(
-            `I can't post in <#${result.channelId}> (${describeSendableChannelStatus({
+            formatCannotPostMessage(result.channelId, {
               status: "missing_permissions",
               channelId: result.channelId,
               missingPermissions: result.missingPermissions,
-            })}). Check the bot permissions and try again.`
+            })
           );
           return;
         }
