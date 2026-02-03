@@ -6,19 +6,9 @@ import {
 } from "../services/contestRatingAlerts.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { parseHandleFilterInput } from "../utils/handles.js";
 
 import type { Command } from "./types.js";
-
-function parseHandleFilter(value: string | null): string[] {
-  if (!value) {
-    return [];
-  }
-  const handles = value
-    .split(",")
-    .map((handle) => handle.trim().toLowerCase())
-    .filter((handle) => handle.length > 0);
-  return Array.from(new Set(handles));
-}
 
 function formatSubscriptionSummary(subscription: ContestRatingAlertSubscription): string {
   const role = subscription.roleId ? `<@&${subscription.roleId}>` : "None";
@@ -207,7 +197,7 @@ export const contestRatingAlertsCommand: Command = {
         const role = interaction.options.getRole("role");
         const roleId = role?.id ?? null;
         const minDelta = interaction.options.getInteger("min_delta") ?? 0;
-        const handleFilter = parseHandleFilter(interaction.options.getString("handles"));
+        const handleFilter = parseHandleFilterInput(interaction.options.getString("handles"));
 
         const subscription = await context.services.contestRatingAlerts.createSubscription(
           guildId,

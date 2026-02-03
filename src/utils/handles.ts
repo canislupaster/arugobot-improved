@@ -71,6 +71,20 @@ export function parseHandleList(raw: string): string[] {
     .filter(Boolean);
 }
 
+export function normalizeHandleFilter(handles: string[]): string[] {
+  const normalized = handles
+    .map((handle) => normalizeHandleKey(normalizeHandleInput(handle)))
+    .filter(Boolean);
+  return Array.from(new Set(normalized));
+}
+
+export function parseHandleFilterInput(raw: string | null): string[] {
+  if (!raw) {
+    return [];
+  }
+  return normalizeHandleFilter(parseHandleList(raw));
+}
+
 export async function resolveHandleTarget(
   store: HandleTargetStore,
   options: HandleTargetOptions

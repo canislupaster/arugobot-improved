@@ -3,6 +3,7 @@ import {
   normalizeHandleKey,
   dedupeHandles,
   parseHandleList,
+  parseHandleFilterInput,
   resolveHandleTarget,
   resolveHandleTargetWithOptionalGuild,
 } from "../../src/utils/handles.js";
@@ -48,6 +49,18 @@ describe("parseHandleList", () => {
 
   it("returns an empty array for whitespace", () => {
     expect(parseHandleList("   ")).toEqual([]);
+  });
+});
+
+describe("parseHandleFilterInput", () => {
+  it("normalizes handle filters with URLs and casing", () => {
+    expect(
+      parseHandleFilterInput("Tourist, https://codeforces.com/profile/Petr, tourist")
+    ).toEqual(["tourist", "petr"]);
+  });
+
+  it("returns an empty array for null input", () => {
+    expect(parseHandleFilterInput(null)).toEqual([]);
   });
 });
 

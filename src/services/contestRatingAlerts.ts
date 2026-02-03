@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
-import type { Database } from "../db/types.js";
+import type { ContestRatingAlertSubscriptionsTable, Database } from "../db/types.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   resolveSendableChannel,
@@ -12,7 +12,7 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getErrorMessageForLog } from "../utils/errors.js";
-import { normalizeHandleKey } from "../utils/handles.js";
+import { normalizeHandleFilter, normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
@@ -86,15 +86,16 @@ type AlertCandidateOptions = {
   maxContests?: number;
 };
 
+type ContestRatingAlertSubscriptionRow = Pick<
+  ContestRatingAlertSubscriptionsTable,
+  "id" | "guild_id" | "channel_id" | "role_id" | "min_delta" | "include_handles"
+>;
+
 function parseHandleFilter(value: string | null): string[] {
   if (!value) {
     return [];
   }
-  const entries = value
-    .split(",")
-    .map((handle) => normalizeHandleKey(handle))
-    .filter((handle) => handle.length > 0);
-  return Array.from(new Set(entries));
+  return normalizeHandleFilter(value.split(","));
 }
 
 function serializeHandleFilter(handles: string[]): string | null {
@@ -102,6 +103,19 @@ function serializeHandleFilter(handles: string[]): string | null {
     return null;
   }
   return Array.from(new Set(handles.map((handle) => normalizeHandleKey(handle)))).join(",");
+}
+
+function mapSubscriptionRow(
+  row: ContestRatingAlertSubscriptionRow
+): ContestRatingAlertSubscription {
+  return {
+    id: row.id,
+    guildId: row.guild_id,
+    channelId: row.channel_id,
+    roleId: row.role_id ?? null,
+    minDelta: row.min_delta ?? 0,
+    includeHandles: parseHandleFilter(row.include_handles),
+  };
 }
 
 function formatEntryLabel(entry: ContestRatingAlertEntry): string {
@@ -187,14 +201,7 @@ export class ContestRatingAlertService {
     if (!row) {
       return null;
     }
-    return {
-      id: row.id,
-      guildId: row.guild_id,
-      channelId: row.channel_id,
-      roleId: row.role_id ?? null,
-      minDelta: row.min_delta ?? 0,
-      includeHandles: parseHandleFilter(row.include_handles),
-    };
+    return mapSubscriptionRow(row);
   }
 
   async listSubscriptions(guildId?: string): Promise<ContestRatingAlertSubscription[]> {
@@ -206,14 +213,7 @@ export class ContestRatingAlertService {
       query = query.where("guild_id", "=", guildId);
     }
     const rows = await query.execute();
-    return rows.map((row) => ({
-      id: row.id,
-      guildId: row.guild_id,
-      channelId: row.channel_id,
-      roleId: row.role_id ?? null,
-      minDelta: row.min_delta ?? 0,
-      includeHandles: parseHandleFilter(row.include_handles),
-    }));
+    return rows.map((row) => mapSubscriptionRow(row));
   }
 
   async getSubscriptionCount(): Promise<number> {
