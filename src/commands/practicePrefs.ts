@@ -1,5 +1,6 @@
 import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
 
+import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
@@ -19,24 +20,11 @@ export const practicePrefsCommand: Command = {
     .setName("practiceprefs")
     .setDescription("Manage your default practice filters")
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("set")
-        .setDescription("Save your default practice filters")
-        .addIntegerOption((option) =>
-          option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
+      addTagOptions(
+        addRatingRangeOptions(
+          subcommand.setName("set").setDescription("Save your default practice filters")
         )
-        .addIntegerOption((option) =>
-          option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
-        )
-        .addIntegerOption((option) =>
-          option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
-        )
-        .addStringOption((option) =>
-          option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
-        )
-        .addStringOption((option) =>
-          option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
-        )
+      )
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("status").setDescription("Show your current practice filters")

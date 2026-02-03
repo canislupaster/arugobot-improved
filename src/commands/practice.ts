@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder, type User } from "discord.js";
 
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { getProblemId } from "../utils/problemSelection.js";
 import { getColor } from "../utils/rating.js";
@@ -112,24 +113,13 @@ async function collectExcludedProblemIds(
 }
 
 export const practiceCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("practice")
-    .setDescription("Suggests a practice problem for a user or handle")
-    .addIntegerOption((option) =>
-      option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
+  data: addTagOptions(
+    addRatingRangeOptions(
+      new SlashCommandBuilder()
+        .setName("practice")
+        .setDescription("Suggests a practice problem for a user or handle")
     )
-    .addIntegerOption((option) =>
-      option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
-    )
-    .addIntegerOption((option) =>
-      option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
-    )
-    .addStringOption((option) =>
-      option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
-    )
-    .addStringOption((option) =>
-      option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
-    )
+  )
     .addUserOption((option) => option.setName("user").setDescription("User to target"))
     .addStringOption((option) =>
       option.setName("handle").setDescription("Codeforces handle to target")

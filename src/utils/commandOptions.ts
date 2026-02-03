@@ -1,4 +1,9 @@
-import { ChannelType, type SlashCommandSubcommandBuilder } from "discord.js";
+import {
+  ChannelType,
+  type SlashCommandBuilder,
+  type SlashCommandOptionsOnlyBuilder,
+  type SlashCommandSubcommandBuilder,
+} from "discord.js";
 
 type ScheduleOptionText = {
   channelDescription: string;
@@ -35,4 +40,45 @@ export function addScheduleOptions(
     .addStringOption((option) =>
       option.setName("utc_offset").setDescription("UTC offset for local time (e.g. +02:00, -05:30, Z)")
     );
+}
+
+export function addRatingRangeOptions(
+  builder: SlashCommandBuilder
+): SlashCommandOptionsOnlyBuilder;
+export function addRatingRangeOptions(
+  builder: SlashCommandSubcommandBuilder
+): SlashCommandSubcommandBuilder;
+export function addRatingRangeOptions(
+  builder: SlashCommandBuilder | SlashCommandSubcommandBuilder
+): SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder {
+  return builder
+    .addIntegerOption((option) =>
+      option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
+    )
+    .addIntegerOption((option) =>
+      option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
+    )
+    .addIntegerOption((option) =>
+      option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
+    )
+    .addStringOption((option) =>
+      option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
+    );
+}
+
+export function addTagOptions(
+  builder: SlashCommandBuilder
+): SlashCommandOptionsOnlyBuilder;
+export function addTagOptions(
+  builder: SlashCommandOptionsOnlyBuilder
+): SlashCommandOptionsOnlyBuilder;
+export function addTagOptions(
+  builder: SlashCommandSubcommandBuilder
+): SlashCommandSubcommandBuilder;
+export function addTagOptions(
+  builder: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder
+): SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder {
+  return builder.addStringOption((option) =>
+    option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
+  );
 }

@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Problem } from "../services/problems.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import {
   filterProblemsByRatingRanges,
   filterProblemsByTags,
@@ -109,29 +110,17 @@ async function resolveHandleData(
 }
 
 export const suggestCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("suggest")
-    .setDescription("Gives problems at a given rating that the handles have not solved")
-    .addIntegerOption((option) =>
-      option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
+  data: addTagOptions(
+    addRatingRangeOptions(
+      new SlashCommandBuilder()
+        .setName("suggest")
+        .setDescription("Gives problems at a given rating that the handles have not solved")
     )
-    .addIntegerOption((option) =>
-      option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
-    )
-    .addIntegerOption((option) =>
-      option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
-    )
-    .addStringOption((option) =>
-      option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
-    )
-    .addStringOption((option) =>
-      option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
-    )
-    .addStringOption((option) =>
-      option
-        .setName("handles")
-        .setDescription(`Space or comma separated list of Codeforces handles (max ${MAX_HANDLES})`)
-    ),
+  ).addStringOption((option) =>
+    option
+      .setName("handles")
+      .setDescription(`Space or comma separated list of Codeforces handles (max ${MAX_HANDLES})`)
+  ),
   async execute(interaction, context) {
     const { rating, minRating: minRatingInput, maxRating: maxRatingInput, rangesRaw } =
       readRatingRangeOptions(interaction);

@@ -2,7 +2,7 @@ import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } f
 
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addScheduleOptions } from "../utils/commandOptions.js";
+import { addRatingRangeOptions, addScheduleOptions, addTagOptions } from "../utils/commandOptions.js";
 import { getSendableChannelStatus } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
@@ -135,28 +135,17 @@ export const practiceRemindersCommand: Command = {
     .setDescription("Configure practice problem reminders")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand((subcommand) =>
-      addScheduleOptions(
-        subcommand.setName("set").setDescription("Enable practice reminders"),
-        {
-          channelDescription: "Channel to post practice problems in",
-          roleDescription: "Role to mention for practice reminders",
-        }
+      addTagOptions(
+        addRatingRangeOptions(
+          addScheduleOptions(
+            subcommand.setName("set").setDescription("Enable practice reminders"),
+            {
+              channelDescription: "Channel to post practice problems in",
+              roleDescription: "Role to mention for practice reminders",
+            }
+          )
+        )
       )
-        .addIntegerOption((option) =>
-          option.setName("rating").setDescription("Exact problem rating").setMinValue(0)
-        )
-        .addIntegerOption((option) =>
-          option.setName("min_rating").setDescription("Minimum rating").setMinValue(0)
-        )
-        .addIntegerOption((option) =>
-          option.setName("max_rating").setDescription("Maximum rating").setMinValue(0)
-        )
-        .addStringOption((option) =>
-          option.setName("ranges").setDescription("Rating ranges (e.g. 800-1200, 1400, 1600-1800)")
-        )
-        .addStringOption((option) =>
-          option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
-        )
         .addStringOption((option) =>
           option
             .setName("days")
