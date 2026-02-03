@@ -36,6 +36,7 @@ import {
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { requireGuild } from "../utils/interaction.js";
 import {
   resolveSubscriptionId,
   resolveSubscriptionSelectionOrReply,
@@ -321,17 +322,17 @@ export const contestRemindersCommand: Command = {
         .addStringOption((option) =>
           option.setName("id").setDescription("Subscription id (from list)")
         )
-    ),
+  ),
   adminOnly: true,
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+    });
+    if (!guild) {
       return;
     }
 
-    const guildId = interaction.guild.id;
+    const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
 
     try {

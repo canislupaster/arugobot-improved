@@ -11,6 +11,7 @@ import {
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { requireGuild } from "../utils/interaction.js";
 import {
   formatRatingRangesWithDefaults,
   readRatingRangeOptions,
@@ -184,17 +185,17 @@ export const practiceRemindersCommand: Command = {
         .addBooleanOption((option) =>
           option.setName("force").setDescription("Send even if a reminder was already posted today")
         )
-    ),
+  ),
   adminOnly: true,
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+    });
+    if (!guild) {
       return;
     }
 
-    const guildId = interaction.guild.id;
+    const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
 
     try {

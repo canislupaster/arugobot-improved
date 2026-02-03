@@ -13,6 +13,7 @@ import {
   getSendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { requireGuild } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -54,17 +55,17 @@ export const tournamentRecapsCommand: Command = {
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("post").setDescription("Post the latest completed tournament recap")
-    ),
+  ),
   adminOnly: true,
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+    });
+    if (!guild) {
       return;
     }
 
-    const guildId = interaction.guild.id;
+    const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
     const noSubscriptionMessage = "No tournament recap auto-posts configured for this server.";
     const postResponses: Record<
