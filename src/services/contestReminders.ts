@@ -9,8 +9,8 @@ import {
   parseKeywordFilters,
   serializeKeywords,
 } from "../utils/contestFilters.js";
-import { buildContestUrl } from "../utils/contestUrl.js";
 import { parseContestScope } from "../utils/contestScope.js";
+import { buildContestUrl } from "../utils/contestUrl.js";
 import { resolveSendableChannelForService } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
