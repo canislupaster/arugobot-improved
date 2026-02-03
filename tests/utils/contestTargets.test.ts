@@ -92,6 +92,30 @@ describe("resolveContestTargets", () => {
     });
   });
 
+  it("enforces max linked handle limits", async () => {
+    const store = {
+      getHandle: jest.fn(),
+      resolveHandle: jest.fn(),
+      getLinkedUsers: jest.fn().mockResolvedValue([
+        { userId: "user-2", handle: "tourist" },
+        { userId: "user-3", handle: "petr" },
+      ]),
+    };
+
+    const result = await resolveContestTargets({
+      ...baseParams,
+      userOptions: [],
+      handleInputs: [],
+      store,
+      maxLinkedHandles: 1,
+    });
+
+    expect(result).toEqual({
+      status: "error",
+      message: "Too many linked handles (2). Provide specific handles or users.",
+    });
+  });
+
   it("dedupes user options before resolving handles", async () => {
     const store = {
       getHandle: jest.fn().mockResolvedValue("tourist"),

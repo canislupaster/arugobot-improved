@@ -32,6 +32,8 @@ type TargetResolution =
   | { status: "ok"; targets: TargetHandle[] }
   | { status: "error"; message: string };
 
+const errorResult = (message: string): TargetResolution => ({ status: "error", message });
+
 export function getUserOptions(users: Array<User | null | undefined>): User[] {
   return users.filter((user): user is User => Boolean(user));
 }
@@ -76,18 +78,12 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   const hasGuildContext = Boolean(guildId || guild);
   if (uniqueUserOptions.length > 0) {
     if (!hasGuildContext) {
-      return {
-        status: "error",
-        message: "Specify handles directly when using this command outside a server.",
-      };
+      return errorResult("Specify handles directly when using this command outside a server.");
     }
     for (const option of uniqueUserOptions) {
       const handle = await store.getHandle(resolvedGuildId, option.id);
       if (!handle) {
-        return {
-          status: "error",
-          message: `User <@${option.id}> does not have a linked handle.`,
-        };
+        return errorResult(`User <@${option.id}> does not have a linked handle.`);
       }
       addTargetHandle(targets, handle, `<@${option.id}>`);
     }
@@ -96,7 +92,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   for (const handleInput of handleInputs) {
     const resolved = await store.resolveHandle(handleInput);
     if (!resolved.exists) {
-      return { status: "error", message: `Invalid handle: ${handleInput}` };
+      return errorResult(`Invalid handle: ${handleInput}`);
     }
     const handle = resolved.canonicalHandle ?? handleInput;
     addTargetHandle(targets, handle, handle);
@@ -104,10 +100,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
 
   if (uniqueUserOptions.length === 0 && handleInputs.length === 0) {
     if (!hasGuildContext) {
-      return {
-        status: "error",
-        message: "Provide at least one handle or run this command in a server.",
-      };
+      return errorResult("Provide at least one handle or run this command in a server.");
     }
     const linkedUsers = await store.getLinkedUsers(resolvedGuildId);
     const filteredLinkedUsers = guild
@@ -119,16 +112,12 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
         })
       : linkedUsers;
     if (filteredLinkedUsers.length === 0) {
-      return {
-        status: "error",
-        message: "No linked handles found in this server yet.",
-      };
+      return errorResult("No linked handles found in this server yet.");
     }
     if (maxLinkedHandles && filteredLinkedUsers.length > maxLinkedHandles) {
-      return {
-        status: "error",
-        message: `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`,
-      };
+      return errorResult(
+        `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`
+      );
     }
     for (const linked of filteredLinkedUsers) {
       addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
@@ -137,7 +126,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
 
   const targetList = Array.from(targets.values());
   if (targetList.length === 0) {
-    return { status: "error", message: "No handles found to check." };
+    return errorResult("No handles found to check.");
   }
 
   return { status: "ok", targets: targetList };
