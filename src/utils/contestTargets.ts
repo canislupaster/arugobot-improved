@@ -95,7 +95,6 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   const targets = new Map<string, TargetHandle>();
   const resolvedGuildId = guildId ?? guild?.id ?? "";
 
-  const hasGuildContext = Boolean(guildId || guild);
   const contextError = getContestTargetContextError({
     guild,
     guildId,
@@ -125,9 +124,6 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   }
 
   if (uniqueUserOptions.length === 0 && handleInputs.length === 0) {
-    if (!hasGuildContext) {
-      return errorResult("Provide at least one handle or run this command in a server.");
-    }
     const linkedUsers = await store.getLinkedUsers(resolvedGuildId);
     const filteredLinkedUsers = guild
       ? await filterEntriesByGuildMembers(guild, linkedUsers, {

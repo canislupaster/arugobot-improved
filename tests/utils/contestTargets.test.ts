@@ -139,6 +139,26 @@ describe("resolveContestTargets", () => {
     expect(store.getHandle).toHaveBeenCalledTimes(1);
   });
 
+  it("dedupes handles across linked users and handle inputs", async () => {
+    const store = {
+      getHandle: jest.fn().mockResolvedValue("tourist"),
+      resolveHandle: jest.fn().mockResolvedValue({ exists: true, canonicalHandle: "tourist" }),
+      getLinkedUsers: jest.fn(),
+    };
+
+    const result = await resolveContestTargets({
+      ...baseParams,
+      userOptions: [{ id: "user-2" } as User],
+      handleInputs: ["TOURIST"],
+      store,
+    });
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.targets).toEqual([{ handle: "tourist", label: "<@user-2>" }]);
+    }
+  });
+
   it("replies when contest targets fail", async () => {
     const store = {
       getHandle: jest.fn(),
