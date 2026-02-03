@@ -216,7 +216,7 @@ function formatNextReminderLine(
   return `Next: ${contestLabel} (${formatDiscordRelativeTime(info.contest.startTimeSeconds)})\nReminder: ${reminderLabel}`;
 }
 
-function addReminderOptions(
+function addReminderChannelOptions(
   subcommand: SlashCommandSubcommandBuilder
 ): SlashCommandSubcommandBuilder {
   return subcommand
@@ -234,7 +234,13 @@ function addReminderOptions(
         .setDescription(`Minutes before start to notify (${MIN_MINUTES}-${MAX_MINUTES})`)
         .setMinValue(MIN_MINUTES)
         .setMaxValue(MAX_MINUTES)
-    )
+    );
+}
+
+function addReminderOptions(
+  subcommand: SlashCommandSubcommandBuilder
+): SlashCommandSubcommandBuilder {
+  return addReminderChannelOptions(subcommand)
     .addStringOption((option) =>
       option
         .setName("include")
@@ -345,8 +351,8 @@ export const contestRemindersCommand: Command = {
     .addSubcommand((subcommand) =>
       subcommand.setName("list").setDescription("List current reminder subscriptions")
     )
-    .addSubcommand((subcommand) =>
-      subcommand
+    .addSubcommand((subcommand) => {
+      const withPreset = subcommand
         .setName("preset")
         .setDescription("Add a reminder preset (Div 2, Div 3, Div 4, Educational)")
         .addStringOption((option) => {
@@ -358,26 +364,11 @@ export const contestRemindersCommand: Command = {
             choice.addChoices({ name: preset.name, value: preset.value });
           }
           return choice;
-        })
-        .addChannelOption((option) =>
-          option
-            .setName("channel")
-            .setDescription("Channel to post reminders in")
-            .setRequired(true)
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-        )
-        .addRoleOption((option) =>
-          option.setName("role").setDescription("Role to mention for reminders")
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("minutes_before")
-            .setDescription(`Minutes before start to notify (${MIN_MINUTES}-${MAX_MINUTES})`)
-            .setMinValue(MIN_MINUTES)
-            .setMaxValue(MAX_MINUTES)
-        )
-        .addStringOption((option) => addContestScopeOption(option, "Which contests to include"))
-    )
+        });
+      return addReminderChannelOptions(withPreset).addStringOption((option) =>
+        addContestScopeOption(option, "Which contests to include")
+      );
+    })
     .addSubcommand((subcommand) =>
       subcommand
         .setName("remove")
