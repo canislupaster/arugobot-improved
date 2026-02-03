@@ -13,6 +13,7 @@ import {
   formatCannotPostMessage,
   formatCannotPostPermissionsMessage,
   getSendableChannelStatus,
+  getSendableChannelStatuses,
   getSendableChannelStatusOrWarn,
   resolveChannelCleanupDecision,
   resolveSendableChannelForService,
@@ -70,6 +71,34 @@ describe("getSendableChannelStatus", () => {
       channelId: "channel-3",
       missingPermissions: ["SendMessages"],
     });
+  });
+});
+
+describe("getSendableChannelStatuses", () => {
+  it("dedupes channel fetches per channel id", async () => {
+    const fetch = jest.fn().mockImplementation(async (channelId: string) => ({
+      id: channelId,
+      type: ChannelType.GuildText,
+    }));
+    const client = {
+      channels: {
+        fetch,
+      },
+    } as unknown as Client;
+
+    const result = await getSendableChannelStatuses(client, [
+      "channel-1",
+      "channel-1",
+      "channel-2",
+    ]);
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledWith("channel-1");
+    expect(fetch).toHaveBeenCalledWith("channel-2");
+    expect(result).toHaveLength(3);
+    expect(result[0]?.status).toBe("ok");
+    expect(result[1]?.status).toBe("ok");
+    expect(result[2]?.status).toBe("ok");
   });
 });
 

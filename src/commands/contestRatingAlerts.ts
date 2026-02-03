@@ -19,6 +19,7 @@ import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
+  getSendableChannelStatuses,
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -63,6 +64,7 @@ function formatSubscriptionSummary(
 }
 
 const NO_SUBSCRIPTIONS_MESSAGE = "No contest rating alerts configured for this server.";
+const NO_ISSUES_MESSAGE = "All contest rating alert subscriptions are healthy.";
 const MULTIPLE_SUBSCRIPTIONS_MESSAGE =
   "Multiple contest rating alerts are configured. Provide an id from /contestratingalerts list.";
 const selectionMessages = {
@@ -105,10 +107,24 @@ export const contestRatingAlertsCommand: Command = {
         )
     )
     .addSubcommand((subcommand) =>
-      subcommand.setName("status").setDescription("List current rating alert subscriptions")
+      subcommand
+        .setName("status")
+        .setDescription("List current rating alert subscriptions")
+        .addBooleanOption((option) =>
+          option
+            .setName("only_issues")
+            .setDescription("Only show alerts with missing channels or permissions")
+        )
     )
     .addSubcommand((subcommand) =>
-      subcommand.setName("list").setDescription("List current rating alert subscriptions")
+      subcommand
+        .setName("list")
+        .setDescription("List current rating alert subscriptions")
+        .addBooleanOption((option) =>
+          option
+            .setName("only_issues")
+            .setDescription("Only show alerts with missing channels or permissions")
+        )
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -171,25 +187,39 @@ export const contestRatingAlertsCommand: Command = {
           });
           return;
         }
+        const onlyIssues = interaction.options.getBoolean?.("only_issues") ?? false;
         const lastNotifiedMap = await context.services.contestRatingAlerts.getLastNotificationMap(
           subscriptions.map((subscription) => subscription.id)
         );
-        const channelStatuses = await Promise.all(
-          subscriptions.map((subscription) =>
-            getSendableChannelStatus(context.client, subscription.channelId)
-          )
+        const channelStatuses = await getSendableChannelStatuses(
+          context.client,
+          subscriptions.map((subscription) => subscription.channelId)
         );
+        const entries = subscriptions.map((subscription, index) => ({
+          subscription,
+          channelStatus: channelStatuses[index] ?? null,
+          lastNotifiedAt: lastNotifiedMap.get(subscription.id) ?? null,
+        }));
+        const filteredEntries = onlyIssues
+          ? entries.filter((entry) => entry.channelStatus?.status !== "ok")
+          : entries;
+        if (filteredEntries.length === 0) {
+          await interaction.reply({
+            content: onlyIssues ? NO_ISSUES_MESSAGE : NO_SUBSCRIPTIONS_MESSAGE,
+          });
+          return;
+        }
 
         const embed = new EmbedBuilder()
           .setTitle("Contest rating alert subscriptions")
           .setColor(EMBED_COLORS.info)
           .addFields(
-            subscriptions.map((subscription, index) => ({
+            filteredEntries.map((entry, index) => ({
               name: `Subscription ${index + 1}`,
               value: formatSubscriptionSummary(
-                subscription,
-                channelStatuses[index],
-                lastNotifiedMap.get(subscription.id) ?? null
+                entry.subscription,
+                entry.channelStatus,
+                entry.lastNotifiedAt
               ),
               inline: false,
             }))

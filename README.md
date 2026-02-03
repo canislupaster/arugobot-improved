@@ -212,7 +212,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   Configure contest reminders for the server (admin only). Use `add` (or legacy `set`) to create
   multiple subscriptions with distinct channel, lead time, role mention, and keyword filters
   (`include`/`exclude`, comma-separated) plus contest `scope` (official, gym, or all). Use
-  `list`/`status` to see subscription ids, `remove` to delete one, `clear` to delete all, and
+  `list`/`status` to see subscription ids (use `only_issues:true` to show missing channels or permissions), `remove` to delete one, `clear` to delete all, and
   `cleanup` to remove subscriptions pointing at deleted channels (use `include_permissions:true`
   to also remove subscriptions where the bot lacks channel permissions).
   `preview`/`post` accept an optional subscription id when multiple are configured. `post` can
@@ -224,7 +224,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Configure rating change alerts for finished contests (admin only). Use `set` to choose a channel
   and optional role mention, `min_delta` filter, and `handles` filter (comma-separated, linked
-  handles only). `cleanup` removes subscriptions pointing at deleted channels (add
+  handles only). `list`/`status` accept `only_issues:true` to show missing channels or permissions. `cleanup` removes subscriptions pointing at deleted channels (add
   `include_permissions:true` to also remove ones missing bot permissions). `preview` shows the next
   alert for linked handles, and `post` sends the latest rating change summary immediately (optionally
   `force` to resend).

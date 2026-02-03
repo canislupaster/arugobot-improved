@@ -66,6 +66,24 @@ export async function getSendableChannelStatus(
   return getSendableChannelStatusForChannel(client, channel, channelId);
 }
 
+export async function getSendableChannelStatuses(
+  client: Client,
+  channelIds: string[]
+): Promise<SendableChannelStatus[]> {
+  const cache = new Map<string, Promise<SendableChannelStatus>>();
+  return Promise.all(
+    channelIds.map((channelId) => {
+      const cached = cache.get(channelId);
+      if (cached) {
+        return cached;
+      }
+      const pending = getSendableChannelStatus(client, channelId);
+      cache.set(channelId, pending);
+      return pending;
+    })
+  );
+}
+
 export async function getSendableChannelStatusOrWarn(
   client: Client,
   channelId: string,

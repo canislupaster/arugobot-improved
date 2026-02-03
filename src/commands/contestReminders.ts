@@ -31,7 +31,7 @@ import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
-  getSendableChannelStatus,
+  getSendableChannelStatuses,
   resolveSendableChannelOrReply,
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
@@ -234,6 +234,7 @@ function addReminderOptions(
 }
 
 const NO_SUBSCRIPTIONS_MESSAGE = "No contest reminders configured for this server.";
+const NO_ISSUES_MESSAGE = "All contest reminder subscriptions are healthy.";
 const MULTIPLE_SUBSCRIPTIONS_MESSAGE =
   "Multiple contest reminder subscriptions are configured. Provide an id from /contestreminders list.";
 const selectionMessages = {
@@ -260,10 +261,24 @@ export const contestRemindersCommand: Command = {
       )
     )
     .addSubcommand((subcommand) =>
-      subcommand.setName("status").setDescription("List current reminder subscriptions")
+      subcommand
+        .setName("status")
+        .setDescription("List current reminder subscriptions")
+        .addBooleanOption((option) =>
+          option
+            .setName("only_issues")
+            .setDescription("Only show reminders with missing channels or permissions")
+        )
     )
     .addSubcommand((subcommand) =>
-      subcommand.setName("list").setDescription("List current reminder subscriptions")
+      subcommand
+        .setName("list")
+        .setDescription("List current reminder subscriptions")
+        .addBooleanOption((option) =>
+          option
+            .setName("only_issues")
+            .setDescription("Only show reminders with missing channels or permissions")
+        )
     )
     .addSubcommand((subcommand) => {
       const withPreset = subcommand
@@ -342,18 +357,32 @@ export const contestRemindersCommand: Command = {
           await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
           return;
         }
+        const onlyIssues = interaction.options.getBoolean?.("only_issues") ?? false;
 
         const refreshState = await refreshContestScopes(context.services.contests, subscriptions);
         const lastNotifiedMap = await context.services.contestReminders.getLastNotificationMap(
           subscriptions.map((subscription) => subscription.id)
         );
-        const channelStatuses = await Promise.all(
-          subscriptions.map((subscription) =>
-            getSendableChannelStatus(context.client, subscription.channelId)
-          )
+        const channelStatuses = await getSendableChannelStatuses(
+          context.client,
+          subscriptions.map((subscription) => subscription.channelId)
         );
+        const entries = subscriptions.map((subscription, index) => ({
+          subscription,
+          channelStatus: channelStatuses[index] ?? null,
+          lastNotifiedAt: lastNotifiedMap.get(subscription.id) ?? null,
+        }));
+        const filteredEntries = onlyIssues
+          ? entries.filter((entry) => entry.channelStatus?.status !== "ok")
+          : entries;
+        if (filteredEntries.length === 0) {
+          await interaction.reply({
+            content: onlyIssues ? NO_ISSUES_MESSAGE : NO_SUBSCRIPTIONS_MESSAGE,
+          });
+          return;
+        }
         const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
-        const scopeSet = new Set(subscriptions.map((subscription) => subscription.scope));
+        const scopeSet = new Set(filteredEntries.map((entry) => entry.subscription.scope));
         for (const scope of scopeSet) {
           upcomingByScope.set(scope, context.services.contests.getUpcomingContests(scope));
         }
@@ -363,15 +392,15 @@ export const contestRemindersCommand: Command = {
           .setTitle("Contest reminder subscriptions")
           .setColor(EMBED_COLORS.info)
           .addFields(
-            subscriptions.map((subscription, index) => ({
+            filteredEntries.map((entry, index) => ({
               name: `Subscription ${index + 1}`,
               value: `${formatSubscriptionSummary(
-                subscription,
-                channelStatuses[index],
-                lastNotifiedMap.get(subscription.id) ?? null
+                entry.subscription,
+                entry.channelStatus,
+                entry.lastNotifiedAt
               )}\n${formatNextReminderLine(
-                subscription,
-                getNextReminderInfo(subscription, upcomingByScope, nowSeconds),
+                entry.subscription,
+                getNextReminderInfo(entry.subscription, upcomingByScope, nowSeconds),
                 refreshState.scopeErrors
               )}`,
               inline: false,

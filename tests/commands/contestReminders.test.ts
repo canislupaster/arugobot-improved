@@ -60,6 +60,54 @@ describe("contestRemindersCommand", () => {
     });
   });
 
+  it("filters status results when only issues are requested", async () => {
+    const channel = {
+      id: "channel-7",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("status"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(true),
+        getString: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-1c",
+      client: createClient(channel),
+      services: {
+        contestReminders: {
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-7",
+              guildId: "guild-1",
+              channelId: "channel-7",
+              minutesBefore: 30,
+              roleId: null,
+              includeKeywords: [],
+              excludeKeywords: [],
+              scope: "official",
+            },
+          ]),
+          getLastNotificationMap: jest.fn().mockResolvedValue(new Map()),
+        },
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getUpcomingContests: jest.fn().mockReturnValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRemindersCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "All contest reminder subscriptions are healthy.",
+    });
+  });
+
   it("adds reminders for the specified channel", async () => {
     const channel = {
       id: "channel-1",

@@ -60,6 +60,47 @@ describe("contestRatingAlertsCommand", () => {
     });
   });
 
+  it("filters status results when only issues are requested", async () => {
+    const channel = {
+      id: "channel-8",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("status"),
+        getChannel: jest.fn(),
+        getRole: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(true),
+      },
+    });
+    const context = {
+      correlationId: "corr-1c",
+      client: createClient(channel),
+      services: {
+        contestRatingAlerts: {
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-8",
+              guildId: "guild-1",
+              channelId: "channel-8",
+              roleId: null,
+              minDelta: 0,
+              includeHandles: [],
+            },
+          ]),
+          getLastNotificationMap: jest.fn().mockResolvedValue(new Map()),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRatingAlertsCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "All contest rating alert subscriptions are healthy.",
+    });
+  });
+
   it("adds a rating alert subscription for the specified channel", async () => {
     const channel = {
       id: "channel-1",
