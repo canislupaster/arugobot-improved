@@ -32,10 +32,39 @@ type RatingRangeInput = {
   defaultMax: number;
 };
 
-function parseRangeToken(token: string): RatingRangeResolution {
+type RatingRangeParseOptions = {
+  defaultMax?: number;
+};
+
+function parseRangeToken(token: string, options: RatingRangeParseOptions): RatingRangeResolution {
+  const plusMatch = token.match(/^(\d+)\+$/);
+  if (plusMatch) {
+    const min = Number(plusMatch[1]);
+    if (!Number.isFinite(min)) {
+      return { ranges: [], error: `Invalid range "${token}".` };
+    }
+    if (min < 0) {
+      return { ranges: [], error: "Ratings must be non-negative integers." };
+    }
+    const resolvedMax =
+      typeof options.defaultMax === "number" && Number.isFinite(options.defaultMax)
+        ? options.defaultMax
+        : null;
+    if (resolvedMax === null) {
+      return {
+        ranges: [],
+        error: `Open-ended range "${token}" needs a maximum. Use 800-1200 or 1200.`,
+      };
+    }
+    if (min > resolvedMax) {
+      return { ranges: [], error: `Invalid range "${token}" (min > max).` };
+    }
+    return { ranges: [{ min, max: resolvedMax }] };
+  }
+
   const match = token.match(/^(\d+)(?:-(\d+))?$/);
   if (!match) {
-    return { ranges: [], error: `Invalid range "${token}". Use 800-1200 or 1200.` };
+    return { ranges: [], error: `Invalid range "${token}". Use 800-1200, 1200, or 1200+.` };
   }
   const min = Number(match[1]);
   const max = match[2] ? Number(match[2]) : min;
@@ -51,7 +80,10 @@ function parseRangeToken(token: string): RatingRangeResolution {
   return { ranges: [{ min, max }] };
 }
 
-export function parseRatingRanges(raw: string): RatingRangeResolution {
+export function parseRatingRanges(
+  raw: string,
+  options: RatingRangeParseOptions = {}
+): RatingRangeResolution {
   const tokens = raw
     .split(/[,\s]+/)
     .map((token) => token.trim())
@@ -62,7 +94,7 @@ export function parseRatingRanges(raw: string): RatingRangeResolution {
 
   const ranges: RatingRange[] = [];
   for (const token of tokens) {
-    const result = parseRangeToken(token);
+    const result = parseRangeToken(token, options);
     if (result.error) {
       return { ranges: [], error: result.error };
     }
@@ -89,7 +121,7 @@ export function resolveRatingRanges({
   }
 
   if (hasRanges) {
-    return parseRatingRanges(rangesRaw ?? "");
+    return parseRatingRanges(rangesRaw ?? "", { defaultMax });
   }
 
   if (hasRating) {

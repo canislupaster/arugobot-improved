@@ -16,9 +16,15 @@ describe("parseRatingRanges", () => {
     ]);
   });
 
+  it("parses open-ended tokens when a default max is provided", () => {
+    const result = parseRatingRanges("1400+", { defaultMax: 3500 });
+    expect(result.error).toBeUndefined();
+    expect(result.ranges).toEqual([{ min: 1400, max: 3500 }]);
+  });
+
   it("rejects invalid tokens", () => {
     const result = parseRatingRanges("800-foo");
-    expect(result.error).toBe('Invalid range "800-foo". Use 800-1200 or 1200.');
+    expect(result.error).toBe('Invalid range "800-foo". Use 800-1200, 1200, or 1200+.');
     expect(result.ranges).toEqual([]);
   });
 });
@@ -47,6 +53,19 @@ describe("resolveRatingRanges", () => {
       defaultMax: 3500,
     });
     expect(result.error).toBe("Use rating, min/max, or ranges, not a mix.");
+  });
+
+  it("applies the default max to open-ended ranges", () => {
+    const result = resolveRatingRanges({
+      rating: null,
+      minRating: null,
+      maxRating: null,
+      rangesRaw: "1600+",
+      defaultMin: 800,
+      defaultMax: 3500,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.ranges).toEqual([{ min: 1600, max: 3500 }]);
   });
 });
 

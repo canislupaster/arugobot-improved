@@ -20,7 +20,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 - **/challenge random** `length` `rating|min_rating|max_rating|ranges` `[tags]` `[user1..user9]` `[open]` `[max_participants]`
 
   Starts a challenge by selecting a random unsolved problem in the rating range (defaults to 800-3500).
-  Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
+  Use `ranges` for multiple bands, e.g. `800-1200, 1400+, 1600-1800`.
   Use `tags` to require tags and prefix `-` to exclude tags (e.g. `dp, greedy, -math`).
   Set `open` to allow anyone in the server to join before the host starts.
   Use `max_participants` to raise the lobby cap (2-10, default 5).
@@ -92,14 +92,14 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Gives some problems in the rating range that none of the CF accounts have done (defaults to 800-3500).
   If `handles` is omitted, uses linked handles in the server.
-  Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
+  Use `ranges` for multiple bands, e.g. `800-1200, 1400+, 1600-1800`.
   Use `tags` to require tags and prefix `-` to exclude tags (e.g. `dp, greedy, -math`).
 
 - **/practice** `rating|min_rating|max_rating|ranges` `[tags]` `[user]` `[handle]`
 
   Suggests a single unsolved practice problem for a linked user or a Codeforces handle.
   If `handle` is omitted, uses the linked handle for `user` (or yourself).
-  Use `ranges` for multiple bands, e.g. `800-1200, 1400, 1600-1800`.
+  Use `ranges` for multiple bands, e.g. `800-1200, 1400+, 1600-1800`.
   Use `tags` to require tags and prefix `-` to exclude tags (e.g. `dp, greedy, -math`).
 
 - **/practiceprefs** `set|status|clear` `rating|min_rating|max_rating|ranges` `[tags]`
