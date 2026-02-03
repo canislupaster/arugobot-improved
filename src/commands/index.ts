@@ -1,3 +1,5 @@
+import { normalizeCommandData } from "../utils/commandData.js";
+
 import { activityCommand } from "./activity.js";
 import { challengeCommand } from "./challenge.js";
 import { challengesCommand } from "./challenges.js";
@@ -38,7 +40,6 @@ import { streakCommand } from "./streak.js";
 import { suggestCommand } from "./suggest.js";
 import { tournamentCommand } from "./tournament.js";
 import { tournamentRecapsCommand } from "./tournamentRecaps.js";
-import { normalizeCommandData } from "../utils/commandData.js";
 import type { Command } from "./types.js";
 
 export const commandList: Command[] = [
