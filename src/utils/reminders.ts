@@ -1,8 +1,7 @@
 import type { Client } from "discord.js";
 
-import type { ServiceError } from "./errors.js";
-import { recordServiceErrorMessage } from "./errors.js";
 import { resolveSendableChannel, type SendableChannel } from "./discordChannels.js";
+import { recordServiceErrorMessage, type ServiceError } from "./errors.js";
 import { wasSentSince } from "./time.js";
 
 export type ManualSendCheckResult =
