@@ -200,6 +200,82 @@ describe("profileCommand", () => {
     );
   });
 
+  it("falls back to legacy history when recent challenges are empty", async () => {
+    const interaction = createInteraction();
+    const ratingChanges = createRatingChangesService([]);
+    const problemDict = new Map([
+      [
+        "1000A",
+        { name: "Fallback A", contestId: 1000, index: "A" },
+      ],
+      [
+        "1001B",
+        { name: "Fallback B", contestId: 1001, index: "B" },
+      ],
+    ]);
+    const context = {
+      correlationId: "corr-4",
+      services: {
+        ratingChanges,
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: true,
+            canonicalHandle: "Tourist",
+            source: "api",
+          }),
+          getUserIdByHandle: jest.fn().mockResolvedValue("user-2"),
+          getCodeforcesProfile: jest.fn().mockResolvedValue({
+            profile: {
+              handle: "tourist",
+              displayHandle: "Tourist",
+              rating: 2400,
+              rank: "grandmaster",
+              maxRating: 2500,
+              maxRank: "grandmaster",
+              lastOnlineTimeSeconds: 123,
+              lastFetched: new Date().toISOString(),
+            },
+            source: "api",
+            isStale: false,
+          }),
+          getRating: jest.fn().mockResolvedValue(1500),
+          getChallengeHistoryPage: jest.fn().mockResolvedValue({
+            total: 0,
+            entries: [],
+          }),
+          getChallengeStreak: jest.fn().mockResolvedValue({
+            currentStreak: 0,
+            longestStreak: 0,
+            totalSolvedDays: 0,
+            lastSolvedAt: null,
+          }),
+          getHistoryWithRatings: jest.fn().mockResolvedValue({
+            history: ["1000A", "1001B"],
+            ratingHistory: [],
+          }),
+          getRecentSubmissions: jest.fn().mockResolvedValue({
+            submissions: [],
+            source: "api",
+            isStale: false,
+          }),
+        },
+        problems: {
+          getProblemDict: jest.fn().mockReturnValue(problemDict),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await profileCommand.execute(interaction, context);
+
+    expect(context.services.store.getHistoryWithRatings).toHaveBeenCalledWith("guild-1", "user-2");
+    const replyPayload = (interaction.editReply as jest.Mock).mock.calls[0]?.[0];
+    const embed = replyPayload?.embeds?.[0];
+    const recentField = embed?.data?.fields?.find((field: { name: string }) =>
+      field.name.includes("Recent problems")
+    );
+    expect(recentField?.value ?? "").toContain("1000A");
+  });
+
   it("rejects invalid handles", async () => {
     const interaction = createInteraction({
       options: {

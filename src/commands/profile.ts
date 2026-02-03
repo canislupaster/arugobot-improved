@@ -39,6 +39,30 @@ function formatProblemLines(entries: ChallengeProblemEntry[]): string {
   return entries.map(buildProblemLine).join("\n");
 }
 
+async function loadFallbackChallengeEntries(
+  guildId: string,
+  linkedUserId: string,
+  services: CommandContext["services"]
+): Promise<{ totalChallenges: number; entries: ChallengeProblemEntry[] }> {
+  const historyData = await services.store.getHistoryWithRatings(guildId, linkedUserId);
+  if (!historyData || historyData.history.length === 0) {
+    return { totalChallenges: 0, entries: [] };
+  }
+
+  const problemDict = services.problems.getProblemDict();
+  const recent = historyData.history.slice(-MAX_RECENT_CHALLENGES);
+  const entries = recent.map((problemId) => {
+    const problem = problemDict.get(problemId);
+    return {
+      problemId,
+      name: problem?.name ?? null,
+      contestId: problem?.contestId,
+      index: problem?.index,
+    };
+  });
+  return { totalChallenges: historyData.history.length, entries };
+}
+
 async function loadChallengeSummary(
   guildId: string,
   linkedUserId: string,
@@ -49,32 +73,28 @@ async function loadChallengeSummary(
     services.store.getChallengeHistoryPage(guildId, linkedUserId, 1, MAX_RECENT_CHALLENGES),
     services.store.getChallengeStreak(guildId, linkedUserId),
   ]);
-  let totalChallenges = recentHistory.total;
-  let recentEntries: ChallengeProblemEntry[] = recentHistory.entries.map((entry) => ({
-    problemId: entry.problemId,
-    name: entry.name,
-    contestId: entry.contestId,
-    index: entry.index,
-  }));
-
-  if (totalChallenges === 0) {
-    const historyData = await services.store.getHistoryWithRatings(guildId, linkedUserId);
-    totalChallenges = historyData?.history.length ?? 0;
-    const problemDict = services.problems.getProblemDict();
-    const recent = historyData?.history.slice(-MAX_RECENT_CHALLENGES) ?? [];
-    recentEntries = recent.map((problemId) => {
-      const problem = problemDict.get(problemId);
-      return {
-        problemId,
-        name: problem?.name ?? null,
-        contestId: problem?.contestId,
-        index: problem?.index,
-      };
-    });
+  if (recentHistory.total > 0) {
+    const recentEntries = recentHistory.entries.map((entry) => ({
+      problemId: entry.problemId,
+      name: entry.name,
+      contestId: entry.contestId,
+      index: entry.index,
+    }));
+    return {
+      botRating,
+      totalChallenges: recentHistory.total,
+      recentLines: formatProblemLines(recentEntries),
+      streak,
+    };
   }
 
-  const recentLines = formatProblemLines(recentEntries);
-  return { botRating, totalChallenges, recentLines, streak };
+  const fallback = await loadFallbackChallengeEntries(guildId, linkedUserId, services);
+  return {
+    botRating,
+    totalChallenges: fallback.totalChallenges,
+    recentLines: formatProblemLines(fallback.entries),
+    streak,
+  };
 }
 
 async function loadRecentSubmissions(
