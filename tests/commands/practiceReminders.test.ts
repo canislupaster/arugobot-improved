@@ -107,6 +107,39 @@ describe("practiceRemindersCommand", () => {
     });
   });
 
+  it("rejects non-text channels", async () => {
+    const channel = {
+      id: "channel-voice",
+      type: ChannelType.GuildVoice,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn().mockReturnValue(null),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      correlationId: "corr-2a",
+      client: createClient(channel),
+      services: {
+        practiceReminders: {
+          setSubscription: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.setSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Pick a text channel for practice reminders.",
+    });
+  });
+
   it("sets practice reminders with custom days", async () => {
     const channel = createSendableChannel("channel-1");
     const interaction = createInteraction({

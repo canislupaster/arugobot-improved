@@ -1,4 +1,10 @@
-import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import {
+  ChannelType,
+  type Client,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+} from "discord.js";
 
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
@@ -34,6 +40,36 @@ const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKENDS = [0, 6];
+
+type ChannelLike = { id: string; type: ChannelType };
+type ReminderChannel = ChannelLike & {
+  type: ChannelType.GuildText | ChannelType.GuildAnnouncement;
+};
+
+function isReminderChannel(channel: ChannelLike): channel is ReminderChannel {
+  return channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement;
+}
+
+async function resolveReminderChannelOrReply(
+  interaction: Parameters<Command["execute"]>[0],
+  client: Client,
+  channel: ChannelLike
+): Promise<ReminderChannel | null> {
+  if (!isReminderChannel(channel)) {
+    await interaction.reply({
+      content: "Pick a text channel for practice reminders.",
+    });
+    return null;
+  }
+  const status = await getSendableChannelStatus(client, channel.id);
+  if (status.status !== "ok") {
+    await interaction.reply({
+      content: formatCannotPostMessage(channel.id, status),
+    });
+    return null;
+  }
+  return channel;
+}
 
 function formatDaysLabel(days: number[]): string {
   const normalized = Array.from(new Set(days)).sort((a, b) => a - b);
@@ -347,21 +383,12 @@ export const practiceRemindersCommand: Command = {
       }
 
       if (subcommand === "set") {
-        const channel = interaction.options.getChannel("channel", true);
-        if (
-          channel.type !== ChannelType.GuildText &&
-          channel.type !== ChannelType.GuildAnnouncement
-        ) {
-          await interaction.reply({
-            content: "Pick a text channel for practice reminders.",
-          });
-          return;
-        }
-        const status = await getSendableChannelStatus(context.client, channel.id);
-        if (status.status !== "ok") {
-          await interaction.reply({
-            content: formatCannotPostMessage(channel.id, status),
-          });
+        const channel = await resolveReminderChannelOrReply(
+          interaction,
+          context.client,
+          interaction.options.getChannel("channel", true)
+        );
+        if (!channel) {
           return;
         }
 
