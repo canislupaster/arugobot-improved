@@ -17,9 +17,9 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
-import { getSendableChannelStatus, type SendableChannelStatus } from "../utils/discordChannels.js";
 import { addContestScopeOption, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
+import { getSendableChannelStatus, type SendableChannelStatus } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
