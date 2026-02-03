@@ -428,6 +428,24 @@ export class ContestReminderService {
             scope: subscription.scope,
           }
         );
+        if (channelStatus.status === "missing") {
+          const removed = await this.removeSubscription(subscription.guildId, subscription.id);
+          if (removed) {
+            logInfo("Contest reminder subscription removed (channel missing).", {
+              guildId: subscription.guildId,
+              subscriptionId: subscription.id,
+              channelId: subscription.channelId,
+              scope: subscription.scope,
+            });
+          } else {
+            logWarn("Contest reminder subscription cleanup failed.", {
+              guildId: subscription.guildId,
+              subscriptionId: subscription.id,
+              channelId: subscription.channelId,
+              scope: subscription.scope,
+            });
+          }
+        }
         if (channelStatus.status !== "ok") {
           this.lastError =
             buildChannelServiceError(

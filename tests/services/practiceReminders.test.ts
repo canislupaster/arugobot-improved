@@ -16,6 +16,13 @@ const createMockClient = (send: jest.Mock) =>
     },
   }) as unknown as Client;
 
+const createMissingChannelClient = () =>
+  ({
+    channels: {
+      fetch: jest.fn().mockResolvedValue(null),
+    },
+  }) as unknown as Client;
+
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 describe("PracticeReminderService", () => {
@@ -133,6 +140,52 @@ describe("PracticeReminderService", () => {
     expect(posts).toHaveLength(0);
     const subscription = await service.getSubscription("guild-1");
     expect(subscription?.lastSentAt).toBeNull();
+  });
+
+  it("clears reminders when the channel is missing", async () => {
+    const nowMs = Date.UTC(2024, 0, 1, 10, 0, 0);
+    jest.useFakeTimers().setSystemTime(new Date(nowMs));
+
+    const problems = [
+      {
+        contestId: 100,
+        index: "A",
+        name: "Sample",
+        rating: 1200,
+        tags: ["dp"],
+      },
+    ];
+
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue(problems),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await service.setSubscription(
+      "guild-1",
+      "missing-channel",
+      9,
+      0,
+      0,
+      ALL_DAYS,
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
+    const client = createMissingChannelClient();
+
+    await service.runTick(client);
+
+    const subscription = await service.getSubscription("guild-1");
+    expect(subscription).toBeNull();
+    expect(service.getLastError()?.message).toContain("Practice reminder channel");
   });
 
   it("returns recent practice posts in descending order", async () => {

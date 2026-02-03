@@ -218,6 +218,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   `preview`/`post` accept an optional subscription id when multiple are configured. `post` can
   `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 2,
   Div 3, Div 4, or Educational) with sensible keyword filters.
+  Subscriptions are automatically removed if the target channel is deleted.
 
 - **/contestratingalerts** `set|status|list|remove|clear|cleanup|preview|post`
 
@@ -232,6 +233,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Configure practice problem reminders (admin only). Use `set` to choose a channel, time, optional `utc_offset` (e.g. `+02:00`, `-05:30`, `Z`), optional `days` (e.g. `mon,wed,fri`, `weekdays`, `weekends`), rating ranges, optional tags, and an optional role mention. If `utc_offset` is omitted the time is interpreted as UTC. Use `cleanup` to remove reminders pointing at deleted channels (add `include_permissions:true` to also remove ones missing bot permissions).
   Use `post` to send a practice problem immediately (optionally `force` to send even if one was posted today).
+  Reminders are automatically cleared if the target channel is deleted.
 
 - **/digest** `set|status|clear|preview|post`
 

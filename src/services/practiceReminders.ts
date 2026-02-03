@@ -468,6 +468,20 @@ export class PracticeReminderService {
           "Practice reminder channel missing or invalid.",
           { guildId: subscription.guildId }
         );
+        if (channelStatus.status === "missing") {
+          const removed = await this.clearSubscription(subscription.guildId);
+          if (removed) {
+            logInfo("Practice reminder subscription removed (channel missing).", {
+              guildId: subscription.guildId,
+              channelId: subscription.channelId,
+            });
+          } else {
+            logWarn("Practice reminder subscription cleanup failed.", {
+              guildId: subscription.guildId,
+              channelId: subscription.channelId,
+            });
+          }
+        }
         if (channelStatus.status !== "ok") {
           this.lastError =
             buildChannelServiceError(

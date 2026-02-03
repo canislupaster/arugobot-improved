@@ -313,6 +313,8 @@ describe("ContestReminderService", () => {
 
     expect(service.getLastError()?.message).toContain("Contest reminder channel");
     expect(service.getLastError()?.message).toContain("missing-channel");
+    const remaining = await service.listSubscriptions("guild-1");
+    expect(remaining).toHaveLength(0);
   });
 
   it("records an error when sending a reminder fails", async () => {
