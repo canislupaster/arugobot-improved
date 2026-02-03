@@ -3,9 +3,11 @@ import type { Kysely } from "kysely";
 
 import type { Database, PracticeRemindersTable } from "../db/types.js";
 import {
-  resolveSendableChannelOrWarn,
+  describeSendableChannelStatus,
+  getSendableChannelStatusOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
+import { buildServiceError } from "../utils/errors.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
@@ -452,15 +454,22 @@ export class PracticeReminderService {
           continue;
         }
 
-        const channel = await resolveSendableChannelOrWarn(
+        const channelStatus = await getSendableChannelStatusOrWarn(
           client,
           subscription.channelId,
           "Practice reminder channel missing or invalid.",
           { guildId: subscription.guildId }
         );
-        if (!channel) {
+        if (channelStatus.status !== "ok") {
+          this.lastError =
+            buildServiceError(
+              `Practice reminder channel ${subscription.channelId}: ${describeSendableChannelStatus(
+                channelStatus
+              )}`
+            ) ?? this.lastError;
           continue;
         }
+        const channel = channelStatus.channel;
 
         const selection = await this.selectProblem(subscription);
         if (!selection.problem) {

@@ -19,7 +19,11 @@ import {
 } from "../utils/contestFilters.js";
 import { addContestScopeOption, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
-import { getSendableChannelStatus, type SendableChannelStatus } from "../utils/discordChannels.js";
+import {
+  describeSendableChannelStatus,
+  getSendableChannelStatus,
+  type SendableChannelStatus,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -49,10 +53,7 @@ function formatChannelStatus(status?: SendableChannelStatus | null): string | nu
   if (!status || status.status === "ok") {
     return null;
   }
-  if (status.status === "missing") {
-    return "Channel status: Missing or deleted";
-  }
-  return `Channel status: Missing permissions (${status.missingPermissions.join(", ")})`;
+  return `Channel status: ${describeSendableChannelStatus(status)}`;
 }
 
 function formatSubscriptionSummary(

@@ -2,9 +2,13 @@ import { EmbedBuilder, type Client } from "discord.js";
 import type { Kysely } from "kysely";
 
 import type { Database } from "../db/types.js";
-import { resolveSendableChannel, resolveSendableChannelOrWarn } from "../utils/discordChannels.js";
+import {
+  describeSendableChannelStatus,
+  getSendableChannelStatusOrWarn,
+  resolveSendableChannel,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { getErrorMessage } from "../utils/errors.js";
+import { buildServiceError, getErrorMessage } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
@@ -324,15 +328,22 @@ export class WeeklyDigestService {
           continue;
         }
 
-        const channel = await resolveSendableChannelOrWarn(
+        const channelStatus = await getSendableChannelStatusOrWarn(
           client,
           subscription.channelId,
           "Weekly digest channel missing.",
           { guildId: subscription.guildId }
         );
-        if (!channel) {
+        if (channelStatus.status !== "ok") {
+          this.lastError =
+            buildServiceError(
+              `Weekly digest channel ${subscription.channelId}: ${describeSendableChannelStatus(
+                channelStatus
+              )}`
+            ) ?? this.lastError;
           continue;
         }
+        const channel = channelStatus.channel;
 
         await this.trySendDigest(subscription, channel, "scheduled");
       }

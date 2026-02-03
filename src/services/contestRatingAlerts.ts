@@ -6,12 +6,13 @@ import type { Kysely } from "kysely";
 import type { ContestRatingAlertSubscriptionsTable, Database } from "../db/types.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import {
+  describeSendableChannelStatus,
+  getSendableChannelStatusOrWarn,
   resolveSendableChannel,
-  resolveSendableChannelOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { getErrorMessageForLog } from "../utils/errors.js";
+import { buildServiceError, getErrorMessageForLog } from "../utils/errors.js";
 import { normalizeHandleFilter, normalizeHandleKey } from "../utils/handles.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
@@ -409,15 +410,22 @@ export class ContestRatingAlertService {
       }
 
       for (const subscription of subscriptions) {
-        const channel = await resolveSendableChannelOrWarn(
+        const channelStatus = await getSendableChannelStatusOrWarn(
           client,
           subscription.channelId,
           "Contest rating alert channel missing or invalid.",
           { guildId: subscription.guildId }
         );
-        if (!channel) {
+        if (channelStatus.status !== "ok") {
+          this.lastError =
+            buildServiceError(
+              `Contest rating alert channel ${subscription.channelId}: ${describeSendableChannelStatus(
+                channelStatus
+              )}`
+            ) ?? this.lastError;
           continue;
         }
+        const channel = channelStatus.channel;
 
         const candidate = await this.findCandidate(subscription, contests, isStale, {
           skipNotified: true,

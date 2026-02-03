@@ -259,6 +259,29 @@ describe("ContestReminderService", () => {
     expect(contestService.refresh).toHaveBeenCalledWith(false, "gym");
   });
 
+  it("records an error when the reminder channel is missing", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.getUpcomingContests.mockReturnValue([
+      {
+        id: 601,
+        name: "CF Round",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 10 * 60,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestReminderService(db, contestService);
+    await service.createSubscription("guild-1", "missing-channel", 10, null, [], [], "official");
+    const client = createMissingChannelClient();
+
+    await service.runTick(client);
+
+    expect(service.getLastError()?.message).toContain("Contest reminder channel");
+    expect(service.getLastError()?.message).toContain("missing-channel");
+  });
+
   it("skips refresh when there are no subscriptions", async () => {
     const service = new ContestReminderService(db, contestService);
     const send = jest.fn().mockResolvedValue(undefined);

@@ -1,7 +1,9 @@
 import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
 
 import {
+  describeSendableChannelStatus,
   getSendableChannelStatus,
+  getSendableChannelStatusOrWarn,
   resolveSendableChannel,
   resolveSendableChannelOrWarn,
   resetChannelWarningCache,
@@ -55,6 +57,47 @@ describe("getSendableChannelStatus", () => {
       channelId: "channel-3",
       missingPermissions: ["SendMessages"],
     });
+  });
+});
+
+describe("getSendableChannelStatusOrWarn", () => {
+  beforeEach(() => {
+    resetChannelWarningCache();
+  });
+
+  it("returns status and logs when the channel is missing", async () => {
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(null),
+      },
+    } as unknown as Client;
+    const logWarn = jest.spyOn(logger, "logWarn").mockImplementation(() => {});
+
+    const result = await getSendableChannelStatusOrWarn(client, "channel-10", "Missing channel", {
+      guildId: "guild-10",
+    });
+
+    expect(result).toEqual({ status: "missing", channelId: "channel-10" });
+    expect(logWarn).toHaveBeenCalledWith("Missing channel", {
+      guildId: "guild-10",
+      channelId: "channel-10",
+    });
+    logWarn.mockRestore();
+  });
+});
+
+describe("describeSendableChannelStatus", () => {
+  it("formats missing and permission statuses", () => {
+    expect(describeSendableChannelStatus({ status: "missing", channelId: "c-1" })).toBe(
+      "Missing or deleted"
+    );
+    expect(
+      describeSendableChannelStatus({
+        status: "missing_permissions",
+        channelId: "c-2",
+        missingPermissions: ["SendMessages"],
+      })
+    ).toBe("Missing permissions (SendMessages)");
   });
 });
 

@@ -3,7 +3,10 @@ import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } f
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addRatingRangeOptions, addScheduleOptions, addTagOptions } from "../utils/commandOptions.js";
-import { getSendableChannelStatus } from "../utils/discordChannels.js";
+import {
+  describeSendableChannelStatus,
+  getSendableChannelStatus,
+} from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   formatRatingRangesWithDefaults,
@@ -257,13 +260,9 @@ export const practiceRemindersCommand: Command = {
           );
 
         if (channelStatus.status !== "ok") {
-          const statusLabel =
-            channelStatus.status === "missing"
-              ? "Missing or deleted"
-              : `Missing permissions (${channelStatus.missingPermissions.join(", ")})`;
           embed.addFields({
             name: "Channel status",
-            value: statusLabel,
+            value: describeSendableChannelStatus(channelStatus),
             inline: false,
           });
         }

@@ -66,6 +66,35 @@ export async function getSendableChannelStatus(
   return { status: "ok", channel };
 }
 
+export async function getSendableChannelStatusOrWarn(
+  client: Client,
+  channelId: string,
+  message: string,
+  context: LogContext = {}
+): Promise<SendableChannelStatus> {
+  const channel = await fetchSendableChannel(client, channelId);
+  if (!channel) {
+    logChannelWarning(message, channelId, { ...context, channelId });
+    return { status: "missing", channelId };
+  }
+  const missingPermissions = getMissingSendPermissions(channel, client);
+  if (missingPermissions) {
+    logChannelWarning(message, channelId, { ...context, channelId, missingPermissions });
+    return { status: "missing_permissions", channelId, missingPermissions };
+  }
+  return { status: "ok", channel };
+}
+
+export function describeSendableChannelStatus(status: SendableChannelStatus): string {
+  if (status.status === "missing") {
+    return "Missing or deleted";
+  }
+  if (status.status === "missing_permissions") {
+    return `Missing permissions (${status.missingPermissions.join(", ")})`;
+  }
+  return "OK";
+}
+
 export async function resolveSendableChannel(
   client: Client,
   channelId: string
@@ -84,17 +113,8 @@ export async function resolveSendableChannelOrWarn(
   message: string,
   context: LogContext = {}
 ): Promise<SendableChannel | null> {
-  const channel = await fetchSendableChannel(client, channelId);
-  if (!channel) {
-    logChannelWarning(message, channelId, { ...context, channelId });
-    return null;
-  }
-  const missingPermissions = getMissingSendPermissions(channel, client);
-  if (missingPermissions) {
-    logChannelWarning(message, channelId, { ...context, channelId, missingPermissions });
-    return null;
-  }
-  return channel;
+  const status = await getSendableChannelStatusOrWarn(client, channelId, message, context);
+  return status.status === "ok" ? status.channel : null;
 }
 
 export function resetChannelWarningCache(): void {
