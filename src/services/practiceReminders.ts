@@ -7,9 +7,8 @@ import {
   getSendableChannelStatusOrWarn,
   type SendableChannel,
 } from "../utils/discordChannels.js";
-import { buildServiceError } from "../utils/errors.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { buildServiceErrorFromException } from "../utils/errors.js";
+import { buildServiceError, buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import {
