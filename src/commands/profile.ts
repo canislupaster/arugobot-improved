@@ -157,6 +157,51 @@ function formatLastRatingChange(entry: {
   return `${entry.contestName}\nRank: ${entry.rank}\nRating: ${entry.oldRating} -> ${entry.newRating} (${delta})\nUpdated: ${updatedAt}`;
 }
 
+type ProfileField = { name: string; value: string; inline: boolean };
+
+function buildProfileFields(options: {
+  displayHandle: string;
+  linkedUserId: string | null;
+  targetId: string;
+  targetMention: string;
+  botRating: number | null;
+  totalChallenges: number;
+  streakSummary: string;
+  cfRating: string;
+  cfMaxRating: string;
+  cfLastOnline: string;
+}): ProfileField[] {
+  const fields: ProfileField[] = [{ name: "Handle", value: options.displayHandle, inline: true }];
+  if (options.linkedUserId) {
+    fields.push(
+      {
+        name: "Linked user",
+        value:
+          options.linkedUserId === options.targetId
+            ? options.targetMention
+            : `<@${options.linkedUserId}>`,
+        inline: true,
+      },
+      {
+        name: "Rating",
+        value:
+          options.botRating !== null && options.botRating >= 0
+            ? String(options.botRating)
+            : "Unknown",
+        inline: true,
+      },
+      { name: "Challenges", value: String(options.totalChallenges), inline: true },
+      { name: "Challenge streak", value: options.streakSummary, inline: true }
+    );
+  }
+  fields.push(
+    { name: "CF rating", value: options.cfRating, inline: true },
+    { name: "CF max", value: options.cfMaxRating, inline: true },
+    { name: "CF last online", value: options.cfLastOnline, inline: true }
+  );
+  return fields;
+}
+
 export const profileCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("profile")
@@ -237,28 +282,18 @@ export const profileCommand: Command = {
         : "Unknown";
 
       const title = handleInput ? `Profile: ${displayHandle}` : `Profile: ${targetName}`;
-      const fields = [{ name: "Handle", value: displayHandle, inline: true }];
-      if (linkedUserId) {
-        fields.push(
-          {
-            name: "Linked user",
-            value: linkedUserId === targetId ? targetMention : `<@${linkedUserId}>`,
-            inline: true,
-          },
-          {
-            name: "Rating",
-            value: botRating !== null && botRating >= 0 ? String(botRating) : "Unknown",
-            inline: true,
-          },
-          { name: "Challenges", value: String(totalChallenges), inline: true },
-          { name: "Challenge streak", value: formatStreakSummary(streakSummary), inline: true }
-        );
-      }
-      fields.push(
-        { name: "CF rating", value: cfRating, inline: true },
-        { name: "CF max", value: cfMaxRating, inline: true },
-        { name: "CF last online", value: cfLastOnline, inline: true }
-      );
+      const fields = buildProfileFields({
+        displayHandle,
+        linkedUserId,
+        targetId,
+        targetMention,
+        botRating,
+        totalChallenges,
+        streakSummary: formatStreakSummary(streakSummary),
+        cfRating,
+        cfMaxRating,
+        cfLastOnline,
+      });
 
       const embed = new EmbedBuilder()
         .setTitle(title)
