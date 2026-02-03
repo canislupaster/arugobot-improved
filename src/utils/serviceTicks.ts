@@ -1,11 +1,23 @@
 export type ServiceTickState = {
-  isTicking: boolean;
+  getIsTicking: () => boolean;
   setTicking: (value: boolean) => void;
   setLastTickAt: (value: string) => void;
 };
 
+export function createServiceTickState(
+  getIsTicking: () => boolean,
+  setTicking: (value: boolean) => void,
+  setLastTickAt: (value: string) => void
+): ServiceTickState {
+  return {
+    getIsTicking,
+    setTicking,
+    setLastTickAt,
+  };
+}
+
 export function beginServiceTick(state: ServiceTickState): (() => void) | null {
-  if (state.isTicking) {
+  if (state.getIsTicking()) {
     return null;
   }
   state.setTicking(true);

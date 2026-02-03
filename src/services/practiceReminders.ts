@@ -21,7 +21,7 @@ import {
   recordReminderSendFailure,
   resolveManualSendChannel,
 } from "../utils/reminders.js";
-import { runServiceTick } from "../utils/serviceTicks.js";
+import { createServiceTickState, runServiceTick } from "../utils/serviceTicks.js";
 import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
@@ -410,15 +410,15 @@ export class PracticeReminderService {
 
   async runTick(client: Client): Promise<void> {
     await runServiceTick(
-      {
-        isTicking: this.isTicking,
-        setTicking: (value) => {
+      createServiceTickState(
+        () => this.isTicking,
+        (value) => {
           this.isTicking = value;
         },
-        setLastTickAt: (value) => {
+        (value) => {
           this.lastTickAt = value;
-        },
-      },
+        }
+      ),
       async () => {
         try {
           const subscriptions = await this.listSubscriptions();

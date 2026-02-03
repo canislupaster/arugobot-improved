@@ -21,7 +21,7 @@ import {
   recordReminderSendFailure,
   resolveManualChannel,
 } from "../utils/reminders.js";
-import { runServiceTick } from "../utils/serviceTicks.js";
+import { createServiceTickState, runServiceTick } from "../utils/serviceTicks.js";
 import {
   cleanupNotifications,
   clearSubscriptionsWithNotifications,
@@ -329,15 +329,15 @@ export class ContestReminderService {
 
   async runTick(client: Client): Promise<void> {
     await runServiceTick(
-      {
-        isTicking: this.isTicking,
-        setTicking: (value) => {
+      createServiceTickState(
+        () => this.isTicking,
+        (value) => {
           this.isTicking = value;
         },
-        setLastTickAt: (value) => {
+        (value) => {
           this.lastTickAt = value;
-        },
-      },
+        }
+      ),
       async () => {
         try {
           let subscriptions: ContestReminder[] = [];
