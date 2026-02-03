@@ -1,4 +1,10 @@
-import { ChannelType, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import {
+  ChannelType,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+  type SlashCommandSubcommandBuilder,
+} from "discord.js";
 
 import type { ContestReminder } from "../services/contestReminders.js";
 import type { ContestScopeFilter } from "../services/contests.js";
@@ -44,6 +50,38 @@ function formatSubscriptionSummary(subscription: ContestReminder): string {
   return `Channel: <#${subscription.channelId}>\nLead time: ${
     subscription.minutesBefore
   } minutes\nScope: ${formatScope(subscription.scope)}\nRole: ${role}\nInclude: ${include}\nExclude: ${exclude}\nID: \`${subscription.id}\``;
+}
+
+function addReminderOptions(
+  subcommand: SlashCommandSubcommandBuilder
+): SlashCommandSubcommandBuilder {
+  return subcommand
+    .addChannelOption((option) =>
+      option
+        .setName("channel")
+        .setDescription("Channel to post reminders in")
+        .setRequired(true)
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+    )
+    .addRoleOption((option) => option.setName("role").setDescription("Role to mention for reminders"))
+    .addIntegerOption((option) =>
+      option
+        .setName("minutes_before")
+        .setDescription(`Minutes before start to notify (${MIN_MINUTES}-${MAX_MINUTES})`)
+        .setMinValue(MIN_MINUTES)
+        .setMaxValue(MAX_MINUTES)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("include")
+        .setDescription("Only remind for contests matching keywords (comma-separated)")
+    )
+    .addStringOption((option) =>
+      option
+        .setName("exclude")
+        .setDescription("Skip contests matching keywords (comma-separated)")
+    )
+    .addStringOption((option) => addContestScopeOption(option, "Which contests to include"));
 }
 
 function resolveSubscriptionId(
@@ -128,70 +166,14 @@ export const contestRemindersCommand: Command = {
     .setDescription("Configure Codeforces contest reminders for this server")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("add")
-        .setDescription("Add a contest reminder subscription")
-        .addChannelOption((option) =>
-          option
-            .setName("channel")
-            .setDescription("Channel to post reminders in")
-            .setRequired(true)
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-        )
-        .addRoleOption((option) =>
-          option.setName("role").setDescription("Role to mention for reminders")
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("minutes_before")
-            .setDescription(`Minutes before start to notify (${MIN_MINUTES}-${MAX_MINUTES})`)
-            .setMinValue(MIN_MINUTES)
-            .setMaxValue(MAX_MINUTES)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("include")
-            .setDescription("Only remind for contests matching keywords (comma-separated)")
-        )
-        .addStringOption((option) =>
-          option
-            .setName("exclude")
-            .setDescription("Skip contests matching keywords (comma-separated)")
-        )
-        .addStringOption((option) => addContestScopeOption(option, "Which contests to include"))
+      addReminderOptions(
+        subcommand.setName("add").setDescription("Add a contest reminder subscription")
+      )
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("set")
-        .setDescription("Add a contest reminder subscription (legacy)")
-        .addChannelOption((option) =>
-          option
-            .setName("channel")
-            .setDescription("Channel to post reminders in")
-            .setRequired(true)
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-        )
-        .addRoleOption((option) =>
-          option.setName("role").setDescription("Role to mention for reminders")
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("minutes_before")
-            .setDescription(`Minutes before start to notify (${MIN_MINUTES}-${MAX_MINUTES})`)
-            .setMinValue(MIN_MINUTES)
-            .setMaxValue(MAX_MINUTES)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("include")
-            .setDescription("Only remind for contests matching keywords (comma-separated)")
-        )
-        .addStringOption((option) =>
-          option
-            .setName("exclude")
-            .setDescription("Skip contests matching keywords (comma-separated)")
-        )
-        .addStringOption((option) => addContestScopeOption(option, "Which contests to include"))
+      addReminderOptions(
+        subcommand.setName("set").setDescription("Add a contest reminder subscription (legacy)")
+      )
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("status").setDescription("List current reminder subscriptions")
