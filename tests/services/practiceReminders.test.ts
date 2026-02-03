@@ -85,6 +85,56 @@ describe("PracticeReminderService", () => {
     expect(posts[0]?.problem_id).toBe("100A");
   });
 
+  it("records an error when sending a reminder fails", async () => {
+    const nowMs = Date.UTC(2024, 0, 1, 10, 0, 0);
+    jest.useFakeTimers().setSystemTime(new Date(nowMs));
+
+    const problems = [
+      {
+        contestId: 100,
+        index: "A",
+        name: "Sample",
+        rating: 1200,
+        tags: ["dp"],
+      },
+    ];
+
+    const service = new PracticeReminderService(
+      db,
+      {
+        ensureProblemsLoaded: jest.fn().mockResolvedValue(problems),
+      } as never,
+      {
+        getLinkedUsers: jest.fn().mockResolvedValue([]),
+        getHistoryList: jest.fn().mockResolvedValue([]),
+        getSolvedProblems: jest.fn().mockResolvedValue([]),
+      } as never
+    );
+
+    await service.setSubscription(
+      "guild-1",
+      "channel-1",
+      9,
+      0,
+      0,
+      ALL_DAYS,
+      [{ min: 800, max: 1400 }],
+      "",
+      null
+    );
+    const send = jest.fn().mockRejectedValue(new Error("send failed"));
+    const client = createMockClient(send);
+
+    await service.runTick(client);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(service.getLastError()?.message).toBe("send failed");
+    const posts = await db.selectFrom("practice_posts").selectAll().execute();
+    expect(posts).toHaveLength(0);
+    const subscription = await service.getSubscription("guild-1");
+    expect(subscription?.lastSentAt).toBeNull();
+  });
+
   it("returns recent practice posts in descending order", async () => {
     const service = new PracticeReminderService(
       db,

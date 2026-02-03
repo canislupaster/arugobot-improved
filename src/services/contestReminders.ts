@@ -474,13 +474,21 @@ export class ContestReminderService {
               scope: subscription.scope,
             });
           } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            logWarn("Contest reminder send failed.", {
-              guildId: subscription.guildId,
-              channelId: subscription.channelId,
-              contestId: contest.id,
-              scope: subscription.scope,
-              error: message,
+            recordReminderSendFailure({
+              error,
+              record: (entry) => {
+                this.lastError = entry;
+              },
+              log: logWarn,
+              logMessage: "Contest reminder send failed.",
+              logContext: {
+                guildId: subscription.guildId,
+                subscriptionId: subscription.id,
+                channelId: subscription.channelId,
+                contestId: contest.id,
+                minutesBefore: subscription.minutesBefore,
+                scope: subscription.scope,
+              },
             });
           }
         }

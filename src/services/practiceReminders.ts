@@ -482,10 +482,18 @@ export class PracticeReminderService {
         try {
           await this.sendReminderMessage(subscription, selection, channel, "scheduled");
         } catch (error) {
-          logWarn("Practice reminder send failed.", {
-            guildId: subscription.guildId,
-            channelId: subscription.channelId,
-            error: String(error),
+          recordReminderSendFailure({
+            error,
+            record: (entry) => {
+              this.lastError = entry;
+            },
+            log: logWarn,
+            logMessage: "Practice reminder send failed.",
+            logContext: {
+              guildId: subscription.guildId,
+              channelId: subscription.channelId,
+              problemId: selection.problem ? getProblemId(selection.problem) : undefined,
+            },
           });
         }
       }
