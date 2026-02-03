@@ -92,6 +92,12 @@ describe("profileCommand", () => {
               },
             ],
           }),
+          getChallengeStreak: jest.fn().mockResolvedValue({
+            currentStreak: 2,
+            longestStreak: 5,
+            totalSolvedDays: 8,
+            lastSolvedAt: new Date().toISOString(),
+          }),
           getHistoryWithRatings: jest.fn(),
           getRecentSubmissions: jest.fn().mockResolvedValue({
             submissions: [
@@ -119,8 +125,16 @@ describe("profileCommand", () => {
 
     expect(ratingChanges.getRatingChanges).toHaveBeenCalledWith("Tourist");
     expect(interaction.deferReply).toHaveBeenCalled();
+    expect(context.services.store.getChallengeStreak).toHaveBeenCalledWith("guild-1", "user-2");
     expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({ embeds: expect.any(Array) })
+    );
+
+    const replyPayload = (interaction.editReply as jest.Mock).mock.calls[0]?.[0];
+    const embed = replyPayload?.embeds?.[0];
+    const fields = embed?.data?.fields ?? [];
+    expect(fields).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Challenge streak" })])
     );
   });
 

@@ -59,7 +59,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
 - **/profile** `[user]` `[handle]`
 
-  Shows a linked handle, rating, Codeforces profile info, and recent completed challenges (or a handle's Codeforces profile + recent submissions).
+  Shows a linked handle, rating, challenge streak, Codeforces profile info, and recent completed challenges (or a handle's Codeforces profile + recent submissions).
   In DMs, provide a `handle`.
 
 - **/compare** `[user1..user4]` `[handles]`

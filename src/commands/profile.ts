@@ -21,6 +21,13 @@ type ChallengeProblemEntry = {
   index?: string;
 };
 
+type ChallengeStreakSummary = {
+  currentStreak: number;
+  longestStreak: number;
+  totalSolvedDays: number;
+  lastSolvedAt: string | null;
+};
+
 function buildProblemLine(entry: ChallengeProblemEntry) {
   if (entry.name && entry.contestId && entry.index) {
     return `- [${entry.problemId}. ${entry.name}](https://codeforces.com/problemset/problem/${entry.contestId}/${entry.index})`;
@@ -37,13 +44,11 @@ async function loadChallengeSummary(
   linkedUserId: string,
   services: CommandContext["services"]
 ) {
-  const botRating = await services.store.getRating(guildId, linkedUserId);
-  const recentHistory = await services.store.getChallengeHistoryPage(
-    guildId,
-    linkedUserId,
-    1,
-    MAX_RECENT_CHALLENGES
-  );
+  const [botRating, recentHistory, streak] = await Promise.all([
+    services.store.getRating(guildId, linkedUserId),
+    services.store.getChallengeHistoryPage(guildId, linkedUserId, 1, MAX_RECENT_CHALLENGES),
+    services.store.getChallengeStreak(guildId, linkedUserId),
+  ]);
   let totalChallenges = recentHistory.total;
   let recentEntries: ChallengeProblemEntry[] = recentHistory.entries.map((entry) => ({
     problemId: entry.problemId,
@@ -69,7 +74,7 @@ async function loadChallengeSummary(
   }
 
   const recentLines = formatProblemLines(recentEntries);
-  return { botRating, totalChallenges, recentLines };
+  return { botRating, totalChallenges, recentLines, streak };
 }
 
 async function loadRecentSubmissions(
@@ -96,6 +101,24 @@ function formatRatingSummary(
     return `${value} (${rank ?? fallbackRank})`;
   }
   return fallbackValue;
+}
+
+function formatStreakSummary(streak: ChallengeStreakSummary | null): string {
+  if (!streak || streak.totalSolvedDays === 0) {
+    return "No completed challenges yet.";
+  }
+  const parts = [
+    `Current: ${streak.currentStreak}`,
+    `Longest: ${streak.longestStreak}`,
+    `Active: ${streak.totalSolvedDays}`,
+  ];
+  if (streak.lastSolvedAt) {
+    const timestampSeconds = Math.floor(Date.parse(streak.lastSolvedAt) / 1000);
+    if (Number.isFinite(timestampSeconds)) {
+      parts.push(`Last: ${formatDiscordRelativeTime(timestampSeconds)}`);
+    }
+  }
+  return parts.join(" • ");
 }
 
 function formatLastRatingChange(entry: {
@@ -167,6 +190,7 @@ export const profileCommand: Command = {
       const botRating = challengeSummary?.botRating ?? null;
       const totalChallenges = challengeSummary?.totalChallenges ?? 0;
       const recentLines = challengeSummary?.recentLines ?? "";
+      const streakSummary = challengeSummary?.streak ?? null;
       const recentSubmissionsLines = recentSubmissions?.lines ?? "";
       const submissionsStale = recentSubmissions?.isStale ?? false;
       const lastRatingChange = ratingChanges?.changes.at(-1) ?? null;
@@ -215,6 +239,11 @@ export const profileCommand: Command = {
                   inline: true,
                 },
                 { name: "Challenges", value: String(totalChallenges), inline: true },
+                {
+                  name: "Challenge streak",
+                  value: formatStreakSummary(streakSummary),
+                  inline: true,
+                },
               ]
             : []),
           { name: "CF rating", value: cfRating, inline: true },
