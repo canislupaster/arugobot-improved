@@ -2,17 +2,14 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestEmbed } from "../utils/contestLookup.js";
-import {
-  formatUnsolvedProblemsValue,
-  splitContestSolves,
-} from "../utils/contestProblems.js";
+import { splitContestSolves } from "../utils/contestProblems.js";
 import { addContestScopeOption } from "../utils/contestScope.js";
 import {
   loadContestSolvesDataOrReply,
   resolveContestSolvesContext,
   resolveContestSolvesOptionsOrReply,
   shouldShowContestSolvesStale,
-  formatContestSolvesSummary,
+  buildContestSolvesSummaryFields,
 } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
@@ -117,28 +114,17 @@ export const contestUpsolveCommand: Command = {
         scope,
         includeScope: true,
       });
+      embed.addFields({ name: "Target", value: targetLabel, inline: false });
       embed.addFields(
-        { name: "Target", value: targetLabel, inline: false },
-        {
-          name: "Summary",
-          value: formatContestSolvesSummary({
-            totalProblems: summaries.length,
-            solvedCount,
-            unsolvedCount,
-          }),
-          inline: false,
-        }
-      );
-
-      embed.addFields({
-        name: "Unsolved problems",
-        value: formatUnsolvedProblemsValue(
+        ...buildContestSolvesSummaryFields({
+          totalProblems: summaries.length,
+          solvedCount,
+          unsolvedCount,
           unsolved,
           limit,
-          "All contest problems were solved by this handle."
-        ),
-        inline: false,
-      });
+          emptyMessage: "All contest problems were solved by this handle.",
+        })
+      );
 
       if (shouldShowContestSolvesStale(contestResult.refreshWasStale, contestSolves)) {
         embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });

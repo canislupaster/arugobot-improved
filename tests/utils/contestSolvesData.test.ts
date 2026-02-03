@@ -1,4 +1,5 @@
 import {
+  buildContestSolvesSummaryFields,
   formatContestSolvesSummary,
   resolveContestSolvesOptionsOrReply,
 } from "../../src/utils/contestSolvesData.js";
@@ -84,5 +85,27 @@ describe("resolveContestSolvesOptionsOrReply", () => {
 
     expect(result).toEqual({ status: "replied" });
     expect(interaction.reply).toHaveBeenCalledWith({ content: "Invalid limit." });
+  });
+});
+
+describe("buildContestSolvesSummaryFields", () => {
+  it("builds summary and unsolved fields with the empty message", () => {
+    const fields = buildContestSolvesSummaryFields({
+      totalProblems: 3,
+      solvedCount: 3,
+      unsolvedCount: 0,
+      unsolved: [],
+      limit: 10,
+      emptyMessage: "All solved.",
+    });
+
+    expect(fields).toHaveLength(2);
+    expect(fields[0].name).toBe("Summary");
+    expect(fields[0].value).toContain("Solved problems: 3/3");
+    expect(fields[1]).toEqual({
+      name: "Unsolved problems",
+      value: "All solved.",
+      inline: false,
+    });
   });
 });

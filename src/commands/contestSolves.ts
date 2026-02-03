@@ -5,7 +5,6 @@ import { buildContestEmbed } from "../utils/contestLookup.js";
 import {
   compareProblemIndex,
   formatContestProblemLines,
-  formatUnsolvedProblemsValue,
   splitContestSolves,
 } from "../utils/contestProblems.js";
 import { addContestScopeOption } from "../utils/contestScope.js";
@@ -14,7 +13,7 @@ import {
   resolveContestSolvesContext,
   resolveContestSolvesOptionsOrReply,
   shouldShowContestSolvesStale,
-  formatContestSolvesSummary,
+  buildContestSolvesSummaryFields,
 } from "../utils/contestSolvesData.js";
 import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
@@ -138,26 +137,17 @@ export const contestSolvesCommand: Command = {
         scope,
         includeScope: true,
       });
-      embed.addFields({
-        name: "Summary",
-        value: formatContestSolvesSummary({
+      embed.addFields(
+        ...buildContestSolvesSummaryFields({
           totalProblems: summaries.length,
           solvedCount,
           unsolvedCount,
           handleCount: targets.length,
-        }),
-        inline: false,
-      });
-
-      embed.addFields({
-        name: "Unsolved problems",
-        value: formatUnsolvedProblemsValue(
           unsolved,
           limit,
-          "All contest problems were solved by linked users."
-        ),
-        inline: false,
-      });
+          emptyMessage: "All contest problems were solved by linked users.",
+        })
+      );
 
       if (solved.length > 0) {
         const lines = formatContestProblemLines(

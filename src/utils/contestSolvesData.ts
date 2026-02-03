@@ -6,7 +6,8 @@ import type { ContestSolvesResult, StoreService } from "../services/store.js";
 
 import type { ContestLookupService } from "./contestLookup.js";
 import { resolveContestOrReply } from "./contestLookup.js";
-import { getContestProblems } from "./contestProblems.js";
+import type { ContestProblemSummary } from "./contestProblems.js";
+import { formatUnsolvedProblemsValue, getContestProblems } from "./contestProblems.js";
 import { parseContestScope, refreshContestData } from "./contestScope.js";
 import { resolveBoundedIntegerOption } from "./interaction.js";
 
@@ -45,6 +46,34 @@ export function formatContestSolvesSummary(options: {
   lines.push(`Solved problems: ${options.solvedCount}/${options.totalProblems}`);
   lines.push(`Unsolved problems: ${options.unsolvedCount}`);
   return lines.join("\n");
+}
+
+export function buildContestSolvesSummaryFields(options: {
+  totalProblems: number;
+  solvedCount: number;
+  unsolvedCount: number;
+  handleCount?: number;
+  unsolved: ContestProblemSummary[];
+  limit: number;
+  emptyMessage: string;
+}): Array<{ name: string; value: string; inline: boolean }> {
+  return [
+    {
+      name: "Summary",
+      value: formatContestSolvesSummary({
+        totalProblems: options.totalProblems,
+        solvedCount: options.solvedCount,
+        unsolvedCount: options.unsolvedCount,
+        handleCount: options.handleCount,
+      }),
+      inline: false,
+    },
+    {
+      name: "Unsolved problems",
+      value: formatUnsolvedProblemsValue(options.unsolved, options.limit, options.emptyMessage),
+      inline: false,
+    },
+  ];
 }
 
 export type ContestSolvesOptionsResult =
