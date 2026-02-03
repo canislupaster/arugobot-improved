@@ -76,28 +76,22 @@ export const digestCommand: Command = {
     .setDescription("Configure weekly digest posts")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand((subcommand) =>
-      addScheduleOptions(
-        subcommand
-          .setName("set")
-          .setDescription("Enable weekly digests")
-          .addStringOption((option) =>
-            option
-              .setName("day")
-              .setDescription("Day of the week to post")
-              .addChoices(
-                { name: "Sunday", value: "sun" },
-                { name: "Monday", value: "mon" },
-                { name: "Tuesday", value: "tue" },
-                { name: "Wednesday", value: "wed" },
-                { name: "Thursday", value: "thu" },
-                { name: "Friday", value: "fri" },
-                { name: "Saturday", value: "sat" }
-              )
-          ),
-        {
-          channelDescription: "Channel to post the digest in",
-          roleDescription: "Role to mention for weekly digests",
-        }
+      addScheduleOptions(subcommand.setName("set").setDescription("Enable weekly digests"), {
+        channelDescription: "Channel to post the digest in",
+        roleDescription: "Role to mention for weekly digests",
+      }).addStringOption((option) =>
+        option
+          .setName("day")
+          .setDescription("Day of the week to post")
+          .addChoices(
+            { name: "Sunday", value: "sun" },
+            { name: "Monday", value: "mon" },
+            { name: "Tuesday", value: "tue" },
+            { name: "Wednesday", value: "wed" },
+            { name: "Thursday", value: "thu" },
+            { name: "Friday", value: "fri" },
+            { name: "Saturday", value: "sat" }
+          )
       )
     )
     .addSubcommand((subcommand) =>
