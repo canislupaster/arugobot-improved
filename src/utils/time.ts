@@ -95,3 +95,17 @@ export function parseUtcOffset(raw: string): { minutes: number } | { error: stri
   }
   return { minutes: totalMinutes };
 }
+
+export function resolveUtcOffsetMinutes(
+  raw?: string | null
+): { minutes: number } | { error: string } {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) {
+    return { minutes: 0 };
+  }
+  const parsed = parseUtcOffset(trimmed);
+  if ("error" in parsed) {
+    return { error: parsed.error };
+  }
+  return { minutes: parsed.minutes };
+}

@@ -7,7 +7,7 @@ import {
   formatDiscordTimestamp,
   formatHourMinute,
   formatUtcOffset,
-  parseUtcOffset,
+  resolveUtcOffsetMinutes,
   toLocalTime,
   toUtcTime,
 } from "../utils/time.js";
@@ -256,15 +256,12 @@ export const digestCommand: Command = {
       const utcOffsetRaw = interaction.options.getString("utc_offset")?.trim() ?? "";
       const role = interaction.options.getRole("role");
 
-      let utcOffsetMinutes = 0;
-      if (utcOffsetRaw) {
-        const parsedOffset = parseUtcOffset(utcOffsetRaw);
-        if ("error" in parsedOffset) {
-          await interaction.reply({ content: parsedOffset.error });
-          return;
-        }
-        utcOffsetMinutes = parsedOffset.minutes;
+      const utcOffsetResult = resolveUtcOffsetMinutes(utcOffsetRaw);
+      if ("error" in utcOffsetResult) {
+        await interaction.reply({ content: utcOffsetResult.error });
+        return;
       }
+      const utcOffsetMinutes = utcOffsetResult.minutes;
 
       const utcTime = toUtcTime(hourInput, minuteInput, utcOffsetMinutes);
       const dayIndex = DAY_INDEX[day] ?? DAY_INDEX[DEFAULT_DAY];

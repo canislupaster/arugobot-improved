@@ -4,6 +4,7 @@ import {
   getLocalDayForUtcMs,
   getUtcScheduleMs,
   parseUtcOffset,
+  resolveUtcOffsetMinutes,
   toLocalTime,
   toUtcTime,
   wasSentSince,
@@ -31,6 +32,15 @@ describe("time utils", () => {
       error: "UTC offset must be between -12:00 and +14:00.",
     });
     expect(parseUtcOffset("bad")).toEqual({
+      error: "Invalid UTC offset. Use formats like +02:00, -05:30, or Z.",
+    });
+  });
+
+  it("resolves optional UTC offsets with defaults", () => {
+    expect(resolveUtcOffsetMinutes(null)).toEqual({ minutes: 0 });
+    expect(resolveUtcOffsetMinutes("")).toEqual({ minutes: 0 });
+    expect(resolveUtcOffsetMinutes(" +02:30 ")).toEqual({ minutes: 150 });
+    expect(resolveUtcOffsetMinutes("bad")).toEqual({
       error: "Invalid UTC offset. Use formats like +02:00, -05:30, or Z.",
     });
   });
