@@ -486,6 +486,42 @@ describe("ContestReminderService", () => {
     expect(result.status).toBe("sent");
   });
 
+  it("marks manual reminders as stale when refresh fails", async () => {
+    const nowSeconds = 1_700_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);
+    contestService.refresh.mockRejectedValue(new Error("refresh failed"));
+    contestService.getUpcomingContests.mockReturnValue([
+      {
+        id: 801,
+        name: "Cached Round",
+        phase: "BEFORE",
+        startTimeSeconds: nowSeconds + 30 * 60,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestReminderService(db, contestService);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      30,
+      null,
+      [],
+      [],
+      "official"
+    );
+    const send = jest.fn().mockResolvedValue(undefined);
+    const client = createMockClient(send);
+
+    const result = await service.sendManualReminder(subscription, client, false);
+
+    expect(result.status).toBe("sent");
+    if (result.status === "sent") {
+      expect(result.isStale).toBe(true);
+    }
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it("returns channel_missing when the manual reminder channel is unavailable", async () => {
     contestService.getUpcomingContests.mockReturnValue([]);
 

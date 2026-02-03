@@ -245,14 +245,8 @@ export class ContestReminderService {
 
     let isStale = false;
     try {
-      if (subscription.scope === "all") {
-        await Promise.all([
-          this.contests.refresh(false, "official"),
-          this.contests.refresh(false, "gym"),
-        ]);
-    } else {
-        await this.contests.refresh(false, subscription.scope);
-      }
+      const refreshScopes = getRefreshScopes([subscription]);
+      await Promise.all(refreshScopes.map((scope) => this.contests.refresh(false, scope)));
     } catch (error) {
       isStale = true;
       const serviceError = buildServiceErrorFromException(error);
