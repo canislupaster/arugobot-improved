@@ -12,12 +12,12 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild } from "../utils/interaction.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import {
   formatRatingRangesWithDefaults,
   readRatingRangeOptions,
   resolveRatingRanges,
 } from "../utils/ratingRanges.js";
-import { buildProblemUrl } from "../utils/problemReference.js";
 import {
   formatDiscordRelativeTime,
   formatDiscordTimestamp,

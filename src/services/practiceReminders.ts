@@ -7,6 +7,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { buildServiceErrorFromException } from "../utils/errors.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import {
   filterProblemsByRatingRanges,
   filterProblemsByTags,
@@ -14,7 +15,6 @@ import {
   parseTagFilters,
   selectRandomProblem,
 } from "../utils/problemSelection.js";
-import { buildProblemUrl } from "../utils/problemReference.js";
 import type { RatingRange } from "../utils/ratingRanges.js";
 import {
   buildReminderSendErrorResult,

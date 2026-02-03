@@ -1,5 +1,5 @@
-import { formatDiscordRelativeTime } from "./time.js";
 import { buildProblemUrl } from "./problemReference.js";
+import { formatDiscordRelativeTime } from "./time.js";
 
 export type SubmissionSummary = {
   contestId: number | null;

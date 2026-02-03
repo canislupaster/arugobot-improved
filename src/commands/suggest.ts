@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Problem } from "../services/problems.js";
 import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import {
   filterProblemsByRatingRanges,
   filterProblemsByTags,
@@ -10,7 +11,6 @@ import {
   parseTagFilters,
   selectRandomProblems,
 } from "../utils/problemSelection.js";
-import { buildProblemUrl } from "../utils/problemReference.js";
 import { getColor } from "../utils/rating.js";
 import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
 

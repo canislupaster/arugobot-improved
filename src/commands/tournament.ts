@@ -28,9 +28,9 @@ import {
   buildPaginationRow,
   paginationTimeoutMs,
 } from "../utils/pagination.js";
+import { buildProblemUrl } from "../utils/problemReference.js";
 import { formatTime } from "../utils/rating.js";
 import { readRatingRangeOptions, resolveRatingRanges } from "../utils/ratingRanges.js";
-import { buildProblemUrl } from "../utils/problemReference.js";
 import { capitalize } from "../utils/text.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 import {
