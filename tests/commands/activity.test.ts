@@ -91,4 +91,38 @@ describe("activityCommand", () => {
     expect(fieldText).toContain("Participations");
     expect(fieldText).toContain("Solved");
   });
+
+  it("shows a top-solvers fallback when guild members are missing", async () => {
+    const interaction = createInteraction({
+      guild: {
+        id: "guild-1",
+        members: {
+          fetch: jest.fn().mockResolvedValue(new Map()),
+          cache: new Map(),
+        },
+      },
+    });
+    const context = {
+      services: {
+        store: {
+          getChallengeActivity: jest.fn().mockResolvedValue({
+            completedChallenges: 2,
+            participantCount: 3,
+            uniqueParticipants: 2,
+            solvedCount: 2,
+            topSolvers: [{ userId: "user-9", solvedCount: 2 }],
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await activityCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0];
+    const fields = embed.data.fields ?? [];
+    const fieldText = JSON.stringify(fields);
+    expect(fieldText).toContain("Top solvers");
+    expect(fieldText).toContain("No current guild members");
+  });
 });

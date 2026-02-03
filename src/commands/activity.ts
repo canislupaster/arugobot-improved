@@ -12,6 +12,8 @@ const DEFAULT_DAYS = 30;
 const MAX_DAYS = 90;
 const MIN_DAYS = 1;
 const TOP_SOLVERS_LIMIT = 5;
+const EMPTY_TOP_SOLVERS_MESSAGE =
+  "No current guild members found in the recent top solvers. Use /handles to review linked accounts.";
 
 function buildSinceIso(days: number): string {
   const now = Date.now();
@@ -104,6 +106,18 @@ function formatTopSolvers(entries: Array<{ userId: string; solvedCount: number }
     .join("\n");
 }
 
+function addTopSolversField(
+  embed: EmbedBuilder,
+  entries: Array<{ userId: string; solvedCount: number }>,
+  fallbackMessage: string
+): void {
+  embed.addFields({
+    name: "Top solvers",
+    value: entries.length > 0 ? formatTopSolvers(entries) : fallbackMessage,
+    inline: false,
+  });
+}
+
 export const activityCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("activity")
@@ -178,13 +192,7 @@ export const activityCommand: Command = {
           guildId: interaction.guild.id,
           userId: interaction.user.id,
         });
-        if (filtered.length > 0) {
-          embed.addFields({
-            name: "Top solvers",
-            value: formatTopSolvers(filtered),
-            inline: false,
-          });
-        }
+        addTopSolversField(embed, filtered, EMPTY_TOP_SOLVERS_MESSAGE);
       }
 
       await interaction.editReply({ embeds: [embed] });
