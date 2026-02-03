@@ -303,6 +303,20 @@ async function selectSubscriptionOrReply(
   return subscriptions[0] ?? null;
 }
 
+async function resolveSubscriptionSelectionOrReply(
+  interaction: Parameters<Command["execute"]>[0],
+  contestReminders: { listSubscriptions: (guildId: string) => Promise<ContestReminder[]> },
+  guildId: string,
+  id: string | null,
+  multiMessage: string
+): Promise<ContestReminder | null> {
+  const subscriptions = await getSubscriptionsOrReply(interaction, contestReminders, guildId);
+  if (!subscriptions) {
+    return null;
+  }
+  return selectSubscriptionOrReply(interaction, subscriptions, id, multiMessage);
+}
+
 export const contestRemindersCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contestreminders")
@@ -659,17 +673,10 @@ export const contestRemindersCommand: Command = {
 
       if (subcommand === "preview") {
         const id = interaction.options.getString("id");
-        const subscriptions = await getSubscriptionsOrReply(
+        const subscription = await resolveSubscriptionSelectionOrReply(
           interaction,
           context.services.contestReminders,
-          guildId
-        );
-        if (!subscriptions) {
-          return;
-        }
-        const subscription = await selectSubscriptionOrReply(
-          interaction,
-          subscriptions,
+          guildId,
           id,
           "Multiple contest reminder subscriptions are configured. Provide an id from /contestreminders list."
         );
@@ -780,17 +787,10 @@ export const contestRemindersCommand: Command = {
       if (subcommand === "post") {
         const force = interaction.options.getBoolean("force") ?? false;
         const id = interaction.options.getString("id");
-        const subscriptions = await getSubscriptionsOrReply(
+        const subscription = await resolveSubscriptionSelectionOrReply(
           interaction,
           context.services.contestReminders,
-          guildId
-        );
-        if (!subscriptions) {
-          return;
-        }
-        const subscription = await selectSubscriptionOrReply(
-          interaction,
-          subscriptions,
+          guildId,
           id,
           "Multiple contest reminder subscriptions are configured. Provide an id from /contestreminders list."
         );
