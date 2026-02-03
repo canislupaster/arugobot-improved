@@ -349,6 +349,16 @@ export const contestRemindersCommand: Command = {
 
     const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
+    const resolveSubscription = async () => {
+      const id = interaction.options.getString("id");
+      const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
+      return resolveSubscriptionSelectionOrReply(
+        interaction,
+        subscriptions,
+        id,
+        selectionMessages
+      );
+    };
 
     try {
       if (subcommand === "status" || subcommand === "list") {
@@ -620,14 +630,7 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "preview") {
-        const id = interaction.options.getString("id");
-        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-        const subscription = await resolveSubscriptionSelectionOrReply(
-          interaction,
-          subscriptions,
-          id,
-          selectionMessages
-        );
+        const subscription = await resolveSubscription();
         if (!subscription) {
           return;
         }
@@ -734,14 +737,7 @@ export const contestRemindersCommand: Command = {
 
       if (subcommand === "post") {
         const force = interaction.options.getBoolean("force") ?? false;
-        const id = interaction.options.getString("id");
-        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-        const subscription = await resolveSubscriptionSelectionOrReply(
-          interaction,
-          subscriptions,
-          id,
-          selectionMessages
-        );
+        const subscription = await resolveSubscription();
         if (!subscription) {
           return;
         }
