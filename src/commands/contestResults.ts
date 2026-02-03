@@ -10,7 +10,7 @@ import {
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
   getUserOptions,
-  resolveContestTargets,
+  resolveContestTargetsOrReply,
   type TargetHandle,
 } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
@@ -149,7 +149,8 @@ export const contestResultsCommand: Command = {
 
       const contest = lookup.contest;
 
-      const targetResult = await resolveContestTargets({
+      const targetResult = await resolveContestTargetsOrReply({
+        interaction,
         guild: interaction.guild,
         guildId: interaction.guildId,
         user: interaction.user,
@@ -160,8 +161,7 @@ export const contestResultsCommand: Command = {
         store: context.services.store,
         maxLinkedHandles: MAX_HANDLES,
       });
-      if (targetResult.status === "error") {
-        await interaction.editReply(targetResult.message);
+      if (targetResult.status === "replied") {
         return;
       }
       const targetList = targetResult.targets;

@@ -28,6 +28,10 @@ type ResolveTargetsParams = {
   maxLinkedHandles?: number;
 };
 
+type ContestTargetsInteraction = {
+  editReply: (message: string) => Promise<unknown>;
+};
+
 type TargetResolution =
   | { status: "ok"; targets: TargetHandle[] }
   | { status: "error"; message: string };
@@ -130,4 +134,16 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   }
 
   return { status: "ok", targets: targetList };
+}
+
+export async function resolveContestTargetsOrReply(
+  params: ResolveTargetsParams & { interaction: ContestTargetsInteraction }
+): Promise<{ status: "ok"; targets: TargetHandle[] } | { status: "replied" }> {
+  const { interaction, ...options } = params;
+  const result = await resolveContestTargets(options);
+  if (result.status === "error") {
+    await interaction.editReply(result.message);
+    return { status: "replied" };
+  }
+  return result;
 }

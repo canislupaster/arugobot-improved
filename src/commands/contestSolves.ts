@@ -15,7 +15,7 @@ import {
   shouldShowContestSolvesStale,
   buildContestSolvesSummaryFields,
 } from "../utils/contestSolvesData.js";
-import { getUserOptions, resolveContestTargets } from "../utils/contestTargets.js";
+import { getUserOptions, resolveContestTargetsOrReply } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
 
 import type { Command } from "./types.js";
@@ -104,7 +104,8 @@ export const contestSolvesCommand: Command = {
         return;
       }
 
-      const targetResult = await resolveContestTargets({
+      const targetResult = await resolveContestTargetsOrReply({
+        interaction,
         guild: interaction.guild,
         guildId: interaction.guildId,
         user: interaction.user,
@@ -114,8 +115,7 @@ export const contestSolvesCommand: Command = {
         correlationId: context.correlationId,
         store: context.services.store,
       });
-      if (targetResult.status === "error") {
-        await interaction.editReply(targetResult.message);
+      if (targetResult.status === "replied") {
         return;
       }
       const targets = targetResult.targets;

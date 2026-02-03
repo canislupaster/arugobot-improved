@@ -1,6 +1,6 @@
 import type { User } from "discord.js";
 
-import { resolveContestTargets } from "../../src/utils/contestTargets.js";
+import { resolveContestTargets, resolveContestTargetsOrReply } from "../../src/utils/contestTargets.js";
 
 describe("resolveContestTargets", () => {
   const baseParams = {
@@ -133,5 +133,54 @@ describe("resolveContestTargets", () => {
 
     expect(result.status).toBe("ok");
     expect(store.getHandle).toHaveBeenCalledTimes(1);
+  });
+
+  it("replies when contest targets fail", async () => {
+    const store = {
+      getHandle: jest.fn(),
+      resolveHandle: jest.fn(),
+      getLinkedUsers: jest.fn().mockResolvedValue([]),
+    };
+    const interaction = {
+      editReply: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const result = await resolveContestTargetsOrReply({
+      ...baseParams,
+      interaction,
+      userOptions: [],
+      handleInputs: [],
+      store,
+    });
+
+    expect(result).toEqual({ status: "replied" });
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No linked handles found in this server yet."
+    );
+  });
+
+  it("returns targets without replying when contest targets resolve", async () => {
+    const store = {
+      getHandle: jest.fn().mockResolvedValue("petr"),
+      resolveHandle: jest.fn(),
+      getLinkedUsers: jest.fn(),
+    };
+    const interaction = {
+      editReply: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const result = await resolveContestTargetsOrReply({
+      ...baseParams,
+      interaction,
+      userOptions: [{ id: "user-2" } as User],
+      handleInputs: [],
+      store,
+    });
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.targets).toEqual([{ handle: "petr", label: "<@user-2>" }]);
+    }
+    expect(interaction.editReply).not.toHaveBeenCalled();
   });
 });
