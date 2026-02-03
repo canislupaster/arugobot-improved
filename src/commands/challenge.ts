@@ -11,8 +11,8 @@ import {
   type User,
 } from "discord.js";
 
-import { EMBED_COLORS } from "../utils/embedColors.js";
 import { addRatingRangeOptions, addTagOptions } from "../utils/commandOptions.js";
+import { EMBED_COLORS } from "../utils/embedColors.js";
 import { logError, type LogContext } from "../utils/logger.js";
 import {
   filterProblemsByRatingRanges,
