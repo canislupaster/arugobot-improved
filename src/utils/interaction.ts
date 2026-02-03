@@ -1,3 +1,4 @@
+import { MessageFlags } from "discord.js";
 import type {
   ChatInputCommandInteraction,
   InteractionDeferReplyOptions,
@@ -44,6 +45,18 @@ export async function safeInteractionReply(
       skipMessage: "Skipping interaction response (already acknowledged).",
       errorMessage: "Interaction response failed.",
     },
+    context
+  );
+}
+
+export async function replyEphemeral(
+  interaction: RepliableInteraction,
+  content: string,
+  context?: LogContext
+): Promise<boolean> {
+  return safeInteractionReply(
+    interaction,
+    { content, flags: MessageFlags.Ephemeral },
     context
   );
 }

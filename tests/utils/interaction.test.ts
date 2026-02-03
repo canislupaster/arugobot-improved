@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from "discord.js";
+import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 
 import {
   resolveBoundedIntegerOption,
@@ -7,6 +7,7 @@ import {
   resolveHandleUserOptions,
   resolvePageOption,
   resolveTargetLabels,
+  replyEphemeral,
   requireGuild,
   safeInteractionDefer,
   safeInteractionEdit,
@@ -88,6 +89,17 @@ describe("safe interaction helpers", () => {
 
     expect(interaction.followUp).toHaveBeenCalledWith({ content: "Hi" });
     expect(interaction.reply).not.toHaveBeenCalled();
+  });
+
+  it("replies ephemerally", async () => {
+    const interaction = createInteraction();
+
+    await expect(replyEphemeral(interaction as never, "Hi")).resolves.toBe(true);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Hi",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 
   it("returns false for ignorable edit errors", async () => {

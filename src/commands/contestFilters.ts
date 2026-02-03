@@ -1,13 +1,9 @@
-import {
-  MessageFlags,
-  PermissionFlagsBits,
-  SlashCommandBuilder,
-  type ChatInputCommandInteraction,
-} from "discord.js";
+import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { parseKeywordFilters } from "../utils/contestFilters.js";
 import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
+import { replyEphemeral } from "../utils/interaction.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -54,16 +50,6 @@ function buildFilterSummary(include: string | null, exclude: string | null): str
     return "None";
   }
   return parts.join(" • ");
-}
-
-async function replyEphemeral(
-  interaction: ChatInputCommandInteraction,
-  content: string
-): Promise<void> {
-  await interaction.reply({
-    content,
-    flags: MessageFlags.Ephemeral,
-  });
 }
 
 export const contestFiltersCommand: Command = {
