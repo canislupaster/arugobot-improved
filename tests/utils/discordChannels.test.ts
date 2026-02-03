@@ -13,6 +13,7 @@ import {
   formatCannotPostMessage,
   getSendableChannelStatus,
   getSendableChannelStatusOrWarn,
+  resolveChannelCleanupDecision,
   resolveSendableChannelForService,
   resolveSendableChannel,
   resolveSendableChannelOrReply,
@@ -255,6 +256,81 @@ describe("resolveSendableChannel", () => {
 
     expect(logWarn).toHaveBeenCalledTimes(1);
     logWarn.mockRestore();
+  });
+});
+
+describe("resolveChannelCleanupDecision", () => {
+  it("returns a reply when the channel is healthy", async () => {
+    const channel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(true),
+      }),
+    };
+    const client = {
+      user: { id: "user-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+
+    const result = await resolveChannelCleanupDecision({
+      client,
+      channelId: "channel-1",
+      includePermissions: false,
+      healthyMessage: "All good.",
+      missingPermissionsMessage: () => "Missing perms.",
+    });
+
+    expect(result.shouldRemove).toBe(false);
+    expect(result.replyMessage).toBe("All good.");
+  });
+
+  it("returns a reply when permissions are missing and cleanup is not forced", async () => {
+    const channel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: (flag: bigint) => flag === PermissionFlagsBits.ViewChannel,
+      }),
+    };
+    const client = {
+      user: { id: "user-1" },
+      channels: {
+        fetch: jest.fn().mockResolvedValue(channel),
+      },
+    } as unknown as Client;
+
+    const result = await resolveChannelCleanupDecision({
+      client,
+      channelId: "channel-2",
+      includePermissions: false,
+      healthyMessage: "All good.",
+      missingPermissionsMessage: (status) =>
+        `Missing ${describeSendableChannelStatus(status)}.`,
+    });
+
+    expect(result.shouldRemove).toBe(false);
+    expect(result.replyMessage).toBe("Missing Missing permissions (SendMessages).");
+  });
+
+  it("allows cleanup when the channel is missing", async () => {
+    const client = {
+      channels: {
+        fetch: jest.fn().mockResolvedValue(null),
+      },
+    } as unknown as Client;
+
+    const result = await resolveChannelCleanupDecision({
+      client,
+      channelId: "channel-3",
+      includePermissions: false,
+      healthyMessage: "All good.",
+      missingPermissionsMessage: () => "Missing perms.",
+    });
+
+    expect(result.shouldRemove).toBe(true);
+    expect(result.replyMessage).toBeNull();
+    expect(result.status).toEqual({ status: "missing", channelId: "channel-3" });
   });
 });
 

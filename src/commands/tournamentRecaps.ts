@@ -10,6 +10,7 @@ import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
+  resolveChannelCleanupDecision,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 
@@ -119,31 +120,27 @@ export const tournamentRecapsCommand: Command = {
             await replyWithContent(noSubscriptionMessage);
             return;
           }
-          const channelStatus = await getSendableChannelStatus(
-            context.client,
-            subscription.channelId
-          );
-          if (channelStatus.status === "ok") {
-            await replyWithContent("Tournament recap channel looks healthy; nothing to clean.");
+          const includePermissions =
+            interaction.options.getBoolean("include_permissions") ?? false;
+          const cleanupDecision = await resolveChannelCleanupDecision({
+            client: context.client,
+            channelId: subscription.channelId,
+            includePermissions,
+            healthyMessage: "Tournament recap channel looks healthy; nothing to clean.",
+            missingPermissionsMessage: (status) =>
+              `Tournament recaps still point at <#${subscription.channelId}> (${describeSendableChannelStatus(
+                status
+              )}). Re-run with include_permissions:true or update the channel with /tournamentrecaps set.`,
+          });
+          if (cleanupDecision.replyMessage) {
+            await replyWithContent(cleanupDecision.replyMessage);
             return;
-          }
-          if (channelStatus.status === "missing_permissions") {
-            const includePermissions =
-              interaction.options.getBoolean("include_permissions") ?? false;
-            if (!includePermissions) {
-              await replyWithContent(
-                `Tournament recaps still point at <#${subscription.channelId}> (${describeSendableChannelStatus(
-                  channelStatus
-                )}). Re-run with include_permissions:true or update the channel with /tournamentrecaps set.`
-              );
-              return;
-            }
           }
           const removed = await context.services.tournamentRecaps.clearSubscription(guildId);
           await replyWithContent(
             removed
               ? `Removed tournament recap settings for <#${subscription.channelId}> (${describeSendableChannelStatus(
-                  channelStatus
+                  cleanupDecision.status
                 )}).`
               : "Failed to remove tournament recap settings. Try again later."
           );

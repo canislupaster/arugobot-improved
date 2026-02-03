@@ -176,6 +176,33 @@ export async function resolveSendableChannelOrWarn(
   return status.status === "ok" ? status.channel : null;
 }
 
+export async function resolveChannelCleanupDecision(params: {
+  client: Client;
+  channelId: string;
+  includePermissions: boolean;
+  healthyMessage: string;
+  missingPermissionsMessage: (
+    status: Extract<SendableChannelStatus, { status: "missing_permissions" }>
+  ) => string;
+}): Promise<{
+  status: SendableChannelStatus;
+  shouldRemove: boolean;
+  replyMessage: string | null;
+}> {
+  const status = await getSendableChannelStatus(params.client, params.channelId);
+  if (status.status === "ok") {
+    return { status, shouldRemove: false, replyMessage: params.healthyMessage };
+  }
+  if (status.status === "missing_permissions" && !params.includePermissions) {
+    return {
+      status,
+      shouldRemove: false,
+      replyMessage: params.missingPermissionsMessage(status),
+    };
+  }
+  return { status, shouldRemove: true, replyMessage: null };
+}
+
 export async function cleanupMissingChannelStatus(params: {
   status: SendableChannelStatus;
   remove: () => Promise<boolean>;
