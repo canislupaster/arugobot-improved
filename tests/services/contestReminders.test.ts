@@ -197,6 +197,39 @@ describe("ContestReminderService", () => {
     expect(notifications[0]?.subscription_id).toBe(subscription.id);
   });
 
+  it("returns the last notified timestamp per subscription", async () => {
+    const service = new ContestReminderService(db, contestService);
+    const subscription = await service.createSubscription(
+      "guild-1",
+      "channel-1",
+      15,
+      null,
+      [],
+      [],
+      "official"
+    );
+
+    await db
+      .insertInto("contest_notifications")
+      .values([
+        {
+          subscription_id: subscription.id,
+          contest_id: 1001,
+          notified_at: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          subscription_id: subscription.id,
+          contest_id: 1002,
+          notified_at: "2026-02-01T00:00:00.000Z",
+        },
+      ])
+      .execute();
+
+    const result = await service.getLastNotificationMap([subscription.id]);
+
+    expect(result.get(subscription.id)).toBe("2026-02-01T00:00:00.000Z");
+  });
+
   it("scopes reminders to gym contests", async () => {
     const nowSeconds = 1_700_000_000;
     jest.spyOn(Date, "now").mockReturnValue(nowSeconds * 1000);

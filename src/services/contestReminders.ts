@@ -424,7 +424,11 @@ export class ContestReminderService {
           client,
           subscription.channelId,
           "Contest reminder channel missing or invalid.",
-          { guildId: subscription.guildId }
+          {
+            guildId: subscription.guildId,
+            subscriptionId: subscription.id,
+            scope: subscription.scope,
+          }
         );
         if (channelStatus.status !== "ok") {
           this.lastError =
@@ -492,6 +496,26 @@ export class ContestReminderService {
     } finally {
       this.isTicking = false;
     }
+  }
+
+  async getLastNotificationMap(subscriptionIds: string[]): Promise<Map<string, string>> {
+    if (subscriptionIds.length === 0) {
+      return new Map();
+    }
+    const rows = await this.db
+      .selectFrom("contest_notifications")
+      .select(({ fn }) => [
+        "subscription_id",
+        fn.max<string>("notified_at").as("last_notified_at"),
+      ])
+      .where("subscription_id", "in", subscriptionIds)
+      .groupBy("subscription_id")
+      .execute();
+    return new Map(
+      rows
+        .filter((row) => Boolean(row.last_notified_at))
+        .map((row) => [row.subscription_id, row.last_notified_at!])
+    );
   }
 
   private async wasNotified(subscriptionId: string, contestId: number): Promise<boolean> {

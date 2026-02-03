@@ -252,6 +252,9 @@ describe("contestRemindersCommand", () => {
               scope: "official",
             },
           ]),
+          getLastNotificationMap: jest
+            .fn()
+            .mockResolvedValue(new Map([["sub-1", "2026-02-01T00:00:00.000Z"]])),
         },
         contests: {
           refresh: jest.fn().mockResolvedValue(undefined),
@@ -276,6 +279,7 @@ describe("contestRemindersCommand", () => {
     expect(fieldValue).toContain("Next:");
     expect(fieldValue).toContain("CF Reminder Round");
     expect(fieldValue).toContain("Reminder:");
+    expect(fieldValue).toContain("Last sent: 2026-02-01T00:00:00.000Z");
   });
 
   it("removes a reminder subscription by id", async () => {

@@ -139,6 +139,48 @@ describe("contestRatingAlertsCommand", () => {
     });
   });
 
+  it("shows status details with last sent info", async () => {
+    const channel = {
+      id: "channel-9",
+      type: ChannelType.GuildText,
+    };
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("status"),
+        getChannel: jest.fn(),
+        getRole: jest.fn(),
+        getString: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-1b",
+      client: createClient(channel),
+      services: {
+        contestRatingAlerts: {
+          listSubscriptions: jest.fn().mockResolvedValue([
+            {
+              id: "sub-9",
+              guildId: "guild-1",
+              channelId: "channel-9",
+              roleId: null,
+              minDelta: 0,
+              includeHandles: [],
+            },
+          ]),
+          getLastNotificationMap: jest
+            .fn()
+            .mockResolvedValue(new Map([["sub-9", "2026-02-01T00:00:00.000Z"]])),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestRatingAlertsCommand.execute(interaction, context);
+
+    const payload = (interaction.reply as jest.Mock).mock.calls[0][0];
+    const fieldValue = payload.embeds[0].data.fields[0].value as string;
+    expect(fieldValue).toContain("Last sent: 2026-02-01T00:00:00.000Z");
+  });
+
   it("previews the next rating change alert when configured", async () => {
     const interaction = createInteraction({
       options: {

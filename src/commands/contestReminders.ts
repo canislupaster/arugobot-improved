@@ -121,15 +121,18 @@ function formatChannelStatus(status?: SendableChannelStatus | null): string | nu
 
 function formatSubscriptionSummary(
   subscription: ContestReminder,
-  channelStatus?: SendableChannelStatus | null
+  channelStatus?: SendableChannelStatus | null,
+  lastNotifiedAt?: string | null
 ): string {
   const include = formatKeywordList(subscription.includeKeywords);
   const exclude = formatKeywordList(subscription.excludeKeywords);
   const role = subscription.roleId ? `<@&${subscription.roleId}>` : "None";
   const statusLine = formatChannelStatus(channelStatus);
+  const lastSentLine = `Last sent: ${lastNotifiedAt ?? "Never"}`;
   const lines = [
     `Channel: <#${subscription.channelId}>`,
     ...(statusLine ? [statusLine] : []),
+    lastSentLine,
     `Lead time: ${subscription.minutesBefore} minutes`,
     `Scope: ${formatScope(subscription.scope)}`,
     `Role: ${role}`,
@@ -425,6 +428,9 @@ export const contestRemindersCommand: Command = {
           context.services.contests,
           subscriptions
         );
+        const lastNotifiedMap = await context.services.contestReminders.getLastNotificationMap(
+          subscriptions.map((subscription) => subscription.id)
+        );
         const channelStatuses = await Promise.all(
           subscriptions.map((subscription) =>
             getSendableChannelStatus(context.client, subscription.channelId)
@@ -445,7 +451,8 @@ export const contestRemindersCommand: Command = {
               name: `Subscription ${index + 1}`,
               value: `${formatSubscriptionSummary(
                 subscription,
-                channelStatuses[index]
+                channelStatuses[index],
+                lastNotifiedMap.get(subscription.id) ?? null
               )}\n${formatNextReminderLine(
                 subscription,
                 getNextReminderInfo(subscription, upcomingByScope, nowSeconds),

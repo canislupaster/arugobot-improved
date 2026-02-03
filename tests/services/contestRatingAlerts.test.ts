@@ -185,6 +185,31 @@ describe("ContestRatingAlertService", () => {
     expect(preview.status).toBe("no_changes");
   });
 
+  it("returns the last notified timestamp per subscription", async () => {
+    const service = new ContestRatingAlertService(db, contestService, ratingChanges, store);
+    const subscription = await service.createSubscription("guild-1", "channel-1", null);
+
+    await db
+      .insertInto("contest_rating_alert_notifications")
+      .values([
+        {
+          subscription_id: subscription.id,
+          contest_id: 2001,
+          notified_at: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          subscription_id: subscription.id,
+          contest_id: 2002,
+          notified_at: "2026-02-01T00:00:00.000Z",
+        },
+      ])
+      .execute();
+
+    const result = await service.getLastNotificationMap([subscription.id]);
+
+    expect(result.get(subscription.id)).toBe("2026-02-01T00:00:00.000Z");
+  });
+
   it("returns no_matching_handles when filters exclude all linked users", async () => {
     contestService.getFinished.mockReturnValue([
       {

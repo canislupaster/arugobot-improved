@@ -6,22 +6,46 @@ import {
 } from "../services/contestRatingAlerts.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
+  describeSendableChannelStatus,
   formatCannotPostMessage,
   getSendableChannelStatus,
+  type SendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
 
 import type { Command } from "./types.js";
 
-function formatSubscriptionSummary(subscription: ContestRatingAlertSubscription): string {
+function formatChannelStatus(status?: SendableChannelStatus | null): string | null {
+  if (!status || status.status === "ok") {
+    return null;
+  }
+  return `Channel status: ${describeSendableChannelStatus(status)}`;
+}
+
+function formatSubscriptionSummary(
+  subscription: ContestRatingAlertSubscription,
+  channelStatus?: SendableChannelStatus | null,
+  lastNotifiedAt?: string | null
+): string {
   const role = subscription.roleId ? `<@&${subscription.roleId}>` : "None";
   const minDelta = subscription.minDelta > 0 ? String(subscription.minDelta) : "None";
   const handles =
     subscription.includeHandles.length > 0
       ? subscription.includeHandles.join(", ")
       : "All linked handles";
-  return `Channel: <#${subscription.channelId}>\nRole: ${role}\nMin delta: ${minDelta}\nHandles: ${handles}\nID: \`${subscription.id}\``;
+  const statusLine = formatChannelStatus(channelStatus);
+  const lastSentLine = `Last sent: ${lastNotifiedAt ?? "Never"}`;
+  const lines = [
+    `Channel: <#${subscription.channelId}>`,
+    ...(statusLine ? [statusLine] : []),
+    lastSentLine,
+    `Role: ${role}`,
+    `Min delta: ${minDelta}`,
+    `Handles: ${handles}`,
+    `ID: \`${subscription.id}\``,
+  ];
+  return lines.join("\n");
 }
 
 const NO_SUBSCRIPTIONS_MESSAGE = "No contest rating alerts configured for this server.";
@@ -161,6 +185,14 @@ export const contestRatingAlertsCommand: Command = {
           });
           return;
         }
+        const lastNotifiedMap = await context.services.contestRatingAlerts.getLastNotificationMap(
+          subscriptions.map((subscription) => subscription.id)
+        );
+        const channelStatuses = await Promise.all(
+          subscriptions.map((subscription) =>
+            getSendableChannelStatus(context.client, subscription.channelId)
+          )
+        );
 
         const embed = new EmbedBuilder()
           .setTitle("Contest rating alert subscriptions")
@@ -168,7 +200,11 @@ export const contestRatingAlertsCommand: Command = {
           .addFields(
             subscriptions.map((subscription, index) => ({
               name: `Subscription ${index + 1}`,
-              value: formatSubscriptionSummary(subscription),
+              value: formatSubscriptionSummary(
+                subscription,
+                channelStatuses[index],
+                lastNotifiedMap.get(subscription.id) ?? null
+              ),
               inline: false,
             }))
           );
