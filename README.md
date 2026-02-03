@@ -136,7 +136,7 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Admin-only diagnostics (uptime, memory, DB status, last error, command usage/latency).
 
-- **/logs** `[limit]` `[level]` `[command]` `[correlation]` `[user]`
+- **/logs** `[limit]` `[level]` `[command]` `[correlation]` `[message]` `[user]`
 
   Admin-only log viewer for recent bot activity in the server.
 

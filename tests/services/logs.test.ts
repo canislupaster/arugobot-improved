@@ -98,6 +98,36 @@ describe("LogsService", () => {
     await db.destroy();
   });
 
+  it("filters entries by message content", async () => {
+    const db = createDb(":memory:");
+    await migrateToLatest(db);
+    const logs = new LogsService(db, 30);
+
+    await logs.write({
+      timestamp: "2024-01-01T00:00:00.000Z",
+      level: "warn",
+      message: "Practice reminder channel missing or invalid.",
+      context: { guildId: "guild-1" },
+    });
+    await logs.write({
+      timestamp: "2024-01-02T00:00:00.000Z",
+      level: "info",
+      message: "Command received.",
+      context: { guildId: "guild-1" },
+    });
+
+    const entries = await logs.getRecentEntries({
+      guildId: "guild-1",
+      message: "reminder channel missing",
+      limit: 5,
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.message).toBe("Practice reminder channel missing or invalid.");
+
+    await db.destroy();
+  });
+
   it("clamps the log entry limit", async () => {
     const db = createDb(":memory:");
     await migrateToLatest(db);

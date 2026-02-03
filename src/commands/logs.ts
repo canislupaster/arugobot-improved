@@ -14,6 +14,7 @@ type LogCommandFilters = {
   level?: LogLevel;
   command?: string;
   correlationId?: string;
+  message?: string;
   user?: { id: string; username: string };
 };
 
@@ -35,6 +36,9 @@ function formatFilterFooter(filters: LogCommandFilters): string | null {
   }
   if (filters.correlationId) {
     items.push(`correlation: ${filters.correlationId}`);
+  }
+  if (filters.message) {
+    items.push(`message: ${filters.message}`);
   }
   return items.length > 0 ? `Filters • ${items.join(" • ")}` : null;
 }
@@ -92,6 +96,9 @@ export const logsCommand: Command = {
     .addStringOption((option) =>
       option.setName("correlation").setDescription("Filter by correlation id")
     )
+    .addStringOption((option) =>
+      option.setName("message").setDescription("Filter by message content")
+    )
     .addUserOption((option) => option.setName("user").setDescription("Filter by user")),
   adminOnly: true,
   async execute(interaction, context) {
@@ -107,11 +114,13 @@ export const logsCommand: Command = {
     const level = interaction.options.getString("level") as LogLevel | null;
     const command = normalizeFilterValue(interaction.options.getString("command"));
     const correlationId = normalizeFilterValue(interaction.options.getString("correlation"));
+    const message = normalizeFilterValue(interaction.options.getString("message"));
     const user = interaction.options.getUser("user") ?? undefined;
     const filters: LogCommandFilters = {
       level: level ?? undefined,
       command,
       correlationId,
+      message,
       user: user ? { id: user.id, username: user.username } : undefined,
     };
 
@@ -125,6 +134,7 @@ export const logsCommand: Command = {
         userId: filters.user?.id,
         command: filters.command,
         correlationId: filters.correlationId,
+        message: filters.message,
       });
 
       if (entries.length === 0) {

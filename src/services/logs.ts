@@ -22,6 +22,7 @@ type LogFilterOptions = {
   userId?: string;
   command?: string;
   correlationId?: string;
+  message?: string;
 };
 
 type LogFilterColumn = "level" | "guild_id" | "user_id" | "command" | "correlation_id";
@@ -70,6 +71,9 @@ function applyLogFilters(
     if (value) {
       filtered = filtered.where(column, "=", value);
     }
+  }
+  if (options.message) {
+    filtered = filtered.where("message", "like", `%${options.message}%`);
   }
   return filtered;
 }

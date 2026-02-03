@@ -7,6 +7,7 @@ const createInteraction = (options: {
   level?: string | null;
   command?: string | null;
   correlation?: string | null;
+  message?: string | null;
   limit?: number | null;
   user?: { id: string; username: string } | null;
 }) =>
@@ -24,6 +25,9 @@ const createInteraction = (options: {
         if (name === "correlation") {
           return options.correlation ?? null;
         }
+        if (name === "message") {
+          return options.message ?? null;
+        }
         return null;
       }),
       getUser: jest.fn().mockReturnValue(options.user ?? null),
@@ -39,6 +43,7 @@ describe("logsCommand", () => {
       level: "error",
       command: "ping",
       correlation: "abc",
+      message: "Boom",
       limit: 3,
     });
     const context = {
@@ -65,6 +70,7 @@ describe("logsCommand", () => {
       userId: undefined,
       command: "ping",
       correlationId: "abc",
+      message: "Boom",
     });
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     const embed = payload.embeds[0].data;
@@ -100,6 +106,7 @@ describe("logsCommand", () => {
       level: "info",
       command: "logs",
       correlation: "corr-1",
+      message: "Hello",
       limit: 2,
       user: { id: "user-9", username: "Coder" },
     });
@@ -124,5 +131,6 @@ describe("logsCommand", () => {
     const footerText = payload.embeds[0].data.footer?.text ?? "";
     expect(footerText).toContain("user: Coder");
     expect(footerText).toContain("correlation: corr-1");
+    expect(footerText).toContain("message: Hello");
   });
 });
