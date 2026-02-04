@@ -569,6 +569,68 @@ describe("practiceRemindersCommand", () => {
     );
   });
 
+  it("reports already-sent practice reminders", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("post"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getRole: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-5a",
+      client: { user: { id: "bot-1" } },
+      services: {
+        practiceReminders: {
+          sendManualReminder: jest.fn().mockResolvedValue({
+            status: "already_sent",
+            lastSentAt: "2026-02-03T10:00:00.000Z",
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "A practice reminder was already posted today (2026-02-03T10:00:00.000Z). Use force to send another."
+    );
+  });
+
+  it("reports missing practice problems when posting", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("post"),
+        getChannel: jest.fn(),
+        getInteger: jest.fn(),
+        getString: jest.fn(),
+        getBoolean: jest.fn().mockReturnValue(false),
+        getRole: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-5b",
+      client: { user: { id: "bot-1" } },
+      services: {
+        practiceReminders: {
+          sendManualReminder: jest.fn().mockResolvedValue({
+            status: "no_problem",
+            candidateCount: 0,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No suitable practice problems found with the current filters."
+    );
+  });
+
   it("reports missing permissions when posting a practice reminder", async () => {
     const interaction = createInteraction({
       options: {

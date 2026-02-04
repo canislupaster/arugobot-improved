@@ -1,6 +1,6 @@
 import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
-import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
+import { getNextScheduledUtcMs, type ManualReminderResult } from "../services/practiceReminders.js";
 import {
   buildSingleChannelCleanupMessages,
   cleanupSingleChannelSubscription,
@@ -186,6 +186,25 @@ function parseDaysInput(raw: string | null | undefined): { days: number[] } | { 
     return { error: "Select at least one day for reminders." };
   }
   return { days: Array.from(days.values()).sort((a, b) => a - b) };
+}
+
+function getManualReminderReply(result: ManualReminderResult): string {
+  switch (result.status) {
+    case "no_subscription":
+      return NO_PRACTICE_REMINDERS_MESSAGE;
+    case "already_sent":
+      return `A practice reminder was already posted today (${result.lastSentAt}). Use force to send another.`;
+    case "channel_missing_permissions":
+      return formatCannotPostPermissionsMessage(result.channelId, result.missingPermissions);
+    case "channel_missing":
+      return "Configured channel is missing or invalid. Use /practicereminders set to update it.";
+    case "no_problem":
+      return "No suitable practice problems found with the current filters.";
+    case "sent":
+      return `Posted a practice problem in <#${result.channelId}>.`;
+    case "error":
+      return "Unable to send a practice reminder right now. Try again later.";
+  }
 }
 
 export const practiceRemindersCommand: Command = {
@@ -536,48 +555,7 @@ export const practiceRemindersCommand: Command = {
           context.client,
           force
         );
-
-        if (result.status === "no_subscription") {
-          await interaction.editReply(NO_PRACTICE_REMINDERS_MESSAGE);
-          return;
-        }
-
-        if (result.status === "already_sent") {
-          await interaction.editReply(
-            `A practice reminder was already posted today (${result.lastSentAt}). Use force to send another.`
-          );
-          return;
-        }
-
-        if (result.status === "channel_missing_permissions") {
-          await interaction.editReply(
-            formatCannotPostPermissionsMessage(result.channelId, result.missingPermissions)
-          );
-          return;
-        }
-
-        if (result.status === "channel_missing") {
-          await interaction.editReply(
-            "Configured channel is missing or invalid. Use /practicereminders set to update it."
-          );
-          return;
-        }
-
-        if (result.status === "no_problem") {
-          await interaction.editReply(
-            "No suitable practice problems found with the current filters."
-          );
-          return;
-        }
-
-        if (result.status === "sent") {
-          await interaction.editReply(`Posted a practice problem in <#${result.channelId}>.`);
-          return;
-        }
-
-        await interaction.editReply(
-          "Unable to send a practice reminder right now. Try again later."
-        );
+        await interaction.editReply(getManualReminderReply(result));
         return;
       }
     } catch (error) {
