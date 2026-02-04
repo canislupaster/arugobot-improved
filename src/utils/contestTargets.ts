@@ -163,6 +163,19 @@ function finalizeTargets(targets: Map<string, TargetHandle>): TargetResolution {
   return { status: "ok", targets: targetList };
 }
 
+function resolveTargetsFromLinkedUsers(
+  linkedUsers: LinkedUserHandle[],
+  maxLinkedHandles?: number
+): TargetResolution {
+  const maxError = getMaxLinkedHandlesError(linkedUsers.length, maxLinkedHandles);
+  if (maxError) {
+    return maxError;
+  }
+  const targets = new Map<string, TargetHandle>();
+  addLinkedUsers(targets, linkedUsers);
+  return finalizeTargets(targets);
+}
+
 type NormalizedHandleInput = {
   raw: string;
   normalized: string;
@@ -239,17 +252,11 @@ async function resolveFallbackTargets(params: {
   user: User;
 }): Promise<TargetResolution> {
   const linkedUsers = await params.store.getLinkedUsers(params.guildId);
-  const targets = new Map<string, TargetHandle>();
   if (!params.guild) {
     if (linkedUsers.length === 0) {
       return errorResult(NO_LINKED_HANDLES_MESSAGE);
     }
-    const maxError = getMaxLinkedHandlesError(linkedUsers.length, params.maxLinkedHandles);
-    if (maxError) {
-      return maxError;
-    }
-    addLinkedUsers(targets, linkedUsers);
-    return finalizeTargets(targets);
+    return resolveTargetsFromLinkedUsers(linkedUsers, params.maxLinkedHandles);
   }
 
   const rosterResult = await resolveGuildRoster(
@@ -266,12 +273,7 @@ async function resolveFallbackTargets(params: {
   if (rosterResult.status === "empty") {
     return errorResult(rosterResult.message);
   }
-  const maxError = getMaxLinkedHandlesError(rosterResult.roster.length, params.maxLinkedHandles);
-  if (maxError) {
-    return maxError;
-  }
-  addLinkedUsers(targets, rosterResult.roster);
-  return finalizeTargets(targets);
+  return resolveTargetsFromLinkedUsers(rosterResult.roster, params.maxLinkedHandles);
 }
 
 export async function resolveContestTargets(params: ResolveTargetsParams): Promise<TargetResolution> {
@@ -302,8 +304,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
 
   const targets = new Map<string, TargetHandle>();
   const resolvedGuildId = guildId ?? guild?.id ?? "";
-  const hasDirectTargets =
-    uniqueUserOptions.length > 0 || normalizedHandleInputs.length > 0;
+  const hasDirectTargets = uniqueUserOptions.length > 0 || normalizedHandles.length > 0;
   const userOptionError = await addUserOptionTargets(
     targets,
     store,
