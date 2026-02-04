@@ -9,6 +9,7 @@ import {
   addPreviewSubcommand,
   addRatingRangeOptions,
   addScheduleOptions,
+  addStatusClearCleanupSubcommands,
   addTagOptions,
 } from "../../src/utils/commandOptions.js";
 
@@ -91,6 +92,25 @@ test("addCleanupSubcommand adds cleanup with include_permissions", () => {
 
   expect(subcommand?.name).toBe("cleanup");
   expect(options.map((option) => option.name)).toEqual(["include_permissions"]);
+});
+
+test("addStatusClearCleanupSubcommands adds status, clear, and cleanup", () => {
+  const builder = addStatusClearCleanupSubcommands(
+    new SlashCommandBuilder().setName("statusable").setDescription("statusable"),
+    {
+      statusDescription: "Status",
+      clearDescription: "Clear",
+      cleanupDescription: "Cleanup",
+    }
+  );
+
+  const json = builder.toJSON();
+  const options = json.options ?? [];
+  const names = options.map((option) => option.name);
+
+  expect(names).toEqual(["status", "clear", "cleanup"]);
+  const cleanup = options[2] as APIApplicationCommandSubcommandOption | undefined;
+  expect(cleanup?.options?.map((option) => option.name)).toEqual(["include_permissions"]);
 });
 
 test("addPostSubcommand adds force and id options when provided", () => {

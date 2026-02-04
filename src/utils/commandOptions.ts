@@ -129,6 +129,31 @@ export function addCleanupSubcommand(
   return addCleanupIncludePermissionsOption(withDetails, includePermissionsDescription);
 }
 
+export function addStatusClearCleanupSubcommands(
+  builder: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder,
+  options: {
+    statusDescription: string;
+    clearDescription: string;
+    cleanupDescription: string;
+    cleanupIncludePermissionsDescription?: string;
+  }
+): SlashCommandSubcommandsOnlyBuilder {
+  return builder
+    .addSubcommand((subcommand) =>
+      subcommand.setName("status").setDescription(options.statusDescription)
+    )
+    .addSubcommand((subcommand) =>
+      subcommand.setName("clear").setDescription(options.clearDescription)
+    )
+    .addSubcommand((subcommand) =>
+      addCleanupSubcommand(
+        subcommand,
+        options.cleanupDescription,
+        options.cleanupIncludePermissionsDescription
+      )
+    );
+}
+
 export function addPostSubcommand(
   subcommand: SlashCommandSubcommandBuilder,
   options: {
