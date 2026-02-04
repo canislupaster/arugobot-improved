@@ -105,6 +105,61 @@ describe("contestActivityCommand", () => {
     expect(fieldText).toContain("Contest A");
   });
 
+  it("shows excluded handles when roster contains non-members", async () => {
+    const interaction = createInteraction({
+      guild: {
+        id: "guild-1",
+        members: {
+          fetch: jest.fn().mockResolvedValue(new Map([["user-1", { user: { id: "user-1" } }]])),
+          cache: new Map([["user-1", { user: { id: "user-1" } }]]),
+        },
+      },
+    });
+    const context = {
+      services: {
+        store: {
+          getServerRoster: jest
+            .fn()
+            .mockResolvedValue([
+              { userId: "user-1", handle: "Alice" },
+              { userId: "user-2", handle: "Bob" },
+            ]),
+        },
+        contestActivity: {
+          getContestActivityForRoster: jest.fn().mockResolvedValue({
+            lookbackDays: 90,
+            contestCount: 1,
+            participantCount: 1,
+            topContests: [],
+            recentContests: [],
+            byScope: {
+              official: { contestCount: 1, participantCount: 1, lastContestAt: 1 },
+              gym: { contestCount: 0, participantCount: 0, lastContestAt: null },
+            },
+            participants: [
+              {
+                userId: "user-1",
+                handle: "Alice",
+                contestCount: 1,
+                officialCount: 1,
+                gymCount: 0,
+                lastContestAt: 1,
+              },
+            ],
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestActivityCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0];
+    const fieldText = JSON.stringify(embed.data.fields ?? []);
+    expect(fieldText).toContain("Excluded handle");
+    expect(fieldText).toContain("1 not in server");
+  });
+
   it("filters contest activity by scope", async () => {
     const interaction = createInteraction({
       options: {

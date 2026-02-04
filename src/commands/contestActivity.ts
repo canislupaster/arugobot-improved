@@ -10,7 +10,7 @@ import {
 import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild } from "../utils/interaction.js";
-import { resolveGuildRosterOrReply } from "../utils/roster.js";
+import { buildRosterExcludedField, resolveGuildRosterOrReply } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -179,6 +179,10 @@ export const contestActivityCommand: Command = {
           { name: "Contests", value: String(scopeSummary.contestCount), inline: true },
           { name: "Participants", value: String(scopeSummary.participantCount), inline: true }
         );
+      const excludedField = buildRosterExcludedField(rosterResult.excludedCount);
+      if (excludedField) {
+        embed.addFields(excludedField);
+      }
 
       if (scope === "all") {
         embed.addFields({

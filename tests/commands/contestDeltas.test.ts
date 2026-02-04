@@ -126,6 +126,58 @@ describe("contestDeltasCommand", () => {
     );
   });
 
+  it("shows excluded handles when roster contains non-members", async () => {
+    const interaction = createInteraction({
+      guild: {
+        id: "guild-1",
+        members: {
+          fetch: jest.fn().mockResolvedValue(new Map([["user-1", { user: { id: "user-1" } }]])),
+          cache: new Map([["user-1", { user: { id: "user-1" } }]]),
+        },
+      },
+    });
+    const context = {
+      correlationId: "corr-1",
+      services: {
+        store: {
+          getServerRoster: jest
+            .fn()
+            .mockResolvedValue([
+              { userId: "user-1", handle: "Alice" },
+              { userId: "user-2", handle: "Bob" },
+            ]),
+        },
+        contestActivity: {
+          getRatingChangeSummaryForRoster: jest.fn().mockResolvedValue({
+            lookbackDays: 90,
+            contestCount: 1,
+            participantCount: 1,
+            totalDelta: 25,
+            lastContestAt: 1,
+            topGainers: [
+              {
+                userId: "user-1",
+                handle: "Alice",
+                contestCount: 1,
+                delta: 25,
+                lastContestAt: 1,
+              },
+            ],
+            topLosers: [],
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestDeltasCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0];
+    const fieldText = JSON.stringify(embed.data.fields ?? []);
+    expect(fieldText).toContain("Excluded handle");
+    expect(fieldText).toContain("1 not in server");
+  });
+
   it("handles empty rating changes", async () => {
     const interaction = createInteraction();
     const context = {

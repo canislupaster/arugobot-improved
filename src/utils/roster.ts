@@ -51,6 +51,16 @@ export function formatRatedRosterLines(
     .join("\n");
 }
 
+export function buildRosterExcludedField(
+  excludedCount: number
+): { name: string; value: string; inline: true } | null {
+  if (excludedCount <= 0) {
+    return null;
+  }
+  const label = excludedCount === 1 ? "Excluded handle" : "Excluded handles";
+  return { name: label, value: `${excludedCount} not in server`, inline: true };
+}
+
 export async function resolveGuildRoster<T extends RosterEntryBase>(
   guild: Guild,
   roster: T[],
