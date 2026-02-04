@@ -5,10 +5,7 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 
-import {
-  buildSingleChannelCleanupMessages,
-  cleanupSingleChannelSubscription,
-} from "../utils/channelCleanup.js";
+import { getSingleChannelCleanupReply } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addCleanupSubcommand } from "../utils/commandOptions.js";
 import {
@@ -126,22 +123,15 @@ export const tournamentRecapsCommand: Command = {
           }
           const includePermissions =
             interaction.options.getBoolean("include_permissions") ?? false;
-          const cleanupMessages = buildSingleChannelCleanupMessages({
+          const replyMessage = await getSingleChannelCleanupReply({
+            client: context.client,
             channelId: subscription.channelId,
+            includePermissions,
             channelLabel: "Tournament recap",
             subjectLabel: "Tournament recaps",
             subject: "tournament recap settings",
             setCommand: "/tournamentrecaps set",
-          });
-          const replyMessage = await cleanupSingleChannelSubscription({
-            client: context.client,
-            channelId: subscription.channelId,
-            includePermissions,
-            healthyMessage: cleanupMessages.healthyMessage,
-            missingPermissionsMessage: cleanupMessages.missingPermissionsMessage,
             remove: () => context.services.tournamentRecaps.clearSubscription(guildId),
-            removedMessage: cleanupMessages.removedMessage,
-            failedMessage: cleanupMessages.failedMessage,
           });
           await replyWithContent(replyMessage);
           return;

@@ -5,6 +5,7 @@ import {
   buildChannelCleanupSummary,
   cleanupChannelSubscriptions,
   cleanupSingleChannelSubscription,
+  getSingleChannelCleanupReply,
   formatPermissionIssueSummary,
   runChannelCleanupSummary,
 } from "../../src/utils/channelCleanup.js";
@@ -335,6 +336,28 @@ describe("cleanupSingleChannelSubscription", () => {
     });
 
     expect(message).toBe("Removed (missing).");
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("getSingleChannelCleanupReply", () => {
+  it("builds cleanup messages and removes missing subscriptions", async () => {
+    const client = createClient({});
+    const remove = jest.fn().mockResolvedValue(true);
+
+    const message = await getSingleChannelCleanupReply({
+      client,
+      channelId: "channel-1",
+      includePermissions: false,
+      channelLabel: "Weekly digest",
+      subjectLabel: "Weekly digest",
+      subject: "weekly digest",
+      setCommand: "/digest set",
+      subjectVerb: "points",
+      remove,
+    });
+
+    expect(message).toBe("Removed weekly digest for <#channel-1> (Missing or deleted).");
     expect(remove).toHaveBeenCalledTimes(1);
   });
 });

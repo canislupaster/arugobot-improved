@@ -5,10 +5,7 @@ import {
   type ManualWeeklyDigestResult,
   type WeeklyDigestSubscription,
 } from "../services/weeklyDigest.js";
-import {
-  buildSingleChannelCleanupMessages,
-  cleanupSingleChannelSubscription,
-} from "../utils/channelCleanup.js";
+import { getSingleChannelCleanupReply } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addPreviewAndPostSubcommands,
@@ -228,23 +225,16 @@ export const digestCommand: Command = {
         }
 
         const includePermissions = interaction.options.getBoolean("include_permissions") ?? false;
-        const cleanupMessages = buildSingleChannelCleanupMessages({
+        const replyMessage = await getSingleChannelCleanupReply({
+          client: context.client,
           channelId: subscription.channelId,
+          includePermissions,
           channelLabel: "Weekly digest",
           subjectLabel: "Weekly digest",
           subject: "weekly digest",
           setCommand: "/digest set",
           subjectVerb: "points",
-        });
-        const replyMessage = await cleanupSingleChannelSubscription({
-          client: context.client,
-          channelId: subscription.channelId,
-          includePermissions,
-          healthyMessage: cleanupMessages.healthyMessage,
-          missingPermissionsMessage: cleanupMessages.missingPermissionsMessage,
           remove: () => context.services.weeklyDigest.clearSubscription(guildId),
-          removedMessage: cleanupMessages.removedMessage,
-          failedMessage: cleanupMessages.failedMessage,
         });
         await interaction.reply({ content: replyMessage });
         return;

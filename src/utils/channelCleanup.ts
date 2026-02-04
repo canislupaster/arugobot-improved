@@ -117,6 +117,37 @@ export async function cleanupSingleChannelSubscription(params: {
   return removed ? params.removedMessage(decision.status) : params.failedMessage;
 }
 
+export async function getSingleChannelCleanupReply(params: {
+  client: Client;
+  channelId: string;
+  includePermissions: boolean;
+  channelLabel: string;
+  subjectLabel: string;
+  subject: string;
+  setCommand: string;
+  remove: () => Promise<boolean>;
+  subjectVerb?: string;
+}): Promise<string> {
+  const cleanupMessages = buildSingleChannelCleanupMessages({
+    channelId: params.channelId,
+    channelLabel: params.channelLabel,
+    subjectLabel: params.subjectLabel,
+    subject: params.subject,
+    setCommand: params.setCommand,
+    subjectVerb: params.subjectVerb,
+  });
+  return cleanupSingleChannelSubscription({
+    client: params.client,
+    channelId: params.channelId,
+    includePermissions: params.includePermissions,
+    healthyMessage: cleanupMessages.healthyMessage,
+    missingPermissionsMessage: cleanupMessages.missingPermissionsMessage,
+    remove: params.remove,
+    removedMessage: cleanupMessages.removedMessage,
+    failedMessage: cleanupMessages.failedMessage,
+  });
+}
+
 export function buildSingleChannelCleanupMessages(options: {
   channelId: string;
   channelLabel: string;
