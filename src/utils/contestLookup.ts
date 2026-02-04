@@ -19,6 +19,10 @@ function normalizeContestQuery(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+function isContestQuery(raw: string, set: Set<string>): boolean {
+  return set.has(normalizeContestQuery(raw));
+}
+
 type ContestMatchEmbedOptions = {
   query: string;
   matches: Contest[];
@@ -88,15 +92,15 @@ export function parseContestId(raw: string): number | null {
 }
 
 export function isLatestQuery(raw: string): boolean {
-  return LATEST_CONTEST_QUERIES.has(normalizeContestQuery(raw));
+  return isContestQuery(raw, LATEST_CONTEST_QUERIES);
 }
 
 export function isUpcomingQuery(raw: string): boolean {
-  return UPCOMING_CONTEST_QUERIES.has(normalizeContestQuery(raw));
+  return isContestQuery(raw, UPCOMING_CONTEST_QUERIES);
 }
 
 export function isOngoingQuery(raw: string): boolean {
-  return ONGOING_CONTEST_QUERIES.has(normalizeContestQuery(raw));
+  return isContestQuery(raw, ONGOING_CONTEST_QUERIES);
 }
 
 export function resolveContestLookup(
