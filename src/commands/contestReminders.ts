@@ -44,7 +44,7 @@ import {
 } from "../utils/subscriptionSelection.js";
 import {
   buildSubscriptionListEmbed,
-  resolveSubscriptionEntriesFromService,
+  resolveSubscriptionEntriesFromInteraction,
 } from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -346,13 +346,11 @@ export const contestRemindersCommand: Command = {
 
     try {
       if (subcommand === "status" || subcommand === "list") {
-        const onlyIssues = resolveBooleanOption(interaction, "only_issues");
-        const entryResult = await resolveSubscriptionEntriesFromService(
+        const entryResult = await resolveSubscriptionEntriesFromInteraction(
           interaction,
           context.client,
           () => context.services.contestReminders.listSubscriptions(guildId),
           (ids) => context.services.contestReminders.getLastNotificationMap(ids),
-          onlyIssues,
           { noSubscriptions: NO_SUBSCRIPTIONS_MESSAGE, noIssues: NO_ISSUES_MESSAGE }
         );
         if (entryResult.status === "replied") {

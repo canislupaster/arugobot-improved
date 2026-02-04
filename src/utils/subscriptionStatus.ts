@@ -1,7 +1,9 @@
+import type { ChatInputCommandInteraction } from "discord.js";
 import { EmbedBuilder, type Client } from "discord.js";
 
 import type { SendableChannelStatus } from "./discordChannels.js";
 import { getSendableChannelStatuses } from "./discordChannels.js";
+import { resolveBooleanOption } from "./interaction.js";
 
 export type ChannelSubscriptionEntry<TSubscription> = {
   subscription: TSubscription;
@@ -51,6 +53,15 @@ export type SubscriptionListResult<TSubscription> =
       subscriptions: TSubscription[];
     }
   | { status: "replied" };
+
+export type SubscriptionListWithOptionResult<TSubscription> =
+  | {
+      status: "ok";
+      entries: Array<ChannelSubscriptionEntry<TSubscription>>;
+      subscriptions: TSubscription[];
+      onlyIssues: boolean;
+    }
+  | { status: "replied"; onlyIssues: boolean };
 
 export async function resolveSubscriptionEntriesOrReply<
   TSubscription extends { id: string; channelId: string },
@@ -113,6 +124,35 @@ export async function resolveSubscriptionEntriesFromService<
     return entryResult;
   }
   return { status: "ok", entries: entryResult.entries, subscriptions };
+}
+
+export async function resolveSubscriptionEntriesFromInteraction<
+  TSubscription extends { id: string; channelId: string },
+>(
+  interaction: ChatInputCommandInteraction,
+  client: Client,
+  listSubscriptions: () => Promise<TSubscription[]>,
+  getLastNotificationMap: (ids: string[]) => Promise<Map<string, string | null>>,
+  messages: { noSubscriptions: string; noIssues: string },
+  options: { onlyIssuesOption?: string; defaultOnlyIssues?: boolean } = {}
+): Promise<SubscriptionListWithOptionResult<TSubscription>> {
+  const onlyIssues = resolveBooleanOption(
+    interaction,
+    options.onlyIssuesOption ?? "only_issues",
+    options.defaultOnlyIssues ?? false
+  );
+  const result = await resolveSubscriptionEntriesFromService(
+    interaction,
+    client,
+    listSubscriptions,
+    getLastNotificationMap,
+    onlyIssues,
+    messages
+  );
+  if (result.status === "replied") {
+    return { status: "replied", onlyIssues };
+  }
+  return { ...result, onlyIssues };
 }
 
 export function buildSubscriptionListEmbed<TSubscription>(params: {

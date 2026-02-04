@@ -26,7 +26,7 @@ import {
 } from "../utils/subscriptionSelection.js";
 import {
   buildSubscriptionListEmbed,
-  resolveSubscriptionEntriesFromService,
+  resolveSubscriptionEntriesFromInteraction,
 } from "../utils/subscriptionStatus.js";
 
 import type { Command } from "./types.js";
@@ -188,13 +188,11 @@ export const contestRatingAlertsCommand: Command = {
 
     try {
       if (subcommand === "status" || subcommand === "list") {
-        const onlyIssues = resolveBooleanOption(interaction, "only_issues");
-        const entryResult = await resolveSubscriptionEntriesFromService(
+        const entryResult = await resolveSubscriptionEntriesFromInteraction(
           interaction,
           context.client,
           () => context.services.contestRatingAlerts.listSubscriptions(guildId),
           (ids) => context.services.contestRatingAlerts.getLastNotificationMap(ids),
-          onlyIssues,
           { noSubscriptions: NO_SUBSCRIPTIONS_MESSAGE, noIssues: NO_ISSUES_MESSAGE }
         );
         if (entryResult.status === "replied") {

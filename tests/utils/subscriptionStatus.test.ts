@@ -7,6 +7,7 @@ import {
   filterChannelSubscriptionEntries,
   resolveSubscriptionEntriesOrReply,
   resolveSubscriptionEntriesFromService,
+  resolveSubscriptionEntriesFromInteraction,
   type ChannelSubscriptionEntry,
 } from "../../src/utils/subscriptionStatus.js";
 
@@ -171,5 +172,28 @@ describe("resolveSubscriptionEntriesFromService", () => {
       expect(result.entries[0]?.subscription.id).toBe("sub-1");
       expect(result.entries[0]?.lastNotifiedAt).toBe("2026-02-03T00:00:00Z");
     }
+  });
+});
+
+describe("resolveSubscriptionEntriesFromInteraction", () => {
+  it("uses only_issues option and returns the flag", async () => {
+    const okStatus: SendableChannelStatus = { status: "ok", channel: {} as never };
+    mockGetSendableChannelStatuses.mockResolvedValue([okStatus]);
+    const interaction = {
+      reply: jest.fn().mockResolvedValue(undefined),
+      options: { getBoolean: jest.fn().mockReturnValue(true) },
+    };
+
+    const result = await resolveSubscriptionEntriesFromInteraction(
+      interaction as never,
+      {} as Client,
+      async () => [{ id: "sub-1", channelId: "channel-1" }],
+      async () => new Map([["sub-1", null]]),
+      { noSubscriptions: "No subs.", noIssues: "No issues." }
+    );
+
+    expect(result.status).toBe("replied");
+    expect(result.onlyIssues).toBe(true);
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "No issues." });
   });
 });
