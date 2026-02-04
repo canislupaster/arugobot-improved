@@ -20,7 +20,7 @@ import {
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
   requireGuildIdAndSubcommand,
-  resolveBooleanOption,
+  runManualPostWithForce,
   safeInteractionDefer,
   safeInteractionEdit,
   safeInteractionReply,
@@ -523,17 +523,11 @@ export const practiceRemindersCommand: Command = {
       }
 
       if (subcommand === "post") {
-        const force = resolveBooleanOption(interaction, "force");
-        const deferred = await safeInteractionDefer(interaction);
-        if (!deferred) {
-          return;
-        }
-        const result = await context.services.practiceReminders.sendManualReminder(
-          guildId,
-          context.client,
-          force
-        );
-        await safeInteractionEdit(interaction, getManualReminderReply(result));
+        await runManualPostWithForce(interaction, {
+          action: (force) =>
+            context.services.practiceReminders.sendManualReminder(guildId, context.client, force),
+          reply: getManualReminderReply,
+        });
         return;
       }
     } catch (error) {

@@ -176,6 +176,30 @@ export function resolveBooleanOption(
   return interaction.options.getBoolean(name) ?? defaultValue;
 }
 
+type ManualPostOptions<T> = {
+  action: (force: boolean) => Promise<T>;
+  reply: (result: T) => InteractionEditReplyOptions | string | null | undefined;
+  defaultReply?: InteractionEditReplyOptions | string;
+  deferOptions?: InteractionDeferReplyOptions;
+  forceOptionName?: string;
+  context?: LogContext;
+};
+
+export async function runManualPostWithForce<T>(
+  interaction: ChatInputCommandInteraction & RepliableInteraction,
+  options: ManualPostOptions<T>
+): Promise<boolean> {
+  const force = resolveBooleanOption(interaction, options.forceOptionName ?? "force");
+  const deferred = await safeInteractionDefer(interaction, options.deferOptions, options.context);
+  if (!deferred) {
+    return false;
+  }
+  const result = await options.action(force);
+  const reply = options.reply(result) ?? options.defaultReply ?? "Done.";
+  await safeInteractionEdit(interaction, reply, options.context);
+  return true;
+}
+
 async function safeInteractionAction(
   action: () => Promise<unknown>,
   labels: { skipMessage: string; errorMessage: string },

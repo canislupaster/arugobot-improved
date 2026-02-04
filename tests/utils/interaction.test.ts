@@ -10,6 +10,7 @@ import {
   resolvePageOptionOrReply,
   resolveTargetLabels,
   replyEphemeral,
+  runManualPostWithForce,
   requireGuild,
   requireGuildAndSubcommand,
   requireGuildIdAndSubcommand,
@@ -164,6 +165,46 @@ describe("resolveBooleanOption", () => {
 
     expect(resolveBooleanOption(interaction, "force", true)).toBe(true);
     expect(resolveBooleanOption(interaction, "force")).toBe(false);
+  });
+});
+
+describe("runManualPostWithForce", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      deferred: false,
+      replied: false,
+      options: { getBoolean: jest.fn().mockReturnValue(true) },
+      deferReply: jest.fn().mockResolvedValue(undefined),
+      editReply: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    }) as unknown as ChatInputCommandInteraction & RepliableInteraction;
+
+  it("defers, runs the action, and edits with the reply", async () => {
+    const interaction = createInteraction();
+    const action = jest.fn().mockResolvedValue({ status: "ok" });
+    const reply = jest.fn().mockReturnValue("sent");
+
+    await expect(runManualPostWithForce(interaction, { action, reply })).resolves.toBe(true);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith(undefined);
+    expect(action).toHaveBeenCalledWith(true);
+    expect(interaction.editReply).toHaveBeenCalledWith("sent");
+  });
+
+  it("falls back to the default reply when reply returns null", async () => {
+    const interaction = createInteraction();
+    const action = jest.fn().mockResolvedValue({ status: "sent" });
+    const reply = jest.fn().mockReturnValue(null);
+
+    await expect(
+      runManualPostWithForce(interaction, {
+        action,
+        reply,
+        defaultReply: "Done.",
+      })
+    ).resolves.toBe(true);
+
+    expect(interaction.editReply).toHaveBeenCalledWith("Done.");
   });
 });
 

@@ -19,7 +19,7 @@ import {
 } from "../utils/discordChannels.js";
 import {
   requireGuildIdAndSubcommand,
-  resolveBooleanOption,
+  runManualPostWithForce,
   safeInteractionDefer,
   safeInteractionEdit,
   safeInteractionReply,
@@ -260,18 +260,12 @@ export const digestCommand: Command = {
       }
 
       if (subcommand === "post") {
-        const deferred = await safeInteractionDefer(interaction);
-        if (!deferred) {
-          return;
-        }
-        const force = resolveBooleanOption(interaction, "force");
-        const result = await context.services.weeklyDigest.sendManualDigest(
-          guildId,
-          context.client,
-          force
-        );
-        const reply = getManualDigestReply(result);
-        await safeInteractionEdit(interaction, reply ?? "Weekly digest sent.");
+        await runManualPostWithForce(interaction, {
+          action: (force) =>
+            context.services.weeklyDigest.sendManualDigest(guildId, context.client, force),
+          reply: getManualDigestReply,
+          defaultReply: "Weekly digest sent.",
+        });
         return;
       }
 
