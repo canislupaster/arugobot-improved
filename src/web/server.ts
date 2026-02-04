@@ -2,6 +2,7 @@ import { createAdaptorServer, type ServerType } from "@hono/node-server";
 import type { Client } from "discord.js";
 
 import type { WebsiteService } from "../services/website.js";
+import type { GitHubIssueAutomationService } from "../services/githubIssueAutomation.js";
 import type { WebServerStatus } from "../types/webStatus.js";
 import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { sleep } from "../utils/sleep.js";
@@ -33,7 +34,12 @@ function formatWebServerErrorMessage(
 
 export async function startWebServer(
   config: WebServerConfig,
-  deps: { website: WebsiteService; client: Client },
+  deps: {
+    website: WebsiteService;
+    client: Client;
+    githubAutomation?: GitHubIssueAutomationService;
+    githubWebhookSecret?: string;
+  },
   status?: WebServerStatus
 ): Promise<ServerType | null> {
   const app = createWebApp(deps);

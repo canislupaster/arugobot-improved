@@ -5,6 +5,8 @@ import type { Client } from "discord.js";
 import { Hono } from "hono";
 
 import type { WebsiteService } from "../services/website.js";
+import type { GitHubIssueAutomationService } from "../services/githubIssueAutomation.js";
+import { verifyGitHubSignature } from "../utils/githubWebhook.js";
 import { logError, logInfo } from "../utils/logger.js";
 
 import {
@@ -21,10 +23,14 @@ import {
 type WebAppContext = {
   website: WebsiteService;
   client: Client;
+  githubAutomation?: GitHubIssueAutomationService;
+  githubWebhookSecret?: string;
 };
 
 type WebVariables = {
   requestId: string;
+  githubAutomation?: GitHubIssueAutomationService;
+  githubWebhookSecret?: string;
 };
 
 type LeaderboardRow = {
@@ -93,10 +99,7 @@ function formatLeaderboardMarkdown(rows: LeaderboardRow[], valueLabel: string): 
   return [header, divider, ...body].join("\n");
 }
 
-async function buildHomeViewModel(
-  website: WebsiteService,
-  client: Client
-): Promise<HomeViewModel> {
+async function buildHomeViewModel(website: WebsiteService, client: Client): Promise<HomeViewModel> {
   const [global, guilds, upcomingContests] = await Promise.all([
     website.getGlobalOverview(),
     website.listGuildSummaries(20),
@@ -117,7 +120,12 @@ async function buildHomeViewModel(
   };
 }
 
-export function createWebApp({ website, client }: WebAppContext) {
+export function createWebApp({
+  website,
+  client,
+  githubAutomation,
+  githubWebhookSecret,
+}: WebAppContext) {
   const app = new Hono<{ Variables: WebVariables }>();
 
   app.use(
@@ -134,6 +142,12 @@ export function createWebApp({ website, client }: WebAppContext) {
     const requestId = randomUUID();
     const start = Date.now();
     c.set("requestId", requestId);
+    if (githubAutomation) {
+      c.set("githubAutomation", githubAutomation);
+    }
+    if (githubWebhookSecret) {
+      c.set("githubWebhookSecret", githubWebhookSecret);
+    }
     try {
       await next();
     } finally {
@@ -348,6 +362,37 @@ export function createWebApp({ website, client }: WebAppContext) {
   app.get("/healthz", async (c) => {
     const health = await website.getHealthStatus();
     return c.json(health);
+  });
+
+  app.post("/github", async (c) => {
+    const githubAutomation = c.get("githubAutomation");
+    if (!githubAutomation) {
+      return c.json({ error: "GitHub automation disabled." }, 404);
+    }
+    const rawBody = await c.req.text();
+    const signature = c.req.header("x-hub-signature-256");
+    const secret = c.get("githubWebhookSecret");
+    if (secret && !verifyGitHubSignature(secret, rawBody, signature)) {
+      return c.json({ error: "Invalid signature." }, 401);
+    }
+    const eventType = c.req.header("x-github-event");
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch (error) {
+      logError("Failed to parse GitHub webhook payload.", {
+        requestId: c.get("requestId"),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return c.json({ error: "Invalid JSON payload." }, 400);
+    }
+    const result = await githubAutomation.handleWebhook(
+      eventType,
+      payload as Parameters<GitHubIssueAutomationService["handleWebhook"]>[1],
+      c.get("requestId")
+    );
+    const status = result.status === "rejected" ? 400 : 202;
+    return c.json({ status: result.status, message: result.message }, status);
   });
 
   app.notFound((c) => c.html(renderNotFoundPage("Page not found."), 404));

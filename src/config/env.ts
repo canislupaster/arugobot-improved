@@ -20,6 +20,15 @@ export type AppConfig = {
   webHost: string;
   webPort: number;
   webPublicUrl?: string;
+  githubWebhookSecret?: string;
+  githubCodexLabel: string;
+  githubActiveLabel: string;
+  githubRepo?: string;
+  codexPromptPath: string;
+  codexWorktreePath: string;
+  codexMaxIterations: number;
+  codexStatusCommentMinutes: number;
+  codexIterationCooldownSeconds: number;
 };
 
 function parseNumber(value: string, fallback: number): number {
@@ -89,6 +98,33 @@ export function validateConfig(config: AppConfig): string[] {
   if (config.webPublicUrl && !isValidUrl(config.webPublicUrl)) {
     errors.push("WEB_PUBLIC_URL must be a valid http(s) URL.");
   }
+  if (config.githubWebhookSecret !== undefined && !config.githubWebhookSecret) {
+    errors.push("GITHUB_WEBHOOK_SECRET must be a non-empty value when set.");
+  }
+  if (!config.githubCodexLabel) {
+    errors.push("GITHUB_CODEX_LABEL must be a non-empty label.");
+  }
+  if (!config.githubActiveLabel) {
+    errors.push("GITHUB_ACTIVE_LABEL must be a non-empty label.");
+  }
+  if (!config.codexPromptPath) {
+    errors.push("CODEX_PROMPT_PATH must be set.");
+  }
+  if (!config.codexWorktreePath) {
+    errors.push("CODEX_WORKTREE_PATH must be set.");
+  }
+  if (!Number.isFinite(config.codexMaxIterations) || config.codexMaxIterations < 0) {
+    errors.push("CODEX_MAX_ITERATIONS must be 0 or greater.");
+  }
+  if (!Number.isFinite(config.codexStatusCommentMinutes) || config.codexStatusCommentMinutes <= 0) {
+    errors.push("CODEX_STATUS_COMMENT_MINUTES must be greater than 0.");
+  }
+  if (
+    !Number.isFinite(config.codexIterationCooldownSeconds) ||
+    config.codexIterationCooldownSeconds < 0
+  ) {
+    errors.push("CODEX_ITERATION_COOLDOWN_SECONDS must be 0 or greater.");
+  }
   return errors;
 }
 
@@ -121,6 +157,21 @@ export function loadConfig(): AppConfig {
   const webPort = parseNumber(process.env.WEB_PORT ?? "8787", 8787);
   const webPublicUrlRaw = process.env.WEB_PUBLIC_URL?.trim();
   const webPublicUrl = webPublicUrlRaw ? webPublicUrlRaw.replace(/\/+$/, "") : undefined;
+  const githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET?.trim() || undefined;
+  const githubCodexLabel = process.env.GITHUB_CODEX_LABEL?.trim() || "codex";
+  const githubActiveLabel = process.env.GITHUB_ACTIVE_LABEL?.trim() || "active";
+  const githubRepo = process.env.GITHUB_REPO?.trim() || undefined;
+  const codexPromptPath = process.env.CODEX_PROMPT_PATH?.trim() || "/home/codex/prompt.txt";
+  const codexWorktreePath = process.env.CODEX_WORKTREE_PATH?.trim() || "/home/codex/arugobot-work";
+  const codexMaxIterations = parseNumber(process.env.CODEX_MAX_ITERATIONS ?? "0", 0);
+  const codexStatusCommentMinutes = parseNumber(
+    process.env.CODEX_STATUS_COMMENT_MINUTES ?? "30",
+    30
+  );
+  const codexIterationCooldownSeconds = parseNumber(
+    process.env.CODEX_ITERATION_COOLDOWN_SECONDS ?? "10",
+    10
+  );
 
   return {
     discordToken,
@@ -140,5 +191,14 @@ export function loadConfig(): AppConfig {
     webHost,
     webPort,
     webPublicUrl,
+    githubWebhookSecret,
+    githubCodexLabel,
+    githubActiveLabel,
+    githubRepo,
+    codexPromptPath,
+    codexWorktreePath,
+    codexMaxIterations,
+    codexStatusCommentMinutes,
+    codexIterationCooldownSeconds,
   };
 }

@@ -17,6 +17,14 @@ describe("validateConfig", () => {
       webHost: "",
       webPort: -1,
       webPublicUrl: "not-a-url",
+      githubWebhookSecret: "",
+      githubCodexLabel: "",
+      githubActiveLabel: "",
+      codexPromptPath: "",
+      codexWorktreePath: "",
+      codexMaxIterations: -1,
+      codexStatusCommentMinutes: 0,
+      codexIterationCooldownSeconds: -1,
     });
     expect(errors).toContain("DISCORD_TOKEN is missing.");
     expect(errors).toContain("DATABASE_URL is missing.");
@@ -31,6 +39,14 @@ describe("validateConfig", () => {
     expect(errors).toContain("WEB_HOST is missing.");
     expect(errors).toContain("WEB_PORT must be a valid port number (0-65535).");
     expect(errors).toContain("WEB_PUBLIC_URL must be a valid http(s) URL.");
+    expect(errors).toContain("GITHUB_WEBHOOK_SECRET must be a non-empty value when set.");
+    expect(errors).toContain("GITHUB_CODEX_LABEL must be a non-empty label.");
+    expect(errors).toContain("GITHUB_ACTIVE_LABEL must be a non-empty label.");
+    expect(errors).toContain("CODEX_PROMPT_PATH must be set.");
+    expect(errors).toContain("CODEX_WORKTREE_PATH must be set.");
+    expect(errors).toContain("CODEX_MAX_ITERATIONS must be 0 or greater.");
+    expect(errors).toContain("CODEX_STATUS_COMMENT_MINUTES must be greater than 0.");
+    expect(errors).toContain("CODEX_ITERATION_COOLDOWN_SECONDS must be 0 or greater.");
   });
 
   it("validates database URL and NODE_ENV", () => {
@@ -49,6 +65,14 @@ describe("validateConfig", () => {
       webHost: "0.0.0.0",
       webPort: 0,
       webPublicUrl: "https://example.com",
+      githubWebhookSecret: "secret",
+      githubCodexLabel: "codex",
+      githubActiveLabel: "active",
+      codexPromptPath: "/tmp/prompt.txt",
+      codexWorktreePath: "/tmp/worktree",
+      codexMaxIterations: 0,
+      codexStatusCommentMinutes: 30,
+      codexIterationCooldownSeconds: 5,
     });
     expect(errors).toContain("DATABASE_URL must start with sqlite: (e.g. sqlite:./bot_data.db).");
     expect(errors).toContain("NODE_ENV must be one of development, production, or test.");

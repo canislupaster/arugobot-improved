@@ -5,7 +5,12 @@ import { Client, Events, GatewayIntentBits } from "discord.js";
 import { sql } from "kysely";
 
 import { handleCommandInteraction } from "./commands/handler.js";
-import { commandData, commandList, commandMap, commandOptionOrderIssues } from "./commands/index.js";
+import {
+  commandData,
+  commandList,
+  commandMap,
+  commandOptionOrderIssues,
+} from "./commands/index.js";
 import { loadConfig, validateConfig } from "./config/env.js";
 import { initDb, destroyDb } from "./db/database.js";
 import { migrateToLatest } from "./db/migrator.js";
@@ -24,6 +29,7 @@ import { ContestService } from "./services/contests.js";
 import { ContestStandingsService } from "./services/contestStandings.js";
 import { DatabaseBackupService, databaseBackupIntervalMs } from "./services/databaseBackups.js";
 import { GuildSettingsService } from "./services/guildSettings.js";
+import { GitHubIssueAutomationService } from "./services/githubIssueAutomation.js";
 import { LogsService, logCleanupIntervalMs } from "./services/logs.js";
 import { MetricsService } from "./services/metrics.js";
 import {
@@ -87,6 +93,17 @@ async function main() {
   );
   const tokenUsage = new TokenUsageService(config.codexLogPath ?? null);
   const metrics = new MetricsService(db);
+  const githubAutomation = new GitHubIssueAutomationService({
+    repoPath: process.cwd(),
+    worktreePath: config.codexWorktreePath,
+    promptPath: config.codexPromptPath,
+    codexLabel: config.githubCodexLabel,
+    activeLabel: config.githubActiveLabel,
+    defaultRepo: config.githubRepo,
+    maxIterations: config.codexMaxIterations,
+    statusCommentMinutes: config.codexStatusCommentMinutes,
+    iterationCooldownSeconds: config.codexIterationCooldownSeconds,
+  });
   const contestReminders = new ContestReminderService(db, contests);
   const problems = new ProblemService(codeforces, cache);
   const ratingChanges = new RatingChangesService(db, codeforces);
@@ -261,10 +278,7 @@ async function main() {
     }
 
     await trackTask(parseData());
-    parseInterval = setInterval(
-      () => runBackgroundTask("parseData", parseData()),
-      60 * 60 * 1000
-    );
+    parseInterval = setInterval(() => runBackgroundTask("parseData", parseData()), 60 * 60 * 1000);
 
     const tickChallenges = async () => {
       if (shuttingDown || isChallengeTicking) {
@@ -477,7 +491,12 @@ async function main() {
 
   webServer = await startWebServer(
     { host: config.webHost, port: config.webPort },
-    { website, client },
+    {
+      website,
+      client,
+      githubAutomation,
+      githubWebhookSecret: config.githubWebhookSecret,
+    },
     webStatus
   );
   if (!webServer) {
@@ -490,6 +509,7 @@ async function main() {
     }
     logWarn("Web server failed to start; continuing without dashboard.");
   }
+  await githubAutomation.initialize();
 
   if (config.logRetentionDays > 0) {
     await trackTask(runLogCleanup());

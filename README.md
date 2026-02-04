@@ -284,6 +284,15 @@ Optional environment variables:
 - `WEB_HOST` (default `0.0.0.0`)
 - `WEB_PORT` (default `8787`, set `0` to bind a random open port)
 - `WEB_PUBLIC_URL` (optional, e.g. `https://bot.example.com`, used for `/dashboard` links)
+- `GITHUB_WEBHOOK_SECRET` (optional GitHub webhook secret; enables signature verification for `/github`)
+- `GITHUB_CODEX_LABEL` (default `codex`)
+- `GITHUB_ACTIVE_LABEL` (default `active`)
+- `GITHUB_REPO` (optional `owner/repo`, enables startup scanning for open codex-labeled issues)
+- `CODEX_PROMPT_PATH` (default `/home/codex/prompt.txt`)
+- `CODEX_WORKTREE_PATH` (default `/home/codex/arugobot-work`)
+- `CODEX_MAX_ITERATIONS` (default `0` for unlimited)
+- `CODEX_STATUS_COMMENT_MINUTES` (default `30`)
+- `CODEX_ITERATION_COOLDOWN_SECONDS` (default `10`)
 
 ```bash
 pnpm install
@@ -301,6 +310,18 @@ Problem and contest caches are persisted in the database to keep basic functiona
 Structured logs are appended to the database (`log_entries`) and cleaned up automatically based on
 `LOG_RETENTION_DAYS`. If `DATABASE_BACKUP` is set, the bot copies the sqlite file into that directory
 on a schedule and removes backups older than `DATABASE_BACKUP_RETENTION_DAYS`.
+
+## GitHub issue automation
+
+The web server exposes `POST /github` for GitHub issue webhooks. When an issue is opened with (or
+later given) the `GITHUB_CODEX_LABEL`, the bot queues a single Codex worker. The worker:
+
+- creates/refreshes a git worktree at `CODEX_WORKTREE_PATH` on a new branch off the repo default branch
+- runs `codex exec` in a loop until the issue is closed (or `CODEX_MAX_ITERATIONS` is hit)
+- posts periodic progress comments (every `CODEX_STATUS_COMMENT_MINUTES`)
+- applies `GITHUB_ACTIVE_LABEL` while working and removes it afterwards
+
+If `GITHUB_REPO` is set, the bot scans for open codex-labeled issues on startup and after each job.
 
 ## Web dashboard
 

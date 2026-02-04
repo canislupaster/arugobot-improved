@@ -10,6 +10,7 @@ import type { RatingChangesService } from "../../src/services/ratingChanges.js";
 import { StoreService } from "../../src/services/store.js";
 import type { TournamentRecap } from "../../src/services/tournaments.js";
 import { WebsiteService } from "../../src/services/website.js";
+import { computeGitHubSignature } from "../../src/utils/githubWebhook.js";
 import { createWebApp } from "../../src/web/app.js";
 
 const mockCodeforces = {
@@ -24,31 +25,29 @@ const mockRatingChanges = {
 
 const mockContestService = {
   refresh: jest.fn().mockResolvedValue(undefined),
-  getUpcoming: jest
-    .fn()
-    .mockImplementation((_limit: number, scope: "official" | "gym") =>
-      scope === "official"
-        ? [
-            {
-              id: 1000,
-              name: "Official Contest",
-              phase: "BEFORE",
-              startTimeSeconds: 1_700_000_000,
-              durationSeconds: 7200,
-              isGym: false,
-            },
-          ]
-        : [
-            {
-              id: 2000,
-              name: "Gym Contest",
-              phase: "BEFORE",
-              startTimeSeconds: 1_700_000_500,
-              durationSeconds: 5400,
-              isGym: true,
-            },
-          ]
-    ),
+  getUpcoming: jest.fn().mockImplementation((_limit: number, scope: "official" | "gym") =>
+    scope === "official"
+      ? [
+          {
+            id: 1000,
+            name: "Official Contest",
+            phase: "BEFORE",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+            isGym: false,
+          },
+        ]
+      : [
+          {
+            id: 2000,
+            name: "Gym Contest",
+            phase: "BEFORE",
+            startTimeSeconds: 1_700_000_500,
+            durationSeconds: 5400,
+            isGym: true,
+          },
+        ]
+  ),
   getLastRefreshAt: jest.fn().mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z")),
   hasContests: jest.fn().mockReturnValue(true),
 };
@@ -263,6 +262,58 @@ describe("web app", () => {
     expect(body).toContain("Round 1");
     expect(body).toContain("Two Sum");
     expect(mockTournaments.getRecap).toHaveBeenCalledWith("guild-1", "t-99");
+  });
+
+  it("accepts GitHub issue webhooks with a valid signature", async () => {
+    const handleWebhook = jest.fn().mockResolvedValue({
+      status: "accepted",
+      message: "ok",
+    });
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+      githubAutomation: { handleWebhook } as never,
+      githubWebhookSecret: "secret",
+    });
+    const payload = { action: "opened", issue: { number: 1 } };
+    const body = JSON.stringify(payload);
+    const signature = computeGitHubSignature("secret", body);
+    const response = await app.request("http://localhost/github", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-github-event": "issues",
+        "x-hub-signature-256": signature,
+      },
+      body,
+    });
+    expect(response.status).toBe(202);
+    expect(handleWebhook).toHaveBeenCalledWith("issues", payload, expect.any(String));
+  });
+
+  it("rejects GitHub webhooks with invalid signatures", async () => {
+    const handleWebhook = jest.fn();
+    const app = createWebApp({
+      website,
+      client: {
+        guilds: { cache: new Map([["guild-1", { name: "Guild One" }]]) },
+      } as never,
+      githubAutomation: { handleWebhook } as never,
+      githubWebhookSecret: "secret",
+    });
+    const response = await app.request("http://localhost/github", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-github-event": "issues",
+        "x-hub-signature-256": "sha256=bad",
+      },
+      body: JSON.stringify({ action: "opened", issue: { number: 1 } }),
+    });
+    expect(response.status).toBe(401);
+    expect(handleWebhook).not.toHaveBeenCalled();
   });
 
   it("returns tournament recap json", async () => {
