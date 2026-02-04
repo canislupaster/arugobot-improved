@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild, resolveBoundedIntegerOption } from "../utils/interaction.js";
+import { requireGuild, resolvePageOption } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
@@ -41,13 +41,7 @@ export const handlesCommand: Command = {
     if (!guild) {
       return;
     }
-    const pageResult = resolveBoundedIntegerOption(interaction, {
-      name: "page",
-      min: 1,
-      max: Number.MAX_SAFE_INTEGER,
-      defaultValue: 1,
-      errorMessage: "Invalid page.",
-    });
+    const pageResult = resolvePageOption(interaction);
     if ("error" in pageResult) {
       await interaction.reply({ content: pageResult.error });
       return;

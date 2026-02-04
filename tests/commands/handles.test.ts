@@ -69,4 +69,20 @@ describe("handlesCommand", () => {
       "No linked handles for current members."
     );
   });
+
+  it("rejects invalid page input", async () => {
+    const interaction = createInteraction();
+    interaction.options.getInteger = jest.fn().mockReturnValue(0);
+    const context = {
+      services: {
+        store: {
+          getServerRoster: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await handlesCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Invalid page." });
+  });
 });
