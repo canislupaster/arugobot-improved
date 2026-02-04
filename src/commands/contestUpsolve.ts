@@ -40,6 +40,46 @@ function buildUpsolveTargetLabels(options: {
   };
 }
 
+type UpsolveTargetResult =
+  | {
+      status: "ok";
+      handle: string;
+      targetLabel: string;
+      titleTarget: string;
+    }
+  | { status: "replied" };
+
+async function resolveUpsolveTargetOrReply(options: {
+  interaction: { editReply: (message: string) => Promise<unknown> };
+  store: Parameters<typeof resolveHandleTargetWithOptionalGuild>[0];
+  guildId: string | null;
+  targetId: string;
+  handleInput: string;
+  mention: string;
+  displayName: string;
+}): Promise<UpsolveTargetResult> {
+  const handleResult = await resolveHandleTargetWithOptionalGuild(options.store, {
+    guildId: options.guildId,
+    targetId: options.targetId,
+    handleInput: options.handleInput,
+    includeLinkedUserId: true,
+  });
+  if ("error" in handleResult) {
+    await options.interaction.editReply(handleResult.error);
+    return { status: "replied" };
+  }
+
+  const labels = buildUpsolveTargetLabels({
+    handle: handleResult.handle,
+    handleInput: options.handleInput,
+    linkedUserId: handleResult.linkedUserId,
+    mention: options.mention,
+    displayName: options.displayName,
+  });
+
+  return { status: "ok", handle: handleResult.handle, ...labels };
+}
+
 export const contestUpsolveCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contestupsolve")
@@ -91,17 +131,18 @@ export const contestUpsolveCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const handleResult = await resolveHandleTargetWithOptionalGuild(context.services.store, {
+      const targetResult = await resolveUpsolveTargetOrReply({
+        interaction,
+        store: context.services.store,
         guildId: interaction.guild?.id ?? null,
         targetId,
         handleInput,
-        includeLinkedUserId: true,
+        mention,
+        displayName,
       });
-      if ("error" in handleResult) {
-        await interaction.editReply(handleResult.error);
+      if (targetResult.status === "replied") {
         return;
       }
-      const { handle, linkedUserId } = handleResult;
 
       const contestPayload = await resolveContestSolvesPayloadOrReply({
         interaction,
@@ -122,25 +163,18 @@ export const contestUpsolveCommand: Command = {
       const { summaries, solved, unsolved } = splitContestSolves(
         contestProblems,
         contestSolves.solves,
-        new Map([[handle, handle]])
+        new Map([[targetResult.handle, targetResult.handle]])
       );
       const solvedCount = solved.length;
       const unsolvedCount = unsolved.length;
-      const { targetLabel, titleTarget } = buildUpsolveTargetLabels({
-        handle,
-        handleInput,
-        linkedUserId,
-        mention,
-        displayName,
-      });
 
       const embed = buildContestEmbed({
         contest,
-        title: `Contest upsolve: ${titleTarget}`,
+        title: `Contest upsolve: ${targetResult.titleTarget}`,
         scope,
         includeScope: true,
       });
-      embed.addFields({ name: "Target", value: targetLabel, inline: false });
+      embed.addFields({ name: "Target", value: targetResult.targetLabel, inline: false });
       embed.addFields(
         ...buildContestSolvesSummaryFields({
           totalProblems: summaries.length,
