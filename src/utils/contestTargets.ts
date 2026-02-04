@@ -146,15 +146,6 @@ function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, la
 
 type LinkedUserHandle = { userId: string; handle: string };
 
-function addLinkedUsers(
-  targets: Map<string, TargetHandle>,
-  linkedUsers: LinkedUserHandle[]
-): void {
-  for (const linked of linkedUsers) {
-    addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
-  }
-}
-
 function finalizeTargets(targets: Map<string, TargetHandle>): TargetResolution {
   const targetList = Array.from(targets.values());
   if (targetList.length === 0) {
@@ -172,7 +163,9 @@ function resolveTargetsFromLinkedUsers(
     return maxError;
   }
   const targets = new Map<string, TargetHandle>();
-  addLinkedUsers(targets, linkedUsers);
+  for (const linked of linkedUsers) {
+    addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
+  }
   return finalizeTargets(targets);
 }
 
@@ -290,13 +283,12 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   } = params;
   const uniqueUserOptions = dedupeUsersById(userOptions);
   const normalizedHandleInputs = normalizeHandleInputs(handleInputs);
-  const normalizedHandles = normalizedHandleInputs.map((entry) => entry.normalized);
 
   const contextError = getContestTargetContextError({
     guild,
     guildId,
     userOptions: uniqueUserOptions,
-    handleInputs: normalizedHandles,
+    handleInputs: normalizedHandleInputs.map((entry) => entry.normalized),
   });
   if (contextError) {
     return errorResult(contextError);
@@ -304,7 +296,8 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
 
   const targets = new Map<string, TargetHandle>();
   const resolvedGuildId = guildId ?? guild?.id ?? "";
-  const hasDirectTargets = uniqueUserOptions.length > 0 || normalizedHandles.length > 0;
+  const hasDirectTargets =
+    uniqueUserOptions.length > 0 || normalizedHandleInputs.length > 0;
   const userOptionError = await addUserOptionTargets(
     targets,
     store,
