@@ -16,8 +16,13 @@ export type RatedRosterEntry = RosterEntry & {
 };
 
 export type RosterResolution<T extends RosterEntryBase> =
-  | { status: "ok"; roster: T[] }
-  | { status: "empty"; message: string; reason: "no_handles" | "no_members" };
+  | { status: "ok"; roster: T[]; excludedCount: number }
+  | {
+      status: "empty";
+      message: string;
+      reason: "no_handles" | "no_members";
+      excludedCount: number;
+    };
 
 export type RosterMessages = {
   noHandles?: string;
@@ -52,11 +57,22 @@ export async function resolveGuildRoster<T extends RosterEntryBase>(
   const noMembersMessage = messages.noMembers ?? NO_MEMBER_HANDLES_MESSAGE;
 
   if (roster.length === 0) {
-    return { status: "empty", message: noHandlesMessage, reason: "no_handles" };
+    return {
+      status: "empty",
+      message: noHandlesMessage,
+      reason: "no_handles",
+      excludedCount: 0,
+    };
   }
   const filtered = await filterEntriesByGuildMembers(guild, roster, context);
+  const excludedCount = Math.max(0, roster.length - filtered.length);
   if (filtered.length === 0) {
-    return { status: "empty", message: noMembersMessage, reason: "no_members" };
+    return {
+      status: "empty",
+      message: noMembersMessage,
+      reason: "no_members",
+      excludedCount,
+    };
   }
-  return { status: "ok", roster: filtered };
+  return { status: "ok", roster: filtered, excludedCount };
 }

@@ -57,7 +57,7 @@ export const handlesCommand: Command = {
       }
       const filteredRoster = rosterResult.roster;
 
-      const excludedCount = Math.max(0, roster.length - filteredRoster.length);
+      const excludedCount = rosterResult.excludedCount;
       const totalPages = Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE));
       if (page > totalPages) {
         await interaction.editReply("Empty page.");

@@ -25,6 +25,7 @@ describe("resolveGuildRoster", () => {
     expect(result.status).toBe("empty");
     if (result.status === "empty") {
       expect(result.reason).toBe("no_handles");
+      expect(result.excludedCount).toBe(0);
       expect(result.message).toContain("No linked handles yet.");
     }
   });
@@ -43,6 +44,7 @@ describe("resolveGuildRoster", () => {
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.roster).toHaveLength(2);
+      expect(result.excludedCount).toBe(0);
     }
   });
 
@@ -57,6 +59,7 @@ describe("resolveGuildRoster", () => {
     expect(result.status).toBe("empty");
     if (result.status === "empty") {
       expect(result.reason).toBe("no_members");
+      expect(result.excludedCount).toBe(1);
       expect(result.message).toContain("No linked handles found for current server members.");
     }
   });
@@ -72,6 +75,7 @@ describe("resolveGuildRoster", () => {
 
     expect(result.status).toBe("empty");
     if (result.status === "empty") {
+      expect(result.excludedCount).toBe(0);
       expect(result.message).toBe("No handles configured.");
     }
   });
