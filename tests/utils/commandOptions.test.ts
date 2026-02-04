@@ -6,6 +6,7 @@ import {
   addCleanupSubcommand,
   addPageOption,
   addPostSubcommand,
+  addPreviewSubcommand,
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
@@ -111,4 +112,24 @@ test("addPostSubcommand adds force and id options when provided", () => {
   expect(subcommand?.name).toBe("post");
   expect(subcommand?.description).toBe("Post now");
   expect(options.map((option) => option.name)).toEqual(["force", "id"]);
+});
+
+test("addPreviewSubcommand adds id option when provided", () => {
+  const builder = new SlashCommandBuilder()
+    .setName("previewable")
+    .setDescription("previewable")
+    .addSubcommand((subcommand) =>
+      addPreviewSubcommand(subcommand, {
+        description: "Preview now",
+        idDescription: "Subscription id",
+      })
+    );
+
+  const json = builder.toJSON();
+  const subcommand = json.options?.[0] as APIApplicationCommandSubcommandOption | undefined;
+  const options = subcommand?.options ?? [];
+
+  expect(subcommand?.name).toBe("preview");
+  expect(subcommand?.description).toBe("Preview now");
+  expect(options.map((option) => option.name)).toEqual(["id"]);
 });

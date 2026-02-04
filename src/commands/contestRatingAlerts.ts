@@ -6,7 +6,11 @@ import {
 } from "../services/contestRatingAlerts.js";
 import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addCleanupSubcommand, addPostSubcommand } from "../utils/commandOptions.js";
+import {
+  addCleanupSubcommand,
+  addPostSubcommand,
+  addPreviewSubcommand,
+} from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
@@ -156,12 +160,10 @@ export const contestRatingAlertsCommand: Command = {
       )
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("preview")
-        .setDescription("Preview the next contest rating change alert")
-        .addStringOption((option) =>
-          option.setName("id").setDescription("Subscription id (from list)")
-        )
+      addPreviewSubcommand(subcommand, {
+        description: "Preview the next contest rating change alert",
+        idDescription: "Subscription id (from list)",
+      })
     )
     .addSubcommand((subcommand) =>
       addPostSubcommand(subcommand, {

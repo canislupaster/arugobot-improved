@@ -152,6 +152,23 @@ export function addPostSubcommand(
   return builder;
 }
 
+export function addPreviewSubcommand(
+  subcommand: SlashCommandSubcommandBuilder,
+  options: {
+    description: string;
+    idDescription?: string;
+  }
+): SlashCommandSubcommandBuilder {
+  const builder = subcommand.setName("preview").setDescription(options.description);
+  const idDescription = options.idDescription;
+  if (idDescription) {
+    builder.addStringOption((option) =>
+      option.setName("id").setDescription(idDescription)
+    );
+  }
+  return builder;
+}
+
 export function addPageOption(
   builder: SlashCommandBuilder
 ): SlashCommandOptionsOnlyBuilder;
