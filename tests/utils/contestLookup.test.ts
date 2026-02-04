@@ -26,6 +26,7 @@ describe("contestLookup helpers", () => {
   it("detects latest contest queries", () => {
     expect(isLatestQuery("latest")).toBe(true);
     expect(isLatestQuery("LAST")).toBe(true);
+    expect(isLatestQuery("  recent ")).toBe(true);
     expect(isLatestQuery("recent")).toBe(true);
     expect(isLatestQuery("older")).toBe(false);
   });
@@ -33,10 +34,12 @@ describe("contestLookup helpers", () => {
   it("detects upcoming and ongoing contest queries", () => {
     expect(isUpcomingQuery("next")).toBe(true);
     expect(isUpcomingQuery("Upcoming")).toBe(true);
+    expect(isUpcomingQuery("  soon")).toBe(true);
     expect(isUpcomingQuery("soon")).toBe(true);
     expect(isUpcomingQuery("later")).toBe(false);
     expect(isOngoingQuery("ongoing")).toBe(true);
     expect(isOngoingQuery("LIVE")).toBe(true);
+    expect(isOngoingQuery("  current ")).toBe(true);
     expect(isOngoingQuery("current")).toBe(true);
     expect(isOngoingQuery("done")).toBe(false);
   });

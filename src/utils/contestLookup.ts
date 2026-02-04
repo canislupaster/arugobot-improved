@@ -15,6 +15,10 @@ const LATEST_CONTEST_QUERIES = new Set(["latest", "last", "recent"]);
 const UPCOMING_CONTEST_QUERIES = new Set(["next", "upcoming", "soon"]);
 const ONGOING_CONTEST_QUERIES = new Set(["ongoing", "live", "current", "now"]);
 
+function normalizeContestQuery(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
 type ContestMatchEmbedOptions = {
   query: string;
   matches: Contest[];
@@ -84,15 +88,15 @@ export function parseContestId(raw: string): number | null {
 }
 
 export function isLatestQuery(raw: string): boolean {
-  return LATEST_CONTEST_QUERIES.has(raw.trim().toLowerCase());
+  return LATEST_CONTEST_QUERIES.has(normalizeContestQuery(raw));
 }
 
 export function isUpcomingQuery(raw: string): boolean {
-  return UPCOMING_CONTEST_QUERIES.has(raw.trim().toLowerCase());
+  return UPCOMING_CONTEST_QUERIES.has(normalizeContestQuery(raw));
 }
 
 export function isOngoingQuery(raw: string): boolean {
-  return ONGOING_CONTEST_QUERIES.has(raw.trim().toLowerCase());
+  return ONGOING_CONTEST_QUERIES.has(normalizeContestQuery(raw));
 }
 
 export function resolveContestLookup(
