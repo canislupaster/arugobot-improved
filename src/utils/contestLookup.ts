@@ -60,6 +60,14 @@ type ContestEmbedOptions = {
   includeScope?: boolean;
 };
 
+const DEFAULT_MISSING_MESSAGES: Record<MissingContestStatus, string> = {
+  missing_latest: "No finished contests found yet.",
+  missing_upcoming: "No upcoming contests found.",
+  missing_ongoing: "No ongoing contests found.",
+  missing_id: "No contest found with that ID.",
+  missing_name: "No contests found matching that name.",
+};
+
 export function parseContestId(raw: string): number | null {
   const trimmed = raw.trim();
   const urlMatch = trimmed.match(/\b(?:contests?|gym)\/(\d+)/i);
@@ -152,21 +160,15 @@ function resolveMissingContestMessage(
   status: MissingContestStatus,
   options: ContestLookupReplyOptions
 ): string {
-  const fallbackMessages: Record<MissingContestStatus, string> = {
-    missing_latest: "No finished contests found yet.",
-    missing_upcoming: "No upcoming contests found.",
-    missing_ongoing: "No ongoing contests found.",
-    missing_id: "No contest found with that ID.",
-    missing_name: "No contests found matching that name.",
-  };
-  const messages: Record<MissingContestStatus, string> = {
-    missing_latest: options.missingLatestMessage ?? fallbackMessages.missing_latest,
-    missing_upcoming: options.missingUpcomingMessage ?? fallbackMessages.missing_upcoming,
-    missing_ongoing: options.missingOngoingMessage ?? fallbackMessages.missing_ongoing,
-    missing_id: options.missingIdMessage ?? fallbackMessages.missing_id,
-    missing_name: options.missingNameMessage ?? fallbackMessages.missing_name,
-  };
-  return messages[status];
+  const override =
+    {
+      missing_latest: options.missingLatestMessage,
+      missing_upcoming: options.missingUpcomingMessage,
+      missing_ongoing: options.missingOngoingMessage,
+      missing_id: options.missingIdMessage,
+      missing_name: options.missingNameMessage,
+    }[status] ?? null;
+  return override ?? DEFAULT_MISSING_MESSAGES[status];
 }
 
 export async function resolveContestOrReply(
