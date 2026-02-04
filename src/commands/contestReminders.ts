@@ -349,7 +349,7 @@ export const contestRemindersCommand: Command = {
 
     try {
       if (subcommand === "status" || subcommand === "list") {
-        const onlyIssues = interaction.options.getBoolean?.("only_issues") ?? false;
+        const onlyIssues = resolveBooleanOption(interaction, "only_issues");
         const entryResult = await resolveSubscriptionEntriesFromService(
           interaction,
           context.client,
@@ -415,7 +415,7 @@ export const contestRemindersCommand: Command = {
 
       if (subcommand === "cleanup") {
         const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-        const includePermissions = interaction.options.getBoolean?.("include_permissions") ?? false;
+        const includePermissions = resolveBooleanOption(interaction, "include_permissions");
         const message = await runChannelCleanupSummary({
           client: context.client,
           subscriptions,

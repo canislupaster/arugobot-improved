@@ -15,7 +15,7 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
-import { resolveBooleanOption } from "../utils/interaction.js";
+import { requireGuild, resolveBooleanOption } from "../utils/interaction.js";
 import {
   appendSubscriptionIdField,
   resolveSubscriptionSelectionFromInteraction,
@@ -172,14 +172,14 @@ export const contestRatingAlertsCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+    });
+    if (!guild) {
       return;
     }
 
-    const guildId = interaction.guild.id;
+    const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
     const selectSubscription = async (): Promise<ContestRatingAlertSubscription | null> => {
       return resolveSubscriptionSelectionFromInteraction(
@@ -191,7 +191,7 @@ export const contestRatingAlertsCommand: Command = {
 
     try {
       if (subcommand === "status" || subcommand === "list") {
-        const onlyIssues = interaction.options.getBoolean?.("only_issues") ?? false;
+        const onlyIssues = resolveBooleanOption(interaction, "only_issues");
         const entryResult = await resolveSubscriptionEntriesFromService(
           interaction,
           context.client,
@@ -231,7 +231,7 @@ export const contestRatingAlertsCommand: Command = {
 
       if (subcommand === "cleanup") {
         const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const includePermissions = interaction.options.getBoolean?.("include_permissions") ?? false;
+        const includePermissions = resolveBooleanOption(interaction, "include_permissions");
         const message = await runChannelCleanupSummary({
           client: context.client,
           subscriptions,

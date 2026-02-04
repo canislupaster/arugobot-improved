@@ -3,8 +3,8 @@ import { ChannelType, type ChatInputCommandInteraction } from "discord.js";
 import { contestRatingAlertsCommand } from "../../src/commands/contestRatingAlerts.js";
 import type { CommandContext } from "../../src/types/commandContext.js";
 
-const createInteraction = (overrides: Record<string, unknown> = {}) =>
-  ({
+const createInteraction = (overrides: Record<string, unknown> = {}) => {
+  const base = {
     commandName: "contestratingalerts",
     user: { id: "user-1", username: "User" },
     guild: { id: "guild-1" },
@@ -19,8 +19,18 @@ const createInteraction = (overrides: Record<string, unknown> = {}) =>
     reply: jest.fn().mockResolvedValue(undefined),
     deferReply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),
+  };
+  const overrideOptions =
+    overrides.options && typeof overrides.options === "object" ? overrides.options : {};
+  return {
+    ...base,
     ...overrides,
-  }) as unknown as ChatInputCommandInteraction;
+    options: {
+      ...base.options,
+      ...overrideOptions,
+    },
+  } as unknown as ChatInputCommandInteraction;
+};
 
 const createClient = (channel: { id: string; type: ChannelType }, canSend = true) => ({
   user: { id: "bot-1" },
