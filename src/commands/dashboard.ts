@@ -6,25 +6,6 @@ import { formatUpdatedAt } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
-function buildDashboardUrl(baseUrl: string | undefined, guildId: string): string | null {
-  if (!baseUrl) {
-    return null;
-  }
-  return `${baseUrl}/guilds/${guildId}`;
-}
-
-function buildDashboardUrlLine(
-  baseUrl: string | undefined,
-  guildId: string,
-  isPublic: boolean
-): string {
-  if (!isPublic) {
-    return "";
-  }
-  const dashboardUrl = buildDashboardUrl(baseUrl, guildId);
-  return dashboardUrl ? ` Dashboard URL: ${dashboardUrl}.` : "";
-}
-
 function formatDashboardVisibilityMessage(options: {
   isPublic: boolean;
   baseUrl: string | undefined;
@@ -32,11 +13,10 @@ function formatDashboardVisibilityMessage(options: {
   updatedAt?: string;
 }): string {
   const visibility = options.isPublic ? "public" : "private";
-  const urlLine = buildDashboardUrlLine(
-    options.baseUrl,
-    options.guildId,
-    options.isPublic
-  );
+  const urlLine =
+    options.isPublic && options.baseUrl
+      ? ` Dashboard URL: ${options.baseUrl}/guilds/${options.guildId}.`
+      : "";
   const updatedAtLine = options.updatedAt
     ? ` Last updated ${formatUpdatedAt(options.updatedAt)}.`
     : "";
