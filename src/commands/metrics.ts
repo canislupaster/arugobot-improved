@@ -9,23 +9,15 @@ import type { CommandMetricSummary } from "../services/metrics.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveBoundedIntegerOption } from "../utils/interaction.js";
-import { formatDiscordTimestamp } from "../utils/time.js";
+import { formatUpdatedAt } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 20;
 
-function formatLastSeen(lastSeenAt: string): string {
-  const ms = Date.parse(lastSeenAt);
-  if (!Number.isFinite(ms)) {
-    return lastSeenAt;
-  }
-  return formatDiscordTimestamp(Math.floor(ms / 1000));
-}
-
 function formatSummaryLine(summary: CommandMetricSummary): string {
-  return `/${summary.name}: ${summary.count} (ok ${summary.successRate}%, avg ${summary.avgLatencyMs}ms, max ${summary.maxLatencyMs}ms, last ${formatLastSeen(summary.lastSeenAt)})`;
+  return `/${summary.name}: ${summary.count} (ok ${summary.successRate}%, avg ${summary.avgLatencyMs}ms, max ${summary.maxLatencyMs}ms, last ${formatUpdatedAt(summary.lastSeenAt)})`;
 }
 
 export const metricsCommand: Command = {
@@ -79,7 +71,7 @@ export const metricsCommand: Command = {
             { name: "Success rate", value: `${summary.successRate}%`, inline: true },
             { name: "Average latency", value: `${summary.avgLatencyMs}ms`, inline: true },
             { name: "Max latency", value: `${summary.maxLatencyMs}ms`, inline: true },
-            { name: "Last seen", value: formatLastSeen(summary.lastSeenAt), inline: false },
+            { name: "Last seen", value: formatUpdatedAt(summary.lastSeenAt), inline: false },
           ]);
 
         await interaction.editReply({ embeds: [embed] });
