@@ -10,7 +10,7 @@ import {
   buildContestSolvesSummaryFields,
   resolveContestSolvesPayloadOrReply,
 } from "../utils/contestSolvesData.js";
-import { resolveHandleTarget } from "../utils/handles.js";
+import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
 import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
@@ -86,8 +86,8 @@ export const contestUpsolveCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const handleResult = await resolveHandleTarget(context.services.store, {
-        guildId: interaction.guildId ?? "",
+      const handleResult = await resolveHandleTargetWithOptionalGuild(context.services.store, {
+        guildId: interaction.guild?.id ?? null,
         targetId,
         handleInput,
         includeLinkedUserId: true,
