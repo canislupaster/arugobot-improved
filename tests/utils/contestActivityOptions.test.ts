@@ -1,0 +1,55 @@
+import {
+  CONTEST_ACTIVITY_DEFAULTS,
+  buildContestActivityOptionConfig,
+  resolveContestActivityOptionsOrReply,
+} from "../../src/utils/contestActivityOptions.js";
+
+const createInteraction = (overrides: Record<string, unknown> = {}) =>
+  ({
+    options: {
+      getInteger: jest.fn().mockReturnValue(null),
+      getString: jest.fn().mockReturnValue(null),
+    },
+    reply: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }) as unknown as Parameters<typeof resolveContestActivityOptionsOrReply>[0];
+
+describe("resolveContestActivityOptionsOrReply", () => {
+  it("returns defaults when options are omitted", async () => {
+    const interaction = createInteraction();
+    const config = buildContestActivityOptionConfig({
+      daysErrorMessage: "Invalid lookback window.",
+      limitErrorMessage: "Invalid limit.",
+    });
+
+    const result = await resolveContestActivityOptionsOrReply(interaction, config);
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.days).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultDays);
+      expect(result.limit).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultLimit);
+      expect(result.scope).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultScope);
+    }
+    expect(interaction.reply).not.toHaveBeenCalled();
+  });
+
+  it("replies on invalid days", async () => {
+    const interaction = createInteraction({
+      options: {
+        getInteger: jest.fn().mockReturnValue(CONTEST_ACTIVITY_DEFAULTS.maxDays + 1),
+        getString: jest.fn().mockReturnValue(null),
+      },
+    });
+    const config = buildContestActivityOptionConfig({
+      daysErrorMessage: "Invalid lookback window.",
+      limitErrorMessage: "Invalid limit.",
+    });
+
+    const result = await resolveContestActivityOptionsOrReply(interaction, config);
+
+    expect(result.status).toBe("replied");
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Invalid lookback window.",
+    });
+  });
+});

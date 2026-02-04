@@ -45,6 +45,10 @@ type IntegerOptionInteraction = {
   };
 };
 
+type ContestActivityReplyInteraction = IntegerOptionInteraction & {
+  reply: (options: { content: string }) => Promise<unknown>;
+};
+
 export function resolveContestActivityOptions(
   interaction: IntegerOptionInteraction,
   config: ContestActivityOptionConfig
@@ -78,4 +82,19 @@ export function resolveContestActivityOptions(
     limit: limitResult.value,
     scope,
   };
+}
+
+export async function resolveContestActivityOptionsOrReply(
+  interaction: ContestActivityReplyInteraction,
+  config: ContestActivityOptionConfig
+): Promise<
+  | { status: "ok"; days: number; limit: number; scope: ContestScopeFilter }
+  | { status: "replied" }
+> {
+  const result = resolveContestActivityOptions(interaction, config);
+  if (result.status === "error") {
+    await interaction.reply({ content: result.message });
+    return { status: "replied" };
+  }
+  return result;
 }

@@ -5,10 +5,11 @@ import { logCommandError } from "../utils/commandLogging.js";
 import {
   CONTEST_ACTIVITY_DEFAULTS,
   buildContestActivityOptionConfig,
-  resolveContestActivityOptions,
+  resolveContestActivityOptionsOrReply,
 } from "../utils/contestActivityOptions.js";
 import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { requireGuild } from "../utils/interaction.js";
 import { resolveGuildRoster } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -129,22 +130,21 @@ export const contestActivityCommand: Command = {
       addContestScopeOption(option, "Which contests to include", ["all", "official", "gym"])
     ),
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-      });
+    const guild = await requireGuild(interaction, {
+      content: "This command can only be used in a server.",
+    });
+    if (!guild) {
       return;
     }
 
-    const optionResult = resolveContestActivityOptions(
+    const optionResult = await resolveContestActivityOptionsOrReply(
       interaction,
       buildContestActivityOptionConfig({
-      daysErrorMessage: "Invalid lookback window.",
-      limitErrorMessage: "Invalid participant limit.",
+        daysErrorMessage: "Invalid lookback window.",
+        limitErrorMessage: "Invalid participant limit.",
       })
     );
-    if (optionResult.status === "error") {
-      await interaction.reply({ content: optionResult.message });
+    if (optionResult.status === "replied") {
       return;
     }
     const { days, limit, scope } = optionResult;
@@ -152,11 +152,11 @@ export const contestActivityCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const roster = await context.services.store.getServerRoster(interaction.guild.id);
-      const rosterResult = await resolveGuildRoster(interaction.guild, roster, {
+      const roster = await context.services.store.getServerRoster(guild.id);
+      const rosterResult = await resolveGuildRoster(guild, roster, {
         correlationId: context.correlationId,
         command: interaction.commandName,
-        guildId: interaction.guild.id,
+        guildId: guild.id,
         userId: interaction.user.id,
       });
       if (rosterResult.status === "empty") {
