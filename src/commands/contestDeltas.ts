@@ -10,15 +10,12 @@ import {
   CONTEST_ACTIVITY_DEFAULTS,
   addContestActivityCommandOptions,
   buildContestActivityOptionConfig,
-  resolveContestActivityContextOrReply,
+  resolveContestActivityRosterContextOrReply,
 } from "../utils/contestActivityOptions.js";
 import { formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
-import {
-  buildRosterExcludedField,
-  resolveGuildRosterFromStoreOrReply,
-} from "../utils/roster.js";
+import { buildRosterExcludedField } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -98,33 +95,26 @@ export const contestDeltasCommand: Command = {
     }
   ),
   async execute(interaction, context) {
-    const optionResult = await resolveContestActivityContextOrReply(
+    const optionResult = await resolveContestActivityRosterContextOrReply(
       interaction,
       buildContestActivityOptionConfig({
         daysErrorMessage: "Invalid lookback window.",
         limitErrorMessage: "Invalid limit.",
       }),
-      { guildMessage: "This command can only be used in a server." }
+      {
+        guildMessage: "This command can only be used in a server.",
+        store: context.services.store,
+        correlationId: context.correlationId,
+      }
     );
     if (optionResult.status === "replied") {
       return;
     }
-    const { guild, days, limit, scope } = optionResult;
-
-    await interaction.deferReply();
+    const { days, limit, scope, roster, excludedCount } = optionResult;
 
     try {
-      const rosterResult = await resolveGuildRosterFromStoreOrReply({
-        guild,
-        interaction,
-        store: context.services.store,
-        correlationId: context.correlationId,
-      });
-      if (rosterResult.status === "replied") {
-        return;
-      }
       const summary = await context.services.contestActivity.getRatingChangeSummaryForRoster(
-        rosterResult.roster,
+        roster,
         { lookbackDays: days, limit, scope }
       );
 
@@ -136,7 +126,7 @@ export const contestDeltasCommand: Command = {
       }
 
       const embed = buildSummaryEmbed(summary, days, scope);
-      const excludedField = buildRosterExcludedField(rosterResult.excludedCount);
+      const excludedField = buildRosterExcludedField(excludedCount);
       if (excludedField) {
         embed.addFields(excludedField);
       }

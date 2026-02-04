@@ -274,7 +274,13 @@ describe("contestDeltasCommand", () => {
         getString: jest.fn().mockReturnValue(null),
       },
     });
-    const context = {} as CommandContext;
+    const context = {
+      services: {
+        store: {
+          getServerRoster: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
 
     await contestDeltasCommand.execute(interaction, context);
 
@@ -290,7 +296,13 @@ describe("contestDeltasCommand", () => {
         getString: jest.fn().mockReturnValue(null),
       },
     });
-    const context = {} as CommandContext;
+    const context = {
+      services: {
+        store: {
+          getServerRoster: jest.fn(),
+        },
+      },
+    } as unknown as CommandContext;
 
     await contestDeltasCommand.execute(interaction, context);
 

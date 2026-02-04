@@ -2,6 +2,7 @@ import {
   CONTEST_ACTIVITY_DEFAULTS,
   buildContestActivityOptionConfig,
   resolveContestActivityContextOrReply,
+  resolveContestActivityRosterContextOrReply,
   resolveContestActivityOptionsOrReply,
 } from "../../src/utils/contestActivityOptions.js";
 
@@ -25,6 +26,21 @@ const createContextInteraction = (overrides: Record<string, unknown> = {}) =>
     guild: { id: "guild-1" },
     ...overrides,
   }) as unknown as Parameters<typeof resolveContestActivityContextOrReply>[0];
+
+const createRosterInteraction = (overrides: Record<string, unknown> = {}) =>
+  ({
+    options: {
+      getInteger: jest.fn().mockReturnValue(null),
+      getString: jest.fn().mockReturnValue(null),
+    },
+    reply: jest.fn().mockResolvedValue(undefined),
+    deferReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(undefined),
+    commandName: "contestactivity",
+    user: { id: "user-1" },
+    guild: { id: "guild-1" },
+    ...overrides,
+  }) as unknown as Parameters<typeof resolveContestActivityRosterContextOrReply>[0];
 
 describe("resolveContestActivityOptionsOrReply", () => {
   it("returns defaults when options are omitted", async () => {
@@ -96,6 +112,67 @@ describe("resolveContestActivityContextOrReply", () => {
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.guild.id).toBe("guild-2");
+      expect(result.days).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultDays);
+      expect(result.limit).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultLimit);
+      expect(result.scope).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultScope);
+    }
+  });
+});
+
+describe("resolveContestActivityRosterContextOrReply", () => {
+  it("replies when roster is empty", async () => {
+    const interaction = createRosterInteraction();
+    const config = buildContestActivityOptionConfig({
+      daysErrorMessage: "Invalid lookback window.",
+      limitErrorMessage: "Invalid limit.",
+    });
+
+    const result = await resolveContestActivityRosterContextOrReply(interaction, config, {
+      guildMessage: "Server only.",
+      store: {
+        getServerRoster: jest.fn().mockResolvedValue([]),
+      },
+    });
+
+    expect(result.status).toBe("replied");
+    expect(interaction.deferReply).toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No linked handles yet. Use /register to link a Codeforces handle."
+    );
+  });
+
+  it("returns roster context when resolved", async () => {
+    const members = new Map([
+      ["user-1", { user: { id: "user-1" }, toString: () => "<@user-1>" }],
+    ]);
+    const interaction = createRosterInteraction({
+      guild: {
+        id: "guild-1",
+        members: {
+          fetch: jest.fn().mockResolvedValue(members),
+          cache: new Map(),
+        },
+      },
+    });
+    const config = buildContestActivityOptionConfig({
+      daysErrorMessage: "Invalid lookback window.",
+      limitErrorMessage: "Invalid limit.",
+    });
+
+    const result = await resolveContestActivityRosterContextOrReply(interaction, config, {
+      guildMessage: "Server only.",
+      store: {
+        getServerRoster: jest.fn().mockResolvedValue([
+          { userId: "user-1", handle: "tourist" },
+        ]),
+      },
+    });
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.guild.id).toBe("guild-1");
+      expect(result.roster).toEqual([{ userId: "user-1", handle: "tourist" }]);
+      expect(result.excludedCount).toBe(0);
       expect(result.days).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultDays);
       expect(result.limit).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultLimit);
       expect(result.scope).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultScope);

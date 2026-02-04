@@ -1,10 +1,16 @@
-import type { SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from "discord.js";
+import type {
+  Guild,
+  SlashCommandBuilder,
+  SlashCommandOptionsOnlyBuilder,
+} from "discord.js";
 
 import type { ContestScopeFilter } from "../services/contests.js";
 
 import { parseContestScope } from "./contestScope.js";
 import { addContestScopeOption } from "./contestScope.js";
 import { resolveBoundedIntegerOption } from "./interaction.js";
+import type { RosterEntry, RosterMessages } from "./roster.js";
+import { resolveGuildRosterFromStoreOrReply } from "./roster.js";
 
 type ContestActivityOptions =
   | { status: "ok"; days: number; limit: number; scope: ContestScopeFilter }
@@ -165,5 +171,70 @@ export async function resolveContestActivityContextOrReply<GuildType extends { i
     days: result.days,
     limit: result.limit,
     scope: result.scope,
+  };
+}
+
+type ContestActivityRosterStore = {
+  getServerRoster: (guildId: string) => Promise<RosterEntry[]>;
+};
+
+type ContestActivityRosterInteraction = ContestActivityContextInteraction<Guild> & {
+  commandName: string;
+  user: { id: string };
+  deferReply: () => Promise<unknown>;
+  editReply: (message: string) => Promise<unknown>;
+};
+
+export async function resolveContestActivityRosterContextOrReply(
+  interaction: ContestActivityRosterInteraction,
+  config: ContestActivityOptionConfig,
+  options: {
+    guildMessage: string;
+    store: ContestActivityRosterStore;
+    correlationId?: string;
+    rosterMessages?: RosterMessages;
+  }
+): Promise<
+  | {
+      status: "ok";
+      guild: Guild;
+      days: number;
+      limit: number;
+      scope: ContestScopeFilter;
+      roster: RosterEntry[];
+      excludedCount: number;
+    }
+  | { status: "replied" }
+> {
+  const contextResult = await resolveContestActivityContextOrReply(
+    interaction,
+    config,
+    { guildMessage: options.guildMessage }
+  );
+  if (contextResult.status === "replied") {
+    return { status: "replied" };
+  }
+
+  await interaction.deferReply();
+
+  const rosterResult = await resolveGuildRosterFromStoreOrReply({
+    guild: contextResult.guild,
+    interaction,
+    store: options.store,
+    correlationId: options.correlationId,
+    messages: options.rosterMessages,
+  });
+  if (rosterResult.status === "replied") {
+    return { status: "replied" };
+  }
+
+  return {
+    status: "ok",
+    guild: contextResult.guild,
+    days: contextResult.days,
+    limit: contextResult.limit,
+    scope: contextResult.scope,
+    roster: rosterResult.roster,
+    excludedCount: rosterResult.excludedCount,
   };
 }
