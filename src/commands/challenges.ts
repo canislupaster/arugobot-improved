@@ -85,6 +85,26 @@ function buildActiveChallengesEmbed(
   return embed;
 }
 
+async function replyWithActiveChallenges(
+  interaction: Parameters<Command["execute"]>[0],
+  title: string,
+  challenges: ActiveChallengeSummary[],
+  options: { limit?: number; emptyMessage: string }
+): Promise<boolean> {
+  if (challenges.length === 0) {
+    await interaction.reply({ content: options.emptyMessage });
+    return false;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const embed = buildActiveChallengesEmbed(title, challenges, {
+    nowSeconds,
+    limit: options.limit,
+  });
+  await interaction.reply({ embeds: [embed] });
+  return true;
+}
+
 function getFirstSolveSummary(challenge: RecentChallengeSummary): string {
   const solved = challenge.participants.filter((participant) => participant.solvedAt !== null);
   if (solved.length === 0) {
@@ -185,23 +205,12 @@ export const challengesCommand: Command = {
 
     try {
       if (subcommand === "list") {
-        const challenges =
-          await context.services.challenges.listActiveChallenges(guildId);
-        if (challenges.length === 0) {
-          await interaction.reply({
-            content: "No active challenges right now.",
-          });
-          return;
-        }
-
+        const challenges = await context.services.challenges.listActiveChallenges(guildId);
         const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-        const nowSeconds = Math.floor(Date.now() / 1000);
-        const embed = buildActiveChallengesEmbed("Active challenges", challenges, {
-          nowSeconds,
+        await replyWithActiveChallenges(interaction, "Active challenges", challenges, {
           limit,
+          emptyMessage: "No active challenges right now.",
         });
-
-        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -210,19 +219,9 @@ export const challengesCommand: Command = {
           guildId,
           interaction.user.id
         );
-        if (challenges.length === 0) {
-          await interaction.reply({
-            content: "You have no active challenges right now.",
-          });
-          return;
-        }
-
-        const nowSeconds = Math.floor(Date.now() / 1000);
-        const embed = buildActiveChallengesEmbed("Your active challenges", challenges, {
-          nowSeconds,
+        await replyWithActiveChallenges(interaction, "Your active challenges", challenges, {
+          emptyMessage: "You have no active challenges right now.",
         });
-
-        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -253,9 +252,9 @@ export const challengesCommand: Command = {
         return;
       }
 
+      const nowSeconds = Math.floor(Date.now() / 1000);
       const options = challenges.slice(0, 25).map((challenge) => {
         const label = truncateLabel(`${challenge.problem.index}. ${challenge.problem.name}`, 90);
-        const nowSeconds = Math.floor(Date.now() / 1000);
         const timeLeft = Math.max(0, challenge.endsAt - nowSeconds);
         const description = `<#${challenge.channelId}> • ${formatTime(timeLeft)} left`;
         return new StringSelectMenuOptionBuilder()
