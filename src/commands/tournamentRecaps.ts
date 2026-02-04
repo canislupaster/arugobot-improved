@@ -15,7 +15,7 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
-  requireGuild,
+  requireGuildAndSubcommand,
   safeInteractionEdit,
   safeInteractionReply,
 } from "../utils/interaction.js";
@@ -70,15 +70,15 @@ export const tournamentRecapsCommand: Command = {
   ),
   adminOnly: true,
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction, {
+    const commandContext = await requireGuildAndSubcommand(interaction, {
       content: "This command can only be used in a server.",
     });
-    if (!guild) {
+    if (!commandContext) {
       return;
     }
 
+    const { guild, subcommand } = commandContext;
     const guildId = guild.id;
-    const subcommand = interaction.options.getSubcommand();
     const replyWithContent = async (content: string) => {
       await safeInteractionReply(interaction, { content });
     };

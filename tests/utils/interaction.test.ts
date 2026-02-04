@@ -11,6 +11,7 @@ import {
   resolveTargetLabels,
   replyEphemeral,
   requireGuild,
+  requireGuildAndSubcommand,
   requireGuildIdAndSubcommand,
   requireGuildIdEphemeral,
   requireGuildAndPage,
@@ -268,6 +269,41 @@ describe("requireGuildIdAndSubcommand", () => {
 
     expect(interaction.reply).not.toHaveBeenCalled();
     expect(interaction.followUp).not.toHaveBeenCalled();
+  });
+});
+
+describe("requireGuildAndSubcommand", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      guild: { id: "guild-1" },
+      reply: jest.fn().mockResolvedValue(undefined),
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("status"),
+      },
+      ...overrides,
+    }) as unknown as ChatInputCommandInteraction;
+
+  it("replies and returns null when no guild", async () => {
+    const interaction = createInteraction({ guild: null });
+
+    await expect(
+      requireGuildAndSubcommand(interaction, { content: "Server only." })
+    ).resolves.toBeNull();
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Server only." });
+  });
+
+  it("returns guild and subcommand when present", async () => {
+    const interaction = createInteraction();
+
+    await expect(
+      requireGuildAndSubcommand(interaction, { content: "Server only." })
+    ).resolves.toEqual({
+      guild: { id: "guild-1" },
+      subcommand: "status",
+    });
+
+    expect(interaction.reply).not.toHaveBeenCalled();
   });
 });
 

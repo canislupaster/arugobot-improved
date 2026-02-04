@@ -133,6 +133,20 @@ export async function requireGuildIdAndSubcommand(
   return { guildId, subcommand: interaction.options.getSubcommand() };
 }
 
+export async function requireGuildAndSubcommand(
+  interaction: ChatInputCommandInteraction,
+  options: InteractionReplyOptions
+): Promise<{
+  guild: NonNullable<ChatInputCommandInteraction["guild"]>;
+  subcommand: string;
+} | null> {
+  const guild = await requireGuild(interaction, options);
+  if (!guild) {
+    return null;
+  }
+  return { guild, subcommand: interaction.options.getSubcommand() };
+}
+
 export async function requireGuildAndPage(
   interaction: ChatInputCommandInteraction & IntegerOptionResolver & RepliableInteraction,
   options: {
