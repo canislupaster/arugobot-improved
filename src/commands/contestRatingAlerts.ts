@@ -21,7 +21,10 @@ import {
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
 import { resolveBooleanOption } from "../utils/interaction.js";
-import { resolveSubscriptionSelectionOrReply } from "../utils/subscriptionSelection.js";
+import {
+  appendSubscriptionIdField,
+  resolveSubscriptionSelectionOrReply,
+} from "../utils/subscriptionSelection.js";
 import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
 
 import type { Command } from "./types.js";
@@ -358,11 +361,7 @@ export const contestRatingAlertsCommand: Command = {
         }
 
         const embed = buildContestRatingAlertEmbed(preview.preview);
-        embed.addFields({
-          name: "Subscription id",
-          value: `\`${subscription.id}\``,
-          inline: false,
-        });
+        appendSubscriptionIdField(embed, subscription.id);
         await interaction.reply({ embeds: [embed] });
         return;
       }

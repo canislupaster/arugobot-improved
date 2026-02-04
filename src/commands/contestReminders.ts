@@ -34,7 +34,10 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild, resolveBooleanOption } from "../utils/interaction.js";
-import { resolveSubscriptionSelectionOrReply } from "../utils/subscriptionSelection.js";
+import {
+  appendSubscriptionIdField,
+  resolveSubscriptionSelectionOrReply,
+} from "../utils/subscriptionSelection.js";
 import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -635,11 +638,7 @@ export const contestRemindersCommand: Command = {
           embed.setFooter({ text: "Showing cached contest data due to a temporary error." });
         }
 
-        embed.addFields({
-          name: "Subscription id",
-          value: `\`${subscription.id}\``,
-          inline: false,
-        });
+        appendSubscriptionIdField(embed, subscription.id);
 
         await interaction.reply({ embeds: [embed] });
         return;

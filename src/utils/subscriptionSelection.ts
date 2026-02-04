@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from "discord.js";
+import { EmbedBuilder, type ChatInputCommandInteraction } from "discord.js";
 
 export type SubscriptionIdResolution =
   | { status: "not_found" }
@@ -80,4 +80,16 @@ export async function resolveSubscriptionSelectionOrReply<T extends { id: string
     return null;
   }
   return selection.subscription;
+}
+
+export function appendSubscriptionIdField(
+  embed: EmbedBuilder,
+  subscriptionId: string
+): EmbedBuilder {
+  embed.addFields({
+    name: "Subscription id",
+    value: `\`${subscriptionId}\``,
+    inline: false,
+  });
+  return embed;
 }

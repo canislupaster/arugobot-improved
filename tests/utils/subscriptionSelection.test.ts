@@ -1,4 +1,7 @@
+import { EmbedBuilder } from "discord.js";
+
 import {
+  appendSubscriptionIdField,
   resolveSubscriptionId,
   resolveSubscriptionSelectionOrReply,
   selectSubscription,
@@ -70,5 +73,17 @@ describe("subscriptionSelection", () => {
     );
     expect(result).toEqual(subscriptions[0]);
     expect(reply).not.toHaveBeenCalled();
+  });
+
+  test("appendSubscriptionIdField adds a subscription id field", () => {
+    const embed = new EmbedBuilder().setTitle("Test");
+    appendSubscriptionIdField(embed, "sub-123");
+    const fields = embed.data.fields ?? [];
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toEqual({
+      name: "Subscription id",
+      value: "`sub-123`",
+      inline: false,
+    });
   });
 });
