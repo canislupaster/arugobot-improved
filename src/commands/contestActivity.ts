@@ -1,7 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { ContestScopeFilter } from "../services/contests.js";
-import { buildCommandLogContext, logCommandError } from "../utils/commandLogging.js";
+import { logCommandError } from "../utils/commandLogging.js";
 import {
   CONTEST_ACTIVITY_DEFAULTS,
   buildContestActivityOptionConfig,
@@ -10,7 +10,10 @@ import {
 import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild } from "../utils/interaction.js";
-import { buildRosterExcludedField, resolveGuildRosterOrReply } from "../utils/roster.js";
+import {
+  buildRosterExcludedField,
+  resolveGuildRosterFromStoreOrReply,
+} from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -146,13 +149,12 @@ export const contestActivityCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const roster = await context.services.store.getServerRoster(guild.id);
-      const rosterResult = await resolveGuildRosterOrReply(
+      const rosterResult = await resolveGuildRosterFromStoreOrReply({
         guild,
-        roster,
-        buildCommandLogContext(interaction, context.correlationId, guild.id),
-        interaction
-      );
+        interaction,
+        store: context.services.store,
+        correlationId: context.correlationId,
+      });
       if (rosterResult.status === "replied") {
         return;
       }

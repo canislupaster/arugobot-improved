@@ -4,6 +4,7 @@ import {
   formatRatedRosterLines,
   resolveGuildRoster,
   resolveGuildRosterOrReply,
+  resolveGuildRosterFromStoreOrReply,
 } from "../../src/utils/roster.js";
 
 const createGuild = (members: Array<{ id: string }>): Guild =>
@@ -118,6 +119,52 @@ describe("resolveGuildRosterOrReply", () => {
       expect(result.excludedCount).toBe(0);
     }
     expect(interaction.editReply).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveGuildRosterFromStoreOrReply", () => {
+  it("loads roster from store and returns results", async () => {
+    const guild = createGuild([{ id: "user-1" }]);
+    const store = {
+      getServerRoster: jest.fn().mockResolvedValue([{ userId: "user-1", handle: "Alice" }]),
+    };
+    const interaction = {
+      commandName: "contestactivity",
+      user: { id: "user-1" },
+      editReply: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const result = await resolveGuildRosterFromStoreOrReply({
+      guild,
+      interaction,
+      store,
+      correlationId: "corr-7",
+    });
+
+    expect(store.getServerRoster).toHaveBeenCalledWith("guild-1");
+    expect(result.status).toBe("ok");
+  });
+
+  it("replies when the stored roster is empty", async () => {
+    const guild = createGuild([]);
+    const store = { getServerRoster: jest.fn().mockResolvedValue([]) };
+    const interaction = {
+      commandName: "contestdeltas",
+      user: { id: "user-1" },
+      editReply: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const result = await resolveGuildRosterFromStoreOrReply({
+      guild,
+      interaction,
+      store,
+      correlationId: "corr-8",
+    });
+
+    expect(result.status).toBe("replied");
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No linked handles yet. Use /register to link a Codeforces handle."
+    );
   });
 });
 

@@ -105,3 +105,35 @@ export async function resolveGuildRosterOrReply<T extends RosterEntryBase>(
   }
   return result;
 }
+
+type RosterStore = {
+  getServerRoster: (guildId: string) => Promise<RosterEntry[]>;
+};
+
+type RosterFetchInteraction = {
+  commandName: string;
+  user: { id: string };
+  editReply: (message: string) => Promise<unknown>;
+};
+
+export async function resolveGuildRosterFromStoreOrReply(params: {
+  guild: Guild;
+  interaction: RosterFetchInteraction;
+  store: RosterStore;
+  correlationId?: string;
+  messages?: RosterMessages;
+}): Promise<{ status: "ok"; roster: RosterEntry[]; excludedCount: number } | { status: "replied" }> {
+  const roster = await params.store.getServerRoster(params.guild.id);
+  return resolveGuildRosterOrReply(
+    params.guild,
+    roster,
+    {
+      correlationId: params.correlationId,
+      command: params.interaction.commandName,
+      guildId: params.guild.id,
+      userId: params.interaction.user.id,
+    },
+    params.interaction,
+    params.messages
+  );
+}
