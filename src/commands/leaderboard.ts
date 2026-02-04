@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 
-import { logCommandError } from "../utils/commandLogging.js";
+import { buildCommandLogContext, logCommandError } from "../utils/commandLogging.js";
 import { addPageOption } from "../utils/commandOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers, resolveMemberMentions } from "../utils/guildMembers.js";
@@ -71,12 +71,7 @@ export const leaderboardCommand: Command = {
 
     await interaction.deferReply();
 
-    const logContext = {
-      correlationId: context.correlationId,
-      command: interaction.commandName,
-      guildId: guild.id,
-      userId: interaction.user.id,
-    };
+    const logContext = buildCommandLogContext(interaction, context.correlationId, guild.id);
 
     const filterRows = async (rows: Array<{ userId: string; value: number }>) =>
       filterEntriesByGuildMembers(guild, rows, logContext);

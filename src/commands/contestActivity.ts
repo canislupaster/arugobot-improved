@@ -1,7 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { ContestScopeFilter } from "../services/contests.js";
-import { logCommandError } from "../utils/commandLogging.js";
+import { buildCommandLogContext, logCommandError } from "../utils/commandLogging.js";
 import {
   CONTEST_ACTIVITY_DEFAULTS,
   buildContestActivityOptionConfig,
@@ -153,12 +153,11 @@ export const contestActivityCommand: Command = {
 
     try {
       const roster = await context.services.store.getServerRoster(guild.id);
-      const rosterResult = await resolveGuildRoster(guild, roster, {
-        correlationId: context.correlationId,
-        command: interaction.commandName,
-        guildId: guild.id,
-        userId: interaction.user.id,
-      });
+      const rosterResult = await resolveGuildRoster(
+        guild,
+        roster,
+        buildCommandLogContext(interaction, context.correlationId, guild.id)
+      );
       if (rosterResult.status === "empty") {
         await interaction.editReply(rosterResult.message);
         return;

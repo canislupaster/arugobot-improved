@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 
-import { logCommandError } from "../utils/commandLogging.js";
+import { buildCommandLogContext, logCommandError } from "../utils/commandLogging.js";
 import { addPageOption } from "../utils/commandOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuildAndPage } from "../utils/interaction.js";
@@ -39,12 +39,7 @@ export const handlesCommand: Command = {
       const rosterResult = await resolveGuildRoster(
         guild,
         roster,
-        {
-          correlationId: context.correlationId,
-          command: interaction.commandName,
-          guildId: guild.id,
-          userId: interaction.user.id,
-        },
+        buildCommandLogContext(interaction, context.correlationId, guild.id),
         {
           noHandles: "No linked handles for current members.",
           noMembers: "No linked handles for current members.",
