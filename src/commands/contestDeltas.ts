@@ -9,11 +9,10 @@ import { logCommandError } from "../utils/commandLogging.js";
 import {
   CONTEST_ACTIVITY_DEFAULTS,
   buildContestActivityOptionConfig,
-  resolveContestActivityOptionsOrReply,
+  resolveContestActivityContextOrReply,
 } from "../utils/contestActivityOptions.js";
 import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild } from "../utils/interaction.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import {
   buildRosterExcludedField,
@@ -112,24 +111,18 @@ export const contestDeltasCommand: Command = {
       addContestScopeOption(option, "Which contests to include", ["all", "official", "gym"])
     ),
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction, {
-      content: "This command can only be used in a server.",
-    });
-    if (!guild) {
-      return;
-    }
-
-    const optionResult = await resolveContestActivityOptionsOrReply(
+    const optionResult = await resolveContestActivityContextOrReply(
       interaction,
       buildContestActivityOptionConfig({
         daysErrorMessage: "Invalid lookback window.",
         limitErrorMessage: "Invalid limit.",
-      })
+      }),
+      { guildMessage: "This command can only be used in a server." }
     );
     if (optionResult.status === "replied") {
       return;
     }
-    const { days, limit, scope } = optionResult;
+    const { guild, days, limit, scope } = optionResult;
 
     await interaction.deferReply();
 

@@ -98,3 +98,39 @@ export async function resolveContestActivityOptionsOrReply(
   }
   return result;
 }
+
+type ContestActivityContextInteraction<GuildType extends { id: string }> =
+  ContestActivityReplyInteraction & {
+    guild: GuildType | null;
+  };
+
+export async function resolveContestActivityContextOrReply<GuildType extends { id: string }>(
+  interaction: ContestActivityContextInteraction<GuildType>,
+  config: ContestActivityOptionConfig,
+  options: { guildMessage: string }
+): Promise<
+  | {
+      status: "ok";
+      guild: GuildType;
+      days: number;
+      limit: number;
+      scope: ContestScopeFilter;
+    }
+  | { status: "replied" }
+> {
+  if (!interaction.guild) {
+    await interaction.reply({ content: options.guildMessage });
+    return { status: "replied" };
+  }
+  const result = await resolveContestActivityOptionsOrReply(interaction, config);
+  if (result.status === "replied") {
+    return { status: "replied" };
+  }
+  return {
+    status: "ok",
+    guild: interaction.guild,
+    days: result.days,
+    limit: result.limit,
+    scope: result.scope,
+  };
+}
