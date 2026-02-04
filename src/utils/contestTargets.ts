@@ -287,12 +287,8 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     maxLinkedHandles,
   } = params;
   const uniqueUserOptions = dedupeUsersById(userOptions);
-  const targets = new Map<string, TargetHandle>();
-  const resolvedGuildId = guildId ?? guild?.id ?? "";
   const normalizedHandleInputs = normalizeHandleInputs(handleInputs);
   const normalizedHandles = normalizedHandleInputs.map((entry) => entry.normalized);
-  const hasDirectTargets =
-    uniqueUserOptions.length > 0 || normalizedHandleInputs.length > 0;
 
   const contextError = getContestTargetContextError({
     guild,
@@ -303,6 +299,11 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   if (contextError) {
     return errorResult(contextError);
   }
+
+  const targets = new Map<string, TargetHandle>();
+  const resolvedGuildId = guildId ?? guild?.id ?? "";
+  const hasDirectTargets =
+    uniqueUserOptions.length > 0 || normalizedHandleInputs.length > 0;
   const userOptionError = await addUserOptionTargets(
     targets,
     store,
