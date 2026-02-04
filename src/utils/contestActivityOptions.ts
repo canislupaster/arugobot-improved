@@ -192,16 +192,7 @@ type ContestActivityRosterInteraction = ContestActivityContextInteraction<Guild>
   editReply: (message: string) => Promise<unknown>;
 };
 
-export async function resolveContestActivityRosterContextOrReply(
-  interaction: ContestActivityRosterInteraction,
-  config: ContestActivityOptionConfig,
-  options: {
-    guildMessage: string;
-    store: ContestActivityRosterStore;
-    correlationId?: string;
-    rosterMessages?: RosterMessages;
-  }
-): Promise<
+type ContestActivityRosterContextResult =
   | {
       status: "ok";
       guild: Guild;
@@ -211,8 +202,18 @@ export async function resolveContestActivityRosterContextOrReply(
       roster: RosterEntry[];
       excludedCount: number;
     }
-  | { status: "replied" }
-> {
+  | { status: "replied" };
+
+export async function resolveContestActivityRosterContextOrReply(
+  interaction: ContestActivityRosterInteraction,
+  config: ContestActivityOptionConfig,
+  options: {
+    guildMessage: string;
+    store: ContestActivityRosterStore;
+    correlationId?: string;
+    rosterMessages?: RosterMessages;
+  }
+): Promise<ContestActivityRosterContextResult> {
   const contextResult = await resolveContestActivityContextOrReply(
     interaction,
     config,
@@ -250,18 +251,7 @@ export async function resolveContestActivityRosterContextWithDefaultsOrReply(
     correlationId?: string;
     rosterMessages?: RosterMessages;
   }
-): Promise<
-  | {
-      status: "ok";
-      guild: Guild;
-      days: number;
-      limit: number;
-      scope: ContestScopeFilter;
-      roster: RosterEntry[];
-      excludedCount: number;
-    }
-  | { status: "replied" }
-> {
+): Promise<ContestActivityRosterContextResult> {
   const config = buildContestActivityOptionConfig({
     daysErrorMessage: messages.daysErrorMessage,
     limitErrorMessage: messages.limitErrorMessage,
