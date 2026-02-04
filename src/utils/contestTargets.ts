@@ -124,17 +124,12 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   }
 
   if (handleInputs.length > 0) {
-    const resolvedInputs = await Promise.all(
-      handleInputs.map(async (handleInput) => ({
-        handleInput,
-        resolved: await store.resolveHandle(handleInput),
-      }))
-    );
-    for (const entry of resolvedInputs) {
-      if (!entry.resolved.exists) {
-        return errorResult(`Invalid handle: ${entry.handleInput}`);
+    for (const handleInput of handleInputs) {
+      const resolved = await store.resolveHandle(handleInput);
+      if (!resolved.exists) {
+        return errorResult(`Invalid handle: ${handleInput}`);
       }
-      const handle = entry.resolved.canonicalHandle ?? entry.handleInput;
+      const handle = resolved.canonicalHandle ?? handleInput;
       addTargetHandle(targets, handle, handle);
     }
   }

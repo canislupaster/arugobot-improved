@@ -77,6 +77,34 @@ describe("resolveContestTargets", () => {
     expect(result).toEqual({ status: "error", message: "Invalid handle: bad" });
   });
 
+  it("stops resolving handles after the first invalid entry", async () => {
+    const resolveHandle = jest.fn(async (handle: string) => {
+      if (handle === "bad") {
+        return { exists: false, canonicalHandle: null };
+      }
+      if (handle === "later") {
+        throw new Error("Should not resolve later handles after a failure.");
+      }
+      return { exists: true, canonicalHandle: "tourist" };
+    });
+    const store = {
+      getHandle: jest.fn(),
+      resolveHandle,
+      getLinkedUsers: jest.fn(),
+    };
+
+    const result = await resolveContestTargets({
+      ...baseParams,
+      userOptions: [],
+      handleInputs: ["bad", "later"],
+      store,
+    });
+
+    expect(result).toEqual({ status: "error", message: "Invalid handle: bad" });
+    expect(resolveHandle).toHaveBeenCalledTimes(1);
+    expect(resolveHandle).toHaveBeenCalledWith("bad");
+  });
+
   it("rejects user options outside a guild", async () => {
     const store = {
       getHandle: jest.fn(),
