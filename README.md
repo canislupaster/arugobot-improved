@@ -53,9 +53,10 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
 
   Shows a page of your completed challenge history (result + rating delta).
 
-- **/leaderboard** `[page]` `[metric]`
+- **/leaderboard** `[page]` `[metric]` `[days]`
 
-  Shows a page of the server leaderboard (metric can be `rating`, `solves`, `streak`, or `longest_streak`).
+  Shows a page of the server leaderboard (metric can be `rating`, `solves`, `contests`, `streak`, or `longest_streak`).
+  Use `days` (1-365) to set the lookback window for the contest leaderboard (defaults to 90 days).
 
 - **/profile** `[user]` `[handle]`
 

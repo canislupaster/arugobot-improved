@@ -2,8 +2,8 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
-import { requireGuild, resolvePageOption } from "../utils/interaction.js";
+import { filterEntriesByGuildMembers, resolveMemberMentions } from "../utils/guildMembers.js";
+import { requireGuild, resolveBoundedIntegerOption, resolvePageOption } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
@@ -24,9 +24,17 @@ export const leaderboardCommand: Command = {
         .addChoices(
           { name: "Rating", value: "rating" },
           { name: "Solves", value: "solves" },
+          { name: "Contests (90d)", value: "contests" },
           { name: "Current streak", value: "streak" },
           { name: "Longest streak", value: "longest_streak" }
         )
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("days")
+        .setDescription("Lookback window for contest leaderboard (1-365 days)")
+        .setMinValue(1)
+        .setMaxValue(365)
     )
     .addIntegerOption((option) =>
       option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
@@ -45,6 +53,21 @@ export const leaderboardCommand: Command = {
     }
     const page = pageResult.value;
     const metric = interaction.options.getString("metric") ?? "rating";
+    let contestDays = 90;
+    if (metric === "contests") {
+      const dayResult = resolveBoundedIntegerOption(interaction, {
+        name: "days",
+        min: 1,
+        max: 365,
+        defaultValue: 90,
+        errorMessage: "Invalid lookback window.",
+      });
+      if ("error" in dayResult) {
+        await interaction.reply({ content: dayResult.error });
+        return;
+      }
+      contestDays = dayResult.value;
+    }
 
     await interaction.deferReply();
 
@@ -82,6 +105,16 @@ export const leaderboardCommand: Command = {
       const totalPages = Math.max(1, Math.ceil(rows.length / 10));
       const paginationIds = buildPaginationIds("leaderboard", interaction.id);
       const medals = [":first_place:", ":second_place:", ":third_place:"];
+      const mentionMap = await resolveMemberMentions(
+        guild,
+        rows.map((entry) => entry.userId),
+        {
+          correlationId: context.correlationId,
+          command: interaction.commandName,
+          guildId: guild.id,
+          userId: interaction.user.id,
+        }
+      );
 
       const renderPage = async (pageNumber: number) => {
         let content = "";
@@ -95,8 +128,7 @@ export const leaderboardCommand: Command = {
             break;
           }
           const entry = rows[index];
-          const member = await guild.members.fetch(entry.userId).catch(() => null);
-          const mention = member ? member.toString() : `<@${entry.userId}>`;
+          const mention = mentionMap.get(entry.userId) ?? `<@${entry.userId}>`;
           const medal = medals[i] ? ` ${medals[i]}` : "";
           content += `${index + 1}. ${mention} (${formatValue(entry.value)})${medal}\n`;
         }
@@ -133,6 +165,46 @@ export const leaderboardCommand: Command = {
           return;
         }
         await renderLeaderboard(rows, "Solve leaderboard", "Solves");
+        return;
+      }
+
+      if (metric === "contests") {
+        const roster = await context.services.store.getServerRoster(guild.id);
+        if (roster.length === 0) {
+          await interaction.editReply(
+            "No linked handles yet. Use /register to link a Codeforces handle."
+          );
+          return;
+        }
+        const filteredRoster = await filterEntriesByGuildMembers(guild, roster, {
+          correlationId: context.correlationId,
+          command: interaction.commandName,
+          guildId: guild.id,
+          userId: interaction.user.id,
+        });
+        if (filteredRoster.length === 0) {
+          await interaction.editReply("No linked handles found for current server members.");
+          return;
+        }
+        const activity = await context.services.contestActivity.getContestActivityForRoster(
+          filteredRoster,
+          { lookbackDays: contestDays }
+        );
+        if (activity.contestCount === 0 || activity.participants.length === 0) {
+          await interaction.editReply(
+            `No contest activity for linked handles in the last ${contestDays} days.`
+          );
+          return;
+        }
+        const rows = activity.participants.map((participant) => ({
+          userId: participant.userId,
+          value: participant.contestCount,
+        }));
+        await renderLeaderboard(
+          rows,
+          `Contest leaderboard (${contestDays}d)`,
+          "Contests"
+        );
         return;
       }
 
