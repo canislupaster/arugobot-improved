@@ -11,7 +11,7 @@ Based on https://github.com/eggag32/ArugoBot/ and https://github.com/phattd15/ar
 
 The following commands are available to you:
 Most command responses are public; handle-linking and admin diagnostics remain ephemeral.
-Handle inputs (including list options like `handles`) accept Codeforces profile URLs and will extract the handle.
+Handle inputs (including list options like `handles`) accept Codeforces profile URLs or @handles and will extract the handle.
 
 - **/challenge problem** `length` `problem` `[user1..user9]` `[open]` `[max_participants]`
 

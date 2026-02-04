@@ -24,6 +24,10 @@ describe("normalizeHandleInput", () => {
   it("leaves plain handles unchanged", () => {
     expect(normalizeHandleInput("  jiangly  ")).toBe("jiangly");
   });
+
+  it("strips leading @ from handles", () => {
+    expect(normalizeHandleInput("@tourist")).toBe("tourist");
+  });
 });
 
 describe("normalizeHandleKey", () => {
@@ -45,6 +49,10 @@ describe("parseHandleList", () => {
     expect(
       parseHandleList("https://codeforces.com/profile/tourist, https://codeforces.com/u/Petr")
     ).toEqual(["tourist", "Petr"]);
+  });
+
+  it("normalizes @-prefixed handles in handle lists", () => {
+    expect(parseHandleList("@tourist, @Petr")).toEqual(["tourist", "Petr"]);
   });
 
   it("returns an empty array for whitespace", () => {

@@ -30,12 +30,13 @@ export function normalizeHandleInput(raw: string): string {
       : trimmed;
   const match = unwrapped.match(PROFILE_PATTERN);
   if (!match) {
-    return trimmed;
+    return unwrapped.startsWith("@") ? unwrapped.slice(1).trim() : unwrapped;
   }
   try {
-    return decodeURIComponent(match[1]);
+    const decoded = decodeURIComponent(match[1]);
+    return decoded.startsWith("@") ? decoded.slice(1).trim() : decoded;
   } catch {
-    return match[1];
+    return match[1].startsWith("@") ? match[1].slice(1).trim() : match[1];
   }
 }
 
