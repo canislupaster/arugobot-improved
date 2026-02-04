@@ -55,6 +55,28 @@ describe("resolveContestTargets", () => {
     expect(result).toEqual({ status: "error", message: "Invalid handle: nope" });
   });
 
+  it("returns the first invalid handle in input order", async () => {
+    const store = {
+      getHandle: jest.fn(),
+      resolveHandle: jest.fn(async (handle: string) => {
+        if (handle === "bad") {
+          return { exists: false, canonicalHandle: null };
+        }
+        return { exists: true, canonicalHandle: "tourist" };
+      }),
+      getLinkedUsers: jest.fn(),
+    };
+
+    const result = await resolveContestTargets({
+      ...baseParams,
+      userOptions: [],
+      handleInputs: ["bad", "tourist"],
+      store,
+    });
+
+    expect(result).toEqual({ status: "error", message: "Invalid handle: bad" });
+  });
+
   it("rejects user options outside a guild", async () => {
     const store = {
       getHandle: jest.fn(),

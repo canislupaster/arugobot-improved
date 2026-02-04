@@ -109,22 +109,34 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     return errorResult(contextError);
   }
   if (uniqueUserOptions.length > 0) {
-    for (const option of uniqueUserOptions) {
-      const handle = await store.getHandle(resolvedGuildId, option.id);
-      if (!handle) {
-        return errorResult(`User <@${option.id}> does not have a linked handle.`);
+    const resolvedUsers = await Promise.all(
+      uniqueUserOptions.map(async (option) => ({
+        option,
+        handle: await store.getHandle(resolvedGuildId, option.id),
+      }))
+    );
+    for (const entry of resolvedUsers) {
+      if (!entry.handle) {
+        return errorResult(`User <@${entry.option.id}> does not have a linked handle.`);
       }
-      addTargetHandle(targets, handle, `<@${option.id}>`);
+      addTargetHandle(targets, entry.handle, `<@${entry.option.id}>`);
     }
   }
 
-  for (const handleInput of handleInputs) {
-    const resolved = await store.resolveHandle(handleInput);
-    if (!resolved.exists) {
-      return errorResult(`Invalid handle: ${handleInput}`);
+  if (handleInputs.length > 0) {
+    const resolvedInputs = await Promise.all(
+      handleInputs.map(async (handleInput) => ({
+        handleInput,
+        resolved: await store.resolveHandle(handleInput),
+      }))
+    );
+    for (const entry of resolvedInputs) {
+      if (!entry.resolved.exists) {
+        return errorResult(`Invalid handle: ${entry.handleInput}`);
+      }
+      const handle = entry.resolved.canonicalHandle ?? entry.handleInput;
+      addTargetHandle(targets, handle, handle);
     }
-    const handle = resolved.canonicalHandle ?? handleInput;
-    addTargetHandle(targets, handle, handle);
   }
 
   if (uniqueUserOptions.length === 0 && handleInputs.length === 0) {
