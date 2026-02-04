@@ -52,6 +52,10 @@ const CONTEST_SCOPE_CHOICES: Record<ContestScopeFilter, { name: string; value: C
 
 const DEFAULT_SCOPE_ORDER: ContestScopeFilter[] = ["official", "gym", "all"];
 
+export function formatContestScopeLabel(scope: ContestScopeFilter): string {
+  return CONTEST_SCOPE_CHOICES[scope].name;
+}
+
 export function addContestScopeOption(
   option: SlashCommandStringOption,
   description = "Which contests to search",

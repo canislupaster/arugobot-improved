@@ -24,6 +24,7 @@ import {
 } from "../utils/contestFilters.js";
 import {
   addContestScopeOption,
+  formatContestScopeLabel,
   parseContestScope,
   refreshContestData,
 } from "../utils/contestScope.js";
@@ -49,10 +50,6 @@ const DEFAULT_MINUTES = 30;
 const MIN_MINUTES = 5;
 const MAX_MINUTES = 24 * 60;
 const DEFAULT_SCOPE: ContestScopeFilter = "official";
-
-function formatScope(scope: ContestScopeFilter): string {
-  return scope === "official" ? "Official" : scope === "gym" ? "Gym" : "All";
-}
 
 function formatKeywordList(keywords: string[]): string {
   return keywords.length > 0 ? keywords.join(", ") : "None";
@@ -81,7 +78,7 @@ function buildSubscriptionResponse(input: {
   excludeKeywords: string[];
   subscriptionId: string;
 }): string {
-  return `${input.intro} in <#${input.channelId}> (${input.minutesBefore} minutes before, ${formatScope(
+  return `${input.intro} in <#${input.channelId}> (${input.minutesBefore} minutes before, ${formatContestScopeLabel(
     input.scope
   )})${formatRoleMention(input.roleId)}${formatFilterLabel(
     input.includeKeywords,
@@ -111,7 +108,7 @@ function formatSubscriptionSummary(
     ...(statusLine ? [statusLine] : []),
     lastSentLine,
     `Lead time: ${subscription.minutesBefore} minutes`,
-    `Scope: ${formatScope(subscription.scope)}`,
+    `Scope: ${formatContestScopeLabel(subscription.scope)}`,
     `Role: ${role}`,
     `Include: ${include}`,
     `Exclude: ${exclude}`,
@@ -692,7 +689,7 @@ export const contestRemindersCommand: Command = {
               value: `${subscription.minutesBefore} minutes`,
               inline: true,
             },
-            { name: "Scope", value: formatScope(subscription.scope), inline: true },
+            { name: "Scope", value: formatContestScopeLabel(subscription.scope), inline: true },
             {
               name: "Contest start",
               value: `${formatDiscordTimestamp(contest.startTimeSeconds)} (${formatDiscordRelativeTime(

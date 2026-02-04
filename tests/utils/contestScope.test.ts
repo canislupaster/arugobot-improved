@@ -1,4 +1,8 @@
-import { parseContestScope, refreshContestData } from "../../src/utils/contestScope.js";
+import {
+  formatContestScopeLabel,
+  parseContestScope,
+  refreshContestData,
+} from "../../src/utils/contestScope.js";
 
 describe("contestScope utils", () => {
   describe("parseContestScope", () => {
@@ -14,6 +18,14 @@ describe("contestScope utils", () => {
 
     it("uses custom fallback when provided", () => {
       expect(parseContestScope("unknown", "all")).toBe("all");
+    });
+  });
+
+  describe("formatContestScopeLabel", () => {
+    it("returns the display label for each scope", () => {
+      expect(formatContestScopeLabel("official")).toBe("Official");
+      expect(formatContestScopeLabel("gym")).toBe("Gym");
+      expect(formatContestScopeLabel("all")).toBe("All");
     });
   });
 

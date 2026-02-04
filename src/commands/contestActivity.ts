@@ -3,7 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
-import { addContestScopeOption } from "../utils/contestScope.js";
+import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -16,10 +16,6 @@ const MAX_DAYS = 365;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 const DEFAULT_SCOPE: ContestScopeFilter = "all";
-
-function formatScope(scope: ContestScopeFilter): string {
-  return scope === "official" ? "Official" : scope === "gym" ? "Gym" : "All";
-}
 
 function formatScopeSummary(
   label: string,
@@ -195,7 +191,7 @@ export const contestActivityCommand: Command = {
       const embed = new EmbedBuilder()
         .setTitle("Contest activity")
         .setColor(EMBED_COLORS.info)
-        .setDescription(`Last ${days} days • Scope: ${formatScope(scope)}`)
+        .setDescription(`Last ${days} days • Scope: ${formatContestScopeLabel(scope)}`)
         .addFields(
           { name: "Contests", value: String(scopeSummary.contestCount), inline: true },
           { name: "Participants", value: String(scopeSummary.participantCount), inline: true }

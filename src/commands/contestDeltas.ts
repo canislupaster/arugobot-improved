@@ -7,7 +7,7 @@ import type {
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
-import { addContestScopeOption } from "../utils/contestScope.js";
+import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
@@ -44,10 +44,6 @@ function formatParticipantSection(
   return entries.map((entry, index) => `${index + 1}. ${formatParticipantLine(entry)}`).join("\n");
 }
 
-function formatScope(scope: ContestScopeFilter): string {
-  return scope === "official" ? "Official" : scope === "gym" ? "Gym" : "All";
-}
-
 function buildSummaryEmbed(
   summary: GuildRatingChangeSummary,
   days: number,
@@ -56,7 +52,7 @@ function buildSummaryEmbed(
   const embed = new EmbedBuilder()
     .setTitle("Contest rating deltas")
     .setColor(EMBED_COLORS.info)
-    .setDescription(`Last ${days} days • Scope: ${formatScope(scope)}`)
+    .setDescription(`Last ${days} days • Scope: ${formatContestScopeLabel(scope)}`)
     .addFields(
       { name: "Contests", value: String(summary.contestCount), inline: true },
       { name: "Participants", value: String(summary.participantCount), inline: true },
