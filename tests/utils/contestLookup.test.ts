@@ -1,3 +1,5 @@
+import type { ChatInputCommandInteraction } from "discord.js";
+
 import type { Contest, ContestScopeFilter } from "../../src/services/contests.js";
 import {
   buildContestEmbed,
@@ -187,10 +189,10 @@ describe("contestLookup helpers", () => {
     };
     const interaction = {
       editReply: jest.fn().mockResolvedValue(undefined),
-    };
+    } as unknown as ChatInputCommandInteraction;
 
     const result = await resolveContestOrReply(
-      interaction as any,
+      interaction,
       "123",
       "official",
       contestService,
