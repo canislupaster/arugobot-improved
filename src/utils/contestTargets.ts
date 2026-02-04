@@ -235,6 +235,33 @@ async function addHandleInputTargets(
   return null;
 }
 
+async function resolveDirectTargets(params: {
+  guildId: string;
+  store: ContestTargetStore;
+  userOptions: User[];
+  normalizedHandleInputs: NormalizedHandleInput[];
+}): Promise<TargetResolution> {
+  const targets = new Map<string, TargetHandle>();
+  const userOptionError = await addUserOptionTargets(
+    targets,
+    params.store,
+    params.guildId,
+    params.userOptions
+  );
+  if (userOptionError) {
+    return userOptionError;
+  }
+  const handleError = await addHandleInputTargets(
+    targets,
+    params.store,
+    params.normalizedHandleInputs
+  );
+  if (handleError) {
+    return handleError;
+  }
+  return finalizeTargets(targets);
+}
+
 async function resolveFallbackTargets(params: {
   guild: Guild | null;
   guildId: string;
@@ -294,38 +321,28 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     return errorResult(contextError);
   }
 
-  const targets = new Map<string, TargetHandle>();
-  const resolvedGuildId = guildId ?? guild?.id ?? "";
   const hasDirectTargets =
     uniqueUserOptions.length > 0 || normalizedHandleInputs.length > 0;
-  const userOptionError = await addUserOptionTargets(
-    targets,
-    store,
-    resolvedGuildId,
-    uniqueUserOptions
-  );
-  if (userOptionError) {
-    return userOptionError;
-  }
+  const resolvedGuildId = guildId ?? guild?.id ?? "";
 
-  const handleError = await addHandleInputTargets(targets, store, normalizedHandleInputs);
-  if (handleError) {
-    return handleError;
-  }
-
-  if (!hasDirectTargets) {
-    return resolveFallbackTargets({
-      guild,
+  if (hasDirectTargets) {
+    return resolveDirectTargets({
       guildId: resolvedGuildId,
       store,
-      maxLinkedHandles,
-      commandName,
-      correlationId,
-      user,
+      userOptions: uniqueUserOptions,
+      normalizedHandleInputs,
     });
   }
 
-  return finalizeTargets(targets);
+  return resolveFallbackTargets({
+    guild,
+    guildId: resolvedGuildId,
+    store,
+    maxLinkedHandles,
+    commandName,
+    correlationId,
+    user,
+  });
 }
 
 export async function resolveContestTargetsOrReply(
