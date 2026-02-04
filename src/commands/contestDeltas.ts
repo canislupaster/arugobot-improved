@@ -6,7 +6,11 @@ import type {
 } from "../services/contestActivity.js";
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
+import {
+  CONTEST_ACTIVITY_DEFAULTS,
+  buildContestActivityOptionConfig,
+  resolveContestActivityOptions,
+} from "../utils/contestActivityOptions.js";
 import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
@@ -14,13 +18,6 @@ import { resolveGuildRoster } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-
-const DEFAULT_DAYS = 90;
-const MIN_DAYS = 1;
-const MAX_DAYS = 365;
-const DEFAULT_LIMIT = 5;
-const MAX_LIMIT = 10;
-const DEFAULT_SCOPE: ContestScopeFilter = "all";
 
 function formatParticipantLine(entry: RatingChangeParticipantSummary): string {
   const lastContest =
@@ -94,16 +91,18 @@ export const contestDeltasCommand: Command = {
     .addIntegerOption((option) =>
       option
         .setName("days")
-        .setDescription(`Lookback window (${MIN_DAYS}-${MAX_DAYS} days)`)
-        .setMinValue(MIN_DAYS)
-        .setMaxValue(MAX_DAYS)
+        .setDescription(
+          `Lookback window (${CONTEST_ACTIVITY_DEFAULTS.minDays}-${CONTEST_ACTIVITY_DEFAULTS.maxDays} days)`
+        )
+        .setMinValue(CONTEST_ACTIVITY_DEFAULTS.minDays)
+        .setMaxValue(CONTEST_ACTIVITY_DEFAULTS.maxDays)
     )
     .addIntegerOption((option) =>
       option
         .setName("limit")
-        .setDescription(`Top gainers/losers to show (1-${MAX_LIMIT})`)
+        .setDescription(`Top gainers/losers to show (1-${CONTEST_ACTIVITY_DEFAULTS.maxLimit})`)
         .setMinValue(1)
-        .setMaxValue(MAX_LIMIT)
+        .setMaxValue(CONTEST_ACTIVITY_DEFAULTS.maxLimit)
     )
     .addStringOption((option) =>
       addContestScopeOption(option, "Which contests to include", ["all", "official", "gym"])
@@ -116,16 +115,13 @@ export const contestDeltasCommand: Command = {
       return;
     }
 
-    const optionResult = resolveContestActivityOptions(interaction, {
-      defaultDays: DEFAULT_DAYS,
-      minDays: MIN_DAYS,
-      maxDays: MAX_DAYS,
-      defaultLimit: DEFAULT_LIMIT,
-      maxLimit: MAX_LIMIT,
-      defaultScope: DEFAULT_SCOPE,
+    const optionResult = resolveContestActivityOptions(
+      interaction,
+      buildContestActivityOptionConfig({
       daysErrorMessage: "Invalid lookback window.",
       limitErrorMessage: "Invalid limit.",
-    });
+      })
+    );
     if (optionResult.status === "error") {
       await interaction.reply({ content: optionResult.message });
       return;

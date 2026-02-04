@@ -18,6 +18,26 @@ type ContestActivityOptionConfig = {
   limitErrorMessage: string;
 };
 
+export const CONTEST_ACTIVITY_DEFAULTS = {
+  defaultDays: 90,
+  minDays: 1,
+  maxDays: 365,
+  defaultLimit: 5,
+  maxLimit: 10,
+  defaultScope: "all" as ContestScopeFilter,
+};
+
+export function buildContestActivityOptionConfig(messages: {
+  daysErrorMessage: string;
+  limitErrorMessage: string;
+}): ContestActivityOptionConfig {
+  return {
+    ...CONTEST_ACTIVITY_DEFAULTS,
+    daysErrorMessage: messages.daysErrorMessage,
+    limitErrorMessage: messages.limitErrorMessage,
+  };
+}
+
 type IntegerOptionInteraction = {
   options: {
     getInteger: (name: string) => number | null;
