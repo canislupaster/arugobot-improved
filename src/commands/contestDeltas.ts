@@ -11,7 +11,7 @@ import {
   addContestActivityCommandOptions,
   resolveContestActivityRosterContextWithDefaultsOrReply,
 } from "../utils/contestActivityOptions.js";
-import { formatContestScopeLabel } from "../utils/contestScope.js";
+import { buildContestSummaryEmbedBase } from "../utils/contestEmbeds.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { appendRosterExcludedField } from "../utils/roster.js";
@@ -46,19 +46,20 @@ function buildSummaryEmbed(
   days: number,
   scope: ContestScopeFilter
 ): EmbedBuilder {
-  const embed = new EmbedBuilder()
-    .setTitle("Contest rating deltas")
-    .setColor(EMBED_COLORS.info)
-    .setDescription(`Last ${days} days • Scope: ${formatContestScopeLabel(scope)}`)
-    .addFields(
-      { name: "Contests", value: String(summary.contestCount), inline: true },
-      { name: "Participants", value: String(summary.participantCount), inline: true },
-      {
-        name: "Total delta",
-        value: formatRatingDelta(summary.totalDelta, { round: true }),
-        inline: true,
-      }
-    );
+  const embed = buildContestSummaryEmbedBase({
+    title: "Contest rating deltas",
+    days,
+    scope,
+    color: EMBED_COLORS.info,
+  }).addFields(
+    { name: "Contests", value: String(summary.contestCount), inline: true },
+    { name: "Participants", value: String(summary.participantCount), inline: true },
+    {
+      name: "Total delta",
+      value: formatRatingDelta(summary.totalDelta, { round: true }),
+      inline: true,
+    }
+  );
 
   if (summary.lastContestAt) {
     embed.addFields({

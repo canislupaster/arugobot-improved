@@ -1,4 +1,4 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 
 import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
@@ -7,7 +7,7 @@ import {
   addContestActivityCommandOptions,
   resolveContestActivityRosterContextWithDefaultsOrReply,
 } from "../utils/contestActivityOptions.js";
-import { formatContestScopeLabel } from "../utils/contestScope.js";
+import { buildContestSummaryEmbedBase } from "../utils/contestEmbeds.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { appendRosterExcludedField } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -139,14 +139,15 @@ export const contestActivityCommand: Command = {
         return;
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle("Contest activity")
-        .setColor(EMBED_COLORS.info)
-        .setDescription(`Last ${days} days • Scope: ${formatContestScopeLabel(scope)}`)
-        .addFields(
-          { name: "Contests", value: String(scopeSummary.contestCount), inline: true },
-          { name: "Participants", value: String(scopeSummary.participantCount), inline: true }
-        );
+      const embed = buildContestSummaryEmbedBase({
+        title: "Contest activity",
+        days,
+        scope,
+        color: EMBED_COLORS.info,
+      }).addFields(
+        { name: "Contests", value: String(scopeSummary.contestCount), inline: true },
+        { name: "Participants", value: String(scopeSummary.participantCount), inline: true }
+      );
       appendRosterExcludedField(embed, excludedCount);
 
       if (scope === "all") {
