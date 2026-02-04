@@ -3,7 +3,11 @@ import { SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers, resolveMemberMentions } from "../utils/guildMembers.js";
-import { requireGuild, resolveBoundedIntegerOption, resolvePageOption } from "../utils/interaction.js";
+import {
+  requireGuild,
+  resolveBoundedIntegerOption,
+  resolvePageOptionOrReply,
+} from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
@@ -46,12 +50,10 @@ export const leaderboardCommand: Command = {
     if (!guild) {
       return;
     }
-    const pageResult = resolvePageOption(interaction);
-    if ("error" in pageResult) {
-      await interaction.reply({ content: pageResult.error });
+    const page = await resolvePageOptionOrReply(interaction);
+    if (page === null) {
       return;
     }
-    const page = pageResult.value;
     const metric = interaction.options.getString("metric") ?? "rating";
     let contestDays = 90;
     if (metric === "contests") {

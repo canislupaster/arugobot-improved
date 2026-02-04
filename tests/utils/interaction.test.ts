@@ -1,4 +1,4 @@
-import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
+import { MessageFlags, type ChatInputCommandInteraction, type RepliableInteraction } from "discord.js";
 
 import {
   resolveBoundedIntegerOption,
@@ -6,6 +6,7 @@ import {
   resolveHandleTargetLabelsOrReply,
   resolveHandleUserOptions,
   resolvePageOption,
+  resolvePageOptionOrReply,
   resolveTargetLabels,
   replyEphemeral,
   requireGuild,
@@ -305,6 +306,41 @@ describe("resolvePageOption", () => {
     const result = resolvePageOption(interaction, { max: 2 });
 
     expect(result).toEqual({ error: "Invalid page." });
+  });
+});
+
+describe("resolvePageOptionOrReply", () => {
+  const createInteraction = (value: number | null) =>
+    ({
+      options: {
+        getInteger: jest.fn().mockReturnValue(value),
+      },
+      deferred: false,
+      replied: false,
+      reply: jest.fn().mockResolvedValue(undefined),
+      followUp: jest.fn().mockResolvedValue(undefined),
+    }) as unknown as RepliableInteraction & {
+      options: { getInteger: jest.Mock };
+      deferred: boolean;
+      replied: boolean;
+      reply: jest.Mock;
+      followUp: jest.Mock;
+    };
+
+  it("returns the resolved page number", async () => {
+    const interaction = createInteraction(2);
+
+    await expect(resolvePageOptionOrReply(interaction)).resolves.toBe(2);
+
+    expect(interaction.reply).not.toHaveBeenCalled();
+  });
+
+  it("replies with an error and returns null", async () => {
+    const interaction = createInteraction(0);
+
+    await expect(resolvePageOptionOrReply(interaction)).resolves.toBeNull();
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Invalid page." });
   });
 });
 

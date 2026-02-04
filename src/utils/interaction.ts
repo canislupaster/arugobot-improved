@@ -305,3 +305,15 @@ export function resolvePageOption(
     errorMessage: options.errorMessage ?? "Invalid page.",
   });
 }
+
+export async function resolvePageOptionOrReply(
+  interaction: IntegerOptionResolver & RepliableInteraction,
+  options: { defaultValue?: number; max?: number; errorMessage?: string } = {}
+): Promise<number | null> {
+  const result = resolvePageOption(interaction, options);
+  if ("error" in result) {
+    await safeInteractionReply(interaction, { content: result.error });
+    return null;
+  }
+  return result.value;
+}

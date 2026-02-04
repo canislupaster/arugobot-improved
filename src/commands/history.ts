@@ -4,7 +4,7 @@ import type { Problem } from "../services/problems.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { buildProblemLink } from "../utils/contestProblems.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild, resolvePageOption } from "../utils/interaction.js";
+import { requireGuild, resolvePageOptionOrReply } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
@@ -106,12 +106,10 @@ export const historyCommand: Command = {
       return;
     }
     const guildId = guild.id;
-    const pageResult = resolvePageOption(interaction);
-    if ("error" in pageResult) {
-      await interaction.reply({ content: pageResult.error });
+    const page = await resolvePageOptionOrReply(interaction);
+    if (page === null) {
       return;
     }
-    const page = pageResult.value;
     const targetUser = interaction.options.getUser("user") ?? interaction.user;
     const targetInfo = getTargetInfo(interaction.user.id, targetUser.id);
 
