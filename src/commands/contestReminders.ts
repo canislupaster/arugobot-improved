@@ -38,7 +38,10 @@ import {
   appendSubscriptionIdField,
   resolveSubscriptionSelectionFromInteraction,
 } from "../utils/subscriptionSelection.js";
-import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
+import {
+  buildSubscriptionListEmbed,
+  resolveSubscriptionEntriesFromService,
+} from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -369,24 +372,21 @@ export const contestRemindersCommand: Command = {
         }
         const nowSeconds = Math.floor(Date.now() / 1000);
 
-        const embed = new EmbedBuilder()
-          .setTitle("Contest reminder subscriptions")
-          .setColor(EMBED_COLORS.info)
-          .addFields(
-            entryResult.entries.map((entry, index) => ({
-              name: `Subscription ${index + 1}`,
-              value: `${formatSubscriptionSummary(
-                entry.subscription,
-                entry.channelStatus,
-                entry.lastNotifiedAt
-              )}\n${formatNextReminderLine(
-                entry.subscription,
-                getNextReminderInfo(entry.subscription, upcomingByScope, nowSeconds),
-                refreshState.scopeErrors
-              )}`,
-              inline: false,
-            }))
-          );
+        const embed = buildSubscriptionListEmbed({
+          title: "Contest reminder subscriptions",
+          color: EMBED_COLORS.info,
+          entries: entryResult.entries,
+          formatEntry: (entry) =>
+            `${formatSubscriptionSummary(
+              entry.subscription,
+              entry.channelStatus,
+              entry.lastNotifiedAt
+            )}\n${formatNextReminderLine(
+              entry.subscription,
+              getNextReminderInfo(entry.subscription, upcomingByScope, nowSeconds),
+              refreshState.scopeErrors
+            )}`,
+        });
 
         if (refreshState.stale || refreshState.scopeErrors.size > 0) {
           const footerParts: string[] = [];

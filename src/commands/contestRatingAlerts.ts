@@ -1,9 +1,4 @@
-import {
-  ChannelType,
-  EmbedBuilder,
-  PermissionFlagsBits,
-  SlashCommandBuilder,
-} from "discord.js";
+import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import {
   buildContestRatingAlertEmbed,
@@ -25,7 +20,10 @@ import {
   appendSubscriptionIdField,
   resolveSubscriptionSelectionFromInteraction,
 } from "../utils/subscriptionSelection.js";
-import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
+import {
+  buildSubscriptionListEmbed,
+  resolveSubscriptionEntriesFromService,
+} from "../utils/subscriptionStatus.js";
 
 import type { Command } from "./types.js";
 
@@ -205,20 +203,17 @@ export const contestRatingAlertsCommand: Command = {
         if (entryResult.status === "replied") {
           return;
         }
-        const embed = new EmbedBuilder()
-          .setTitle("Contest rating alert subscriptions")
-          .setColor(EMBED_COLORS.info)
-          .addFields(
-            entryResult.entries.map((entry, index) => ({
-              name: `Subscription ${index + 1}`,
-              value: formatSubscriptionSummary(
-                entry.subscription,
-                entry.channelStatus,
-                entry.lastNotifiedAt
-              ),
-              inline: false,
-            }))
-          );
+        const embed = buildSubscriptionListEmbed({
+          title: "Contest rating alert subscriptions",
+          color: EMBED_COLORS.info,
+          entries: entryResult.entries,
+          formatEntry: (entry) =>
+            formatSubscriptionSummary(
+              entry.subscription,
+              entry.channelStatus,
+              entry.lastNotifiedAt
+            ),
+        });
 
         await interaction.reply({ embeds: [embed] });
         return;

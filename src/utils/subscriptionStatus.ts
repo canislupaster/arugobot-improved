@@ -1,4 +1,4 @@
-import type { Client } from "discord.js";
+import { EmbedBuilder, type Client } from "discord.js";
 
 import type { SendableChannelStatus } from "./discordChannels.js";
 import { getSendableChannelStatuses } from "./discordChannels.js";
@@ -113,4 +113,19 @@ export async function resolveSubscriptionEntriesFromService<
     return entryResult;
   }
   return { status: "ok", entries: entryResult.entries, subscriptions };
+}
+
+export function buildSubscriptionListEmbed<TSubscription>(params: {
+  title: string;
+  color: number;
+  entries: Array<ChannelSubscriptionEntry<TSubscription>>;
+  formatEntry: (entry: ChannelSubscriptionEntry<TSubscription>) => string;
+}): EmbedBuilder {
+  return new EmbedBuilder().setTitle(params.title).setColor(params.color).addFields(
+    params.entries.map((entry, index) => ({
+      name: `Subscription ${index + 1}`,
+      value: params.formatEntry(entry),
+      inline: false,
+    }))
+  );
 }
