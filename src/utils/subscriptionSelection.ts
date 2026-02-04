@@ -82,6 +82,17 @@ export async function resolveSubscriptionSelectionOrReply<T extends { id: string
   return selection.subscription;
 }
 
+export async function resolveSubscriptionSelectionFromInteraction<T extends { id: string }>(
+  interaction: ChatInputCommandInteraction,
+  listSubscriptions: () => Promise<T[]>,
+  messages: SubscriptionSelectionMessages,
+  optionName = "id"
+): Promise<T | null> {
+  const inputId = interaction.options.getString(optionName);
+  const subscriptions = await listSubscriptions();
+  return resolveSubscriptionSelectionOrReply(interaction, subscriptions, inputId, messages);
+}
+
 export function appendSubscriptionIdField(
   embed: EmbedBuilder,
   subscriptionId: string

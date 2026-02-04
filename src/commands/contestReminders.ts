@@ -36,7 +36,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild, resolveBooleanOption } from "../utils/interaction.js";
 import {
   appendSubscriptionIdField,
-  resolveSubscriptionSelectionOrReply,
+  resolveSubscriptionSelectionFromInteraction,
 } from "../utils/subscriptionSelection.js";
 import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
@@ -337,12 +337,9 @@ export const contestRemindersCommand: Command = {
     const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
     const resolveSubscription = async () => {
-      const id = interaction.options.getString("id");
-      const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-      return resolveSubscriptionSelectionOrReply(
+      return resolveSubscriptionSelectionFromInteraction(
         interaction,
-        subscriptions,
-        id,
+        () => context.services.contestReminders.listSubscriptions(guildId),
         selectionMessages
       );
     };
@@ -519,12 +516,9 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "remove") {
-        const id = interaction.options.getString("id", true);
-        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-        const subscription = await resolveSubscriptionSelectionOrReply(
+        const subscription = await resolveSubscriptionSelectionFromInteraction(
           interaction,
-          subscriptions,
-          id,
+          () => context.services.contestReminders.listSubscriptions(guildId),
           selectionMessages
         );
         if (!subscription) {

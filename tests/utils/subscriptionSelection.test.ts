@@ -3,6 +3,7 @@ import { EmbedBuilder } from "discord.js";
 import {
   appendSubscriptionIdField,
   resolveSubscriptionId,
+  resolveSubscriptionSelectionFromInteraction,
   resolveSubscriptionSelectionOrReply,
   selectSubscription,
 } from "../../src/utils/subscriptionSelection.js";
@@ -73,6 +74,37 @@ describe("subscriptionSelection", () => {
     );
     expect(result).toEqual(subscriptions[0]);
     expect(reply).not.toHaveBeenCalled();
+  });
+
+  test("resolveSubscriptionSelectionFromInteraction returns subscription", async () => {
+    const reply = jest.fn().mockResolvedValue(undefined);
+    const options = { getString: jest.fn().mockReturnValue("abc") };
+    const interaction = { reply, options } as unknown as { reply: typeof reply; options: typeof options };
+    const listSubscriptions = jest.fn().mockResolvedValue(subscriptions);
+    const result = await resolveSubscriptionSelectionFromInteraction(
+      interaction as never,
+      listSubscriptions,
+      selectionMessages
+    );
+    expect(result).toEqual(subscriptions[0]);
+    expect(listSubscriptions).toHaveBeenCalledTimes(1);
+    expect(options.getString).toHaveBeenCalledWith("id");
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  test("resolveSubscriptionSelectionFromInteraction replies when none", async () => {
+    const reply = jest.fn().mockResolvedValue(undefined);
+    const options = { getString: jest.fn().mockReturnValue(null) };
+    const interaction = { reply, options } as unknown as { reply: typeof reply; options: typeof options };
+    const listSubscriptions = jest.fn().mockResolvedValue([]);
+    const result = await resolveSubscriptionSelectionFromInteraction(
+      interaction as never,
+      listSubscriptions,
+      selectionMessages
+    );
+    expect(result).toBeNull();
+    expect(listSubscriptions).toHaveBeenCalledTimes(1);
+    expect(reply).toHaveBeenCalledWith({ content: "none" });
   });
 
   test("appendSubscriptionIdField adds a subscription id field", () => {

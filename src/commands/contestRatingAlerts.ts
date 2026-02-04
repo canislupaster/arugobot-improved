@@ -23,7 +23,7 @@ import { parseHandleFilterInput } from "../utils/handles.js";
 import { resolveBooleanOption } from "../utils/interaction.js";
 import {
   appendSubscriptionIdField,
-  resolveSubscriptionSelectionOrReply,
+  resolveSubscriptionSelectionFromInteraction,
 } from "../utils/subscriptionSelection.js";
 import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
 
@@ -184,12 +184,9 @@ export const contestRatingAlertsCommand: Command = {
     const guildId = interaction.guild.id;
     const subcommand = interaction.options.getSubcommand();
     const selectSubscription = async (): Promise<ContestRatingAlertSubscription | null> => {
-      const id = interaction.options.getString("id");
-      const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-      return resolveSubscriptionSelectionOrReply(
+      return resolveSubscriptionSelectionFromInteraction(
         interaction,
-        subscriptions,
-        id,
+        () => context.services.contestRatingAlerts.listSubscriptions(guildId),
         selectionMessages
       );
     };
@@ -303,12 +300,9 @@ export const contestRatingAlertsCommand: Command = {
       }
 
       if (subcommand === "remove") {
-        const id = interaction.options.getString("id", true);
-        const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const subscription = await resolveSubscriptionSelectionOrReply(
+        const subscription = await resolveSubscriptionSelectionFromInteraction(
           interaction,
-          subscriptions,
-          id,
+          () => context.services.contestRatingAlerts.listSubscriptions(guildId),
           selectionMessages
         );
         if (!subscription) {
