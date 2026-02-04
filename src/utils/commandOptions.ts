@@ -137,18 +137,8 @@ export function addPostSubcommand(
   }
 ): SlashCommandSubcommandBuilder {
   const builder = subcommand.setName("post").setDescription(options.description);
-  const forceDescription = options.forceDescription;
-  if (forceDescription) {
-    builder.addBooleanOption((option) =>
-      option.setName("force").setDescription(forceDescription)
-    );
-  }
-  const idDescription = options.idDescription;
-  if (idDescription) {
-    builder.addStringOption((option) =>
-      option.setName("id").setDescription(idDescription)
-    );
-  }
+  addOptionalBooleanOption(builder, "force", options.forceDescription);
+  addOptionalStringOption(builder, "id", options.idDescription);
   return builder;
 }
 
@@ -160,13 +150,34 @@ export function addPreviewSubcommand(
   }
 ): SlashCommandSubcommandBuilder {
   const builder = subcommand.setName("preview").setDescription(options.description);
-  const idDescription = options.idDescription;
-  if (idDescription) {
-    builder.addStringOption((option) =>
-      option.setName("id").setDescription(idDescription)
-    );
-  }
+  addOptionalStringOption(builder, "id", options.idDescription);
   return builder;
+}
+
+function addOptionalBooleanOption(
+  builder: SlashCommandSubcommandBuilder,
+  name: string,
+  description?: string
+): SlashCommandSubcommandBuilder {
+  if (!description) {
+    return builder;
+  }
+  return builder.addBooleanOption((option) =>
+    option.setName(name).setDescription(description)
+  );
+}
+
+function addOptionalStringOption(
+  builder: SlashCommandSubcommandBuilder,
+  name: string,
+  description?: string
+): SlashCommandSubcommandBuilder {
+  if (!description) {
+    return builder;
+  }
+  return builder.addStringOption((option) =>
+    option.setName(name).setDescription(description)
+  );
 }
 
 export function addPageOption(
