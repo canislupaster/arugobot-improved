@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 
-import { addPageOption } from "../utils/commandOptions.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { addPageOption } from "../utils/commandOptions.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuildAndPage } from "../utils/interaction.js";
 import {
