@@ -43,6 +43,11 @@ export const contestSolvesCommand: Command = {
       option.setName("handles").setDescription("Comma or space separated handles to include")
     )
     .addStringOption((option) => addContestScopeOption(option))
+    .addBooleanOption((option) =>
+      option
+        .setName("force_refresh")
+        .setDescription("Force refresh contest submissions cache")
+    )
     .addIntegerOption((option) =>
       option
         .setName("limit")
@@ -61,6 +66,7 @@ export const contestSolvesCommand: Command = {
     }
     const { queryRaw, scope, limit } = optionResult;
     const handleInputs = parseHandleList(handlesRaw);
+    const forceRefresh = interaction.options.getBoolean("force_refresh") ?? false;
     const userOptions = getUserOptions([
       interaction.options.getUser("user1"),
       interaction.options.getUser("user2"),
@@ -98,7 +104,8 @@ export const contestSolvesCommand: Command = {
         interaction,
         context.services.problems,
         context.services.store,
-        contest.id
+        contest.id,
+        { ttlMs: forceRefresh ? 0 : undefined }
       );
       if (contestData.status === "replied") {
         return;

@@ -48,6 +48,11 @@ export const contestUpsolveCommand: Command = {
       option.setName("handle").setDescription("Codeforces handle to target")
     )
     .addStringOption((option) => addContestScopeOption(option))
+    .addBooleanOption((option) =>
+      option
+        .setName("force_refresh")
+        .setDescription("Force refresh contest submissions cache")
+    )
     .addIntegerOption((option) =>
       option
         .setName("limit")
@@ -77,6 +82,7 @@ export const contestUpsolveCommand: Command = {
       return;
     }
     const { queryRaw, scope, limit } = optionResult;
+    const forceRefresh = interaction.options.getBoolean("force_refresh") ?? false;
 
     await interaction.deferReply();
 
@@ -109,7 +115,8 @@ export const contestUpsolveCommand: Command = {
         interaction,
         context.services.problems,
         context.services.store,
-        contest.id
+        contest.id,
+        { ttlMs: forceRefresh ? 0 : undefined }
       );
       if (contestData.status === "replied") {
         return;

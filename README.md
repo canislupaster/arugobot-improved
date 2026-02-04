@@ -200,11 +200,13 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   Shows which contest problems linked users have solved and highlights unsolved problems.
   Use `latest` to target the most recent finished contest.
   Provide handles or users to limit the list (handles are required outside a server).
+  Use `force_refresh` to bypass the contest submissions cache.
 
 - **/contestupsolve** `query` `[user]` `[handle]` `[limit]` `[scope]`
 
   Shows unsolved contest problems for a linked user or a Codeforces handle.
   Use `latest` to target the most recent finished contest.
+  Use `force_refresh` to bypass the contest submissions cache.
 
 - **/contesthistory** `[user]` `[handle]` `[limit]`
 

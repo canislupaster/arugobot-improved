@@ -209,10 +209,15 @@ export async function resolveContestSolvesContext(
   };
 }
 
+type ContestSolvesLoadOptions = {
+  ttlMs?: number;
+};
+
 export async function loadContestSolvesData(
   problems: Pick<ProblemService, "ensureProblemsLoaded">,
   store: Pick<StoreService, "getContestSolvesResult">,
-  contestId: number
+  contestId: number,
+  options: ContestSolvesLoadOptions = {}
 ): Promise<ContestSolvesDataResult> {
   const allProblems = await problems.ensureProblemsLoaded();
   const contestProblems = getContestProblems(allProblems, contestId);
@@ -220,7 +225,7 @@ export async function loadContestSolvesData(
     return { status: "no_problems" };
   }
 
-  const contestSolves = await store.getContestSolvesResult(contestId);
+  const contestSolves = await store.getContestSolvesResult(contestId, options.ttlMs);
   if (!contestSolves) {
     return { status: "no_solves" };
   }
@@ -232,12 +237,13 @@ export async function loadContestSolvesDataOrReply(
   interaction: Pick<ChatInputCommandInteraction, "editReply">,
   problems: Pick<ProblemService, "ensureProblemsLoaded">,
   store: Pick<StoreService, "getContestSolvesResult">,
-  contestId: number
+  contestId: number,
+  options: ContestSolvesLoadOptions = {}
 ): Promise<
   | { status: "ok"; contestProblems: Problem[]; contestSolves: ContestSolvesResult }
   | { status: "replied" }
 > {
-  const contestData = await loadContestSolvesData(problems, store, contestId);
+  const contestData = await loadContestSolvesData(problems, store, contestId, options);
   if (contestData.status !== "ok") {
     await interaction.editReply(
       getContestSolvesDataMessage(contestData) ?? "No contest data available."
