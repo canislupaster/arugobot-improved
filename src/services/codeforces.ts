@@ -81,29 +81,47 @@ export class CodeforcesClient {
       }
     };
 
+    const normalizeRequestError = (error: unknown): RetryableError => {
+      const name =
+        error instanceof Error
+          ? error.name
+          : typeof error === "object" && error !== null
+            ? String((error as { name?: unknown }).name ?? "")
+            : "";
+      if (name === "AbortError") {
+        const timeoutError = new Error(`Request timed out after ${timeoutMs}ms`) as RetryableError;
+        timeoutError.retryable = true;
+        return timeoutError;
+      }
+      return error as RetryableError;
+    };
+
     const retries = 2;
     for (let attemptIndex = 0; attemptIndex <= retries; attemptIndex += 1) {
       try {
         return await this.scheduler.schedule(attempt);
       } catch (error) {
+        const normalizedError = normalizeRequestError(error);
         const retryable =
-          !(error instanceof Error) ||
-          (error as RetryableError).retryable === undefined ||
-          (error as RetryableError).retryable === true;
+          !(normalizedError instanceof Error) ||
+          normalizedError.retryable === undefined ||
+          normalizedError.retryable === true;
         if (!retryable || attemptIndex >= retries) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            normalizedError instanceof Error ? normalizedError.message : String(normalizedError);
           this.lastError = {
             message,
             endpoint,
             timestamp: new Date().toISOString(),
           };
-          throw error;
+          throw normalizedError;
         }
         const waitMs = this.options.requestDelayMs * (attemptIndex + 1);
         logWarn("Codeforces request failed, retrying.", {
           endpoint,
           waitMs,
-          error: error instanceof Error ? error.message : String(error),
+          error:
+            normalizedError instanceof Error ? normalizedError.message : String(normalizedError),
         });
         if (waitMs > 0) {
           await sleep(waitMs);
