@@ -1,10 +1,37 @@
-import type { Guild, User } from "discord.js";
+import type { ChatInputCommandInteraction, Guild, User } from "discord.js";
 
 import {
+  getContestUserOptions,
   getContestTargetContextError,
   resolveContestTargets,
   resolveContestTargetsOrReply,
 } from "../../src/utils/contestTargets.js";
+
+describe("getContestUserOptions", () => {
+  it("collects user options and drops missing entries", () => {
+    const getUser = jest.fn((name: string) => {
+      if (name === "user1") {
+        return { id: "user-1" } as User;
+      }
+      if (name === "user3") {
+        return { id: "user-3" } as User;
+      }
+      return null;
+    });
+    const interaction = {
+      options: { getUser },
+    } as unknown as ChatInputCommandInteraction;
+
+    expect(getContestUserOptions(interaction)).toEqual([
+      { id: "user-1" },
+      { id: "user-3" },
+    ]);
+    expect(getUser).toHaveBeenCalledWith("user1");
+    expect(getUser).toHaveBeenCalledWith("user2");
+    expect(getUser).toHaveBeenCalledWith("user3");
+    expect(getUser).toHaveBeenCalledWith("user4");
+  });
+});
 
 describe("resolveContestTargets", () => {
   const baseParams = {

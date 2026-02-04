@@ -1,4 +1,4 @@
-import type { Guild, User } from "discord.js";
+import type { ChatInputCommandInteraction, Guild, User } from "discord.js";
 
 import { normalizeHandleInput, normalizeHandleKey } from "./handles.js";
 import { resolveGuildRoster } from "./roster.js";
@@ -46,6 +46,15 @@ const formatTooManyHandlesMessage = (count: number) =>
 
 export function getUserOptions(users: Array<User | null | undefined>): User[] {
   return users.filter((user): user is User => Boolean(user));
+}
+
+export function getContestUserOptions(interaction: ChatInputCommandInteraction): User[] {
+  return getUserOptions([
+    interaction.options.getUser("user1"),
+    interaction.options.getUser("user2"),
+    interaction.options.getUser("user3"),
+    interaction.options.getUser("user4"),
+  ]);
 }
 
 export function getContestTargetContextError(options: {

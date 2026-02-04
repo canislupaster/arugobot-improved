@@ -16,7 +16,7 @@ import {
 } from "../utils/contestSolvesData.js";
 import {
   getContestTargetContextError,
-  getUserOptions,
+  getContestUserOptions,
   resolveContestTargetsOrReply,
 } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
@@ -66,12 +66,7 @@ export const contestSolvesCommand: Command = {
     const { queryRaw, scope, limit } = optionResult;
     const handleInputs = parseHandleList(handlesRaw);
     const forceRefresh = interaction.options.getBoolean("force_refresh") ?? false;
-    const userOptions = getUserOptions([
-      interaction.options.getUser("user1"),
-      interaction.options.getUser("user2"),
-      interaction.options.getUser("user3"),
-      interaction.options.getUser("user4"),
-    ]);
+    const userOptions = getContestUserOptions(interaction);
 
     const targetContextError = getContestTargetContextError({
       guild: interaction.guild,

@@ -7,7 +7,7 @@ import { formatContestPhase, formatContestTag, resolveContestOrReply } from "../
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
   getContestTargetContextError,
-  getUserOptions,
+  getContestUserOptions,
   resolveContestTargetsOrReply,
   type TargetHandle,
 } from "../utils/contestTargets.js";
@@ -106,12 +106,7 @@ export const contestChangesCommand: Command = {
     const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
     const scope = parseContestScope(interaction.options.getString("scope"));
     const handleInputs = parseHandleList(handlesRaw);
-    const userOptions = getUserOptions([
-      interaction.options.getUser("user1"),
-      interaction.options.getUser("user2"),
-      interaction.options.getUser("user3"),
-      interaction.options.getUser("user4"),
-    ]);
+    const userOptions = getContestUserOptions(interaction);
 
     const targetContextError = getContestTargetContextError({
       guild: interaction.guild,
