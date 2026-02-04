@@ -18,6 +18,28 @@ import type { Command } from "./types.js";
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
 
+type UpsolveTargetLabels = {
+  titleTarget: string;
+  targetLabel: string;
+};
+
+function buildUpsolveTargetLabels(options: {
+  handle: string;
+  handleInput: string;
+  linkedUserId: string | null;
+  mention: string;
+  displayName: string;
+}): UpsolveTargetLabels {
+  const linkedLabel = options.linkedUserId ? ` (linked to <@${options.linkedUserId}>)` : "";
+  const targetLabel = options.handleInput
+    ? `${options.handle}${linkedLabel}`
+    : `${options.mention} (${options.handle})`;
+  return {
+    targetLabel,
+    titleTarget: options.handleInput ? options.handle : options.displayName,
+  };
+}
+
 export const contestUpsolveCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contestupsolve")
@@ -104,9 +126,13 @@ export const contestUpsolveCommand: Command = {
       );
       const solvedCount = solved.length;
       const unsolvedCount = unsolved.length;
-      const linkedLabel = linkedUserId ? ` (linked to <@${linkedUserId}>)` : "";
-      const targetLabel = handleInput ? `${handle}${linkedLabel}` : `${mention} (${handle})`;
-      const titleTarget = handleInput ? handle : displayName;
+      const { targetLabel, titleTarget } = buildUpsolveTargetLabels({
+        handle,
+        handleInput,
+        linkedUserId,
+        mention,
+        displayName,
+      });
 
       const embed = buildContestEmbed({
         contest,
@@ -130,7 +156,11 @@ export const contestUpsolveCommand: Command = {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      logCommandError(`Error in contest upsolve: ${String(error)}`, interaction, context.correlationId);
+      logCommandError(
+        `Error in contest upsolve: ${String(error)}`,
+        interaction,
+        context.correlationId
+      );
       await interaction.editReply("Something went wrong.");
     }
   },
