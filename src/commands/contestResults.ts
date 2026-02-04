@@ -5,7 +5,7 @@ import { buildContestEmbed, formatContestTag, resolveContestOrReply } from "../u
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
   resolveContestTargetInputsOrReply,
-  resolveContestTargetsOrReply,
+  resolveContestTargetsFromInteractionOrReply,
   type TargetHandle,
 } from "../utils/contestTargets.js";
 
@@ -108,12 +108,8 @@ export const contestResultsCommand: Command = {
 
       const contest = lookup.contest;
 
-      const targetResult = await resolveContestTargetsOrReply({
+      const targetResult = await resolveContestTargetsFromInteractionOrReply({
         interaction,
-        guild: interaction.guild,
-        guildId: interaction.guildId,
-        user: interaction.user,
-        commandName: interaction.commandName,
         userOptions,
         handleInputs,
         correlationId: context.correlationId,

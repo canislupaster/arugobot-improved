@@ -5,6 +5,7 @@ import {
   getContestTargetContextError,
   resolveContestTargetInputsOrReply,
   resolveContestTargets,
+  resolveContestTargetsFromInteractionOrReply,
   resolveContestTargetsOrReply,
   validateContestTargetContextOrReply,
 } from "../../src/utils/contestTargets.js";
@@ -376,6 +377,34 @@ describe("resolveContestTargets", () => {
       expect(result.targets).toEqual([{ handle: "petr", label: "<@user-2>" }]);
     }
     expect(interaction.editReply).not.toHaveBeenCalled();
+  });
+
+  it("uses interaction context when resolving contest targets", async () => {
+    const store = {
+      getHandle: jest.fn(),
+      resolveHandle: jest.fn(),
+      getLinkedUsers: jest.fn(),
+    };
+    const interaction = {
+      guild: null,
+      guildId: null,
+      user: { id: "user-1" },
+      commandName: "contestresults",
+      editReply: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ChatInputCommandInteraction;
+
+    const result = await resolveContestTargetsFromInteractionOrReply({
+      interaction,
+      userOptions: [],
+      handleInputs: [],
+      correlationId: "corr-1",
+      store,
+    });
+
+    expect(result).toEqual({ status: "replied" });
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Provide at least one handle or run this command in a server."
+    );
   });
 });
 

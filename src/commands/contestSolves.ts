@@ -16,7 +16,7 @@ import {
 } from "../utils/contestSolvesData.js";
 import {
   resolveContestTargetInputsOrReply,
-  resolveContestTargetsOrReply,
+  resolveContestTargetsFromInteractionOrReply,
 } from "../utils/contestTargets.js";
 
 import type { Command } from "./types.js";
@@ -86,12 +86,8 @@ export const contestSolvesCommand: Command = {
         return;
       }
 
-      const targetResult = await resolveContestTargetsOrReply({
+      const targetResult = await resolveContestTargetsFromInteractionOrReply({
         interaction,
-        guild: interaction.guild,
-        guildId: interaction.guildId,
-        user: interaction.user,
-        commandName: interaction.commandName,
         userOptions,
         handleInputs,
         correlationId: context.correlationId,

@@ -341,3 +341,22 @@ export async function resolveContestTargetsOrReply(
   }
   return result;
 }
+
+export async function resolveContestTargetsFromInteractionOrReply(options: {
+  interaction: ChatInputCommandInteraction & ContestTargetsInteraction;
+  userOptions: User[];
+  handleInputs: string[];
+  correlationId: string;
+  store: ContestTargetStore;
+  maxLinkedHandles?: number;
+}): Promise<{ status: "ok"; targets: TargetHandle[] } | { status: "replied" }> {
+  const { interaction, ...rest } = options;
+  return resolveContestTargetsOrReply({
+    interaction,
+    guild: interaction.guild,
+    guildId: interaction.guildId,
+    user: interaction.user,
+    commandName: interaction.commandName,
+    ...rest,
+  });
+}
