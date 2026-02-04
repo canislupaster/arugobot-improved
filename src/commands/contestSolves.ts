@@ -15,11 +15,9 @@ import {
   resolveContestSolvesPayloadOrReply,
 } from "../utils/contestSolvesData.js";
 import {
-  getContestUserOptions,
+  resolveContestTargetInputsOrReply,
   resolveContestTargetsOrReply,
-  validateContestTargetContextOrReply,
 } from "../utils/contestTargets.js";
-import { parseHandleList } from "../utils/handles.js";
 
 import type { Command } from "./types.js";
 
@@ -55,7 +53,7 @@ export const contestSolvesCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     ),
   async execute(interaction, context) {
-    const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
+    const handlesRaw = interaction.options.getString("handles") ?? "";
     const optionResult = await resolveContestSolvesOptionsOrReply(interaction, {
       defaultLimit: DEFAULT_LIMIT,
       maxLimit: MAX_LIMIT,
@@ -64,18 +62,12 @@ export const contestSolvesCommand: Command = {
       return;
     }
     const { queryRaw, scope, limit } = optionResult;
-    const handleInputs = parseHandleList(handlesRaw);
     const forceRefresh = interaction.options.getBoolean("force_refresh") ?? false;
-    const userOptions = getContestUserOptions(interaction);
-
-    const targetContextResult = await validateContestTargetContextOrReply(interaction, {
-      guild: interaction.guild,
-      userOptions,
-      handleInputs,
-    });
-    if (targetContextResult.status === "replied") {
+    const targetInputs = await resolveContestTargetInputsOrReply(interaction, handlesRaw);
+    if (targetInputs.status === "replied") {
       return;
     }
+    const { handleInputs, userOptions } = targetInputs;
 
     await interaction.deferReply();
 

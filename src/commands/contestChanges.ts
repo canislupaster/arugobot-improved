@@ -6,12 +6,10 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestEmbed, resolveContestOrReply } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
-  getContestUserOptions,
+  resolveContestTargetInputsOrReply,
   resolveContestTargetsOrReply,
   type TargetHandle,
-  validateContestTargetContextOrReply,
 } from "../utils/contestTargets.js";
-import { parseHandleList } from "../utils/handles.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 
 import type { Command } from "./types.js";
@@ -75,19 +73,13 @@ export const contestChangesCommand: Command = {
     .addStringOption((option) => addContestScopeOption(option)),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
-    const handlesRaw = interaction.options.getString("handles")?.trim() ?? "";
+    const handlesRaw = interaction.options.getString("handles") ?? "";
     const scope = parseContestScope(interaction.options.getString("scope"));
-    const handleInputs = parseHandleList(handlesRaw);
-    const userOptions = getContestUserOptions(interaction);
-
-    const targetContextResult = await validateContestTargetContextOrReply(interaction, {
-      guild: interaction.guild,
-      userOptions,
-      handleInputs,
-    });
-    if (targetContextResult.status === "replied") {
+    const targetInputs = await resolveContestTargetInputsOrReply(interaction, handlesRaw);
+    if (targetInputs.status === "replied") {
       return;
     }
+    const { handleInputs, userOptions } = targetInputs;
 
     await interaction.deferReply();
 

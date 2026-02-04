@@ -3,6 +3,7 @@ import type { ChatInputCommandInteraction, Guild, User } from "discord.js";
 import {
   getContestUserOptions,
   getContestTargetContextError,
+  resolveContestTargetInputsOrReply,
   resolveContestTargets,
   resolveContestTargetsOrReply,
   validateContestTargetContextOrReply,
@@ -375,6 +376,46 @@ describe("resolveContestTargets", () => {
       expect(result.targets).toEqual([{ handle: "petr", label: "<@user-2>" }]);
     }
     expect(interaction.editReply).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveContestTargetInputsOrReply", () => {
+  it("replies when no guild and no handles are provided", async () => {
+    const reply = jest.fn();
+    const interaction = {
+      guild: null,
+      options: {
+        getUser: jest.fn(),
+      },
+      reply,
+    } as unknown as ChatInputCommandInteraction;
+
+    const result = await resolveContestTargetInputsOrReply(interaction, " ");
+
+    expect(result).toEqual({ status: "replied" });
+    expect(reply).toHaveBeenCalledWith({
+      content: "Provide at least one handle or run this command in a server.",
+    });
+  });
+
+  it("returns handles and user options when valid", async () => {
+    const getUser = jest.fn(() => null);
+    const interaction = {
+      guild: null,
+      options: { getUser },
+      reply: jest.fn(),
+    } as unknown as ChatInputCommandInteraction;
+
+    const result = await resolveContestTargetInputsOrReply(
+      interaction,
+      " tourist, https://codeforces.com/profile/petr "
+    );
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.handleInputs).toEqual(["tourist", "petr"]);
+      expect(result.userOptions).toEqual([]);
+    }
   });
 });
 

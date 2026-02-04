@@ -1,6 +1,6 @@
 import type { ChatInputCommandInteraction, Guild, User } from "discord.js";
 
-import { normalizeHandleInput, normalizeHandleKey } from "./handles.js";
+import { normalizeHandleInput, normalizeHandleKey, parseHandleList } from "./handles.js";
 import { resolveGuildRoster } from "./roster.js";
 
 export type TargetHandle = {
@@ -64,6 +64,26 @@ export function getContestUserOptions(interaction: ChatInputCommandInteraction):
     interaction.options.getUser("user3"),
     interaction.options.getUser("user4"),
   ]);
+}
+
+export async function resolveContestTargetInputsOrReply(
+  interaction: ChatInputCommandInteraction,
+  handlesRaw: string
+): Promise<
+  | { status: "ok"; handleInputs: string[]; userOptions: User[] }
+  | { status: "replied" }
+> {
+  const handleInputs = parseHandleList(handlesRaw.trim());
+  const userOptions = getContestUserOptions(interaction);
+  const targetContextResult = await validateContestTargetContextOrReply(interaction, {
+    guild: interaction.guild,
+    userOptions,
+    handleInputs,
+  });
+  if (targetContextResult.status === "replied") {
+    return { status: "replied" };
+  }
+  return { status: "ok", handleInputs, userOptions };
 }
 
 export function getContestTargetContextError(options: {
