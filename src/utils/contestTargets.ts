@@ -290,12 +290,15 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   const targets = new Map<string, TargetHandle>();
   const resolvedGuildId = guildId ?? guild?.id ?? "";
   const normalizedHandleInputs = normalizeHandleInputs(handleInputs);
+  const normalizedHandles = normalizedHandleInputs.map((entry) => entry.normalized);
+  const hasDirectTargets =
+    uniqueUserOptions.length > 0 || normalizedHandleInputs.length > 0;
 
   const contextError = getContestTargetContextError({
     guild,
     guildId,
     userOptions: uniqueUserOptions,
-    handleInputs: normalizedHandleInputs.map((entry) => entry.normalized),
+    handleInputs: normalizedHandles,
   });
   if (contextError) {
     return errorResult(contextError);
@@ -315,7 +318,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     return handleError;
   }
 
-  if (uniqueUserOptions.length === 0 && normalizedHandleInputs.length === 0) {
+  if (!hasDirectTargets) {
     return resolveFallbackTargets({
       guild,
       guildId: resolvedGuildId,
