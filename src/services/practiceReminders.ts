@@ -23,11 +23,11 @@ import {
   resolveManualSendChannel,
 } from "../utils/reminders.js";
 import { runServiceTick } from "../utils/serviceTicks.js";
-import { TickTrackedService } from "./tickTrackedService.js";
 import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
 import type { StoreService } from "./store.js";
+import { TickTrackedService } from "./tickTrackedService.js";
 
 const DEFAULT_RATING_RANGES: RatingRange[] = [{ min: 800, max: 3500 }];
 const MAX_HANDLES_FOR_SOLVED = 10;
