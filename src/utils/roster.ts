@@ -1,7 +1,7 @@
 import type { Guild } from "discord.js";
 
-import type { LogContext } from "./logger.js";
 import { filterEntriesByGuildMembers } from "./guildMembers.js";
+import type { LogContext } from "./logger.js";
 
 export type RosterEntry = {
   userId: string;

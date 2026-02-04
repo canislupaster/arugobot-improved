@@ -9,8 +9,8 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
 import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolveGuildRoster } from "../utils/roster.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
+import { resolveGuildRoster } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
