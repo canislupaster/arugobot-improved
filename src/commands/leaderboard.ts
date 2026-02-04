@@ -13,9 +13,12 @@ import {
   buildPaginationIds,
   runPaginatedInteraction,
 } from "../utils/pagination.js";
+import { resolveGuildRoster } from "../utils/roster.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { Command } from "./types.js";
+
+const PAGE_SIZE = 10;
 
 export const leaderboardCommand: Command = {
   data: new SlashCommandBuilder()
@@ -73,13 +76,15 @@ export const leaderboardCommand: Command = {
 
     await interaction.deferReply();
 
+    const logContext = {
+      correlationId: context.correlationId,
+      command: interaction.commandName,
+      guildId: guild.id,
+      userId: interaction.user.id,
+    };
+
     const filterRows = async (rows: Array<{ userId: string; value: number }>) =>
-      filterEntriesByGuildMembers(guild, rows, {
-        correlationId: context.correlationId,
-        command: interaction.commandName,
-        guildId: guild.id,
-        userId: interaction.user.id,
-      });
+      filterEntriesByGuildMembers(guild, rows, logContext);
 
     const ensureRows = async (
       rows: Array<{ userId: string; value: number }>,
@@ -104,27 +109,22 @@ export const leaderboardCommand: Command = {
       fieldName: string,
       formatValue: (value: number) => string = (value) => String(value)
     ) => {
-      const totalPages = Math.max(1, Math.ceil(rows.length / 10));
+      const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
       const paginationIds = buildPaginationIds("leaderboard", interaction.id);
       const medals = [":first_place:", ":second_place:", ":third_place:"];
       const mentionMap = await resolveMemberMentions(
         guild,
         rows.map((entry) => entry.userId),
-        {
-          correlationId: context.correlationId,
-          command: interaction.commandName,
-          guildId: guild.id,
-          userId: interaction.user.id,
-        }
+        logContext
       );
 
       const renderPage = async (pageNumber: number) => {
         let content = "";
-        const start = (pageNumber - 1) * 10;
+        const start = (pageNumber - 1) * PAGE_SIZE;
         if (start >= rows.length) {
           return null;
         }
-        for (let i = 0; i < 10; i += 1) {
+        for (let i = 0; i < PAGE_SIZE; i += 1) {
           const index = start + i;
           if (index >= rows.length) {
             break;
@@ -172,24 +172,13 @@ export const leaderboardCommand: Command = {
 
       if (metric === "contests") {
         const roster = await context.services.store.getServerRoster(guild.id);
-        if (roster.length === 0) {
-          await interaction.editReply(
-            "No linked handles yet. Use /register to link a Codeforces handle."
-          );
-          return;
-        }
-        const filteredRoster = await filterEntriesByGuildMembers(guild, roster, {
-          correlationId: context.correlationId,
-          command: interaction.commandName,
-          guildId: guild.id,
-          userId: interaction.user.id,
-        });
-        if (filteredRoster.length === 0) {
-          await interaction.editReply("No linked handles found for current server members.");
+        const rosterResult = await resolveGuildRoster(guild, roster, logContext);
+        if (rosterResult.status === "empty") {
+          await interaction.editReply(rosterResult.message);
           return;
         }
         const activity = await context.services.contestActivity.getContestActivityForRoster(
-          filteredRoster,
+          rosterResult.roster,
           { lookbackDays: contestDays }
         );
         if (activity.contestCount === 0 || activity.participants.length === 0) {

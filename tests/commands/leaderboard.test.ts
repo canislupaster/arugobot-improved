@@ -160,4 +160,25 @@ describe("leaderboardCommand", () => {
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds[0].data.title).toBe("Contest leaderboard (30d)");
   });
+
+  it("reports when no handles are linked for contest leaderboard", async () => {
+    const interaction = createInteraction({
+      getInteger: (name: string) => (name === "page" ? 1 : null),
+      getString: (name: string) => (name === "metric" ? "contests" : null),
+    });
+    const context = {
+      services: {
+        store: {
+          getServerRoster: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await leaderboardCommand.execute(interaction, context);
+
+    expect(context.services.store.getServerRoster).toHaveBeenCalledWith("guild-1");
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No linked handles yet. Use /register to link a Codeforces handle."
+    );
+  });
 });
