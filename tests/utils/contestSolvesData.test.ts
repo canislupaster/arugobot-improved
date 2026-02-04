@@ -1,5 +1,6 @@
 import type { ContestSolvesResult } from "../../src/services/store.js";
 import {
+  applyContestSolvesStaleFooter,
   buildContestSolvesSummaryFields,
   formatContestSolvesSummary,
   getContestSolvesStaleFooter,
@@ -129,5 +130,29 @@ describe("getContestSolvesStaleFooter", () => {
     expect(getContestSolvesStaleFooter(false, { ...baseSolves, isStale: true })).toBe(
       "Showing cached data due to a temporary Codeforces error."
     );
+  });
+});
+
+describe("applyContestSolvesStaleFooter", () => {
+  const baseSolves: ContestSolvesResult = { solves: [], source: "api", isStale: false };
+
+  it("returns false without setting a footer when data is fresh", () => {
+    const embed = { setFooter: jest.fn() };
+
+    const result = applyContestSolvesStaleFooter(embed, false, baseSolves);
+
+    expect(result).toBe(false);
+    expect(embed.setFooter).not.toHaveBeenCalled();
+  });
+
+  it("sets the footer and returns true when data is stale", () => {
+    const embed = { setFooter: jest.fn() };
+
+    const result = applyContestSolvesStaleFooter(embed, true, baseSolves);
+
+    expect(result).toBe(true);
+    expect(embed.setFooter).toHaveBeenCalledWith({
+      text: "Showing cached data due to a temporary Codeforces error.",
+    });
   });
 });

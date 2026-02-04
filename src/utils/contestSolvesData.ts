@@ -45,6 +45,23 @@ export function getContestSolvesStaleFooter(
     : null;
 }
 
+type ContestSolvesFooterTarget = {
+  setFooter: (options: { text: string }) => unknown;
+};
+
+export function applyContestSolvesStaleFooter(
+  embed: ContestSolvesFooterTarget,
+  refreshWasStale: boolean,
+  contestSolves: ContestSolvesResult
+): boolean {
+  const footer = getContestSolvesStaleFooter(refreshWasStale, contestSolves);
+  if (!footer) {
+    return false;
+  }
+  embed.setFooter({ text: footer });
+  return true;
+}
+
 export function formatContestSolvesSummary(options: {
   totalProblems: number;
   solvedCount: number;

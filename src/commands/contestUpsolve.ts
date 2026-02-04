@@ -5,11 +5,11 @@ import { buildContestEmbed } from "../utils/contestLookup.js";
 import { splitContestSolves } from "../utils/contestProblems.js";
 import { addContestScopeOption } from "../utils/contestScope.js";
 import {
+  applyContestSolvesStaleFooter,
   loadContestSolvesDataOrReply,
   resolveContestSolvesContext,
   resolveContestSolvesOptionsOrReply,
   buildContestSolvesSummaryFields,
-  getContestSolvesStaleFooter,
 } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
@@ -149,13 +149,7 @@ export const contestUpsolveCommand: Command = {
         })
       );
 
-      const staleFooter = getContestSolvesStaleFooter(
-        contestResult.refreshWasStale,
-        contestSolves
-      );
-      if (staleFooter) {
-        embed.setFooter({ text: staleFooter });
-      }
+      applyContestSolvesStaleFooter(embed, contestResult.refreshWasStale, contestSolves);
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {

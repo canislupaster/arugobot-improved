@@ -9,11 +9,11 @@ import {
 } from "../utils/contestProblems.js";
 import { addContestScopeOption } from "../utils/contestScope.js";
 import {
+  applyContestSolvesStaleFooter,
   loadContestSolvesDataOrReply,
   resolveContestSolvesContext,
   resolveContestSolvesOptionsOrReply,
   buildContestSolvesSummaryFields,
-  getContestSolvesStaleFooter,
 } from "../utils/contestSolvesData.js";
 import {
   getContestTargetContextError,
@@ -162,13 +162,7 @@ export const contestSolvesCommand: Command = {
         embed.addFields({ name: "Solved problems", value: lines, inline: false });
       }
 
-      const staleFooter = getContestSolvesStaleFooter(
-        contestResult.refreshWasStale,
-        contestSolves
-      );
-      if (staleFooter) {
-        embed.setFooter({ text: staleFooter });
-      }
+      applyContestSolvesStaleFooter(embed, contestResult.refreshWasStale, contestSolves);
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
