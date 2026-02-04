@@ -11,6 +11,10 @@ export type RosterEntry = RosterEntryBase & {
   handle: string;
 };
 
+export type RatedRosterEntry = RosterEntry & {
+  rating: number;
+};
+
 export type RosterResolution<T extends RosterEntryBase> =
   | { status: "ok"; roster: T[] }
   | { status: "empty"; message: string; reason: "no_handles" | "no_members" };
@@ -23,6 +27,20 @@ export type RosterMessages = {
 const NO_LINKED_HANDLES_MESSAGE =
   "No linked handles yet. Use /register to link a Codeforces handle.";
 const NO_MEMBER_HANDLES_MESSAGE = "No linked handles found for current server members.";
+
+export function formatRatedRosterLines(
+  roster: RatedRosterEntry[],
+  start: number,
+  count: number
+): string {
+  return roster
+    .slice(start, start + count)
+    .map(
+      (entry, index) =>
+        `${start + index + 1}. <@${entry.userId}> - ${entry.handle} (${entry.rating})`
+    )
+    .join("\n");
+}
 
 export async function resolveGuildRoster<T extends RosterEntryBase>(
   guild: Guild,

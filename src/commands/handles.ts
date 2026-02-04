@@ -8,24 +8,11 @@ import {
   buildPaginationIds,
   runPaginatedInteraction,
 } from "../utils/pagination.js";
-import { resolveGuildRoster } from "../utils/roster.js";
+import { formatRatedRosterLines, resolveGuildRoster } from "../utils/roster.js";
 
 import type { Command } from "./types.js";
 
 const PAGE_SIZE = 10;
-
-const buildRosterLines = (
-  roster: Array<{ userId: string; handle: string; rating: number }>,
-  start: number,
-  count: number
-) =>
-  roster
-    .slice(start, start + count)
-    .map(
-      (entry, index) =>
-        `${start + index + 1}. <@${entry.userId}> - ${entry.handle} (${entry.rating})`
-    )
-    .join("\n");
 
 export const handlesCommand: Command = {
   data: new SlashCommandBuilder()
@@ -84,7 +71,7 @@ export const handlesCommand: Command = {
           return null;
         }
 
-        const lines = buildRosterLines(filteredRoster, start, PAGE_SIZE);
+        const lines = formatRatedRosterLines(filteredRoster, start, PAGE_SIZE);
 
         const embed = buildPageEmbed({
           title: "Linked handles",

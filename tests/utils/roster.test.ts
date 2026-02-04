@@ -1,6 +1,6 @@
 import type { Guild } from "discord.js";
 
-import { resolveGuildRoster } from "../../src/utils/roster.js";
+import { formatRatedRosterLines, resolveGuildRoster } from "../../src/utils/roster.js";
 
 const createGuild = (members: Array<{ id: string }>): Guild =>
   ({
@@ -74,5 +74,21 @@ describe("resolveGuildRoster", () => {
     if (result.status === "empty") {
       expect(result.message).toBe("No handles configured.");
     }
+  });
+});
+
+describe("formatRatedRosterLines", () => {
+  it("formats numbered handle entries with ratings", () => {
+    const lines = formatRatedRosterLines(
+      [
+        { userId: "user-1", handle: "tourist", rating: 3500 },
+        { userId: "user-2", handle: "petr", rating: 3400 },
+      ],
+      0,
+      1
+    );
+
+    expect(lines).toContain("1. <@user-1> - tourist (3500)");
+    expect(lines).not.toContain("petr");
   });
 });
