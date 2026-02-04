@@ -161,6 +161,35 @@ export async function resolveContestSolvesOptionsOrReply(
   return result;
 }
 
+type ContestSolvesCommandOptionsInteraction = ContestSolvesOptionsInteraction & {
+  options: ContestSolvesOptionsInteraction["options"] & {
+    getBoolean: (name: string) => boolean | null;
+  };
+};
+
+export async function resolveContestSolvesCommandOptionsOrReply(
+  interaction: ContestSolvesCommandOptionsInteraction & {
+    reply: (options: { content: string }) => Promise<unknown>;
+  },
+  options: { defaultLimit: number; maxLimit: number }
+): Promise<
+  | {
+      status: "ok";
+      queryRaw: string;
+      scope: ContestScopeFilter;
+      limit: number;
+      forceRefresh: boolean;
+    }
+  | { status: "replied" }
+> {
+  const optionResult = await resolveContestSolvesOptionsOrReply(interaction, options);
+  if (optionResult.status === "replied") {
+    return optionResult;
+  }
+  const forceRefresh = interaction.options.getBoolean("force_refresh") ?? false;
+  return { ...optionResult, forceRefresh };
+}
+
 export type ContestSolvesContextResult =
   | {
       status: "ok";

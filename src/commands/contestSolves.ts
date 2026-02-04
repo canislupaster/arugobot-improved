@@ -10,8 +10,8 @@ import {
 import { addContestScopeOption } from "../utils/contestScope.js";
 import {
   applyContestSolvesStaleFooter,
-  resolveContestSolvesOptionsOrReply,
   buildContestSolvesSummaryFields,
+  resolveContestSolvesCommandOptionsOrReply,
   resolveContestSolvesPayloadOrReply,
 } from "../utils/contestSolvesData.js";
 import {
@@ -54,15 +54,14 @@ export const contestSolvesCommand: Command = {
     ),
   async execute(interaction, context) {
     const handlesRaw = interaction.options.getString("handles") ?? "";
-    const optionResult = await resolveContestSolvesOptionsOrReply(interaction, {
+    const optionResult = await resolveContestSolvesCommandOptionsOrReply(interaction, {
       defaultLimit: DEFAULT_LIMIT,
       maxLimit: MAX_LIMIT,
     });
     if (optionResult.status === "replied") {
       return;
     }
-    const { queryRaw, scope, limit } = optionResult;
-    const forceRefresh = interaction.options.getBoolean("force_refresh") ?? false;
+    const { queryRaw, scope, limit, forceRefresh } = optionResult;
     const targetInputs = await resolveContestTargetInputsOrReply(interaction, handlesRaw);
     if (targetInputs.status === "replied") {
       return;

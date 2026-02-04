@@ -4,6 +4,7 @@ import {
   buildContestSolvesSummaryFields,
   formatContestSolvesSummary,
   getContestSolvesStaleFooter,
+  resolveContestSolvesCommandOptionsOrReply,
   resolveContestSolvesOptionsOrReply,
 } from "../../src/utils/contestSolvesData.js";
 
@@ -88,6 +89,68 @@ describe("resolveContestSolvesOptionsOrReply", () => {
 
     expect(result).toEqual({ status: "replied" });
     expect(interaction.reply).toHaveBeenCalledWith({ content: "Invalid limit." });
+  });
+});
+
+describe("resolveContestSolvesCommandOptionsOrReply", () => {
+  type FakeInteraction = {
+    options: {
+      getString: jest.Mock<string | null, [string]>;
+      getInteger: jest.Mock<number | null, [string]>;
+      getBoolean: jest.Mock<boolean | null, [string]>;
+    };
+    reply: jest.Mock<Promise<void>, [{ content: string }]>;
+  };
+
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      options: {
+        getString: jest.fn((name: string) => (name === "query" ? " 123 " : null)),
+        getInteger: jest.fn().mockReturnValue(null),
+        getBoolean: jest.fn().mockReturnValue(null),
+      },
+      reply: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    }) as FakeInteraction;
+
+  it("returns false when force_refresh is unset", async () => {
+    const interaction = createInteraction();
+
+    const result = await resolveContestSolvesCommandOptionsOrReply(
+      interaction as unknown as Parameters<typeof resolveContestSolvesCommandOptionsOrReply>[0],
+      {
+        defaultLimit: 10,
+        maxLimit: 25,
+      }
+    );
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.forceRefresh).toBe(false);
+    }
+  });
+
+  it("returns true when force_refresh is set", async () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn((name: string) => (name === "query" ? "123" : null)),
+        getInteger: jest.fn().mockReturnValue(null),
+        getBoolean: jest.fn((name: string) => (name === "force_refresh" ? true : null)),
+      },
+    });
+
+    const result = await resolveContestSolvesCommandOptionsOrReply(
+      interaction as unknown as Parameters<typeof resolveContestSolvesCommandOptionsOrReply>[0],
+      {
+        defaultLimit: 10,
+        maxLimit: 25,
+      }
+    );
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.forceRefresh).toBe(true);
+    }
   });
 });
 
