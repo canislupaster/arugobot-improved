@@ -41,6 +41,8 @@ const NO_LINKED_HANDLES_MESSAGE =
   "No linked handles yet. Use /register to link a Codeforces handle.";
 const NO_CURRENT_MEMBERS_MESSAGE =
   "No linked handles found for current server members. Use /handles to review linked accounts.";
+const formatTooManyHandlesMessage = (count: number) =>
+  `Too many linked handles (${count}). Provide specific handles or users.`;
 
 export function getUserOptions(users: Array<User | null | undefined>): User[] {
   return users.filter((user): user is User => Boolean(user));
@@ -165,9 +167,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
         return errorResult(NO_LINKED_HANDLES_MESSAGE);
       }
       if (maxLinkedHandles && linkedUsers.length > maxLinkedHandles) {
-        return errorResult(
-          `Too many linked handles (${linkedUsers.length}). Provide specific handles or users.`
-        );
+        return errorResult(formatTooManyHandlesMessage(linkedUsers.length));
       }
       for (const linked of linkedUsers) {
         addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
@@ -194,9 +194,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
       return errorResult(rosterResult.message);
     }
     if (maxLinkedHandles && rosterResult.roster.length > maxLinkedHandles) {
-      return errorResult(
-        `Too many linked handles (${rosterResult.roster.length}). Provide specific handles or users.`
-      );
+      return errorResult(formatTooManyHandlesMessage(rosterResult.roster.length));
     }
     for (const linked of rosterResult.roster) {
       addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
