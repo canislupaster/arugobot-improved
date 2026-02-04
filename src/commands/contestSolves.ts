@@ -10,10 +10,9 @@ import {
 import { addContestScopeOption } from "../utils/contestScope.js";
 import {
   applyContestSolvesStaleFooter,
-  loadContestSolvesDataOrReply,
-  resolveContestSolvesContext,
   resolveContestSolvesOptionsOrReply,
   buildContestSolvesSummaryFields,
+  resolveContestSolvesPayloadOrReply,
 } from "../utils/contestSolvesData.js";
 import {
   getContestTargetContextError,
@@ -87,27 +86,18 @@ export const contestSolvesCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const contestResult = await resolveContestSolvesContext({
+      const contestPayload = await resolveContestSolvesPayloadOrReply({
         interaction,
         queryRaw,
         scope,
         contests: context.services.contests,
         maxMatches: MAX_MATCHES,
         footerText: "Use /contestsolves with the contest ID to see solve counts.",
+        problems: context.services.problems,
+        store: context.services.store,
+        ttlMs: forceRefresh ? 0 : undefined,
       });
-      if (contestResult.status === "replied") {
-        return;
-      }
-
-      const contest = contestResult.contest;
-      const contestData = await loadContestSolvesDataOrReply(
-        interaction,
-        context.services.problems,
-        context.services.store,
-        contest.id,
-        { ttlMs: forceRefresh ? 0 : undefined }
-      );
-      if (contestData.status === "replied") {
+      if (contestPayload.status === "replied") {
         return;
       }
 
@@ -127,7 +117,7 @@ export const contestSolvesCommand: Command = {
       }
       const targets = targetResult.targets;
 
-      const { contestProblems, contestSolves } = contestData;
+      const { contest, contestProblems, contestSolves } = contestPayload;
 
       const handleToUserId = new Map(targets.map((target) => [target.handle, target.label]));
       const { summaries, solved, unsolved } = splitContestSolves(
@@ -169,7 +159,7 @@ export const contestSolvesCommand: Command = {
         embed.addFields({ name: "Solved problems", value: lines, inline: false });
       }
 
-      applyContestSolvesStaleFooter(embed, contestResult.refreshWasStale, contestSolves);
+      applyContestSolvesStaleFooter(embed, contestPayload.refreshWasStale, contestSolves);
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {

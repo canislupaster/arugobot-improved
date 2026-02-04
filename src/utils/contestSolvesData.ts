@@ -252,3 +252,45 @@ export async function loadContestSolvesDataOrReply(
   }
   return contestData;
 }
+
+type ContestSolvesPayloadResult =
+  | {
+      status: "ok";
+      contest: Contest;
+      refreshWasStale: boolean;
+      contestProblems: Problem[];
+      contestSolves: ContestSolvesResult;
+    }
+  | { status: "replied" };
+
+export async function resolveContestSolvesPayloadOrReply(
+  options: ContestSolvesContextOptions & {
+    problems: Pick<ProblemService, "ensureProblemsLoaded">;
+    store: Pick<StoreService, "getContestSolvesResult">;
+    ttlMs?: number;
+  }
+): Promise<ContestSolvesPayloadResult> {
+  const contestResult = await resolveContestSolvesContext(options);
+  if (contestResult.status === "replied") {
+    return { status: "replied" };
+  }
+
+  const contestData = await loadContestSolvesDataOrReply(
+    options.interaction,
+    options.problems,
+    options.store,
+    contestResult.contest.id,
+    { ttlMs: options.ttlMs }
+  );
+  if (contestData.status === "replied") {
+    return { status: "replied" };
+  }
+
+  return {
+    status: "ok",
+    contest: contestResult.contest,
+    refreshWasStale: contestResult.refreshWasStale,
+    contestProblems: contestData.contestProblems,
+    contestSolves: contestData.contestSolves,
+  };
+}

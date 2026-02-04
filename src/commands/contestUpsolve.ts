@@ -6,10 +6,9 @@ import { splitContestSolves } from "../utils/contestProblems.js";
 import { addContestScopeOption } from "../utils/contestScope.js";
 import {
   applyContestSolvesStaleFooter,
-  loadContestSolvesDataOrReply,
-  resolveContestSolvesContext,
   resolveContestSolvesOptionsOrReply,
   buildContestSolvesSummaryFields,
+  resolveContestSolvesPayloadOrReply,
 } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
@@ -87,17 +86,6 @@ export const contestUpsolveCommand: Command = {
     await interaction.deferReply();
 
     try {
-      const contestResult = await resolveContestSolvesContext({
-        interaction,
-        queryRaw,
-        scope,
-        contests: context.services.contests,
-        footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
-      });
-      if (contestResult.status === "replied") {
-        return;
-      }
-
       const handleResult = await resolveHandleTarget(context.services.store, {
         guildId: interaction.guildId ?? "",
         targetId,
@@ -110,18 +98,21 @@ export const contestUpsolveCommand: Command = {
       }
       const { handle, linkedUserId } = handleResult;
 
-      const contest = contestResult.contest;
-      const contestData = await loadContestSolvesDataOrReply(
+      const contestPayload = await resolveContestSolvesPayloadOrReply({
         interaction,
-        context.services.problems,
-        context.services.store,
-        contest.id,
-        { ttlMs: forceRefresh ? 0 : undefined }
-      );
-      if (contestData.status === "replied") {
+        queryRaw,
+        scope,
+        contests: context.services.contests,
+        footerText: "Use /contestupsolve with the contest ID to list unsolved problems.",
+        problems: context.services.problems,
+        store: context.services.store,
+        ttlMs: forceRefresh ? 0 : undefined,
+      });
+      if (contestPayload.status === "replied") {
         return;
       }
-      const { contestProblems, contestSolves } = contestData;
+
+      const { contest, contestProblems, contestSolves } = contestPayload;
 
       const { summaries, solved, unsolved } = splitContestSolves(
         contestProblems,
@@ -156,7 +147,7 @@ export const contestUpsolveCommand: Command = {
         })
       );
 
-      applyContestSolvesStaleFooter(embed, contestResult.refreshWasStale, contestSolves);
+      applyContestSolvesStaleFooter(embed, contestPayload.refreshWasStale, contestSolves);
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
