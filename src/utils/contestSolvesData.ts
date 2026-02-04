@@ -111,8 +111,17 @@ export function buildContestSolvesSummaryFields(options: {
   ];
 }
 
+type ContestSolvesOptionsOk = {
+  status: "ok";
+  queryRaw: string;
+  scope: ContestScopeFilter;
+  limit: number;
+};
+
+const CONTEST_SOLVES_REPLIED = { status: "replied" } as const;
+
 export type ContestSolvesOptionsResult =
-  | { status: "ok"; queryRaw: string; scope: ContestScopeFilter; limit: number }
+  | ContestSolvesOptionsOk
   | { status: "error"; message: string };
 
 type ContestSolvesOptionsInteraction = {
@@ -150,13 +159,11 @@ export async function resolveContestSolvesOptionsOrReply(
     reply: (options: { content: string }) => Promise<unknown>;
   },
   options: { defaultLimit: number; maxLimit: number }
-): Promise<{ status: "ok"; queryRaw: string; scope: ContestScopeFilter; limit: number } | {
-  status: "replied";
-}> {
+): Promise<ContestSolvesOptionsOk | typeof CONTEST_SOLVES_REPLIED> {
   const result = resolveContestSolvesOptions(interaction, options);
   if (result.status === "error") {
     await interaction.reply({ content: result.message });
-    return { status: "replied" };
+    return CONTEST_SOLVES_REPLIED;
   }
   return result;
 }
@@ -180,7 +187,7 @@ export async function resolveContestSolvesCommandOptionsOrReply(
       limit: number;
       forceRefresh: boolean;
     }
-  | { status: "replied" }
+  | typeof CONTEST_SOLVES_REPLIED
 > {
   const optionResult = await resolveContestSolvesOptionsOrReply(interaction, options);
   if (optionResult.status === "replied") {
