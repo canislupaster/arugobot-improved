@@ -3,7 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveHandleTargetWithOptionalGuild } from "../utils/handles.js";
-import { resolveHandleUserOptions } from "../utils/interaction.js";
+import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -32,30 +32,27 @@ export const contestHistoryCommand: Command = {
         .setMaxValue(MAX_LIMIT)
     ),
   async execute(interaction, context) {
-    const handleResolution = resolveHandleUserOptions(interaction);
-    if (handleResolution.error) {
-      await interaction.reply({ content: handleResolution.error });
+    const targetResolution = await resolveHandleTargetLabelsOrReply(interaction, {
+      contextMessages: {
+        userInDm: "Run this command in a server or provide a handle.",
+        missingHandleInDm: "Run this command in a server or provide a handle.",
+      },
+    });
+    if (targetResolution.status === "replied") {
       return;
     }
-    const { handleInput, userOption } = handleResolution;
-    const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
 
-    if (!interaction.guild && !handleInput) {
-      await interaction.reply({
-        content: "Run this command in a server or provide a handle.",
-      });
-      return;
-    }
+    const { handleInput, targetId } = targetResolution;
+    const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
 
     await interaction.deferReply();
 
     try {
-      const targetUser = userOption ?? interaction.user;
       const handleResult = await resolveHandleTargetWithOptionalGuild(
         context.services.store,
         {
           guildId: interaction.guild?.id ?? null,
-          targetId: targetUser.id,
+          targetId,
           handleInput,
         }
       );
