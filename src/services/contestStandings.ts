@@ -168,6 +168,7 @@ export class ContestStandingsService {
     handles: string[],
     entries: ContestStandingEntry[]
   ): Promise<void> {
+    const handlesPayload = JSON.stringify(handles);
     const payload = JSON.stringify(entries);
     const timestamp = new Date().toISOString();
     await this.db
@@ -175,13 +176,13 @@ export class ContestStandingsService {
       .values({
         contest_id: contestId,
         handles_hash: handlesHash,
-        handles: JSON.stringify(handles),
+        handles: handlesPayload,
         payload,
         last_fetched: timestamp,
       })
       .onConflict((oc) =>
         oc.columns(["contest_id", "handles_hash"]).doUpdateSet({
-          handles: JSON.stringify(handles),
+          handles: handlesPayload,
           payload,
           last_fetched: timestamp,
         })
