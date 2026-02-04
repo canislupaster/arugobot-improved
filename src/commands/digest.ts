@@ -27,6 +27,7 @@ import type { Command } from "./types.js";
 const DEFAULT_HOUR_UTC = 9;
 const DEFAULT_MINUTE_UTC = 0;
 const DEFAULT_DAY = "mon";
+const NO_SUBSCRIPTION_MESSAGE = "No weekly digests configured for this server.";
 
 const DAY_LABELS: Record<string, string> = {
   sun: "Sunday",
@@ -81,7 +82,7 @@ function formatScheduleLabel(
 function getManualDigestReply(result: ManualWeeklyDigestResult): string | null {
   switch (result.status) {
     case "no_subscription":
-      return "No weekly digests configured for this server.";
+      return NO_SUBSCRIPTION_MESSAGE;
     case "channel_missing_permissions":
       return formatCannotPostPermissionsMessage(result.channelId, result.missingPermissions);
     case "channel_missing":
@@ -160,7 +161,7 @@ export const digestCommand: Command = {
       if (subcommand === "status") {
         const subscription = await context.services.weeklyDigest.getSubscription(guildId);
         if (!subscription) {
-          await interaction.reply({ content: "No weekly digests configured for this server." });
+          await interaction.reply({ content: NO_SUBSCRIPTION_MESSAGE });
           return;
         }
         const dayKey = Object.entries(DAY_INDEX).find(
@@ -201,7 +202,7 @@ export const digestCommand: Command = {
       if (subcommand === "cleanup") {
         const subscription = await context.services.weeklyDigest.getSubscription(guildId);
         if (!subscription) {
-          await interaction.reply({ content: "No weekly digests configured for this server." });
+          await interaction.reply({ content: NO_SUBSCRIPTION_MESSAGE });
           return;
         }
 
@@ -230,7 +231,7 @@ export const digestCommand: Command = {
         await interaction.deferReply();
         const preview = await context.services.weeklyDigest.getPreview(guildId);
         if (!preview) {
-          await interaction.editReply("No weekly digests configured for this server.");
+          await interaction.editReply(NO_SUBSCRIPTION_MESSAGE);
           return;
         }
         await interaction.editReply({
