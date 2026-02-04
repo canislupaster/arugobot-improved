@@ -50,11 +50,15 @@ function getMissingSendPermissions(channel: SendableChannel, client: Client): st
   return missing.length > 0 ? missing : null;
 }
 
+async function fetchChannelOrNull(client: Client, channelId: string): Promise<Channel | null> {
+  return client.channels.fetch(channelId).catch(() => null);
+}
+
 async function fetchSendableChannel(
   client: Client,
   channelId: string
 ): Promise<SendableChannel | null> {
-  const channel = await client.channels.fetch(channelId).catch(() => null);
+  const channel = await fetchChannelOrNull(client, channelId);
   return isSendableChannel(channel) ? channel : null;
 }
 
@@ -62,7 +66,7 @@ export async function getSendableChannelStatus(
   client: Client,
   channelId: string
 ): Promise<SendableChannelStatus> {
-  const channel = await client.channels.fetch(channelId).catch(() => null);
+  const channel = await fetchChannelOrNull(client, channelId);
   return getSendableChannelStatusForChannel(client, channel, channelId);
 }
 
@@ -90,7 +94,7 @@ export async function getSendableChannelStatusOrWarn(
   message: string,
   context: LogContext = {}
 ): Promise<SendableChannelStatus> {
-  const channel = await client.channels.fetch(channelId).catch(() => null);
+  const channel = await fetchChannelOrNull(client, channelId);
   const status = getSendableChannelStatusForChannel(client, channel, channelId);
   if (status.status !== "ok") {
     logChannelWarning(message, channelId, {
