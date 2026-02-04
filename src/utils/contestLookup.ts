@@ -58,6 +58,7 @@ type ContestEmbedOptions = {
   title: string;
   scope?: ContestScopeFilter;
   includeScope?: boolean;
+  includeEnds?: boolean;
 };
 
 const DEFAULT_MISSING_MESSAGES: Record<MissingContestStatus, string> = {
@@ -254,6 +255,7 @@ export function buildContestEmbed({
   title,
   scope,
   includeScope = false,
+  includeEnds = true,
 }: ContestEmbedOptions): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(title)
@@ -279,7 +281,7 @@ export function buildContestEmbed({
     }
   }
 
-  if (contest.phase === "CODING") {
+  if (includeEnds && contest.phase === "CODING") {
     const endsAt = contest.startTimeSeconds + contest.durationSeconds;
     embed.addFields({
       name: "Ends",

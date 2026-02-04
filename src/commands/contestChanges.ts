@@ -3,7 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { formatContestPhase, formatContestTag, resolveContestOrReply } from "../utils/contestLookup.js";
+import { buildContestEmbed, resolveContestOrReply } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
   getContestUserOptions,
@@ -11,15 +11,8 @@ import {
   type TargetHandle,
   validateContestTargetContextOrReply,
 } from "../utils/contestTargets.js";
-import { buildContestUrl } from "../utils/contestUrl.js";
-import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleList } from "../utils/handles.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
-import {
-  formatDiscordRelativeTime,
-  formatDiscordTimestamp,
-  formatDuration,
-} from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
@@ -27,35 +20,14 @@ const MAX_MATCHES = 5;
 const MAX_HANDLES = 50;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
-function buildContestEmbed(contest: Contest): EmbedBuilder {
-  return new EmbedBuilder()
-    .setTitle(`Contest rating changes: ${contest.name}`)
-    .setColor(EMBED_COLORS.info)
-    .setDescription(`[Open contest](${buildContestUrl(contest)})`)
-    .addFields(
-      { name: "Contest ID", value: String(contest.id), inline: true },
-      { name: "Status", value: formatContestPhase(contest.phase), inline: true },
-      {
-        name: "Starts",
-        value: `${formatDiscordTimestamp(contest.startTimeSeconds)} (${formatDiscordRelativeTime(
-          contest.startTimeSeconds
-        )})`,
-        inline: false,
-      },
-      { name: "Duration", value: formatDuration(contest.durationSeconds), inline: true }
-    );
-}
-
-function applyContestSection(
-  embed: EmbedBuilder,
-  contest: Contest,
-  scope: ContestScopeFilter
-): EmbedBuilder {
-  const scopeLabel = formatContestTag(contest, scope);
-  if (scopeLabel) {
-    embed.addFields({ name: "Section", value: scopeLabel, inline: true });
-  }
-  return embed;
+function buildContestChangesEmbed(contest: Contest, scope: ContestScopeFilter): EmbedBuilder {
+  return buildContestEmbed({
+    contest,
+    title: `Contest rating changes: ${contest.name}`,
+    scope,
+    includeScope: true,
+    includeEnds: false,
+  });
 }
 
 function buildContestStatusEmbed(
@@ -63,7 +35,7 @@ function buildContestStatusEmbed(
   scope: ContestScopeFilter,
   message: string
 ): EmbedBuilder {
-  const embed = applyContestSection(buildContestEmbed(contest), contest, scope);
+  const embed = buildContestChangesEmbed(contest, scope);
   embed.addFields({ name: "Rating changes", value: message, inline: false });
   return embed;
 }
@@ -218,7 +190,7 @@ export const contestChangesCommand: Command = {
         found.push({ ...target, ...entry });
       }
 
-      const embed = applyContestSection(buildContestEmbed(contest), contest, scope);
+      const embed = buildContestChangesEmbed(contest, scope);
       const footerNotes: string[] = [];
 
       if (found.length === 0) {

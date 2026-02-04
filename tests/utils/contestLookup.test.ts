@@ -86,6 +86,23 @@ describe("contestLookup helpers", () => {
     expect(contestEmbed.fields?.some((field) => field.name === "Contest ID")).toBe(true);
   });
 
+  it("allows suppressing end times for ongoing contests", () => {
+    const contest: Contest = {
+      id: 1357,
+      name: "Codeforces Round #1357",
+      phase: "CODING",
+      startTimeSeconds: 1_700_000_000,
+      durationSeconds: 7200,
+      isGym: false,
+    };
+    const contestEmbed = buildContestEmbed({
+      contest,
+      title: `Contest results: ${contest.name}`,
+      includeEnds: false,
+    }).data;
+    expect(contestEmbed.fields?.some((field) => field.name === "Ends")).toBe(false);
+  });
+
   it("resolves contest lookup queries", () => {
     const contests: Contest[] = [
       {
