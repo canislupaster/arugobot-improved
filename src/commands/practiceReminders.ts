@@ -534,13 +534,16 @@ export const practiceRemindersCommand: Command = {
 
       if (subcommand === "post") {
         const force = resolveBooleanOption(interaction, "force");
-        await interaction.deferReply();
+        const deferred = await safeInteractionDefer(interaction);
+        if (!deferred) {
+          return;
+        }
         const result = await context.services.practiceReminders.sendManualReminder(
           guildId,
           context.client,
           force
         );
-        await interaction.editReply(getManualReminderReply(result));
+        await safeInteractionEdit(interaction, getManualReminderReply(result));
         return;
       }
     } catch (error) {

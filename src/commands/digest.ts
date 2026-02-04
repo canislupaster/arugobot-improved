@@ -20,7 +20,13 @@ import {
   formatCannotPostPermissionsMessage,
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
-import { requireGuildIdAndSubcommand, resolveBooleanOption } from "../utils/interaction.js";
+import {
+  requireGuildIdAndSubcommand,
+  resolveBooleanOption,
+  safeInteractionDefer,
+  safeInteractionEdit,
+  safeInteractionReply,
+} from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,
   formatHourMinute,
@@ -245,13 +251,16 @@ export const digestCommand: Command = {
       }
 
       if (subcommand === "preview") {
-        await interaction.deferReply();
-        const preview = await context.services.weeklyDigest.getPreview(guildId);
-        if (!preview) {
-          await interaction.editReply(NO_SUBSCRIPTION_MESSAGE);
+        const deferred = await safeInteractionDefer(interaction);
+        if (!deferred) {
           return;
         }
-        await interaction.editReply({
+        const preview = await context.services.weeklyDigest.getPreview(guildId);
+        if (!preview) {
+          await safeInteractionEdit(interaction, NO_SUBSCRIPTION_MESSAGE);
+          return;
+        }
+        await safeInteractionEdit(interaction, {
           content: `Next scheduled post: ${formatDiscordTimestamp(
             Math.floor(preview.nextScheduledAt / 1000)
           )}`,
@@ -261,7 +270,10 @@ export const digestCommand: Command = {
       }
 
       if (subcommand === "post") {
-        await interaction.deferReply();
+        const deferred = await safeInteractionDefer(interaction);
+        if (!deferred) {
+          return;
+        }
         const force = resolveBooleanOption(interaction, "force");
         const result = await context.services.weeklyDigest.sendManualDigest(
           guildId,
@@ -269,7 +281,7 @@ export const digestCommand: Command = {
           force
         );
         const reply = getManualDigestReply(result);
-        await interaction.editReply(reply ?? "Weekly digest sent.");
+        await safeInteractionEdit(interaction, reply ?? "Weekly digest sent.");
         return;
       }
 
@@ -322,7 +334,7 @@ export const digestCommand: Command = {
       logCommandError("Digest command failed.", interaction, context.correlationId, {
         error: error instanceof Error ? error.message : String(error),
       });
-      await interaction.reply({ content: "Failed to update digest settings." });
+      await safeInteractionReply(interaction, { content: "Failed to update digest settings." });
     }
   },
 };
