@@ -111,6 +111,26 @@ export async function requireGuildEphemeral(
   return requireGuild(interaction, { content, flags: MessageFlags.Ephemeral });
 }
 
+export async function requireGuildAndPage(
+  interaction: ChatInputCommandInteraction & IntegerOptionResolver & RepliableInteraction,
+  options: {
+    guildMessage?: string;
+    pageOptions?: { defaultValue?: number; max?: number; errorMessage?: string };
+  } = {}
+): Promise<{ guild: NonNullable<ChatInputCommandInteraction["guild"]>; page: number } | null> {
+  const guild = await requireGuild(interaction, {
+    content: options.guildMessage ?? "This command can only be used in a server.",
+  });
+  if (!guild) {
+    return null;
+  }
+  const page = await resolvePageOptionOrReply(interaction, options.pageOptions);
+  if (page === null) {
+    return null;
+  }
+  return { guild, page };
+}
+
 async function safeInteractionAction(
   action: () => Promise<unknown>,
   labels: { skipMessage: string; errorMessage: string },

@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild, resolvePageOptionOrReply } from "../utils/interaction.js";
+import { requireGuildAndPage } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
@@ -22,16 +22,13 @@ export const handlesCommand: Command = {
       option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
     ),
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction, {
-      content: "This command can only be used in a server.",
+    const guildAndPage = await requireGuildAndPage(interaction, {
+      guildMessage: "This command can only be used in a server.",
     });
-    if (!guild) {
+    if (!guildAndPage) {
       return;
     }
-    const page = await resolvePageOptionOrReply(interaction);
-    if (page === null) {
-      return;
-    }
+    const { guild, page } = guildAndPage;
 
     await interaction.deferReply();
 

@@ -10,6 +10,7 @@ import {
   resolveTargetLabels,
   replyEphemeral,
   requireGuild,
+  requireGuildAndPage,
   safeInteractionDefer,
   safeInteractionEdit,
   safeInteractionReply,
@@ -170,6 +171,50 @@ describe("requireGuild", () => {
     ).resolves.toEqual({ id: "guild-1" });
 
     expect(interaction.reply).not.toHaveBeenCalled();
+  });
+});
+
+describe("requireGuildAndPage", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      deferred: false,
+      replied: false,
+      guild: { id: "guild-1" },
+      reply: jest.fn().mockResolvedValue(undefined),
+      followUp: jest.fn().mockResolvedValue(undefined),
+      options: {
+        getInteger: jest.fn().mockReturnValue(null),
+      },
+      ...overrides,
+    }) as unknown as ChatInputCommandInteraction & RepliableInteraction;
+
+  it("returns null when no guild", async () => {
+    const interaction = createInteraction({ guild: null });
+
+    await expect(
+      requireGuildAndPage(interaction, { guildMessage: "Server only." })
+    ).resolves.toBeNull();
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Server only." });
+  });
+
+  it("returns null when page is invalid", async () => {
+    const interaction = createInteraction({
+      options: { getInteger: jest.fn().mockReturnValue(0) },
+    });
+
+    await expect(requireGuildAndPage(interaction)).resolves.toBeNull();
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Invalid page." });
+  });
+
+  it("returns guild and page when valid", async () => {
+    const interaction = createInteraction();
+
+    await expect(requireGuildAndPage(interaction)).resolves.toEqual({
+      guild: { id: "guild-1" },
+      page: 1,
+    });
   });
 });
 
