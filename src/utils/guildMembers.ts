@@ -4,12 +4,53 @@ import { logWarn, type LogContext } from "./logger.js";
 
 const MEMBER_CHUNK_SIZE = 100;
 
+type GuildMemberLike = {
+  user: { id: string };
+  toString?: () => string;
+};
+
 function chunkIds(ids: string[], size: number): string[][] {
   const chunks: string[][] = [];
   for (let index = 0; index < ids.length; index += size) {
     chunks.push(ids.slice(index, index + size));
   }
   return chunks;
+}
+
+async function fetchMembersWithFallback(
+  guild: Guild,
+  userIds: string[],
+  context?: LogContext
+): Promise<Map<string, GuildMemberLike>> {
+  const membersById = new Map<string, GuildMemberLike>();
+  if (userIds.length === 0) {
+    return membersById;
+  }
+  const uniqueIds = Array.from(new Set(userIds));
+  const chunks = chunkIds(uniqueIds, MEMBER_CHUNK_SIZE);
+
+  for (const chunk of chunks) {
+    try {
+      const members = await guild.members.fetch({ user: chunk });
+      for (const member of members.values()) {
+        membersById.set(member.user.id, member);
+      }
+    } catch (error) {
+      logWarn("Guild member fetch failed; using cached members.", {
+        ...context,
+        guildId: guild.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      for (const id of chunk) {
+        const cached = guild.members.cache.get(id);
+        if (cached) {
+          membersById.set(id, cached);
+        }
+      }
+    }
+  }
+
+  return membersById;
 }
 
 export async function filterEntriesByGuildMembers<T extends { userId: string }>(
@@ -20,34 +61,15 @@ export async function filterEntriesByGuildMembers<T extends { userId: string }>(
   if (entries.length === 0) {
     return [];
   }
-  const uniqueIds = Array.from(new Set(entries.map((entry) => entry.userId)));
-  const present = new Set<string>();
-  const chunks = chunkIds(uniqueIds, MEMBER_CHUNK_SIZE);
-
-  for (const chunk of chunks) {
-    try {
-      const members = await guild.members.fetch({ user: chunk });
-      for (const member of members.values()) {
-        present.add(member.user.id);
-      }
-    } catch (error) {
-      logWarn("Guild member fetch failed; using cached members.", {
-        ...context,
-        guildId: guild.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      for (const id of chunk) {
-        if (guild.members.cache.has(id)) {
-          present.add(id);
-        }
-      }
-    }
-  }
-
-  return entries.filter((entry) => present.has(entry.userId));
+  const membersById = await fetchMembersWithFallback(
+    guild,
+    entries.map((entry) => entry.userId),
+    context
+  );
+  return entries.filter((entry) => membersById.has(entry.userId));
 }
 
-function formatMemberMention(member: { user: { id: string }; toString?: () => string }): string {
+function formatMemberMention(member: GuildMemberLike): string {
   if (typeof member.toString === "function") {
     return member.toString();
   }
@@ -64,33 +86,12 @@ export async function resolveMemberMentions(
     return mentions;
   }
   const uniqueIds = Array.from(new Set(userIds));
-  const chunks = chunkIds(uniqueIds, MEMBER_CHUNK_SIZE);
-
-  for (const chunk of chunks) {
-    try {
-      const members = await guild.members.fetch({ user: chunk });
-      for (const member of members.values()) {
-        mentions.set(member.user.id, formatMemberMention(member));
-      }
-    } catch (error) {
-      logWarn("Guild member fetch failed; using cached members.", {
-        ...context,
-        guildId: guild.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      for (const id of chunk) {
-        const cached = guild.members.cache.get(id);
-        if (cached) {
-          mentions.set(id, formatMemberMention(cached));
-        }
-      }
-    }
+  const membersById = await fetchMembersWithFallback(guild, uniqueIds, context);
+  for (const [id, member] of membersById.entries()) {
+    mentions.set(id, formatMemberMention(member));
   }
-
   for (const id of uniqueIds) {
-    if (!mentions.has(id)) {
-      mentions.set(id, `<@${id}>`);
-    }
+    mentions.set(id, mentions.get(id) ?? `<@${id}>`);
   }
 
   return mentions;
