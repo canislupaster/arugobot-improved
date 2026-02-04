@@ -22,6 +22,7 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
+import { addCleanupIncludePermissionsOption } from "../utils/commandOptions.js";
 import {
   addContestScopeOption,
   formatContestScopeLabel,
@@ -310,14 +311,12 @@ export const contestRemindersCommand: Command = {
       subcommand.setName("clear").setDescription("Remove all contest reminders")
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("cleanup")
-        .setDescription("Remove contest reminders targeting deleted channels")
-        .addBooleanOption((option) =>
-          option
-            .setName("include_permissions")
-            .setDescription("Also remove subscriptions where the bot lacks permissions")
-        )
+      addCleanupIncludePermissionsOption(
+        subcommand
+          .setName("cleanup")
+          .setDescription("Remove contest reminders targeting deleted channels"),
+        "Also remove subscriptions where the bot lacks permissions"
+      )
     )
     .addSubcommand((subcommand) =>
       subcommand

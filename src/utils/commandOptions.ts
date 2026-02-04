@@ -110,6 +110,15 @@ export function addContestFilterOptions(
     .addStringOption((option) => addContestScopeOption(option, scopeDescription));
 }
 
+export function addCleanupIncludePermissionsOption(
+  subcommand: SlashCommandSubcommandBuilder,
+  description = "Also remove if the bot is missing channel permissions"
+): SlashCommandSubcommandBuilder {
+  return subcommand.addBooleanOption((option) =>
+    option.setName("include_permissions").setDescription(description)
+  );
+}
+
 export function addPageOption(
   builder: SlashCommandBuilder
 ): SlashCommandOptionsOnlyBuilder;

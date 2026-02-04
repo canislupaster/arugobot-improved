@@ -3,7 +3,12 @@ import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addRatingRangeOptions, addScheduleOptions, addTagOptions } from "../utils/commandOptions.js";
+import {
+  addCleanupIncludePermissionsOption,
+  addRatingRangeOptions,
+  addScheduleOptions,
+  addTagOptions,
+} from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
@@ -167,14 +172,11 @@ export const practiceRemindersCommand: Command = {
       subcommand.setName("clear").setDescription("Disable daily practice reminders")
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("cleanup")
-        .setDescription("Remove reminders pointing at missing channels")
-        .addBooleanOption((option) =>
-          option
-            .setName("include_permissions")
-            .setDescription("Also remove if the bot is missing channel permissions")
-        )
+      addCleanupIncludePermissionsOption(
+        subcommand
+          .setName("cleanup")
+          .setDescription("Remove reminders pointing at missing channels")
+      )
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("preview").setDescription("Preview the next practice reminder")

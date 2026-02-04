@@ -6,7 +6,7 @@ import {
 } from "../services/weeklyDigest.js";
 import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addScheduleOptions } from "../utils/commandOptions.js";
+import { addCleanupIncludePermissionsOption, addScheduleOptions } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
@@ -126,14 +126,11 @@ export const digestCommand: Command = {
       subcommand.setName("clear").setDescription("Disable weekly digests")
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("cleanup")
-        .setDescription("Remove digests pointing at missing channels")
-        .addBooleanOption((option) =>
-          option
-            .setName("include_permissions")
-            .setDescription("Also remove if the bot is missing channel permissions")
-        )
+      addCleanupIncludePermissionsOption(
+        subcommand
+          .setName("cleanup")
+          .setDescription("Remove digests pointing at missing channels")
+      )
     )
     .addSubcommand((subcommand) =>
       subcommand
