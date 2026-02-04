@@ -1,6 +1,7 @@
 import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
 
 import {
+  buildChannelCleanupSummary,
   cleanupChannelSubscriptions,
   cleanupSingleChannelSubscription,
   formatPermissionIssueSummary,
@@ -121,6 +122,63 @@ describe("formatPermissionIssueSummary", () => {
 
     expect(summary).toBe(
       "Subscriptions with missing permissions (not removed): `sub-1` (<#channel-1>): Missing permissions (SendMessages)."
+    );
+  });
+});
+
+describe("buildChannelCleanupSummary", () => {
+  it("returns the all-good message when there are no issues", () => {
+    const summary = buildChannelCleanupSummary(
+      {
+        removedIds: [],
+        removedPermissionIds: [],
+        failedIds: [],
+        failedPermissionIds: [],
+        permissionIssues: [],
+      },
+      {
+        label: "contest reminder subscription",
+        allGoodMessage: "All contest reminder channels look good.",
+      }
+    );
+
+    expect(summary).toBe("All contest reminder channels look good.");
+  });
+
+  it("formats cleanup lines in order with permission hints", () => {
+    const summary = buildChannelCleanupSummary(
+      {
+        removedIds: ["sub-missing"],
+        removedPermissionIds: ["sub-missing-perms"],
+        failedIds: ["sub-failed"],
+        failedPermissionIds: ["sub-failed-perms"],
+        permissionIssues: [
+          {
+            id: "sub-perms",
+            channelId: "channel-1",
+            status: {
+              status: "missing_permissions",
+              channelId: "channel-1",
+              missingPermissions: ["SendMessages"],
+            },
+          },
+        ],
+      },
+      {
+        label: "contest reminder subscription",
+        allGoodMessage: "All contest reminder channels look good.",
+        cleanupHint: "Use /contestreminders cleanup include_permissions:true to remove them.",
+      }
+    );
+
+    expect(summary).toBe(
+      [
+        "Removed 1 contest reminder subscription with missing channels: `sub-missing`.",
+        "Removed 1 contest reminder subscription with missing permissions: `sub-missing-perms`.",
+        "Failed to remove 1 subscription: `sub-failed`.",
+        "Failed to remove 1 subscription with missing permissions: `sub-failed-perms`.",
+        "Subscriptions with missing permissions (not removed): `sub-perms` (<#channel-1>): Missing permissions (SendMessages). Use /contestreminders cleanup include_permissions:true to remove them.",
+      ].join("\n")
     );
   });
 });

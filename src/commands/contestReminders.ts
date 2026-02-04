@@ -8,11 +8,7 @@ import {
 
 import type { ContestReminder } from "../services/contestReminders.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
-import {
-  cleanupChannelSubscriptions,
-  formatIdList,
-  formatPermissionIssueSummary,
-} from "../utils/channelCleanup.js";
+import { buildChannelCleanupSummary, cleanupChannelSubscriptions } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addCleanupIncludePermissionsOption } from "../utils/commandOptions.js";
 import {
@@ -450,66 +446,12 @@ export const contestRemindersCommand: Command = {
           removeSubscription: (id) =>
             context.services.contestReminders.removeSubscription(guildId, id),
         });
-        const {
-          removedIds,
-          removedPermissionIds,
-          failedIds,
-          failedPermissionIds,
-          permissionIssues,
-        } = cleanup;
-
-        if (
-          removedIds.length === 0 &&
-          removedPermissionIds.length === 0 &&
-          failedIds.length === 0 &&
-          failedPermissionIds.length === 0 &&
-          permissionIssues.length === 0
-        ) {
-          await interaction.reply({
-            content: "All contest reminder channels look good.",
-          });
-          return;
-        }
-
-        const lines: string[] = [];
-        if (removedIds.length > 0) {
-          lines.push(
-            `Removed ${removedIds.length} contest reminder subscription${
-              removedIds.length === 1 ? "" : "s"
-            } with missing channels: ${formatIdList(removedIds)}.`
-          );
-        }
-        if (removedPermissionIds.length > 0) {
-          lines.push(
-            `Removed ${removedPermissionIds.length} contest reminder subscription${
-              removedPermissionIds.length === 1 ? "" : "s"
-            } with missing permissions: ${formatIdList(removedPermissionIds)}.`
-          );
-        }
-        if (failedIds.length > 0) {
-          lines.push(
-            `Failed to remove ${failedIds.length} subscription${
-              failedIds.length === 1 ? "" : "s"
-            }: ${formatIdList(failedIds)}.`
-          );
-        }
-        if (failedPermissionIds.length > 0) {
-          lines.push(
-            `Failed to remove ${failedPermissionIds.length} subscription${
-              failedPermissionIds.length === 1 ? "" : "s"
-            } with missing permissions: ${formatIdList(failedPermissionIds)}.`
-          );
-        }
-        if (permissionIssues.length > 0) {
-          const summary = formatPermissionIssueSummary(permissionIssues, {
-            cleanupHint: "Use /contestreminders cleanup include_permissions:true to remove them.",
-          });
-          if (summary) {
-            lines.push(summary);
-          }
-        }
-
-        await interaction.reply({ content: lines.join("\n") });
+        const message = buildChannelCleanupSummary(cleanup, {
+          label: "contest reminder subscription",
+          allGoodMessage: "All contest reminder channels look good.",
+          cleanupHint: "Use /contestreminders cleanup include_permissions:true to remove them.",
+        });
+        await interaction.reply({ content: message });
         return;
       }
 

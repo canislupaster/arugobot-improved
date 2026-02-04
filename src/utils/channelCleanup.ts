@@ -132,3 +132,55 @@ export function formatPermissionIssueSummary(
   const hint = options.cleanupHint?.trim();
   return hint ? `${summary} ${hint}` : summary;
 }
+
+export function buildChannelCleanupSummary(
+  cleanup: ChannelCleanupResult,
+  options: {
+    label: string;
+    allGoodMessage: string;
+    cleanupHint?: string;
+  }
+): string {
+  const lines: string[] = [];
+  const pluralize = (count: number) => (count === 1 ? "" : "s");
+
+  if (cleanup.removedIds.length > 0) {
+    lines.push(
+      `Removed ${cleanup.removedIds.length} ${options.label}${pluralize(
+        cleanup.removedIds.length
+      )} with missing channels: ${formatIdList(cleanup.removedIds)}.`
+    );
+  }
+  if (cleanup.removedPermissionIds.length > 0) {
+    lines.push(
+      `Removed ${cleanup.removedPermissionIds.length} ${options.label}${pluralize(
+        cleanup.removedPermissionIds.length
+      )} with missing permissions: ${formatIdList(cleanup.removedPermissionIds)}.`
+    );
+  }
+  if (cleanup.failedIds.length > 0) {
+    lines.push(
+      `Failed to remove ${cleanup.failedIds.length} subscription${pluralize(
+        cleanup.failedIds.length
+      )}: ${formatIdList(cleanup.failedIds)}.`
+    );
+  }
+  if (cleanup.failedPermissionIds.length > 0) {
+    lines.push(
+      `Failed to remove ${cleanup.failedPermissionIds.length} subscription${pluralize(
+        cleanup.failedPermissionIds.length
+      )} with missing permissions: ${formatIdList(cleanup.failedPermissionIds)}.`
+    );
+  }
+  const permissionSummary = formatPermissionIssueSummary(cleanup.permissionIssues, {
+    cleanupHint: options.cleanupHint,
+  });
+  if (permissionSummary) {
+    lines.push(permissionSummary);
+  }
+
+  if (lines.length === 0) {
+    return options.allGoodMessage;
+  }
+  return lines.join("\n");
+}
