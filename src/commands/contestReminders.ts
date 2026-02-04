@@ -38,10 +38,7 @@ import {
   resolveSubscriptionId,
   resolveSubscriptionSelectionOrReply,
 } from "../utils/subscriptionSelection.js";
-import {
-  buildChannelSubscriptionEntries,
-  filterChannelSubscriptionEntries,
-} from "../utils/subscriptionStatus.js";
+import { resolveSubscriptionEntriesOrReply } from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -363,23 +360,22 @@ export const contestRemindersCommand: Command = {
           return;
         }
         const onlyIssues = interaction.options.getBoolean?.("only_issues") ?? false;
-
-        const refreshState = await refreshContestScopes(context.services.contests, subscriptions);
         const lastNotifiedMap = await context.services.contestReminders.getLastNotificationMap(
           subscriptions.map((subscription) => subscription.id)
         );
-        const entries = await buildChannelSubscriptionEntries(
+        const entryResult = await resolveSubscriptionEntriesOrReply(
+          interaction,
           context.client,
           subscriptions,
-          lastNotifiedMap
+          lastNotifiedMap,
+          onlyIssues,
+          { noSubscriptions: NO_SUBSCRIPTIONS_MESSAGE, noIssues: NO_ISSUES_MESSAGE }
         );
-        const filteredEntries = filterChannelSubscriptionEntries(entries, onlyIssues);
-        if (filteredEntries.length === 0) {
-          await interaction.reply({
-            content: onlyIssues ? NO_ISSUES_MESSAGE : NO_SUBSCRIPTIONS_MESSAGE,
-          });
+        if (entryResult.status === "replied") {
           return;
         }
+        const filteredEntries = entryResult.entries;
+        const refreshState = await refreshContestScopes(context.services.contests, subscriptions);
         const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
         const scopeSet = new Set(filteredEntries.map((entry) => entry.subscription.scope));
         for (const scope of scopeSet) {

@@ -24,10 +24,7 @@ import {
   resolveSubscriptionId,
   resolveSubscriptionSelectionOrReply,
 } from "../utils/subscriptionSelection.js";
-import {
-  buildChannelSubscriptionEntries,
-  filterChannelSubscriptionEntries,
-} from "../utils/subscriptionStatus.js";
+import { resolveSubscriptionEntriesOrReply } from "../utils/subscriptionStatus.js";
 
 import type { Command } from "./types.js";
 
@@ -214,19 +211,18 @@ export const contestRatingAlertsCommand: Command = {
         const lastNotifiedMap = await context.services.contestRatingAlerts.getLastNotificationMap(
           subscriptions.map((subscription) => subscription.id)
         );
-        const entries = await buildChannelSubscriptionEntries(
+        const entryResult = await resolveSubscriptionEntriesOrReply(
+          interaction,
           context.client,
           subscriptions,
-          lastNotifiedMap
+          lastNotifiedMap,
+          onlyIssues,
+          { noSubscriptions: NO_SUBSCRIPTIONS_MESSAGE, noIssues: NO_ISSUES_MESSAGE }
         );
-        const filteredEntries = filterChannelSubscriptionEntries(entries, onlyIssues);
-        if (filteredEntries.length === 0) {
-          await interaction.reply({
-            content: onlyIssues ? NO_ISSUES_MESSAGE : NO_SUBSCRIPTIONS_MESSAGE,
-          });
+        if (entryResult.status === "replied") {
           return;
         }
-
+        const filteredEntries = entryResult.entries;
         const embed = new EmbedBuilder()
           .setTitle("Contest rating alert subscriptions")
           .setColor(EMBED_COLORS.info)

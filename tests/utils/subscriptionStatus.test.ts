@@ -5,6 +5,7 @@ import { getSendableChannelStatuses } from "../../src/utils/discordChannels.js";
 import {
   buildChannelSubscriptionEntries,
   filterChannelSubscriptionEntries,
+  resolveSubscriptionEntriesOrReply,
   type ChannelSubscriptionEntry,
 } from "../../src/utils/subscriptionStatus.js";
 
@@ -67,5 +68,65 @@ describe("filterChannelSubscriptionEntries", () => {
 
     expect(filtered).toHaveLength(1);
     expect(filtered[0]?.subscription.id).toBe("sub-2");
+  });
+});
+
+describe("resolveSubscriptionEntriesOrReply", () => {
+  it("replies when no subscriptions exist", async () => {
+    const interaction = { reply: jest.fn().mockResolvedValue(undefined) };
+
+    const result = await resolveSubscriptionEntriesOrReply(
+      interaction,
+      {} as Client,
+      [],
+      new Map(),
+      false,
+      { noSubscriptions: "No subs.", noIssues: "No issues." }
+    );
+
+    expect(result.status).toBe("replied");
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "No subs." });
+  });
+
+  it("replies with no-issues message when onlyIssues filters everything", async () => {
+    const okStatus: SendableChannelStatus = { status: "ok", channel: {} as never };
+    mockGetSendableChannelStatuses.mockResolvedValue([okStatus]);
+    const interaction = { reply: jest.fn().mockResolvedValue(undefined) };
+    const subscriptions = [{ id: "sub-1", channelId: "channel-1" }];
+
+    const result = await resolveSubscriptionEntriesOrReply(
+      interaction,
+      {} as Client,
+      subscriptions,
+      new Map(),
+      true,
+      { noSubscriptions: "No subs.", noIssues: "No issues." }
+    );
+
+    expect(result.status).toBe("replied");
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "No issues." });
+  });
+
+  it("returns entries when available", async () => {
+    const okStatus: SendableChannelStatus = { status: "ok", channel: {} as never };
+    mockGetSendableChannelStatuses.mockResolvedValue([okStatus]);
+    const interaction = { reply: jest.fn().mockResolvedValue(undefined) };
+    const subscriptions = [{ id: "sub-1", channelId: "channel-1" }];
+
+    const result = await resolveSubscriptionEntriesOrReply(
+      interaction,
+      {} as Client,
+      subscriptions,
+      new Map([["sub-1", "2026-02-03T00:00:00Z"]]),
+      false,
+      { noSubscriptions: "No subs.", noIssues: "No issues." }
+    );
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.entries).toHaveLength(1);
+      expect(result.entries[0]?.subscription.id).toBe("sub-1");
+      expect(result.entries[0]?.lastNotifiedAt).toBe("2026-02-03T00:00:00Z");
+    }
   });
 });

@@ -39,3 +39,38 @@ export function filterChannelSubscriptionEntries<TSubscription>(
   }
   return entries.filter((entry) => entry.channelStatus?.status !== "ok");
 }
+
+type SubscriptionEntriesResult<TSubscription> =
+  | { status: "ok"; entries: Array<ChannelSubscriptionEntry<TSubscription>> }
+  | { status: "replied" };
+
+export async function resolveSubscriptionEntriesOrReply<
+  TSubscription extends { id: string; channelId: string },
+>(
+  interaction: { reply: (options: { content: string }) => Promise<unknown> },
+  client: Client,
+  subscriptions: TSubscription[],
+  lastNotifiedMap: Map<string, string | null>,
+  onlyIssues: boolean,
+  messages: { noSubscriptions: string; noIssues: string }
+): Promise<SubscriptionEntriesResult<TSubscription>> {
+  if (subscriptions.length === 0) {
+    await interaction.reply({ content: messages.noSubscriptions });
+    return { status: "replied" };
+  }
+
+  const entries = await buildChannelSubscriptionEntries(
+    client,
+    subscriptions,
+    lastNotifiedMap
+  );
+  const filtered = filterChannelSubscriptionEntries(entries, onlyIssues);
+  if (filtered.length === 0) {
+    await interaction.reply({
+      content: onlyIssues ? messages.noIssues : messages.noSubscriptions,
+    });
+    return { status: "replied" };
+  }
+
+  return { status: "ok", entries: filtered };
+}
