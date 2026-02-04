@@ -283,7 +283,7 @@ export const contestRemindersCommand: Command = {
     .addSubcommand((subcommand) => {
       const withPreset = subcommand
         .setName("preset")
-        .setDescription("Add a reminder preset (Div 2, Div 3, Div 4, Educational)")
+        .setDescription("Add a reminder preset (Div 1, Div 2, Div 3, Div 4, Educational)")
         .addStringOption((option) => {
           const choice = option
             .setName("preset")

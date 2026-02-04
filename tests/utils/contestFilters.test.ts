@@ -44,11 +44,14 @@ describe("contestFilters", () => {
   it("exposes contest reminder presets", () => {
     const presets = listContestReminderPresets();
     expect(presets).toEqual([
+      { name: "Div 1", value: "div1" },
       { name: "Div 2", value: "div2" },
       { name: "Div 3", value: "div3" },
       { name: "Div 4", value: "div4" },
       { name: "Educational", value: "educational" },
     ]);
+    const div1Preset = getContestReminderPreset("div1");
+    expect(div1Preset.includeKeywords).toContain("div. 1");
     const preset = getContestReminderPreset("div2");
     expect(preset.includeKeywords).toContain("div. 2");
     const div3Preset = getContestReminderPreset("div3");

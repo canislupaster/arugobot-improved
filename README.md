@@ -228,8 +228,8 @@ Handle inputs (including list options like `handles`) accept Codeforces profile 
   `cleanup` to remove subscriptions pointing at deleted channels (use `include_permissions:true`
   to also remove subscriptions where the bot lacks channel permissions).
   `preview`/`post` accept an optional subscription id when multiple are configured. `post` can
-  `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 2,
-  Div 3, Div 4, or Educational) with sensible keyword filters.
+  `force` a reminder even if one was already posted. `preset` adds a curated subscription (Div 1,
+  Div 2, Div 3, Div 4, or Educational) with sensible keyword filters.
   Subscriptions are automatically removed if the target channel is deleted.
 
 - **/contestratingalerts** `set|status|list|remove|clear|cleanup|preview|post`
