@@ -39,6 +39,9 @@ const DEFAULT_MIN_RATING = 800;
 const DEFAULT_MAX_RATING = 3500;
 const DEFAULT_HOUR_UTC = 9;
 const DEFAULT_MINUTE_UTC = 0;
+const NO_PRACTICE_REMINDERS_MESSAGE = "No practice reminders configured for this server.";
+const NO_PRACTICE_REMINDERS_WERE_MESSAGE =
+  "No practice reminders were configured for this server.";
 const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS = [1, 2, 3, 4, 5];
@@ -205,9 +208,7 @@ export const practiceRemindersCommand: Command = {
       if (subcommand === "status") {
         const subscription = await context.services.practiceReminders.getSubscription(guildId);
         if (!subscription) {
-          await interaction.reply({
-            content: "No practice reminders configured for this server.",
-          });
+          await interaction.reply({ content: NO_PRACTICE_REMINDERS_MESSAGE });
           return;
         }
 
@@ -303,7 +304,7 @@ export const practiceRemindersCommand: Command = {
         await interaction.reply({
           content: removed
             ? "Practice reminders disabled for this server."
-            : "No practice reminders were configured for this server.",
+            : NO_PRACTICE_REMINDERS_WERE_MESSAGE,
         });
         return;
       }
@@ -311,9 +312,7 @@ export const practiceRemindersCommand: Command = {
       if (subcommand === "cleanup") {
         const subscription = await context.services.practiceReminders.getSubscription(guildId);
         if (!subscription) {
-          await interaction.reply({
-            content: "No practice reminders were configured for this server.",
-          });
+          await interaction.reply({ content: NO_PRACTICE_REMINDERS_WERE_MESSAGE });
           return;
         }
 
@@ -418,7 +417,7 @@ export const practiceRemindersCommand: Command = {
         }
         const preview = await context.services.practiceReminders.getPreview(guildId);
         if (!preview) {
-          await safeInteractionEdit(interaction, "No practice reminders configured for this server.");
+          await safeInteractionEdit(interaction, NO_PRACTICE_REMINDERS_MESSAGE);
           return;
         }
 
@@ -530,7 +529,7 @@ export const practiceRemindersCommand: Command = {
         );
 
         if (result.status === "no_subscription") {
-          await interaction.editReply("No practice reminders configured for this server.");
+          await interaction.editReply(NO_PRACTICE_REMINDERS_MESSAGE);
           return;
         }
 
