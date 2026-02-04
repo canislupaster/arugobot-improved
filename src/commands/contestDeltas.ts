@@ -9,7 +9,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { resolveContestActivityOptions } from "../utils/contestActivityOptions.js";
 import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { resolveGuildRoster } from "../utils/roster.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
@@ -136,26 +136,18 @@ export const contestDeltasCommand: Command = {
 
     try {
       const roster = await context.services.store.getServerRoster(interaction.guild.id);
-      if (roster.length === 0) {
-        await interaction.editReply(
-          "No linked handles yet. Use /register to link a Codeforces handle."
-        );
-        return;
-      }
-      const filteredRoster = await filterEntriesByGuildMembers(interaction.guild, roster, {
+      const rosterResult = await resolveGuildRoster(interaction.guild, roster, {
         correlationId: context.correlationId,
         command: interaction.commandName,
         guildId: interaction.guild.id,
         userId: interaction.user.id,
       });
-      if (filteredRoster.length === 0) {
-        await interaction.editReply(
-          "No linked handles found for current server members."
-        );
+      if (rosterResult.status === "empty") {
+        await interaction.editReply(rosterResult.message);
         return;
       }
       const summary = await context.services.contestActivity.getRatingChangeSummaryForRoster(
-        filteredRoster,
+        rosterResult.roster,
         { lookbackDays: days, limit, scope }
       );
 
