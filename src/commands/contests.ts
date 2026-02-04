@@ -1,12 +1,12 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
+import { addContestFilterOptions } from "../utils/commandOptions.js";
 import {
   filterContestsByKeywords,
   formatKeywordFilterClauses,
   parseKeywordFilters,
 } from "../utils/contestFilters.js";
-import { addContestFilterOptions } from "../utils/commandOptions.js";
 import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";

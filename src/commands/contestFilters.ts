@@ -1,8 +1,8 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { formatKeywordFilterClauses, parseKeywordFilters } from "../utils/contestFilters.js";
 import { addContestFilterOptions } from "../utils/commandOptions.js";
+import { formatKeywordFilterClauses, parseKeywordFilters } from "../utils/contestFilters.js";
 import {
   formatContestScopeLabel,
   parseContestScope,
