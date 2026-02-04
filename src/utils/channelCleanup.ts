@@ -2,7 +2,7 @@ import type { Client } from "discord.js";
 
 import {
   describeSendableChannelStatus,
-  getSendableChannelStatus,
+  getSendableChannelStatuses,
   resolveChannelCleanupDecision,
   type SendableChannelStatus,
 } from "./discordChannels.js";
@@ -36,10 +36,9 @@ type ChannelCleanupOptions = {
 export async function cleanupChannelSubscriptions(
   options: ChannelCleanupOptions
 ): Promise<ChannelCleanupResult> {
-  const channelStatuses = await Promise.all(
-    options.subscriptions.map((subscription) =>
-      getSendableChannelStatus(options.client, subscription.channelId)
-    )
+  const channelStatuses = await getSendableChannelStatuses(
+    options.client,
+    options.subscriptions.map((subscription) => subscription.channelId)
   );
 
   const removedIds: string[] = [];

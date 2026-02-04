@@ -78,6 +78,27 @@ describe("cleanupChannelSubscriptions", () => {
     expect(result.permissionIssues).toEqual([]);
     expect(removeSubscription).toHaveBeenCalledTimes(1);
   });
+
+  it("dedupes channel lookups when subscriptions share a channel", async () => {
+    const okChannel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({ has: () => true }),
+    };
+    const client = createClient({ "channel-ok": okChannel });
+    const removeSubscription = jest.fn().mockResolvedValue(true);
+
+    await cleanupChannelSubscriptions({
+      client,
+      includePermissions: false,
+      removeSubscription,
+      subscriptions: [
+        { id: "sub-1", channelId: "channel-ok" },
+        { id: "sub-2", channelId: "channel-ok" },
+      ],
+    });
+
+    expect(client.channels.fetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("formatPermissionIssueSummary", () => {
