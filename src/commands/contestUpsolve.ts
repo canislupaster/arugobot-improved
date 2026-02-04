@@ -8,8 +8,8 @@ import {
   loadContestSolvesDataOrReply,
   resolveContestSolvesContext,
   resolveContestSolvesOptionsOrReply,
-  shouldShowContestSolvesStale,
   buildContestSolvesSummaryFields,
+  getContestSolvesStaleFooter,
 } from "../utils/contestSolvesData.js";
 import { resolveHandleTarget } from "../utils/handles.js";
 import { resolveHandleTargetLabelsOrReply } from "../utils/interaction.js";
@@ -126,8 +126,12 @@ export const contestUpsolveCommand: Command = {
         })
       );
 
-      if (shouldShowContestSolvesStale(contestResult.refreshWasStale, contestSolves)) {
-        embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
+      const staleFooter = getContestSolvesStaleFooter(
+        contestResult.refreshWasStale,
+        contestSolves
+      );
+      if (staleFooter) {
+        embed.setFooter({ text: staleFooter });
       }
 
       await interaction.editReply({ embeds: [embed] });

@@ -33,6 +33,18 @@ export function shouldShowContestSolvesStale(
   return refreshWasStale || contestSolves.isStale;
 }
 
+const CONTEST_SOLVES_STALE_FOOTER =
+  "Showing cached data due to a temporary Codeforces error.";
+
+export function getContestSolvesStaleFooter(
+  refreshWasStale: boolean,
+  contestSolves: ContestSolvesResult
+): string | null {
+  return shouldShowContestSolvesStale(refreshWasStale, contestSolves)
+    ? CONTEST_SOLVES_STALE_FOOTER
+    : null;
+}
+
 export function formatContestSolvesSummary(options: {
   totalProblems: number;
   solvedCount: number;
