@@ -58,6 +58,36 @@ export type PageEmbedOptions = {
   color?: number;
 };
 
+export type PageSlice<T> = {
+  start: number;
+  items: T[];
+  totalPages: number;
+};
+
+export function getTotalPages(totalItems: number, pageSize: number): number {
+  if (pageSize <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.ceil(totalItems / pageSize));
+}
+
+export function getPageSlice<T>(
+  items: T[],
+  pageNumber: number,
+  pageSize: number
+): PageSlice<T> | null {
+  const totalPages = getTotalPages(items.length, pageSize);
+  if (items.length === 0 || pageNumber < 1 || pageNumber > totalPages) {
+    return null;
+  }
+  const start = (pageNumber - 1) * pageSize;
+  return {
+    start,
+    items: items.slice(start, start + pageSize),
+    totalPages,
+  };
+}
+
 export function buildPageEmbed(options: PageEmbedOptions): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(options.title)

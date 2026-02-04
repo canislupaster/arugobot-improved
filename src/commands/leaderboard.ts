@@ -7,6 +7,8 @@ import { requireGuildAndPage, resolveBoundedIntegerOption } from "../utils/inter
 import {
   buildPageEmbed,
   buildPaginationIds,
+  getPageSlice,
+  getTotalPages,
   runPaginatedInteraction,
 } from "../utils/pagination.js";
 import { resolveGuildRoster } from "../utils/roster.js";
@@ -102,7 +104,7 @@ export const leaderboardCommand: Command = {
       fieldName: string,
       formatValue: (value: number) => string = (value) => String(value)
     ) => {
-      const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+      const totalPages = getTotalPages(rows.length, PAGE_SIZE);
       const paginationIds = buildPaginationIds("leaderboard", interaction.id);
       const medals = [":first_place:", ":second_place:", ":third_place:"];
       const mentionMap = await resolveMemberMentions(
@@ -113,20 +115,16 @@ export const leaderboardCommand: Command = {
 
       const renderPage = async (pageNumber: number) => {
         let content = "";
-        const start = (pageNumber - 1) * PAGE_SIZE;
-        if (start >= rows.length) {
+        const pageSlice = getPageSlice(rows, pageNumber, PAGE_SIZE);
+        if (!pageSlice) {
           return null;
         }
-        for (let i = 0; i < PAGE_SIZE; i += 1) {
-          const index = start + i;
-          if (index >= rows.length) {
-            break;
-          }
-          const entry = rows[index];
+        pageSlice.items.forEach((entry, index) => {
+          const rank = pageSlice.start + index + 1;
           const mention = mentionMap.get(entry.userId) ?? `<@${entry.userId}>`;
-          const medal = medals[i] ? ` ${medals[i]}` : "";
-          content += `${index + 1}. ${mention} (${formatValue(entry.value)})${medal}\n`;
-        }
+          const medal = medals[index] ? ` ${medals[index]}` : "";
+          content += `${rank}. ${mention} (${formatValue(entry.value)})${medal}\n`;
+        });
 
         const embed = buildPageEmbed({
           title,

@@ -3,6 +3,8 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import {
   buildPaginationIds,
+  getPageSlice,
+  getTotalPages,
   paginationTimeoutMs,
   runPaginatedInteraction,
 } from "../../src/utils/pagination.js";
@@ -84,5 +86,34 @@ describe("runPaginatedInteraction", () => {
     expect(payload.embeds).toHaveLength(1);
     expect(payload.components).toEqual([]);
     expect(response.createMessageComponentCollector).not.toHaveBeenCalled();
+  });
+});
+
+describe("getTotalPages", () => {
+  it("returns at least one page", () => {
+    expect(getTotalPages(0, 10)).toBe(1);
+    expect(getTotalPages(1, 10)).toBe(1);
+  });
+
+  it("rounds up when items exceed the page size", () => {
+    expect(getTotalPages(10, 10)).toBe(1);
+    expect(getTotalPages(11, 10)).toBe(2);
+  });
+});
+
+describe("getPageSlice", () => {
+  it("returns the slice for a valid page", () => {
+    const items = Array.from({ length: 12 }, (_, index) => index + 1);
+    const slice = getPageSlice(items, 2, 5);
+    expect(slice).not.toBeNull();
+    expect(slice?.start).toBe(5);
+    expect(slice?.items).toEqual([6, 7, 8, 9, 10]);
+    expect(slice?.totalPages).toBe(3);
+  });
+
+  it("returns null for empty or out-of-range pages", () => {
+    const items = Array.from({ length: 12 }, (_, index) => index + 1);
+    expect(getPageSlice(items, 4, 5)).toBeNull();
+    expect(getPageSlice([], 1, 5)).toBeNull();
   });
 });

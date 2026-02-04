@@ -6,6 +6,8 @@ import { requireGuildAndPage } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
+  getPageSlice,
+  getTotalPages,
   runPaginatedInteraction,
 } from "../utils/pagination.js";
 import { formatRatedRosterLines, resolveGuildRoster } from "../utils/roster.js";
@@ -55,7 +57,7 @@ export const handlesCommand: Command = {
       const filteredRoster = rosterResult.roster;
 
       const excludedCount = rosterResult.excludedCount;
-      const totalPages = Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE));
+      const totalPages = getTotalPages(filteredRoster.length, PAGE_SIZE);
       if (page > totalPages) {
         await interaction.editReply("Empty page.");
         return;
@@ -63,12 +65,16 @@ export const handlesCommand: Command = {
 
       const paginationIds = buildPaginationIds("handles", interaction.id);
       const renderPage = async (pageNumber: number) => {
-        const start = (pageNumber - 1) * PAGE_SIZE;
-        if (start >= filteredRoster.length) {
+        const pageSlice = getPageSlice(filteredRoster, pageNumber, PAGE_SIZE);
+        if (!pageSlice) {
           return null;
         }
 
-        const lines = formatRatedRosterLines(filteredRoster, start, PAGE_SIZE);
+        const lines = formatRatedRosterLines(
+          filteredRoster,
+          pageSlice.start,
+          pageSlice.items.length
+        );
 
         const embed = buildPageEmbed({
           title: "Linked handles",
