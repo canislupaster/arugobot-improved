@@ -2,17 +2,9 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { replyEphemeral } from "../utils/interaction.js";
-import { formatDiscordTimestamp } from "../utils/time.js";
+import { formatUpdatedAt } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-
-function formatUpdatedAt(updatedAt: string): string {
-  const parsed = Date.parse(updatedAt);
-  if (!Number.isFinite(parsed)) {
-    return updatedAt;
-  }
-  return formatDiscordTimestamp(Math.floor(parsed / 1000));
-}
 
 function buildDashboardUrl(baseUrl: string | undefined, guildId: string): string | null {
   if (!baseUrl) {

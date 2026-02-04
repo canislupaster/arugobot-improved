@@ -19,6 +19,14 @@ export function formatDiscordRelativeTime(unixSeconds: number): string {
   return `<t:${unixSeconds}:R>`;
 }
 
+export function formatUpdatedAt(updatedAt: string): string {
+  const parsed = Date.parse(updatedAt);
+  if (!Number.isFinite(parsed)) {
+    return updatedAt;
+  }
+  return formatDiscordTimestamp(Math.floor(parsed / 1000));
+}
+
 export function formatHourMinute(hour: number, minute: number): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }

@@ -4,7 +4,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { formatKeywordFilterClauses, parseKeywordFilters } from "../utils/contestFilters.js";
 import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import { replyEphemeral } from "../utils/interaction.js";
-import { formatDiscordTimestamp } from "../utils/time.js";
+import { formatUpdatedAt } from "../utils/time.js";
 
 import type { Command } from "./types.js";
 
@@ -14,14 +14,6 @@ function normalizeKeywordInput(value: string | null): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function formatUpdatedAt(updatedAt: string): string {
-  const parsed = Date.parse(updatedAt);
-  if (!Number.isFinite(parsed)) {
-    return updatedAt;
-  }
-  return formatDiscordTimestamp(Math.floor(parsed / 1000));
 }
 
 function formatScope(scope: string | null): string {

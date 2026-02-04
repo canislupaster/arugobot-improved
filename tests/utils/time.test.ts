@@ -1,5 +1,6 @@
 import {
   formatHourMinute,
+  formatUpdatedAt,
   formatUtcOffset,
   getLocalDayForUtcMs,
   getUtcScheduleMs,
@@ -19,6 +20,12 @@ describe("time utils", () => {
     expect(formatUtcOffset(0)).toBe("UTC");
     expect(formatUtcOffset(-330)).toBe("UTC-05:30");
     expect(formatUtcOffset(150)).toBe("UTC+02:30");
+  });
+
+  it("formats updated timestamps when possible", () => {
+    const value = new Date(Date.UTC(2024, 0, 1, 0, 0, 0)).toISOString();
+    expect(formatUpdatedAt(value)).toBe("<t:1704067200:F>");
+    expect(formatUpdatedAt("not-a-date")).toBe("not-a-date");
   });
 
   it("parses UTC offsets", () => {
