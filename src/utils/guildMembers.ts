@@ -17,6 +17,10 @@ function chunkIds(ids: string[], size: number): string[][] {
   return chunks;
 }
 
+function uniqueIds(ids: string[]): string[] {
+  return Array.from(new Set(ids));
+}
+
 async function fetchMembersWithFallback(
   guild: Guild,
   userIds: string[],
@@ -26,8 +30,8 @@ async function fetchMembersWithFallback(
   if (userIds.length === 0) {
     return membersById;
   }
-  const uniqueIds = Array.from(new Set(userIds));
-  const chunks = chunkIds(uniqueIds, MEMBER_CHUNK_SIZE);
+  const unique = uniqueIds(userIds);
+  const chunks = chunkIds(unique, MEMBER_CHUNK_SIZE);
 
   for (const chunk of chunks) {
     try {
@@ -85,12 +89,12 @@ export async function resolveMemberMentions(
   if (userIds.length === 0) {
     return mentions;
   }
-  const uniqueIds = Array.from(new Set(userIds));
-  const membersById = await fetchMembersWithFallback(guild, uniqueIds, context);
+  const unique = uniqueIds(userIds);
+  const membersById = await fetchMembersWithFallback(guild, unique, context);
   for (const [id, member] of membersById.entries()) {
     mentions.set(id, formatMemberMention(member));
   }
-  for (const id of uniqueIds) {
+  for (const id of unique) {
     mentions.set(id, mentions.get(id) ?? `<@${id}>`);
   }
 
