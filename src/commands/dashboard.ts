@@ -108,11 +108,11 @@ export const dashboardCommand: Command = {
       await context.services.guildSettings.setDashboardPublic(guildId, isPublic);
       await replyEphemeral(
         interaction,
-        `Dashboard visibility updated: ${isPublic ? "public" : "private"}.${buildDashboardUrlLine(
-          context.config.webPublicUrl,
+        formatDashboardVisibilityMessage({
+          isPublic,
+          baseUrl: context.config.webPublicUrl,
           guildId,
-          isPublic
-        )}`
+        })
       );
     } catch (error) {
       logCommandError("Dashboard command failed.", interaction, context.correlationId, {
