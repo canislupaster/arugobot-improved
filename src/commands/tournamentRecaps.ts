@@ -14,9 +14,24 @@ import {
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild, safeInteractionReply } from "../utils/interaction.js";
+import {
+  requireGuild,
+  safeInteractionEdit,
+  safeInteractionReply,
+} from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
+
+const NO_SUBSCRIPTION_MESSAGE = "No tournament recap auto-posts configured for this server.";
+const POST_RESPONSE_MESSAGES: Record<
+  "no_subscription" | "no_completed" | "channel_missing" | "recap_missing",
+  string
+> = {
+  no_subscription: NO_SUBSCRIPTION_MESSAGE,
+  no_completed: "No completed tournaments to recap.",
+  channel_missing: "Recap channel is missing; use /tournamentrecaps set to update the channel.",
+  recap_missing: "Unable to build a recap for the latest tournament.",
+};
 
 export const tournamentRecapsCommand: Command = {
   data: new SlashCommandBuilder()
@@ -65,19 +80,8 @@ export const tournamentRecapsCommand: Command = {
 
     const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
-    const noSubscriptionMessage = "No tournament recap auto-posts configured for this server.";
-    const postResponses: Record<
-      "no_subscription" | "no_completed" | "channel_missing" | "recap_missing",
-      string
-    > = {
-      no_subscription: noSubscriptionMessage,
-      no_completed: "No completed tournaments to recap.",
-      channel_missing: "Recap channel is missing; use /tournamentrecaps set to update the channel.",
-      recap_missing: "Unable to build a recap for the latest tournament.",
-    };
-
     const replyWithContent = async (content: string) => {
-      await interaction.reply({ content });
+      await safeInteractionReply(interaction, { content });
     };
 
     const buildStatusEmbed = (subscription: { channelId: string; roleId: string | null }) =>
@@ -96,7 +100,7 @@ export const tournamentRecapsCommand: Command = {
         case "status": {
           const subscription = await context.services.tournamentRecaps.getSubscription(guildId);
           if (!subscription) {
-            await replyWithContent(noSubscriptionMessage);
+            await replyWithContent(NO_SUBSCRIPTION_MESSAGE);
             return;
           }
 
@@ -116,7 +120,7 @@ export const tournamentRecapsCommand: Command = {
         case "cleanup": {
           const subscription = await context.services.tournamentRecaps.getSubscription(guildId);
           if (!subscription) {
-            await replyWithContent(noSubscriptionMessage);
+            await replyWithContent(NO_SUBSCRIPTION_MESSAGE);
             return;
           }
           const includePermissions =
@@ -166,20 +170,24 @@ export const tournamentRecapsCommand: Command = {
             context.client
           );
           if (result.status === "error") {
-            await interaction.editReply(`Failed to post recap: ${result.message}`);
+            await safeInteractionEdit(interaction, `Failed to post recap: ${result.message}`);
             return;
           }
           if (result.status === "channel_missing_permissions") {
-            await interaction.editReply(
+            await safeInteractionEdit(
+              interaction,
               formatCannotPostPermissionsMessage(result.channelId, result.missingPermissions)
             );
             return;
           }
           if (result.status !== "sent") {
-            await interaction.editReply(postResponses[result.status]);
+            await safeInteractionEdit(interaction, POST_RESPONSE_MESSAGES[result.status]);
             return;
           }
-          await interaction.editReply(`Tournament recap posted in <#${result.channelId}>.`);
+          await safeInteractionEdit(
+            interaction,
+            `Tournament recap posted in <#${result.channelId}>.`
+          );
           return;
         }
         default:
