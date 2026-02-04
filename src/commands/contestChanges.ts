@@ -10,7 +10,7 @@ import { addContestScopeOption, parseContestScope } from "../utils/contestScope.
 import {
   buildMissingTargetsField,
   partitionTargetsByHandle,
-  resolveContestTargetsFromInteractionOrReply,
+  resolveContestTargetsFromContextOrReply,
 } from "../utils/contestTargets.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 
@@ -127,17 +127,16 @@ export const contestChangesCommand: Command = {
         return;
       }
 
-      const targetResult = await resolveContestTargetsFromInteractionOrReply({
+      const targetList = await resolveContestTargetsFromContextOrReply({
         interaction,
-        ...contestResult.targetInputs,
+        targetInputs: contestResult.targetInputs,
         correlationId: context.correlationId,
         store: context.services.store,
         maxLinkedHandles: MAX_HANDLES,
       });
-      if (targetResult.status === "replied") {
+      if (!targetList) {
         return;
       }
-      const targetList = targetResult.targets;
 
       const changes = await context.services.contestRatingChanges.getContestRatingChanges(
         contest.id

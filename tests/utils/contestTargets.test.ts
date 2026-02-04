@@ -7,6 +7,7 @@ import {
   partitionTargetsByHandle,
   resolveContestTargetInputsOrReply,
   resolveContestTargets,
+  resolveContestTargetsFromContextOrReply,
   resolveContestTargetsFromInteractionOrReply,
   resolveContestTargetsOrReply,
 } from "../../src/utils/contestTargets.js";
@@ -403,6 +404,58 @@ describe("resolveContestTargets", () => {
     });
 
     expect(result).toEqual({ status: "replied" });
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "Provide at least one handle or run this command in a server."
+    );
+  });
+
+  it("resolves targets using contest context inputs", async () => {
+    const store = {
+      getHandle: jest.fn().mockResolvedValue("petr"),
+      resolveHandle: jest.fn(),
+      getLinkedUsers: jest.fn(),
+    };
+    const interaction = {
+      guild: null,
+      guildId: "guild-1",
+      user: { id: "user-1" },
+      commandName: "contestresults",
+      editReply: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ChatInputCommandInteraction;
+
+    const result = await resolveContestTargetsFromContextOrReply({
+      interaction,
+      targetInputs: { userOptions: [{ id: "user-2" } as User], handleInputs: [] },
+      correlationId: "corr-1",
+      store,
+    });
+
+    expect(result).toEqual([{ handle: "petr", label: "<@user-2>" }]);
+    expect(interaction.editReply).not.toHaveBeenCalled();
+  });
+
+  it("returns null when contest context resolution replies", async () => {
+    const store = {
+      getHandle: jest.fn(),
+      resolveHandle: jest.fn(),
+      getLinkedUsers: jest.fn(),
+    };
+    const interaction = {
+      guild: null,
+      guildId: null,
+      user: { id: "user-1" },
+      commandName: "contestresults",
+      editReply: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ChatInputCommandInteraction;
+
+    const result = await resolveContestTargetsFromContextOrReply({
+      interaction,
+      targetInputs: { userOptions: [], handleInputs: [] },
+      correlationId: "corr-1",
+      store,
+    });
+
+    expect(result).toBeNull();
     expect(interaction.editReply).toHaveBeenCalledWith(
       "Provide at least one handle or run this command in a server."
     );

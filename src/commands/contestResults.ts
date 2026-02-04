@@ -8,7 +8,7 @@ import { addContestScopeOption, parseContestScope } from "../utils/contestScope.
 import {
   buildMissingTargetsField,
   partitionTargetsByHandle,
-  resolveContestTargetsFromInteractionOrReply,
+  resolveContestTargetsFromContextOrReply,
 } from "../utils/contestTargets.js";
 
 import type { Command } from "./types.js";
@@ -94,19 +94,18 @@ export const contestResultsCommand: Command = {
         return;
       }
 
-      const targetResult = await resolveContestTargetsFromInteractionOrReply({
+      const targetList = await resolveContestTargetsFromContextOrReply({
         interaction,
-        ...contestResult.targetInputs,
+        targetInputs: contestResult.targetInputs,
         correlationId: context.correlationId,
         store: context.services.store,
         maxLinkedHandles: MAX_HANDLES,
       });
-      if (targetResult.status === "replied") {
+      if (!targetList) {
         return;
       }
 
       const { contest, stale } = contestResult;
-      const targetList = targetResult.targets;
 
       const standings = await context.services.contestStandings.getStandings(
         contest.id,

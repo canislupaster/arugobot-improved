@@ -393,3 +393,23 @@ export async function resolveContestTargetsFromInteractionOrReply(options: {
     ...rest,
   });
 }
+
+export async function resolveContestTargetsFromContextOrReply(options: {
+  interaction: ChatInputCommandInteraction & ContestTargetsInteraction;
+  targetInputs: { userOptions: User[]; handleInputs: string[] };
+  correlationId: string;
+  store: ContestTargetStore;
+  maxLinkedHandles?: number;
+}): Promise<TargetHandle[] | null> {
+  const result = await resolveContestTargetsFromInteractionOrReply({
+    interaction: options.interaction,
+    ...options.targetInputs,
+    correlationId: options.correlationId,
+    store: options.store,
+    maxLinkedHandles: options.maxLinkedHandles,
+  });
+  if (result.status === "replied") {
+    return null;
+  }
+  return result.targets;
+}
