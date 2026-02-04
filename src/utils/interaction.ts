@@ -104,6 +104,13 @@ export async function requireGuild(
   return null;
 }
 
+export async function requireGuildEphemeral(
+  interaction: ChatInputCommandInteraction,
+  content: string
+): Promise<NonNullable<ChatInputCommandInteraction["guild"]> | null> {
+  return requireGuild(interaction, { content, flags: MessageFlags.Ephemeral });
+}
+
 async function safeInteractionAction(
   action: () => Promise<unknown>,
   labels: { skipMessage: string; errorMessage: string },

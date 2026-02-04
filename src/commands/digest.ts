@@ -1,4 +1,4 @@
-import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import {
   getNextWeeklyScheduledUtcMs,
@@ -12,7 +12,7 @@ import {
   formatCannotPostPermissionsMessage,
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
-import { requireGuild } from "../utils/interaction.js";
+import { requireGuildEphemeral } from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,
   formatHourMinute,
@@ -150,10 +150,10 @@ export const digestCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction, {
-      content: "This command can only be used in a server.",
-      flags: MessageFlags.Ephemeral,
-    });
+    const guild = await requireGuildEphemeral(
+      interaction,
+      "This command can only be used in a server."
+    );
     if (!guild) {
       return;
     }
