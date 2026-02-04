@@ -47,6 +47,40 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKENDS = [0, 6];
 
+type EmbedField = { name: string; value: string; inline?: boolean };
+type ScheduleFields = { utcField: EmbedField; localFields: EmbedField[] };
+
+function buildScheduleFields(
+  hourUtc: number,
+  minuteUtc: number,
+  utcOffsetMinutes: number
+): ScheduleFields {
+  const utcField: EmbedField = {
+    name: "Schedule (UTC)",
+    value: formatHourMinute(hourUtc, minuteUtc),
+    inline: true,
+  };
+  if (utcOffsetMinutes === 0) {
+    return { utcField, localFields: [] };
+  }
+  const localTime = toLocalTime(hourUtc, minuteUtc, utcOffsetMinutes);
+  return {
+    utcField,
+    localFields: [
+      {
+        name: "Schedule (local)",
+        value: formatHourMinute(localTime.hour, localTime.minute),
+        inline: true,
+      },
+      {
+        name: "UTC offset",
+        value: formatUtcOffset(utcOffsetMinutes),
+        inline: true,
+      },
+    ],
+  };
+}
+
 function formatDaysLabel(days: number[]): string {
   const normalized = Array.from(new Set(days)).sort((a, b) => a - b);
   if (normalized.length === DEFAULT_DAYS.length) {
@@ -223,7 +257,7 @@ export const practiceRemindersCommand: Command = {
           subscription.daysOfWeek,
           subscription.utcOffsetMinutes
         );
-        const localTime = toLocalTime(
+        const scheduleFields = buildScheduleFields(
           subscription.hourUtc,
           subscription.minuteUtc,
           subscription.utcOffsetMinutes
@@ -234,25 +268,8 @@ export const practiceRemindersCommand: Command = {
           .setColor(EMBED_COLORS.success)
           .addFields(
             { name: "Channel", value: `<#${subscription.channelId}>`, inline: true },
-            {
-              name: "Schedule (UTC)",
-              value: formatHourMinute(subscription.hourUtc, subscription.minuteUtc),
-              inline: true,
-            },
-            ...(subscription.utcOffsetMinutes !== 0
-              ? [
-                  {
-                    name: "Schedule (local)",
-                    value: formatHourMinute(localTime.hour, localTime.minute),
-                    inline: true,
-                  },
-                  {
-                    name: "UTC offset",
-                    value: formatUtcOffset(subscription.utcOffsetMinutes),
-                    inline: true,
-                  },
-                ]
-              : []),
+            scheduleFields.utcField,
+            ...scheduleFields.localFields,
             {
               name: "Ranges",
               value: formatRatingRangesWithDefaults(
@@ -422,7 +439,7 @@ export const practiceRemindersCommand: Command = {
         }
 
         const nextScheduledSeconds = Math.floor(preview.nextScheduledAt / 1000);
-        const localTime = toLocalTime(
+        const scheduleFields = buildScheduleFields(
           preview.subscription.hourUtc,
           preview.subscription.minuteUtc,
           preview.subscription.utcOffsetMinutes
@@ -439,26 +456,9 @@ export const practiceRemindersCommand: Command = {
               )})`,
               inline: false,
             },
-            {
-              name: "Schedule (UTC)",
-              value: formatHourMinute(preview.subscription.hourUtc, preview.subscription.minuteUtc),
-              inline: true,
-            },
+            scheduleFields.utcField,
             { name: "Days", value: formatDaysLabel(preview.subscription.daysOfWeek), inline: true },
-            ...(preview.subscription.utcOffsetMinutes !== 0
-              ? [
-                  {
-                    name: "Schedule (local)",
-                    value: formatHourMinute(localTime.hour, localTime.minute),
-                    inline: true,
-                  },
-                  {
-                    name: "UTC offset",
-                    value: formatUtcOffset(preview.subscription.utcOffsetMinutes),
-                    inline: true,
-                  },
-                ]
-              : []),
+            ...scheduleFields.localFields,
             {
               name: "Ranges",
               value: formatRatingRangesWithDefaults(
