@@ -111,6 +111,28 @@ export function addContestFilterOptions(
     .addStringOption((option) => addContestScopeOption(option, scopeDescription));
 }
 
+export function addContestTargetOptions(
+  builder: SlashCommandBuilder
+): SlashCommandOptionsOnlyBuilder;
+export function addContestTargetOptions(
+  builder: SlashCommandOptionsOnlyBuilder
+): SlashCommandOptionsOnlyBuilder;
+export function addContestTargetOptions(
+  builder: SlashCommandSubcommandBuilder
+): SlashCommandSubcommandBuilder;
+export function addContestTargetOptions(
+  builder: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder
+): SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder {
+  return builder
+    .addUserOption((option) => option.setName("user1").setDescription("User to include"))
+    .addUserOption((option) => option.setName("user2").setDescription("User to include"))
+    .addUserOption((option) => option.setName("user3").setDescription("User to include"))
+    .addUserOption((option) => option.setName("user4").setDescription("User to include"))
+    .addStringOption((option) =>
+      option.setName("handles").setDescription("Comma or space separated handles to include")
+    );
+}
+
 export function addCleanupIncludePermissionsOption(
   subcommand: SlashCommandSubcommandBuilder,
   description = "Also remove if the bot is missing channel permissions"

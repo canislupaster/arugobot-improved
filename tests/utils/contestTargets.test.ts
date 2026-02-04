@@ -1,6 +1,7 @@
-import type { ChatInputCommandInteraction, Guild, User } from "discord.js";
+import { EmbedBuilder, type ChatInputCommandInteraction, type Guild, type User } from "discord.js";
 
 import {
+  applyMissingTargetsAndStaleFooter,
   buildMissingTargetsField,
   getContestUserOptions,
   getContestTargetContextError,
@@ -35,6 +36,27 @@ describe("getContestUserOptions", () => {
     expect(getUser).toHaveBeenCalledWith("user2");
     expect(getUser).toHaveBeenCalledWith("user3");
     expect(getUser).toHaveBeenCalledWith("user4");
+  });
+});
+
+describe("applyMissingTargetsAndStaleFooter", () => {
+  it("adds missing field and stale footer", () => {
+    const embed = new EmbedBuilder();
+    const footerNotes: string[] = [];
+
+    applyMissingTargetsAndStaleFooter({
+      embed,
+      missing: [{ handle: "tourist", label: "tourist" }],
+      footerNotes,
+      isStale: true,
+    });
+
+    const json = embed.toJSON();
+    expect(json.fields?.[0]?.name).toBe("Not found");
+    expect(json.fields?.[0]?.value).toContain("tourist");
+    expect(json.footer?.text).toBe(
+      "Showing cached data due to a temporary Codeforces error."
+    );
   });
 });
 

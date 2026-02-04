@@ -1,7 +1,7 @@
 import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextScheduledUtcMs, type ManualReminderResult } from "../services/practiceReminders.js";
-import { getSingleChannelCleanupReply } from "../utils/channelCleanup.js";
+import { replyWithSingleChannelCleanup } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addPreviewAndPostSubcommands,
@@ -342,18 +342,16 @@ export const practiceRemindersCommand: Command = {
           return;
         }
 
-        const includePermissions = interaction.options.getBoolean("include_permissions") ?? false;
-        const replyMessage = await getSingleChannelCleanupReply({
+        await replyWithSingleChannelCleanup({
+          interaction,
           client: context.client,
           channelId: subscription.channelId,
-          includePermissions,
           channelLabel: "Practice reminder",
           subjectLabel: "Practice reminders",
           subject: "practice reminders",
           setCommand: "/practicereminders set",
           remove: () => context.services.practiceReminders.clearSubscription(guildId),
         });
-        await interaction.reply({ content: replyMessage });
         return;
       }
 

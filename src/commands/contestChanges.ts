@@ -3,12 +3,13 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { addContestTargetOptions } from "../utils/commandOptions.js";
 import { resolveContestContextOrReply } from "../utils/contestCommand.js";
-import { buildRankedLines, formatTargetLabel } from "../utils/contestEntries.js";
+import { addRankedLinesField, formatTargetLabel } from "../utils/contestEntries.js";
 import { buildContestEmbed } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import {
-  buildMissingTargetsField,
+  applyMissingTargetsAndStaleFooter,
   partitionTargetsByHandle,
   resolveContestTargetsFromContextOrReply,
 } from "../utils/contestTargets.js";
@@ -52,27 +53,24 @@ function mapChangesByHandle(changes: RatingChange[]): Map<string, RatingChange> 
 }
 
 export const contestChangesCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("contestchanges")
-    .setDescription("Shows rating changes for linked users in a contest")
-    .addStringOption((option) =>
-      option.setName("query").setDescription("Contest id, URL, name, or latest").setRequired(true)
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("limit")
-        .setDescription(`Number of results to show (1-${MAX_LIMIT})`)
-        .setMinValue(1)
-        .setMaxValue(MAX_LIMIT)
-    )
-    .addUserOption((option) => option.setName("user1").setDescription("User to include"))
-    .addUserOption((option) => option.setName("user2").setDescription("User to include"))
-    .addUserOption((option) => option.setName("user3").setDescription("User to include"))
-    .addUserOption((option) => option.setName("user4").setDescription("User to include"))
-    .addStringOption((option) =>
-      option.setName("handles").setDescription("Comma or space separated handles to include")
-    )
-    .addStringOption((option) => addContestScopeOption(option)),
+  data: addContestTargetOptions(
+    new SlashCommandBuilder()
+      .setName("contestchanges")
+      .setDescription("Shows rating changes for linked users in a contest")
+      .addStringOption((option) =>
+        option
+          .setName("query")
+          .setDescription("Contest id, URL, name, or latest")
+          .setRequired(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("limit")
+          .setDescription(`Number of results to show (1-${MAX_LIMIT})`)
+          .setMinValue(1)
+          .setMaxValue(MAX_LIMIT)
+      )
+  ).addStringOption((option) => addContestScopeOption(option)),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles") ?? "";
@@ -166,33 +164,29 @@ export const contestChangesCommand: Command = {
         });
       } else {
         const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-        const { lines, truncated, total } = buildRankedLines(found, limit, (entry) => {
-          const display = formatTargetLabel(entry.label, entry.handle);
-          const delta = entry.newRating - entry.oldRating;
-          const rank = entry.rank > 0 ? `#${entry.rank}` : "Unranked";
-          return `${rank} ${display} • ${entry.oldRating} → ${entry.newRating} (${formatRatingDelta(
-            delta
-          )})`;
+        addRankedLinesField({
+          embed,
+          entries: found,
+          limit,
+          fieldName: "Rating changes",
+          footerNotes,
+          formatLine: (entry) => {
+            const display = formatTargetLabel(entry.label, entry.handle);
+            const delta = entry.newRating - entry.oldRating;
+            const rank = entry.rank > 0 ? `#${entry.rank}` : "Unranked";
+            return `${rank} ${display} • ${entry.oldRating} → ${entry.newRating} (${formatRatingDelta(
+              delta
+            )})`;
+          },
         });
-        embed.addFields({ name: "Rating changes", value: lines.join("\n"), inline: false });
-
-        if (truncated) {
-          footerNotes.push(`Showing top ${limit} of ${total} entries.`);
-        }
       }
 
-      const missingField = buildMissingTargetsField(missing);
-      if (missingField) {
-        embed.addFields(missingField);
-      }
-
-      if (stale || changes.isStale) {
-        footerNotes.push("Showing cached data due to a temporary Codeforces error.");
-      }
-
-      if (footerNotes.length > 0) {
-        embed.setFooter({ text: footerNotes.join(" ") });
-      }
+      applyMissingTargetsAndStaleFooter({
+        embed,
+        missing,
+        footerNotes,
+        isStale: stale || changes.isStale,
+      });
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {

@@ -1,4 +1,4 @@
-import type { Client } from "discord.js";
+import type { ChatInputCommandInteraction, Client } from "discord.js";
 
 import {
   describeSendableChannelStatus,
@@ -146,6 +146,36 @@ export async function getSingleChannelCleanupReply(params: {
     removedMessage: cleanupMessages.removedMessage,
     failedMessage: cleanupMessages.failedMessage,
   });
+}
+
+export async function replyWithSingleChannelCleanup(params: {
+  interaction: ChatInputCommandInteraction;
+  client: Client;
+  channelId: string;
+  channelLabel: string;
+  subjectLabel: string;
+  subject: string;
+  setCommand: string;
+  remove: () => Promise<boolean>;
+  subjectVerb?: string;
+  includePermissionsOption?: string;
+}): Promise<void> {
+  const includePermissions =
+    params.interaction.options.getBoolean(
+      params.includePermissionsOption ?? "include_permissions"
+    ) ?? false;
+  const replyMessage = await getSingleChannelCleanupReply({
+    client: params.client,
+    channelId: params.channelId,
+    includePermissions,
+    channelLabel: params.channelLabel,
+    subjectLabel: params.subjectLabel,
+    subject: params.subject,
+    setCommand: params.setCommand,
+    subjectVerb: params.subjectVerb,
+    remove: params.remove,
+  });
+  await params.interaction.reply({ content: replyMessage });
 }
 
 export function buildSingleChannelCleanupMessages(options: {

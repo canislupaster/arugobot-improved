@@ -5,7 +5,7 @@ import {
   type ManualWeeklyDigestResult,
   type WeeklyDigestSubscription,
 } from "../services/weeklyDigest.js";
-import { getSingleChannelCleanupReply } from "../utils/channelCleanup.js";
+import { replyWithSingleChannelCleanup } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addPreviewAndPostSubcommands,
@@ -224,11 +224,10 @@ export const digestCommand: Command = {
           return;
         }
 
-        const includePermissions = interaction.options.getBoolean("include_permissions") ?? false;
-        const replyMessage = await getSingleChannelCleanupReply({
+        await replyWithSingleChannelCleanup({
+          interaction,
           client: context.client,
           channelId: subscription.channelId,
-          includePermissions,
           channelLabel: "Weekly digest",
           subjectLabel: "Weekly digest",
           subject: "weekly digest",
@@ -236,7 +235,6 @@ export const digestCommand: Command = {
           subjectVerb: "points",
           remove: () => context.services.weeklyDigest.clearSubscription(guildId),
         });
-        await interaction.reply({ content: replyMessage });
         return;
       }
 

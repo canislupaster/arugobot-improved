@@ -3,6 +3,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 import {
   addContestFilterOptions,
+  addContestTargetOptions,
   addCleanupSubcommand,
   addPageOption,
   addPostSubcommand,
@@ -65,6 +66,17 @@ test("addContestFilterOptions adds include/exclude/scope", () => {
   const names = json.options?.map((option) => option.name);
 
   expect(names).toEqual(["include", "exclude", "scope"]);
+});
+
+test("addContestTargetOptions adds contest target options", () => {
+  const builder = addContestTargetOptions(
+    new SlashCommandBuilder().setName("contesttargets").setDescription("contesttargets")
+  );
+
+  const json = builder.toJSON();
+  const names = json.options?.map((option) => option.name);
+
+  expect(names).toEqual(["user1", "user2", "user3", "user4", "handles"]);
 });
 
 test("addPageOption adds page input", () => {

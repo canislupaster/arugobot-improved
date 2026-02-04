@@ -2,14 +2,15 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { resolveContestContextOrReply } from "../utils/contestCommand.js";
-import { buildRankedLines, formatTargetLabel } from "../utils/contestEntries.js";
+import { addRankedLinesField, formatTargetLabel } from "../utils/contestEntries.js";
 import { buildContestEmbed, formatContestTag } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import {
-  buildMissingTargetsField,
+  applyMissingTargetsAndStaleFooter,
   partitionTargetsByHandle,
   resolveContestTargetsFromContextOrReply,
 } from "../utils/contestTargets.js";
+import { addContestTargetOptions } from "../utils/commandOptions.js";
 
 import type { Command } from "./types.js";
 
@@ -41,26 +42,24 @@ function formatPoints(points: number): string {
 }
 
 export const contestResultsCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("contestresults")
-    .setDescription("Shows standings for linked users in a contest")
-    .addStringOption((option) =>
-      option.setName("query").setDescription("Contest id, URL, name, or latest").setRequired(true)
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("limit")
-        .setDescription(`Number of results to show (1-${MAX_LIMIT})`)
-        .setMinValue(1)
-        .setMaxValue(MAX_LIMIT)
-    )
-    .addUserOption((option) => option.setName("user1").setDescription("User to include"))
-    .addUserOption((option) => option.setName("user2").setDescription("User to include"))
-    .addUserOption((option) => option.setName("user3").setDescription("User to include"))
-    .addUserOption((option) => option.setName("user4").setDescription("User to include"))
-    .addStringOption((option) =>
-      option.setName("handles").setDescription("Comma or space separated handles to include")
-    )
+  data: addContestTargetOptions(
+    new SlashCommandBuilder()
+      .setName("contestresults")
+      .setDescription("Shows standings for linked users in a contest")
+      .addStringOption((option) =>
+        option
+          .setName("query")
+          .setDescription("Contest id, URL, name, or latest")
+          .setRequired(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("limit")
+          .setDescription(`Number of results to show (1-${MAX_LIMIT})`)
+          .setMinValue(1)
+          .setMaxValue(MAX_LIMIT)
+      )
+  )
     .addBooleanOption((option) =>
       option
         .setName("include_practice")
@@ -144,37 +143,32 @@ export const contestResultsCommand: Command = {
         });
       } else {
         const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-        const { lines, truncated, total } = buildRankedLines(found, limit, (entry) => {
-          const display = formatTargetLabel(entry.label, entry.handle);
-          const rank = entry.rank > 0 ? `#${entry.rank}` : "Unranked";
-          const points = formatPoints(entry.points);
-          const penalty = Number.isFinite(entry.penalty) ? String(entry.penalty) : "0";
-          const typeLabel =
-            entry.participantType && entry.participantType !== "CONTESTANT"
-              ? ` • ${formatParticipantType(entry.participantType)}`
-              : "";
-          return `${rank} ${display} • ${points} pts • ${penalty} pen${typeLabel}`;
+        addRankedLinesField({
+          embed,
+          entries: found,
+          limit,
+          fieldName: "Standings",
+          footerNotes,
+          formatLine: (entry) => {
+            const display = formatTargetLabel(entry.label, entry.handle);
+            const rank = entry.rank > 0 ? `#${entry.rank}` : "Unranked";
+            const points = formatPoints(entry.points);
+            const penalty = Number.isFinite(entry.penalty) ? String(entry.penalty) : "0";
+            const typeLabel =
+              entry.participantType && entry.participantType !== "CONTESTANT"
+                ? ` • ${formatParticipantType(entry.participantType)}`
+                : "";
+            return `${rank} ${display} • ${points} pts • ${penalty} pen${typeLabel}`;
+          },
         });
-
-        embed.addFields({ name: "Standings", value: lines.join("\n"), inline: false });
-
-        if (truncated) {
-          footerNotes.push(`Showing top ${limit} of ${total} entries.`);
-        }
       }
 
-      const missingField = buildMissingTargetsField(missing);
-      if (missingField) {
-        embed.addFields(missingField);
-      }
-
-      if (stale || standings.isStale) {
-        footerNotes.push("Showing cached data due to a temporary Codeforces error.");
-      }
-
-      if (footerNotes.length > 0) {
-        embed.setFooter({ text: footerNotes.join(" ") });
-      }
+      applyMissingTargetsAndStaleFooter({
+        embed,
+        missing,
+        footerNotes,
+        isStale: stale || standings.isStale,
+      });
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {

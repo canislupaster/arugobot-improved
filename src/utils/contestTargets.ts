@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction, Guild, User } from "discord.js";
+import { EmbedBuilder, type ChatInputCommandInteraction, type Guild, type User } from "discord.js";
 
 import { normalizeHandleInput, normalizeHandleKey, parseHandleList } from "./handles.js";
 import { resolveGuildRoster } from "./roster.js";
@@ -160,6 +160,24 @@ export function buildMissingTargetsField(
     value: `${preview}${suffix}`,
     inline: false,
   };
+}
+
+export function applyMissingTargetsAndStaleFooter(options: {
+  embed: EmbedBuilder;
+  missing: TargetHandle[];
+  footerNotes: string[];
+  isStale: boolean;
+}): void {
+  const missingField = buildMissingTargetsField(options.missing);
+  if (missingField) {
+    options.embed.addFields(missingField);
+  }
+  if (options.isStale) {
+    options.footerNotes.push("Showing cached data due to a temporary Codeforces error.");
+  }
+  if (options.footerNotes.length > 0) {
+    options.embed.setFooter({ text: options.footerNotes.join(" ") });
+  }
 }
 
 type LinkedUserHandle = { userId: string; handle: string };
