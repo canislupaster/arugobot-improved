@@ -18,23 +18,6 @@ import type { Command } from "./types.js";
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
 
-function buildTargetLabels(input: {
-  handle: string;
-  handleInput: string;
-  linkedUserId: string | null;
-  mention: string;
-  displayName: string;
-}): { targetLabel: string; titleTarget: string } {
-  if (input.handleInput) {
-    const linkedLabel = input.linkedUserId ? ` (linked to <@${input.linkedUserId}>)` : "";
-    return { targetLabel: `${input.handle}${linkedLabel}`, titleTarget: input.handle };
-  }
-  return {
-    targetLabel: `${input.mention} (${input.handle})`,
-    titleTarget: input.displayName,
-  };
-}
-
 export const contestUpsolveCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contestupsolve")
@@ -121,13 +104,9 @@ export const contestUpsolveCommand: Command = {
       );
       const solvedCount = solved.length;
       const unsolvedCount = unsolved.length;
-      const { targetLabel, titleTarget } = buildTargetLabels({
-        handle,
-        handleInput,
-        linkedUserId,
-        mention,
-        displayName,
-      });
+      const linkedLabel = linkedUserId ? ` (linked to <@${linkedUserId}>)` : "";
+      const targetLabel = handleInput ? `${handle}${linkedLabel}` : `${mention} (${handle})`;
+      const titleTarget = handleInput ? handle : displayName;
 
       const embed = buildContestEmbed({
         contest,
