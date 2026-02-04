@@ -1,6 +1,7 @@
 import type { ChatInputCommandInteraction, Guild, User } from "discord.js";
 
 import {
+  buildMissingTargetsField,
   getContestUserOptions,
   getContestTargetContextError,
   partitionTargetsByHandle,
@@ -405,6 +406,34 @@ describe("resolveContestTargets", () => {
     expect(interaction.editReply).toHaveBeenCalledWith(
       "Provide at least one handle or run this command in a server."
     );
+  });
+});
+
+describe("buildMissingTargetsField", () => {
+  it("returns null when no targets are missing", () => {
+    expect(buildMissingTargetsField([])).toBeNull();
+  });
+
+  it("formats a short missing list without a suffix", () => {
+    const field = buildMissingTargetsField([
+      { handle: "tourist", label: "tourist" },
+      { handle: "petr", label: "<@123>" },
+    ]);
+    expect(field).toEqual({
+      name: "Not found",
+      value: "tourist, <@123>",
+      inline: false,
+    });
+  });
+
+  it("adds a suffix when more than 10 targets are missing", () => {
+    const missing = Array.from({ length: 12 }, (_, index) => ({
+      handle: `handle-${index}`,
+      label: `user-${index}`,
+    }));
+    const field = buildMissingTargetsField(missing);
+    expect(field?.value).toContain("user-0, user-1, user-2, user-3, user-4");
+    expect(field?.value).toContain("...and 2 more.");
   });
 });
 

@@ -8,6 +8,8 @@ export type TargetHandle = {
   label: string;
 };
 
+const MISSING_TARGET_PREVIEW_LIMIT = 10;
+
 type ContestTargetStore = {
   getHandle: (guildId: string, userId: string) => Promise<string | null>;
   resolveHandle: (
@@ -139,6 +141,25 @@ export function partitionTargetsByHandle<T>(
     found.push({ ...target, ...entry });
   }
   return { found, missing };
+}
+
+export function buildMissingTargetsField(
+  missing: TargetHandle[]
+): { name: string; value: string; inline: false } | null {
+  if (missing.length === 0) {
+    return null;
+  }
+  const preview = missing
+    .slice(0, MISSING_TARGET_PREVIEW_LIMIT)
+    .map((entry) => entry.label)
+    .join(", ");
+  const remaining = missing.length - MISSING_TARGET_PREVIEW_LIMIT;
+  const suffix = remaining > 0 ? `\n...and ${remaining} more.` : "";
+  return {
+    name: "Not found",
+    value: `${preview}${suffix}`,
+    inline: false,
+  };
 }
 
 type LinkedUserHandle = { userId: string; handle: string };

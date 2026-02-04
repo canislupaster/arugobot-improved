@@ -6,6 +6,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestEmbed, resolveContestOrReply } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
+  buildMissingTargetsField,
   partitionTargetsByHandle,
   resolveContestTargetInputsOrReply,
   resolveContestTargetsFromInteractionOrReply,
@@ -198,17 +199,9 @@ export const contestChangesCommand: Command = {
         }
       }
 
-      if (missing.length > 0) {
-        const preview = missing
-          .slice(0, 10)
-          .map((entry) => entry.label)
-          .join(", ");
-        const suffix = missing.length > 10 ? `\n...and ${missing.length - 10} more.` : "";
-        embed.addFields({
-          name: "Not found",
-          value: `${preview}${suffix}`,
-          inline: false,
-        });
+      const missingField = buildMissingTargetsField(missing);
+      if (missingField) {
+        embed.addFields(missingField);
       }
 
       if (stale || changes.isStale) {
