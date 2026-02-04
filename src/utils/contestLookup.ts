@@ -152,7 +152,7 @@ export function resolveContestLookup(
   return { status: "ok", contest: matches[0] };
 }
 
-type ContestLookupReplyOptions = {
+export type ContestLookupReplyOptions = {
   maxMatches?: number;
   footerText: string;
   refreshWasStale: boolean;

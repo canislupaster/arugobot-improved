@@ -2,13 +2,13 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
+import { resolveContestContextOrReply } from "../utils/contestCommand.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { buildContestEmbed, resolveContestOrReply } from "../utils/contestLookup.js";
-import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
+import { buildContestEmbed } from "../utils/contestLookup.js";
+import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import {
   buildMissingTargetsField,
   partitionTargetsByHandle,
-  resolveContestTargetInputsOrReply,
   resolveContestTargetsFromInteractionOrReply,
 } from "../utils/contestTargets.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
@@ -76,43 +76,29 @@ export const contestChangesCommand: Command = {
     const queryRaw = interaction.options.getString("query", true).trim();
     const handlesRaw = interaction.options.getString("handles") ?? "";
     const scope = parseContestScope(interaction.options.getString("scope"));
-    const targetInputs = await resolveContestTargetInputsOrReply(interaction, handlesRaw);
-    if (targetInputs.status === "replied") {
-      return;
-    }
-    const { handleInputs, userOptions } = targetInputs;
-
-    await interaction.deferReply();
-
-    const refreshResult = await refreshContestData(context.services.contests, scope);
-    if ("error" in refreshResult) {
-      await interaction.editReply(refreshResult.error);
-      return;
-    }
-    const stale = refreshResult.stale;
 
     try {
-      const lookup = await resolveContestOrReply(
+      const contestResult = await resolveContestContextOrReply({
         interaction,
+        services: context.services,
         queryRaw,
+        handlesRaw,
         scope,
-        context.services.contests,
-        {
-          maxMatches: MAX_MATCHES,
+        maxMatches: MAX_MATCHES,
+        lookupOptions: {
           footerText: "Use /contestchanges with the contest ID for rating changes.",
-          refreshWasStale: stale,
           missingLatestMessage: "No finished contests found yet.",
           missingUpcomingMessage: "No upcoming contests found yet.",
           missingOngoingMessage: "No ongoing contests found right now.",
           missingIdMessage: "No contest found with that ID.",
           missingNameMessage: "No contests found matching that name.",
-        }
-      );
-      if (lookup.status === "replied") {
+        },
+      });
+      if (contestResult.status === "replied") {
         return;
       }
 
-      const contest = lookup.contest;
+      const { contest, stale } = contestResult;
 
       if (contest.isGym) {
         const embed = buildContestStatusEmbed(
@@ -142,8 +128,7 @@ export const contestChangesCommand: Command = {
 
       const targetResult = await resolveContestTargetsFromInteractionOrReply({
         interaction,
-        userOptions,
-        handleInputs,
+        ...contestResult.targetInputs,
         correlationId: context.correlationId,
         store: context.services.store,
         maxLinkedHandles: MAX_HANDLES,

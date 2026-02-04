@@ -1,12 +1,12 @@
 import { SlashCommandBuilder } from "discord.js";
 
+import { resolveContestContextOrReply } from "../utils/contestCommand.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { buildContestEmbed, formatContestTag, resolveContestOrReply } from "../utils/contestLookup.js";
-import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
+import { buildContestEmbed, formatContestTag } from "../utils/contestLookup.js";
+import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import {
   buildMissingTargetsField,
   partitionTargetsByHandle,
-  resolveContestTargetInputsOrReply,
   resolveContestTargetsFromInteractionOrReply,
 } from "../utils/contestTargets.js";
 
@@ -71,48 +71,31 @@ export const contestResultsCommand: Command = {
     const handlesRaw = interaction.options.getString("handles") ?? "";
     const includePractice = interaction.options.getBoolean("include_practice") ?? false;
     const scope = parseContestScope(interaction.options.getString("scope"));
-    const targetInputs = await resolveContestTargetInputsOrReply(interaction, handlesRaw);
-    if (targetInputs.status === "replied") {
-      return;
-    }
-    const { handleInputs, userOptions } = targetInputs;
-
-    await interaction.deferReply();
-
-    const refreshResult = await refreshContestData(context.services.contests, scope);
-    if ("error" in refreshResult) {
-      await interaction.editReply(refreshResult.error);
-      return;
-    }
-    const stale = refreshResult.stale;
 
     try {
-      const lookup = await resolveContestOrReply(
+      const contestResult = await resolveContestContextOrReply({
         interaction,
+        services: context.services,
         queryRaw,
+        handlesRaw,
         scope,
-        context.services.contests,
-        {
-          maxMatches: MAX_MATCHES,
+        maxMatches: MAX_MATCHES,
+        lookupOptions: {
           footerText: "Use /contestresults with the contest ID for standings.",
-          refreshWasStale: stale,
           missingLatestMessage: "No finished contests found yet.",
           missingUpcomingMessage: "No upcoming contests found yet.",
           missingOngoingMessage: "No ongoing contests found right now.",
           missingIdMessage: "No contest found with that ID.",
           missingNameMessage: "No contests found matching that name.",
-        }
-      );
-      if (lookup.status === "replied") {
+        },
+      });
+      if (contestResult.status === "replied") {
         return;
       }
 
-      const contest = lookup.contest;
-
       const targetResult = await resolveContestTargetsFromInteractionOrReply({
         interaction,
-        userOptions,
-        handleInputs,
+        ...contestResult.targetInputs,
         correlationId: context.correlationId,
         store: context.services.store,
         maxLinkedHandles: MAX_HANDLES,
@@ -120,6 +103,8 @@ export const contestResultsCommand: Command = {
       if (targetResult.status === "replied") {
         return;
       }
+
+      const { contest, stale } = contestResult;
       const targetList = targetResult.targets;
 
       const standings = await context.services.contestStandings.getStandings(
