@@ -14,7 +14,7 @@ import {
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild } from "../utils/interaction.js";
+import { requireGuild, safeInteractionReply } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -191,11 +191,7 @@ export const tournamentRecapsCommand: Command = {
         interaction,
         context.correlationId
       );
-      if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: "Something went wrong." });
-      } else {
-        await interaction.reply({ content: "Something went wrong." });
-      }
+      await safeInteractionReply(interaction, { content: "Something went wrong." });
     }
   },
 };

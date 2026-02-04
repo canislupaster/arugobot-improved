@@ -10,6 +10,7 @@ import {
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { safeInteractionReply } from "../utils/interaction.js";
 import { buildProblemUrl } from "../utils/problemReference.js";
 import { formatTime } from "../utils/rating.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
@@ -344,11 +345,7 @@ export const challengesCommand: Command = {
       });
     } catch (error) {
       logCommandError(`Error in challenges: ${String(error)}`, interaction, context.correlationId);
-      if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: "Something went wrong." });
-      } else {
-        await interaction.reply({ content: "Something went wrong." });
-      }
+      await safeInteractionReply(interaction, { content: "Something went wrong." });
     }
   },
 };

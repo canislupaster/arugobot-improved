@@ -136,4 +136,24 @@ describe("tournamentRecapsCommand", () => {
       content: "Removed tournament recap settings for <#channel-1> (Missing or deleted).",
     });
   });
+
+  it("falls back to a simple reply when the command throws", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("status"),
+      },
+    });
+    const context = {
+      correlationId: "corr-5",
+      services: {
+        tournamentRecaps: {
+          getSubscription: jest.fn().mockRejectedValue(new Error("boom")),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await tournamentRecapsCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Something went wrong." });
+  });
 });

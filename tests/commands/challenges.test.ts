@@ -201,4 +201,25 @@ describe("challengesCommand", () => {
     expect(fields[0].name).not.toContain("](");
     expect(fields[0].value).toContain("Problem:");
   });
+
+  it("falls back to a simple reply when the command throws", async () => {
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("list"),
+        getInteger: jest.fn(),
+      },
+    });
+    const context = {
+      correlationId: "corr-5",
+      services: {
+        challenges: {
+          listActiveChallenges: jest.fn().mockRejectedValue(new Error("boom")),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await challengesCommand.execute(interaction, context);
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Something went wrong." });
+  });
 });
