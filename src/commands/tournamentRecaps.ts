@@ -9,9 +9,8 @@ import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   describeSendableChannelStatus,
-  formatCannotPostMessage,
   formatCannotPostPermissionsMessage,
-  getSendableChannelStatus,
+  resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild } from "../utils/interaction.js";
@@ -144,17 +143,13 @@ export const tournamentRecapsCommand: Command = {
           return;
         }
         case "set": {
-          const channel = interaction.options.getChannel("channel", true);
-          if (
-            channel.type !== ChannelType.GuildText &&
-            channel.type !== ChannelType.GuildAnnouncement
-          ) {
-            await replyWithContent("Pick a text channel for tournament recaps.");
-            return;
-          }
-          const status = await getSendableChannelStatus(context.client, channel.id);
-          if (status.status !== "ok") {
-            await replyWithContent(formatCannotPostMessage(channel.id, status));
+          const channel = await resolveSendableChannelOrReply(
+            interaction,
+            context.client,
+            interaction.options.getChannel("channel", true),
+            { invalidTypeMessage: "Pick a text channel for tournament recaps." }
+          );
+          if (!channel) {
             return;
           }
           const role = interaction.options.getRole("role");

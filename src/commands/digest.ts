@@ -1,4 +1,4 @@
-import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import {
   getNextWeeklyScheduledUtcMs,
@@ -9,9 +9,8 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { addScheduleOptions } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
-  formatCannotPostMessage,
   formatCannotPostPermissionsMessage,
-  getSendableChannelStatus,
+  resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { requireGuild } from "../utils/interaction.js";
 import {
@@ -261,21 +260,13 @@ export const digestCommand: Command = {
         return;
       }
 
-      const channel = interaction.options.getChannel("channel", true);
-      if (
-        channel.type !== ChannelType.GuildText &&
-        channel.type !== ChannelType.GuildAnnouncement
-      ) {
-        await interaction.reply({
-          content: "Select a text or announcement channel.",
-        });
-        return;
-      }
-      const status = await getSendableChannelStatus(context.client, channel.id);
-      if (status.status !== "ok") {
-        await interaction.reply({
-          content: formatCannotPostMessage(channel.id, status),
-        });
+      const channel = await resolveSendableChannelOrReply(
+        interaction,
+        context.client,
+        interaction.options.getChannel("channel", true),
+        { invalidTypeMessage: "Select a text or announcement channel." }
+      );
+      if (!channel) {
         return;
       }
 
