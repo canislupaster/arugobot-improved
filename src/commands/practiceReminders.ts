@@ -55,6 +55,25 @@ const NO_PRACTICE_REMINDERS_WERE_MESSAGE =
   "No practice reminders were configured for this server.";
 const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_TOKEN_MAP: Record<string, number> = {
+  sun: 0,
+  sunday: 0,
+  mon: 1,
+  monday: 1,
+  tue: 2,
+  tues: 2,
+  tuesday: 2,
+  wed: 3,
+  wednesday: 3,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  thursday: 4,
+  fri: 5,
+  friday: 5,
+  sat: 6,
+  saturday: 6,
+};
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKENDS = [0, 6];
 
@@ -107,34 +126,7 @@ function formatDaysLabel(days: number[]): string {
 }
 
 function resolveDayToken(token: string): number | null {
-  switch (token) {
-    case "sun":
-    case "sunday":
-      return 0;
-    case "mon":
-    case "monday":
-      return 1;
-    case "tue":
-    case "tues":
-    case "tuesday":
-      return 2;
-    case "wed":
-    case "wednesday":
-      return 3;
-    case "thu":
-    case "thur":
-    case "thurs":
-    case "thursday":
-      return 4;
-    case "fri":
-    case "friday":
-      return 5;
-    case "sat":
-    case "saturday":
-      return 6;
-    default:
-      return null;
-  }
+  return DAY_TOKEN_MAP[token] ?? null;
 }
 
 function parseDaysInput(raw: string | null | undefined): { days: number[] } | { error: string } {

@@ -185,6 +185,39 @@ describe("practiceRemindersCommand", () => {
     });
   });
 
+  it("rejects invalid day inputs", async () => {
+    const channel = createSendableChannel("channel-1");
+    const interaction = createInteraction({
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("set"),
+        getChannel: jest.fn().mockReturnValue(channel),
+        getInteger: jest.fn().mockReturnValue(null),
+        getString: jest.fn((name: string) => {
+          if (name === "days") {
+            return "funday";
+          }
+          return null;
+        }),
+        getBoolean: jest.fn(),
+        getRole: jest.fn().mockReturnValue(null),
+      },
+    });
+    const context = {
+      correlationId: "corr-2c",
+      client: createClient(channel),
+      services: {
+        practiceReminders: {
+          setSubscription: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await practiceRemindersCommand.execute(interaction, context);
+
+    expect(context.services.practiceReminders.setSubscription).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Invalid day: funday" });
+  });
+
   it("clears practice reminders when requested", async () => {
     const interaction = createInteraction({
       options: {
