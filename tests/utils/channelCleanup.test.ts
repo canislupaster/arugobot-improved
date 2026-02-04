@@ -1,6 +1,7 @@
 import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
 
 import {
+  buildSingleChannelCleanupMessages,
   buildChannelCleanupSummary,
   cleanupChannelSubscriptions,
   cleanupSingleChannelSubscription,
@@ -124,6 +125,38 @@ describe("formatPermissionIssueSummary", () => {
     expect(summary).toBe(
       "Subscriptions with missing permissions (not removed): `sub-1` (<#channel-1>): Missing permissions (SendMessages)."
     );
+  });
+});
+
+describe("buildSingleChannelCleanupMessages", () => {
+  it("builds consistent cleanup text for a single channel", () => {
+    const messages = buildSingleChannelCleanupMessages({
+      channelId: "channel-1",
+      channelLabel: "Practice reminder",
+      subjectLabel: "Practice reminders",
+      subject: "practice reminders",
+      setCommand: "/practicereminders set",
+    });
+
+    expect(messages.healthyMessage).toBe(
+      "Practice reminder channel looks healthy; nothing to clean."
+    );
+    expect(
+      messages.missingPermissionsMessage({
+        status: "missing_permissions",
+        channelId: "channel-1",
+        missingPermissions: ["SendMessages"],
+      })
+    ).toBe(
+      "Practice reminders still point at <#channel-1> (Missing permissions (SendMessages)). Re-run with include_permissions:true or update the channel with /practicereminders set."
+    );
+    expect(
+      messages.removedMessage({
+        status: "missing",
+        channelId: "channel-1",
+      })
+    ).toBe("Removed practice reminders for <#channel-1> (Missing or deleted).");
+    expect(messages.failedMessage).toBe("Failed to remove practice reminders. Try again later.");
   });
 });
 

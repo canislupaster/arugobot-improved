@@ -5,11 +5,13 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 
-import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
+import {
+  buildSingleChannelCleanupMessages,
+  cleanupSingleChannelSubscription,
+} from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addCleanupSubcommand } from "../utils/commandOptions.js";
 import {
-  describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
@@ -124,21 +126,22 @@ export const tournamentRecapsCommand: Command = {
           }
           const includePermissions =
             interaction.options.getBoolean("include_permissions") ?? false;
+          const cleanupMessages = buildSingleChannelCleanupMessages({
+            channelId: subscription.channelId,
+            channelLabel: "Tournament recap",
+            subjectLabel: "Tournament recaps",
+            subject: "tournament recap settings",
+            setCommand: "/tournamentrecaps set",
+          });
           const replyMessage = await cleanupSingleChannelSubscription({
             client: context.client,
             channelId: subscription.channelId,
             includePermissions,
-            healthyMessage: "Tournament recap channel looks healthy; nothing to clean.",
-            missingPermissionsMessage: (status) =>
-              `Tournament recaps still point at <#${subscription.channelId}> (${describeSendableChannelStatus(
-                status
-              )}). Re-run with include_permissions:true or update the channel with /tournamentrecaps set.`,
+            healthyMessage: cleanupMessages.healthyMessage,
+            missingPermissionsMessage: cleanupMessages.missingPermissionsMessage,
             remove: () => context.services.tournamentRecaps.clearSubscription(guildId),
-            removedMessage: (status) =>
-              `Removed tournament recap settings for <#${subscription.channelId}> (${describeSendableChannelStatus(
-                status
-              )}).`,
-            failedMessage: "Failed to remove tournament recap settings. Try again later.",
+            removedMessage: cleanupMessages.removedMessage,
+            failedMessage: cleanupMessages.failedMessage,
           });
           await replyWithContent(replyMessage);
           return;

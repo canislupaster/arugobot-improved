@@ -117,6 +117,34 @@ export async function cleanupSingleChannelSubscription(params: {
   return removed ? params.removedMessage(decision.status) : params.failedMessage;
 }
 
+export function buildSingleChannelCleanupMessages(options: {
+  channelId: string;
+  channelLabel: string;
+  subjectLabel: string;
+  subject: string;
+  setCommand: string;
+}): {
+  healthyMessage: string;
+  missingPermissionsMessage: (
+    status: Extract<SendableChannelStatus, { status: "missing_permissions" }>
+  ) => string;
+  removedMessage: (status: SendableChannelStatus) => string;
+  failedMessage: string;
+} {
+  return {
+    healthyMessage: `${options.channelLabel} channel looks healthy; nothing to clean.`,
+    missingPermissionsMessage: (status) =>
+      `${options.subjectLabel} still point at <#${options.channelId}> (${describeSendableChannelStatus(
+        status
+      )}). Re-run with include_permissions:true or update the channel with ${options.setCommand}.`,
+    removedMessage: (status) =>
+      `Removed ${options.subject} for <#${options.channelId}> (${describeSendableChannelStatus(
+        status
+      )}).`,
+    failedMessage: `Failed to remove ${options.subject}. Try again later.`,
+  };
+}
+
 export function formatIdList(ids: string[]): string {
   return ids.map((id) => `\`${id}\``).join(", ");
 }

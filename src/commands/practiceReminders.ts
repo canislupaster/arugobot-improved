@@ -1,7 +1,10 @@
 import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
-import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
+import {
+  buildSingleChannelCleanupMessages,
+  cleanupSingleChannelSubscription,
+} from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
@@ -339,21 +342,22 @@ export const practiceRemindersCommand: Command = {
         }
 
         const includePermissions = interaction.options.getBoolean("include_permissions") ?? false;
+        const cleanupMessages = buildSingleChannelCleanupMessages({
+          channelId: subscription.channelId,
+          channelLabel: "Practice reminder",
+          subjectLabel: "Practice reminders",
+          subject: "practice reminders",
+          setCommand: "/practicereminders set",
+        });
         const replyMessage = await cleanupSingleChannelSubscription({
           client: context.client,
           channelId: subscription.channelId,
           includePermissions,
-          healthyMessage: "Practice reminder channel looks healthy; nothing to clean.",
-          missingPermissionsMessage: (status) =>
-            `Practice reminders still point at <#${subscription.channelId}> (${describeSendableChannelStatus(
-              status
-            )}). Re-run with include_permissions:true or update the channel with /practicereminders set.`,
+          healthyMessage: cleanupMessages.healthyMessage,
+          missingPermissionsMessage: cleanupMessages.missingPermissionsMessage,
           remove: () => context.services.practiceReminders.clearSubscription(guildId),
-          removedMessage: (status) =>
-            `Removed practice reminders for <#${subscription.channelId}> (${describeSendableChannelStatus(
-              status
-            )}).`,
-          failedMessage: "Failed to remove practice reminders. Try again later.",
+          removedMessage: cleanupMessages.removedMessage,
+          failedMessage: cleanupMessages.failedMessage,
         });
         await interaction.reply({ content: replyMessage });
         return;
