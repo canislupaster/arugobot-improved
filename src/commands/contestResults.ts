@@ -9,6 +9,7 @@ import {
   partitionTargetsByHandle,
   resolveContestTargetsFromInteractionOrReply,
 } from "../utils/contestTargets.js";
+import { buildRankedLines, formatTargetLabel } from "../utils/contestEntries.js";
 
 import type { Command } from "./types.js";
 
@@ -144,11 +145,8 @@ export const contestResultsCommand: Command = {
         });
       } else {
         const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-        const sorted = found.sort((a, b) => a.rank - b.rank);
-        const lines = sorted.slice(0, limit).map((entry) => {
-          const display = entry.label.startsWith("<@")
-            ? `${entry.label} (${entry.handle})`
-            : entry.label;
+        const { lines, truncated, total } = buildRankedLines(found, limit, (entry) => {
+          const display = formatTargetLabel(entry.label, entry.handle);
           const rank = entry.rank > 0 ? `#${entry.rank}` : "Unranked";
           const points = formatPoints(entry.points);
           const penalty = Number.isFinite(entry.penalty) ? String(entry.penalty) : "0";
@@ -161,8 +159,8 @@ export const contestResultsCommand: Command = {
 
         embed.addFields({ name: "Standings", value: lines.join("\n"), inline: false });
 
-        if (found.length > limit) {
-          footerNotes.push(`Showing top ${limit} of ${found.length} entries.`);
+        if (truncated) {
+          footerNotes.push(`Showing top ${limit} of ${total} entries.`);
         }
       }
 

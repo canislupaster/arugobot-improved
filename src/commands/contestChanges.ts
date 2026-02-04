@@ -11,6 +11,7 @@ import {
   partitionTargetsByHandle,
   resolveContestTargetsFromInteractionOrReply,
 } from "../utils/contestTargets.js";
+import { buildRankedLines, formatTargetLabel } from "../utils/contestEntries.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 
 import type { Command } from "./types.js";
@@ -166,11 +167,8 @@ export const contestChangesCommand: Command = {
         });
       } else {
         const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
-        const sorted = found.sort((a, b) => a.rank - b.rank);
-        const lines = sorted.slice(0, limit).map((entry) => {
-          const display = entry.label.startsWith("<@")
-            ? `${entry.label} (${entry.handle})`
-            : entry.label;
+        const { lines, truncated, total } = buildRankedLines(found, limit, (entry) => {
+          const display = formatTargetLabel(entry.label, entry.handle);
           const delta = entry.newRating - entry.oldRating;
           const rank = entry.rank > 0 ? `#${entry.rank}` : "Unranked";
           return `${rank} ${display} • ${entry.oldRating} → ${entry.newRating} (${formatRatingDelta(
@@ -179,8 +177,8 @@ export const contestChangesCommand: Command = {
         });
         embed.addFields({ name: "Rating changes", value: lines.join("\n"), inline: false });
 
-        if (found.length > limit) {
-          footerNotes.push(`Showing top ${limit} of ${found.length} entries.`);
+        if (truncated) {
+          footerNotes.push(`Showing top ${limit} of ${total} entries.`);
         }
       }
 
