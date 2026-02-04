@@ -123,6 +123,7 @@ export function buildSingleChannelCleanupMessages(options: {
   subjectLabel: string;
   subject: string;
   setCommand: string;
+  subjectVerb?: string;
 }): {
   healthyMessage: string;
   missingPermissionsMessage: (
@@ -131,10 +132,11 @@ export function buildSingleChannelCleanupMessages(options: {
   removedMessage: (status: SendableChannelStatus) => string;
   failedMessage: string;
 } {
+  const subjectVerb = options.subjectVerb ?? "point";
   return {
     healthyMessage: `${options.channelLabel} channel looks healthy; nothing to clean.`,
     missingPermissionsMessage: (status) =>
-      `${options.subjectLabel} still point at <#${options.channelId}> (${describeSendableChannelStatus(
+      `${options.subjectLabel} still ${subjectVerb} at <#${options.channelId}> (${describeSendableChannelStatus(
         status
       )}). Re-run with include_permissions:true or update the channel with ${options.setCommand}.`,
     removedMessage: (status) =>

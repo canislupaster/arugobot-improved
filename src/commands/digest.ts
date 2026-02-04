@@ -5,7 +5,10 @@ import {
   type ManualWeeklyDigestResult,
   type WeeklyDigestSubscription,
 } from "../services/weeklyDigest.js";
-import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
+import {
+  buildSingleChannelCleanupMessages,
+  cleanupSingleChannelSubscription,
+} from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
@@ -14,7 +17,6 @@ import {
   buildPreviewPostOptions,
 } from "../utils/commandOptions.js";
 import {
-  describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
@@ -222,21 +224,23 @@ export const digestCommand: Command = {
         }
 
         const includePermissions = interaction.options.getBoolean("include_permissions") ?? false;
+        const cleanupMessages = buildSingleChannelCleanupMessages({
+          channelId: subscription.channelId,
+          channelLabel: "Weekly digest",
+          subjectLabel: "Weekly digest",
+          subject: "weekly digest",
+          setCommand: "/digest set",
+          subjectVerb: "points",
+        });
         const replyMessage = await cleanupSingleChannelSubscription({
           client: context.client,
           channelId: subscription.channelId,
           includePermissions,
-          healthyMessage: "Weekly digest channel looks healthy; nothing to clean.",
-          missingPermissionsMessage: (status) =>
-            `Weekly digest still points at <#${subscription.channelId}> (${describeSendableChannelStatus(
-              status
-            )}). Re-run with include_permissions:true or update the channel with /digest set.`,
+          healthyMessage: cleanupMessages.healthyMessage,
+          missingPermissionsMessage: cleanupMessages.missingPermissionsMessage,
           remove: () => context.services.weeklyDigest.clearSubscription(guildId),
-          removedMessage: (status) =>
-            `Removed weekly digest for <#${subscription.channelId}> (${describeSendableChannelStatus(
-              status
-            )}).`,
-          failedMessage: "Failed to remove weekly digest. Try again later.",
+          removedMessage: cleanupMessages.removedMessage,
+          failedMessage: cleanupMessages.failedMessage,
         });
         await interaction.reply({ content: replyMessage });
         return;
