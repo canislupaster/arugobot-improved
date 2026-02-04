@@ -166,6 +166,94 @@ function normalizeHandleInputs(inputs: string[]): NormalizedHandleInput[] {
   return result;
 }
 
+async function addUserOptionTargets(
+  targets: Map<string, TargetHandle>,
+  store: ContestTargetStore,
+  guildId: string,
+  userOptions: User[]
+): Promise<TargetResolution | null> {
+  if (userOptions.length === 0) {
+    return null;
+  }
+  const resolvedUsers = await Promise.all(
+    userOptions.map(async (option) => ({
+      option,
+      handle: await store.getHandle(guildId, option.id),
+    }))
+  );
+  for (const entry of resolvedUsers) {
+    if (!entry.handle) {
+      return errorResult(`User <@${entry.option.id}> does not have a linked handle.`);
+    }
+    addTargetHandle(targets, entry.handle, `<@${entry.option.id}>`);
+  }
+  return null;
+}
+
+async function addHandleInputTargets(
+  targets: Map<string, TargetHandle>,
+  store: ContestTargetStore,
+  normalizedHandleInputs: NormalizedHandleInput[]
+): Promise<TargetResolution | null> {
+  if (normalizedHandleInputs.length === 0) {
+    return null;
+  }
+  for (const handleInput of normalizedHandleInputs) {
+    const resolved = await store.resolveHandle(handleInput.normalized);
+    if (!resolved.exists) {
+      return errorResult(`Invalid handle: ${handleInput.raw}`);
+    }
+    const handle = resolved.canonicalHandle ?? handleInput.normalized;
+    addTargetHandle(targets, handle, handle);
+  }
+  return null;
+}
+
+async function resolveFallbackTargets(params: {
+  guild: Guild | null;
+  guildId: string;
+  store: ContestTargetStore;
+  maxLinkedHandles?: number;
+  commandName: string;
+  correlationId: string;
+  user: User;
+}): Promise<TargetResolution> {
+  const linkedUsers = await params.store.getLinkedUsers(params.guildId);
+  const targets = new Map<string, TargetHandle>();
+  if (!params.guild) {
+    if (linkedUsers.length === 0) {
+      return errorResult(NO_LINKED_HANDLES_MESSAGE);
+    }
+    const maxError = getMaxLinkedHandlesError(linkedUsers.length, params.maxLinkedHandles);
+    if (maxError) {
+      return maxError;
+    }
+    addLinkedUsers(targets, linkedUsers);
+    return finalizeTargets(targets);
+  }
+
+  const rosterResult = await resolveGuildRoster(
+    params.guild,
+    linkedUsers,
+    {
+      correlationId: params.correlationId,
+      command: params.commandName,
+      guildId: params.guildId,
+      userId: params.user.id,
+    },
+    { noMembers: NO_CURRENT_MEMBERS_MESSAGE, noHandles: NO_LINKED_HANDLES_MESSAGE }
+  );
+  if (rosterResult.status === "empty") {
+    return errorResult(rosterResult.message);
+  }
+  const maxError = getMaxLinkedHandlesError(rosterResult.roster.length, params.maxLinkedHandles);
+  if (maxError) {
+    return maxError;
+  }
+  addLinkedUsers(targets, rosterResult.roster);
+  return finalizeTargets(targets);
+}
+
 export async function resolveContestTargets(params: ResolveTargetsParams): Promise<TargetResolution> {
   const {
     guild,
@@ -192,65 +280,31 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   if (contextError) {
     return errorResult(contextError);
   }
-  if (uniqueUserOptions.length > 0) {
-    const resolvedUsers = await Promise.all(
-      uniqueUserOptions.map(async (option) => ({
-        option,
-        handle: await store.getHandle(resolvedGuildId, option.id),
-      }))
-    );
-    for (const entry of resolvedUsers) {
-      if (!entry.handle) {
-        return errorResult(`User <@${entry.option.id}> does not have a linked handle.`);
-      }
-      addTargetHandle(targets, entry.handle, `<@${entry.option.id}>`);
-    }
+  const userOptionError = await addUserOptionTargets(
+    targets,
+    store,
+    resolvedGuildId,
+    uniqueUserOptions
+  );
+  if (userOptionError) {
+    return userOptionError;
   }
 
-  if (normalizedHandleInputs.length > 0) {
-    for (const handleInput of normalizedHandleInputs) {
-      const resolved = await store.resolveHandle(handleInput.normalized);
-      if (!resolved.exists) {
-        return errorResult(`Invalid handle: ${handleInput.raw}`);
-      }
-      const handle = resolved.canonicalHandle ?? handleInput.normalized;
-      addTargetHandle(targets, handle, handle);
-    }
+  const handleError = await addHandleInputTargets(targets, store, normalizedHandleInputs);
+  if (handleError) {
+    return handleError;
   }
 
   if (uniqueUserOptions.length === 0 && normalizedHandleInputs.length === 0) {
-    const linkedUsers = await store.getLinkedUsers(resolvedGuildId);
-    if (!guild) {
-      if (linkedUsers.length === 0) {
-        return errorResult(NO_LINKED_HANDLES_MESSAGE);
-      }
-      const maxError = getMaxLinkedHandlesError(linkedUsers.length, maxLinkedHandles);
-      if (maxError) {
-        return maxError;
-      }
-      addLinkedUsers(targets, linkedUsers);
-      return finalizeTargets(targets);
-    }
-
-    const rosterResult = await resolveGuildRoster(
+    return resolveFallbackTargets({
       guild,
-      linkedUsers,
-      {
-        correlationId,
-        command: commandName,
-        guildId: resolvedGuildId,
-        userId: user.id,
-      },
-      { noMembers: NO_CURRENT_MEMBERS_MESSAGE, noHandles: NO_LINKED_HANDLES_MESSAGE }
-    );
-    if (rosterResult.status === "empty") {
-      return errorResult(rosterResult.message);
-    }
-    const maxError = getMaxLinkedHandlesError(rosterResult.roster.length, maxLinkedHandles);
-    if (maxError) {
-      return maxError;
-    }
-    addLinkedUsers(targets, rosterResult.roster);
+      guildId: resolvedGuildId,
+      store,
+      maxLinkedHandles,
+      commandName,
+      correlationId,
+      user,
+    });
   }
 
   return finalizeTargets(targets);
