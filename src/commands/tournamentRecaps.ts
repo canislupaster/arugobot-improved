@@ -7,7 +7,7 @@ import {
 
 import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addCleanupIncludePermissionsOption } from "../utils/commandOptions.js";
+import { addCleanupSubcommand } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
@@ -60,10 +60,9 @@ export const tournamentRecapsCommand: Command = {
       subcommand.setName("clear").setDescription("Disable automatic recap posts")
     )
     .addSubcommand((subcommand) =>
-      addCleanupIncludePermissionsOption(
-        subcommand
-          .setName("cleanup")
-          .setDescription("Remove recap settings pointing at missing channels")
+      addCleanupSubcommand(
+        subcommand,
+        "Remove recap settings pointing at missing channels"
       )
     )
     .addSubcommand((subcommand) =>

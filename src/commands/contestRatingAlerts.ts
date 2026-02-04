@@ -11,7 +11,7 @@ import {
 } from "../services/contestRatingAlerts.js";
 import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addCleanupIncludePermissionsOption } from "../utils/commandOptions.js";
+import { addCleanupSubcommand } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
@@ -150,10 +150,9 @@ export const contestRatingAlertsCommand: Command = {
       subcommand.setName("clear").setDescription("Remove all rating change alerts")
     )
     .addSubcommand((subcommand) =>
-      addCleanupIncludePermissionsOption(
-        subcommand
-          .setName("cleanup")
-          .setDescription("Remove rating alerts targeting deleted channels"),
+      addCleanupSubcommand(
+        subcommand,
+        "Remove rating alerts targeting deleted channels",
         "Also remove subscriptions where the bot lacks permissions"
       )
     )

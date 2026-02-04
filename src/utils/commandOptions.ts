@@ -119,6 +119,15 @@ export function addCleanupIncludePermissionsOption(
   );
 }
 
+export function addCleanupSubcommand(
+  subcommand: SlashCommandSubcommandBuilder,
+  description: string,
+  includePermissionsDescription?: string
+): SlashCommandSubcommandBuilder {
+  const withDetails = subcommand.setName("cleanup").setDescription(description);
+  return addCleanupIncludePermissionsOption(withDetails, includePermissionsDescription);
+}
+
 export function addPageOption(
   builder: SlashCommandBuilder
 ): SlashCommandOptionsOnlyBuilder;

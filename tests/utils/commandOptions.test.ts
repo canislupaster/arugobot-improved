@@ -3,6 +3,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 import {
   addContestFilterOptions,
+  addCleanupSubcommand,
   addPageOption,
   addRatingRangeOptions,
   addScheduleOptions,
@@ -72,4 +73,20 @@ test("addPageOption adds page input", () => {
   const names = json.options?.map((option) => option.name);
 
   expect(names).toEqual(["page"]);
+});
+
+test("addCleanupSubcommand adds cleanup with include_permissions", () => {
+  const builder = new SlashCommandBuilder()
+    .setName("cleanup")
+    .setDescription("cleanup")
+    .addSubcommand((subcommand) =>
+      addCleanupSubcommand(subcommand, "Cleanup subscriptions")
+    );
+
+  const json = builder.toJSON();
+  const subcommand = json.options?.[0] as APIApplicationCommandSubcommandOption | undefined;
+  const options = subcommand?.options ?? [];
+
+  expect(subcommand?.name).toBe("cleanup");
+  expect(options.map((option) => option.name)).toEqual(["include_permissions"]);
 });

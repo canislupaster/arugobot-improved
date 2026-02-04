@@ -4,7 +4,7 @@ import { getNextScheduledUtcMs } from "../services/practiceReminders.js";
 import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
-  addCleanupIncludePermissionsOption,
+  addCleanupSubcommand,
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
@@ -209,10 +209,9 @@ export const practiceRemindersCommand: Command = {
       subcommand.setName("clear").setDescription("Disable daily practice reminders")
     )
     .addSubcommand((subcommand) =>
-      addCleanupIncludePermissionsOption(
-        subcommand
-          .setName("cleanup")
-          .setDescription("Remove reminders pointing at missing channels")
+      addCleanupSubcommand(
+        subcommand,
+        "Remove reminders pointing at missing channels"
       )
     )
     .addSubcommand((subcommand) =>
