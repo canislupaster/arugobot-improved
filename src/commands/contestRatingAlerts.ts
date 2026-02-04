@@ -195,6 +195,16 @@ export const contestRatingAlertsCommand: Command = {
 
     const guildId = interaction.guild.id;
     const subcommand = interaction.options.getSubcommand();
+    const selectSubscription = async (): Promise<ContestRatingAlertSubscription | null> => {
+      const id = interaction.options.getString("id");
+      const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
+      return resolveSubscriptionSelectionOrReply(
+        interaction,
+        subscriptions,
+        id,
+        selectionMessages
+      );
+    };
 
     try {
       if (subcommand === "status" || subcommand === "list") {
@@ -404,14 +414,7 @@ export const contestRatingAlertsCommand: Command = {
       }
 
       if (subcommand === "preview") {
-        const id = interaction.options.getString("id");
-        const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const subscription = await resolveSubscriptionSelectionOrReply(
-          interaction,
-          subscriptions,
-          id,
-          selectionMessages
-        );
+        const subscription = await selectSubscription();
         if (!subscription) {
           return;
         }
@@ -456,14 +459,7 @@ export const contestRatingAlertsCommand: Command = {
 
       if (subcommand === "post") {
         const force = interaction.options.getBoolean("force") ?? false;
-        const id = interaction.options.getString("id");
-        const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const subscription = await resolveSubscriptionSelectionOrReply(
-          interaction,
-          subscriptions,
-          id,
-          selectionMessages
-        );
+        const subscription = await selectSubscription();
         if (!subscription) {
           return;
         }
