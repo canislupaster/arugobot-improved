@@ -88,7 +88,13 @@ export class CodeforcesClient {
           : typeof error === "object" && error !== null
             ? String((error as { name?: unknown }).name ?? "")
             : "";
-      if (name === "AbortError") {
+      const message = error instanceof Error ? error.message : "";
+      const lowered = message.toLowerCase();
+      const isAbort =
+        name === "AbortError" ||
+        lowered.includes("operation was aborted") ||
+        lowered.includes("request was aborted");
+      if (isAbort) {
         const timeoutError = new Error(`Request timed out after ${timeoutMs}ms`) as RetryableError;
         timeoutError.retryable = true;
         return timeoutError;

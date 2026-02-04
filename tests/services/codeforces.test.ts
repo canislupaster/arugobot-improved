@@ -163,4 +163,22 @@ describe("CodeforcesClient", () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  it("treats aborted messages as timeouts even without AbortError", async () => {
+    const abortError = new Error("The operation was aborted");
+    const fetchMock = jest.fn().mockRejectedValue(abortError);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const client = new CodeforcesClient({
+      baseUrl: "https://codeforces.com/api",
+      requestDelayMs: 0,
+      timeoutMs: 1500,
+      scheduler: immediateScheduler,
+    });
+
+    await expect(client.request("contest.list")).rejects.toThrow(
+      "Request timed out after 1500ms"
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });
