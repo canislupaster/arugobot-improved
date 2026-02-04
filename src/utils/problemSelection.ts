@@ -84,12 +84,16 @@ export function filterProblemsByRatingRanges(
   });
 }
 
+function getRemainingProblems(problems: Problem[], excludedIds: Set<string>): Problem[] {
+  return problems.filter((problem) => !excludedIds.has(getProblemId(problem)));
+}
+
 export function selectRandomProblems(
   problems: Problem[],
   excludedIds: Set<string>,
   limit: number
 ): Problem[] {
-  const remaining = problems.filter((problem) => !excludedIds.has(getProblemId(problem)));
+  const remaining = getRemainingProblems(problems, excludedIds);
   for (let i = remaining.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
@@ -98,6 +102,10 @@ export function selectRandomProblems(
 }
 
 export function selectRandomProblem(problems: Problem[], excludedIds: Set<string>): Problem | null {
-  const [picked] = selectRandomProblems(problems, excludedIds, 1);
-  return picked ?? null;
+  const remaining = getRemainingProblems(problems, excludedIds);
+  if (remaining.length === 0) {
+    return null;
+  }
+  const index = Math.floor(Math.random() * remaining.length);
+  return remaining[index] ?? null;
 }

@@ -42,6 +42,14 @@ describe("problemSelection", () => {
     expect(selected.map(getProblemId)).toEqual(["2A", "1C"]);
   });
 
+  it("selects a random remaining problem", () => {
+    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.99);
+    const excluded = new Set<string>(["1A", "1B"]);
+    const result = selectRandomProblem(problems, excluded);
+    expect(randomSpy).toHaveBeenCalledTimes(1);
+    expect(result ? getProblemId(result) : null).toBe("2A");
+  });
+
   it("parses include and exclude tag filters", () => {
     const filters = parseTagFilters("dp, greedy -math");
     expect(filters).toEqual({ include: ["dp", "greedy"], exclude: ["math"] });
