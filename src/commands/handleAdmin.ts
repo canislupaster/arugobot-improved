@@ -62,6 +62,20 @@ const replyForUpdateResult = (
   return interaction.editReply("Unable to update handle right now.");
 };
 
+const getHandleOrReply = async (
+  interaction: ChatInputCommandInteraction,
+  store: StoreService,
+  guildId: string,
+  userId: string
+): Promise<string | null> => {
+  const handle = await store.getHandle(guildId, userId);
+  if (!handle) {
+    await interaction.editReply(formatNoHandleMessage(userId));
+    return null;
+  }
+  return handle;
+};
+
 export const handleAdminCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("handleadmin")
@@ -111,9 +125,13 @@ export const handleAdminCommand: Command = {
 
     try {
       if (subcommand === "status") {
-        const handle = await context.services.store.getHandle(guildId, user.id);
+        const handle = await getHandleOrReply(
+          interaction,
+          context.services.store,
+          guildId,
+          user.id
+        );
         if (!handle) {
-          await interaction.editReply(formatNoHandleMessage(user.id));
           return;
         }
         await interaction.editReply(`Handle for <@${user.id}> is ${handle}.`);
@@ -121,9 +139,13 @@ export const handleAdminCommand: Command = {
       }
 
       if (subcommand === "unlink") {
-        const handle = await context.services.store.getHandle(guildId, user.id);
+        const handle = await getHandleOrReply(
+          interaction,
+          context.services.store,
+          guildId,
+          user.id
+        );
         if (!handle) {
-          await interaction.editReply(formatNoHandleMessage(user.id));
           return;
         }
         await context.services.store.unlinkUser(guildId, user.id);
