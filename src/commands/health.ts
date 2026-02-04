@@ -8,7 +8,7 @@ import {
 
 import {
   describeSendableChannelStatus,
-  getSendableChannelStatus,
+  getSendableChannelStatuses,
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -74,18 +74,10 @@ async function getChannelIssues(
   if (targets.length === 0) {
     return [];
   }
-
-  const statusCache = new Map<string, Promise<SendableChannelStatus>>();
-  const getStatus = (channelId: string): Promise<SendableChannelStatus> => {
-    const cached = statusCache.get(channelId);
-    if (cached) {
-      return cached;
-    }
-    const pending = getSendableChannelStatus(context.client, channelId);
-    statusCache.set(channelId, pending);
-    return pending;
-  };
-  const statuses = await Promise.all(targets.map((target) => getStatus(target.channelId)));
+  const statuses = await getSendableChannelStatuses(
+    context.client,
+    targets.map((target) => target.channelId)
+  );
 
   return targets
     .map((target, index) => ({
