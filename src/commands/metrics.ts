@@ -53,7 +53,8 @@ export const metricsCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    const commandName = interaction.options.getString("command")?.trim() ?? "";
+    const commandNameRaw = interaction.options.getString("command")?.trim() ?? "";
+    const commandName = commandNameRaw.replace(/^\/+/, "");
     const limitResult = resolveBoundedIntegerOption(interaction, {
       name: "limit",
       min: 1,

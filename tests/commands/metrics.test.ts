@@ -47,6 +47,29 @@ describe("metricsCommand", () => {
     );
   });
 
+  it("strips leading slashes from command input", async () => {
+    const interaction = createInteraction({ command: "/ping" });
+    const context = {
+      services: {
+        metrics: {
+          getCommandSummary: jest.fn().mockResolvedValue({
+            name: "ping",
+            count: 1,
+            successRate: 100,
+            avgLatencyMs: 12,
+            maxLatencyMs: 12,
+            lastSeenAt: new Date().toISOString(),
+          }),
+          getCommandUsageSummary: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await metricsCommand.execute(interaction, context);
+
+    expect(context.services.metrics.getCommandSummary).toHaveBeenCalledWith("ping");
+  });
+
   it("handles empty summary list", async () => {
     const interaction = createInteraction({});
     const context = {
