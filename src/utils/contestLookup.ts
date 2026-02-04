@@ -51,6 +51,8 @@ export type ContestLookupReplyResult =
   | { status: "ok"; contest: Contest }
   | { status: "replied" };
 
+type MissingContestStatus = Exclude<ContestLookupResult["status"], "ok" | "ambiguous">;
+
 type ContestEmbedOptions = {
   contest: Contest;
   title: string;
@@ -146,6 +148,27 @@ type ContestLookupReplyOptions = {
   missingNameMessage?: string;
 };
 
+function resolveMissingContestMessage(
+  status: MissingContestStatus,
+  options: ContestLookupReplyOptions
+): string {
+  const fallbackMessages: Record<MissingContestStatus, string> = {
+    missing_latest: "No finished contests found yet.",
+    missing_upcoming: "No upcoming contests found.",
+    missing_ongoing: "No ongoing contests found.",
+    missing_id: "No contest found with that ID.",
+    missing_name: "No contests found matching that name.",
+  };
+  const messages: Record<MissingContestStatus, string> = {
+    missing_latest: options.missingLatestMessage ?? fallbackMessages.missing_latest,
+    missing_upcoming: options.missingUpcomingMessage ?? fallbackMessages.missing_upcoming,
+    missing_ongoing: options.missingOngoingMessage ?? fallbackMessages.missing_ongoing,
+    missing_id: options.missingIdMessage ?? fallbackMessages.missing_id,
+    missing_name: options.missingNameMessage ?? fallbackMessages.missing_name,
+  };
+  return messages[status];
+}
+
 export async function resolveContestOrReply(
   interaction: ChatInputCommandInteraction,
   queryRaw: string,
@@ -174,22 +197,7 @@ export async function resolveContestOrReply(
     return { status: "replied" };
   }
 
-  const missingLatestMessage = options.missingLatestMessage ?? "No finished contests found yet.";
-  const missingUpcomingMessage = options.missingUpcomingMessage ?? "No upcoming contests found.";
-  const missingOngoingMessage = options.missingOngoingMessage ?? "No ongoing contests found.";
-  const missingIdMessage = options.missingIdMessage ?? "No contest found with that ID.";
-  const missingNameMessage = options.missingNameMessage ?? "No contests found matching that name.";
-  const errorMessage =
-    lookup.status === "missing_latest"
-      ? missingLatestMessage
-      : lookup.status === "missing_upcoming"
-        ? missingUpcomingMessage
-        : lookup.status === "missing_ongoing"
-          ? missingOngoingMessage
-      : lookup.status === "missing_id"
-        ? missingIdMessage
-        : missingNameMessage;
-  await interaction.editReply(errorMessage);
+  await interaction.editReply(resolveMissingContestMessage(lookup.status, options));
   return { status: "replied" };
 }
 

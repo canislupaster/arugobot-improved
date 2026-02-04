@@ -9,6 +9,7 @@ import {
   isUpcomingQuery,
   parseContestId,
   resolveContestLookup,
+  resolveContestOrReply,
 } from "../../src/utils/contestLookup.js";
 
 describe("contestLookup helpers", () => {
@@ -174,5 +175,33 @@ describe("contestLookup helpers", () => {
     if (ongoingLookup.status === "ok") {
       expect(ongoingLookup.contest.id).toBe(404);
     }
+  });
+
+  it("uses custom missing-id messages when contest lookup fails", async () => {
+    const contestService = {
+      getLatestFinished: (_scope: ContestScopeFilter) => null,
+      getUpcoming: (_limit: number, _scope: ContestScopeFilter) => [],
+      getOngoing: (_scope: ContestScopeFilter) => [],
+      getContestById: (_contestId: number, _scope: ContestScopeFilter) => null,
+      searchContests: (_query: string, _limit: number, _scope: ContestScopeFilter) => [],
+    };
+    const interaction = {
+      editReply: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const result = await resolveContestOrReply(
+      interaction as any,
+      "123",
+      "official",
+      contestService,
+      {
+        footerText: "Use /contest.",
+        refreshWasStale: false,
+        missingIdMessage: "No contest with that ID.",
+      }
+    );
+
+    expect(result).toEqual({ status: "replied" });
+    expect(interaction.editReply).toHaveBeenCalledWith("No contest with that ID.");
   });
 });
