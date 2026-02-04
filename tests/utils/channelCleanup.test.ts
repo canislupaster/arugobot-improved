@@ -5,6 +5,7 @@ import {
   cleanupChannelSubscriptions,
   cleanupSingleChannelSubscription,
   formatPermissionIssueSummary,
+  runChannelCleanupSummary,
 } from "../../src/utils/channelCleanup.js";
 
 const createClient = (channels: Record<string, unknown | null>): Client =>
@@ -180,6 +181,58 @@ describe("buildChannelCleanupSummary", () => {
         "Subscriptions with missing permissions (not removed): `sub-perms` (<#channel-1>): Missing permissions (SendMessages). Use /contestreminders cleanup include_permissions:true to remove them.",
       ].join("\n")
     );
+  });
+});
+
+describe("runChannelCleanupSummary", () => {
+  it("returns the empty message when there are no subscriptions", async () => {
+    const client = createClient({});
+    const removeSubscription = jest.fn().mockResolvedValue(true);
+
+    const message = await runChannelCleanupSummary({
+      client,
+      subscriptions: [],
+      includePermissions: false,
+      removeSubscription,
+      emptyMessage: "No subscriptions configured.",
+      summary: {
+        label: "contest reminder subscription",
+        allGoodMessage: "All contest reminder channels look good.",
+      },
+    });
+
+    expect(message).toBe("No subscriptions configured.");
+    expect(removeSubscription).not.toHaveBeenCalled();
+  });
+
+  it("returns the summary message when cleanup runs", async () => {
+    const missingPermChannel = {
+      type: ChannelType.GuildText,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: (flag: bigint) => flag === PermissionFlagsBits.ViewChannel,
+      }),
+    };
+    const client = createClient({
+      "channel-missing-perms": missingPermChannel,
+    });
+    const removeSubscription = jest.fn().mockResolvedValue(true);
+
+    const message = await runChannelCleanupSummary({
+      client,
+      subscriptions: [{ id: "sub-missing-perms", channelId: "channel-missing-perms" }],
+      includePermissions: true,
+      removeSubscription,
+      emptyMessage: "No subscriptions configured.",
+      summary: {
+        label: "contest reminder subscription",
+        allGoodMessage: "All contest reminder channels look good.",
+      },
+    });
+
+    expect(message).toBe(
+      "Removed 1 contest reminder subscription with missing permissions: `sub-missing-perms`."
+    );
+    expect(removeSubscription).toHaveBeenCalledTimes(1);
   });
 });
 

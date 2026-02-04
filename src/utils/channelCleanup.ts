@@ -33,6 +33,12 @@ type ChannelCleanupOptions = {
   removeSubscription: (id: string) => Promise<boolean>;
 };
 
+type ChannelCleanupSummaryOptions = {
+  label: string;
+  allGoodMessage: string;
+  cleanupHint?: string;
+};
+
 export async function cleanupChannelSubscriptions(
   options: ChannelCleanupOptions
 ): Promise<ChannelCleanupResult> {
@@ -183,4 +189,25 @@ export function buildChannelCleanupSummary(
     return options.allGoodMessage;
   }
   return lines.join("\n");
+}
+
+export async function runChannelCleanupSummary(options: {
+  client: Client;
+  subscriptions: ChannelSubscription[];
+  includePermissions: boolean;
+  removeSubscription: (id: string) => Promise<boolean>;
+  emptyMessage: string;
+  summary: ChannelCleanupSummaryOptions;
+}): Promise<string> {
+  if (options.subscriptions.length === 0) {
+    return options.emptyMessage;
+  }
+
+  const cleanup = await cleanupChannelSubscriptions({
+    client: options.client,
+    subscriptions: options.subscriptions,
+    includePermissions: options.includePermissions,
+    removeSubscription: options.removeSubscription,
+  });
+  return buildChannelCleanupSummary(cleanup, options.summary);
 }

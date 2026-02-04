@@ -8,7 +8,7 @@ import {
 
 import type { ContestReminder } from "../services/contestReminders.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
-import { buildChannelCleanupSummary, cleanupChannelSubscriptions } from "../utils/channelCleanup.js";
+import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { addCleanupIncludePermissionsOption } from "../utils/commandOptions.js";
 import {
@@ -433,23 +433,19 @@ export const contestRemindersCommand: Command = {
 
       if (subcommand === "cleanup") {
         const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-        if (subscriptions.length === 0) {
-          await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
-          return;
-        }
-
         const includePermissions = interaction.options.getBoolean?.("include_permissions") ?? false;
-        const cleanup = await cleanupChannelSubscriptions({
+        const message = await runChannelCleanupSummary({
           client: context.client,
           subscriptions,
           includePermissions,
           removeSubscription: (id) =>
             context.services.contestReminders.removeSubscription(guildId, id),
-        });
-        const message = buildChannelCleanupSummary(cleanup, {
-          label: "contest reminder subscription",
-          allGoodMessage: "All contest reminder channels look good.",
-          cleanupHint: "Use /contestreminders cleanup include_permissions:true to remove them.",
+          emptyMessage: NO_SUBSCRIPTIONS_MESSAGE,
+          summary: {
+            label: "contest reminder subscription",
+            allGoodMessage: "All contest reminder channels look good.",
+            cleanupHint: "Use /contestreminders cleanup include_permissions:true to remove them.",
+          },
         });
         await interaction.reply({ content: message });
         return;
