@@ -78,6 +78,21 @@ const selectionMessages = {
     `Subscription id matches multiple entries. Use the full id. Matches: ${matches.join(", ")}`,
 };
 
+function getAlertStatusMessage(status: string, contestName?: string): string | null {
+  switch (status) {
+    case "no_handles":
+      return "No linked handles found in this server yet.";
+    case "no_matching_handles":
+      return "No linked handles match the alert filters.";
+    case "no_contest":
+      return "No finished contests found yet.";
+    case "no_changes":
+      return `No rating changes found for ${contestName ?? "this contest"} yet.`;
+    default:
+      return null;
+  }
+}
+
 export const contestRatingAlertsCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("contestratingalerts")
@@ -402,28 +417,12 @@ export const contestRatingAlertsCommand: Command = {
         }
 
         const preview = await context.services.contestRatingAlerts.getPreview(subscription);
-        if (preview.status === "no_handles") {
-          await interaction.reply({
-            content: "No linked handles found in this server yet.",
-          });
-          return;
-        }
-        if (preview.status === "no_matching_handles") {
-          await interaction.reply({
-            content: "No linked handles match the alert filters.",
-          });
-          return;
-        }
-        if (preview.status === "no_contest") {
-          await interaction.reply({
-            content: "No finished contests found yet.",
-          });
-          return;
-        }
-        if (preview.status === "no_changes") {
-          await interaction.reply({
-            content: `No rating changes found for ${preview.contest.name} yet.`,
-          });
+        const previewStatusMessage = getAlertStatusMessage(
+          preview.status,
+          preview.status === "no_changes" ? preview.contest.name : undefined
+        );
+        if (previewStatusMessage) {
+          await interaction.reply({ content: previewStatusMessage });
           return;
         }
         if (preview.status === "already_notified") {
@@ -433,6 +432,12 @@ export const contestRatingAlertsCommand: Command = {
           return;
         }
         if (preview.status === "error") {
+          await interaction.reply({
+            content: "Unable to load contest data right now. Try again later.",
+          });
+          return;
+        }
+        if (preview.status !== "ready") {
           await interaction.reply({
             content: "Unable to load contest data right now. Try again later.",
           });
@@ -487,20 +492,12 @@ export const contestRatingAlertsCommand: Command = {
           );
           return;
         }
-        if (result.status === "no_handles") {
-          await interaction.editReply("No linked handles found in this server yet.");
-          return;
-        }
-        if (result.status === "no_matching_handles") {
-          await interaction.editReply("No linked handles match the alert filters.");
-          return;
-        }
-        if (result.status === "no_contest") {
-          await interaction.editReply("No finished contests found yet.");
-          return;
-        }
-        if (result.status === "no_changes") {
-          await interaction.editReply(`No rating changes found for ${result.contestName} yet.`);
+        const resultStatusMessage = getAlertStatusMessage(
+          result.status,
+          result.status === "no_changes" ? result.contestName : undefined
+        );
+        if (resultStatusMessage) {
+          await interaction.editReply(resultStatusMessage);
           return;
         }
         if (result.status === "already_notified") {
