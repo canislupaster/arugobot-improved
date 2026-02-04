@@ -2,13 +2,13 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { resolveGuildRoster } from "../utils/roster.js";
 import { requireGuild, resolveBoundedIntegerOption } from "../utils/interaction.js";
 import {
   buildPageEmbed,
   buildPaginationIds,
   runPaginatedInteraction,
 } from "../utils/pagination.js";
+import { resolveGuildRoster } from "../utils/roster.js";
 
 import type { Command } from "./types.js";
 
