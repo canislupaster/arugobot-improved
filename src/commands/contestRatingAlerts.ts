@@ -21,7 +21,7 @@ import {
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
 import { resolveSubscriptionSelectionOrReply } from "../utils/subscriptionSelection.js";
-import { resolveSubscriptionEntriesOrReply } from "../utils/subscriptionStatus.js";
+import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
 
 import type { Command } from "./types.js";
 
@@ -196,34 +196,23 @@ export const contestRatingAlertsCommand: Command = {
 
     try {
       if (subcommand === "status" || subcommand === "list") {
-        const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        if (subscriptions.length === 0) {
-          await interaction.reply({
-            content: NO_SUBSCRIPTIONS_MESSAGE,
-          });
-          return;
-        }
         const onlyIssues = interaction.options.getBoolean?.("only_issues") ?? false;
-        const lastNotifiedMap = await context.services.contestRatingAlerts.getLastNotificationMap(
-          subscriptions.map((subscription) => subscription.id)
-        );
-        const entryResult = await resolveSubscriptionEntriesOrReply(
+        const entryResult = await resolveSubscriptionEntriesFromService(
           interaction,
           context.client,
-          subscriptions,
-          lastNotifiedMap,
+          () => context.services.contestRatingAlerts.listSubscriptions(guildId),
+          (ids) => context.services.contestRatingAlerts.getLastNotificationMap(ids),
           onlyIssues,
           { noSubscriptions: NO_SUBSCRIPTIONS_MESSAGE, noIssues: NO_ISSUES_MESSAGE }
         );
         if (entryResult.status === "replied") {
           return;
         }
-        const filteredEntries = entryResult.entries;
         const embed = new EmbedBuilder()
           .setTitle("Contest rating alert subscriptions")
           .setColor(EMBED_COLORS.info)
           .addFields(
-            filteredEntries.map((entry, index) => ({
+            entryResult.entries.map((entry, index) => ({
               name: `Subscription ${index + 1}`,
               value: formatSubscriptionSummary(
                 entry.subscription,

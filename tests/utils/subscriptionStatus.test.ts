@@ -6,6 +6,7 @@ import {
   buildChannelSubscriptionEntries,
   filterChannelSubscriptionEntries,
   resolveSubscriptionEntriesOrReply,
+  resolveSubscriptionEntriesFromService,
   type ChannelSubscriptionEntry,
 } from "../../src/utils/subscriptionStatus.js";
 
@@ -124,6 +125,48 @@ describe("resolveSubscriptionEntriesOrReply", () => {
 
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
+      expect(result.entries).toHaveLength(1);
+      expect(result.entries[0]?.subscription.id).toBe("sub-1");
+      expect(result.entries[0]?.lastNotifiedAt).toBe("2026-02-03T00:00:00Z");
+    }
+  });
+});
+
+describe("resolveSubscriptionEntriesFromService", () => {
+  it("replies when the service returns no subscriptions", async () => {
+    const interaction = { reply: jest.fn().mockResolvedValue(undefined) };
+
+    const result = await resolveSubscriptionEntriesFromService(
+      interaction,
+      {} as Client,
+      async () => [],
+      async () => new Map(),
+      false,
+      { noSubscriptions: "No subs.", noIssues: "No issues." }
+    );
+
+    expect(result.status).toBe("replied");
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "No subs." });
+  });
+
+  it("returns subscriptions and entries when available", async () => {
+    const okStatus: SendableChannelStatus = { status: "ok", channel: {} as never };
+    mockGetSendableChannelStatuses.mockResolvedValue([okStatus]);
+    const interaction = { reply: jest.fn().mockResolvedValue(undefined) };
+    const subscriptions = [{ id: "sub-1", channelId: "channel-1" }];
+
+    const result = await resolveSubscriptionEntriesFromService(
+      interaction,
+      {} as Client,
+      async () => subscriptions,
+      async () => new Map([["sub-1", "2026-02-03T00:00:00Z"]]),
+      false,
+      { noSubscriptions: "No subs.", noIssues: "No issues." }
+    );
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.subscriptions).toEqual(subscriptions);
       expect(result.entries).toHaveLength(1);
       expect(result.entries[0]?.subscription.id).toBe("sub-1");
       expect(result.entries[0]?.lastNotifiedAt).toBe("2026-02-03T00:00:00Z");

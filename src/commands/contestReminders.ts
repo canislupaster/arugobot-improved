@@ -35,7 +35,7 @@ import {
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild } from "../utils/interaction.js";
 import { resolveSubscriptionSelectionOrReply } from "../utils/subscriptionSelection.js";
-import { resolveSubscriptionEntriesOrReply } from "../utils/subscriptionStatus.js";
+import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -350,30 +350,24 @@ export const contestRemindersCommand: Command = {
 
     try {
       if (subcommand === "status" || subcommand === "list") {
-        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-        if (subscriptions.length === 0) {
-          await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
-          return;
-        }
         const onlyIssues = interaction.options.getBoolean?.("only_issues") ?? false;
-        const lastNotifiedMap = await context.services.contestReminders.getLastNotificationMap(
-          subscriptions.map((subscription) => subscription.id)
-        );
-        const entryResult = await resolveSubscriptionEntriesOrReply(
+        const entryResult = await resolveSubscriptionEntriesFromService(
           interaction,
           context.client,
-          subscriptions,
-          lastNotifiedMap,
+          () => context.services.contestReminders.listSubscriptions(guildId),
+          (ids) => context.services.contestReminders.getLastNotificationMap(ids),
           onlyIssues,
           { noSubscriptions: NO_SUBSCRIPTIONS_MESSAGE, noIssues: NO_ISSUES_MESSAGE }
         );
         if (entryResult.status === "replied") {
           return;
         }
-        const filteredEntries = entryResult.entries;
-        const refreshState = await refreshContestScopes(context.services.contests, subscriptions);
+        const refreshState = await refreshContestScopes(
+          context.services.contests,
+          entryResult.subscriptions
+        );
         const upcomingByScope = new Map<ContestScopeFilter, Contest[]>();
-        const scopeSet = new Set(filteredEntries.map((entry) => entry.subscription.scope));
+        const scopeSet = new Set(entryResult.entries.map((entry) => entry.subscription.scope));
         for (const scope of scopeSet) {
           upcomingByScope.set(scope, context.services.contests.getUpcomingContests(scope));
         }
@@ -383,7 +377,7 @@ export const contestRemindersCommand: Command = {
           .setTitle("Contest reminder subscriptions")
           .setColor(EMBED_COLORS.info)
           .addFields(
-            filteredEntries.map((entry, index) => ({
+            entryResult.entries.map((entry, index) => ({
               name: `Subscription ${index + 1}`,
               value: `${formatSubscriptionSummary(
                 entry.subscription,

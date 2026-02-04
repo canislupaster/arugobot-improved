@@ -44,6 +44,14 @@ type SubscriptionEntriesResult<TSubscription> =
   | { status: "ok"; entries: Array<ChannelSubscriptionEntry<TSubscription>> }
   | { status: "replied" };
 
+export type SubscriptionListResult<TSubscription> =
+  | {
+      status: "ok";
+      entries: Array<ChannelSubscriptionEntry<TSubscription>>;
+      subscriptions: TSubscription[];
+    }
+  | { status: "replied" };
+
 export async function resolveSubscriptionEntriesOrReply<
   TSubscription extends { id: string; channelId: string },
 >(
@@ -73,4 +81,36 @@ export async function resolveSubscriptionEntriesOrReply<
   }
 
   return { status: "ok", entries: filtered };
+}
+
+export async function resolveSubscriptionEntriesFromService<
+  TSubscription extends { id: string; channelId: string },
+>(
+  interaction: { reply: (options: { content: string }) => Promise<unknown> },
+  client: Client,
+  listSubscriptions: () => Promise<TSubscription[]>,
+  getLastNotificationMap: (ids: string[]) => Promise<Map<string, string | null>>,
+  onlyIssues: boolean,
+  messages: { noSubscriptions: string; noIssues: string }
+): Promise<SubscriptionListResult<TSubscription>> {
+  const subscriptions = await listSubscriptions();
+  if (subscriptions.length === 0) {
+    await interaction.reply({ content: messages.noSubscriptions });
+    return { status: "replied" };
+  }
+  const lastNotifiedMap = await getLastNotificationMap(
+    subscriptions.map((subscription) => subscription.id)
+  );
+  const entryResult = await resolveSubscriptionEntriesOrReply(
+    interaction,
+    client,
+    subscriptions,
+    lastNotifiedMap,
+    onlyIssues,
+    messages
+  );
+  if (entryResult.status === "replied") {
+    return entryResult;
+  }
+  return { status: "ok", entries: entryResult.entries, subscriptions };
 }
