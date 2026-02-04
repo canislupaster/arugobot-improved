@@ -1,7 +1,7 @@
 import type { Guild, User } from "discord.js";
 
-import { filterEntriesByGuildMembers } from "./guildMembers.js";
 import { normalizeHandleInput, normalizeHandleKey } from "./handles.js";
+import { resolveGuildRoster } from "./roster.js";
 
 export type TargetHandle = {
   handle: string;
@@ -160,26 +160,45 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
 
   if (uniqueUserOptions.length === 0 && normalizedHandleInputs.length === 0) {
     const linkedUsers = await store.getLinkedUsers(resolvedGuildId);
-    if (linkedUsers.length === 0) {
-      return errorResult(NO_LINKED_HANDLES_MESSAGE);
+    if (!guild) {
+      if (linkedUsers.length === 0) {
+        return errorResult(NO_LINKED_HANDLES_MESSAGE);
+      }
+      if (maxLinkedHandles && linkedUsers.length > maxLinkedHandles) {
+        return errorResult(
+          `Too many linked handles (${linkedUsers.length}). Provide specific handles or users.`
+        );
+      }
+      for (const linked of linkedUsers) {
+        addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
+      }
+      const targetList = Array.from(targets.values());
+      if (targetList.length === 0) {
+        return errorResult("No handles found to check.");
+      }
+      return { status: "ok", targets: targetList };
     }
-    const filteredLinkedUsers = guild
-      ? await filterEntriesByGuildMembers(guild, linkedUsers, {
-          correlationId,
-          command: commandName,
-          guildId: resolvedGuildId,
-          userId: user.id,
-        })
-      : linkedUsers;
-    if (filteredLinkedUsers.length === 0) {
-      return errorResult(NO_CURRENT_MEMBERS_MESSAGE);
+
+    const rosterResult = await resolveGuildRoster(
+      guild,
+      linkedUsers,
+      {
+        correlationId,
+        command: commandName,
+        guildId: resolvedGuildId,
+        userId: user.id,
+      },
+      { noMembers: NO_CURRENT_MEMBERS_MESSAGE, noHandles: NO_LINKED_HANDLES_MESSAGE }
+    );
+    if (rosterResult.status === "empty") {
+      return errorResult(rosterResult.message);
     }
-    if (maxLinkedHandles && filteredLinkedUsers.length > maxLinkedHandles) {
+    if (maxLinkedHandles && rosterResult.roster.length > maxLinkedHandles) {
       return errorResult(
-        `Too many linked handles (${filteredLinkedUsers.length}). Provide specific handles or users.`
+        `Too many linked handles (${rosterResult.roster.length}). Provide specific handles or users.`
       );
     }
-    for (const linked of filteredLinkedUsers) {
+    for (const linked of rosterResult.roster) {
       addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
     }
   }

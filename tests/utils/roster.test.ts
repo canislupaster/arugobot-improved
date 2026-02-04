@@ -60,4 +60,19 @@ describe("resolveGuildRoster", () => {
       expect(result.message).toContain("No linked handles found for current server members.");
     }
   });
+
+  it("allows custom empty messages", async () => {
+    const guild = createGuild([]);
+    const result = await resolveGuildRoster(
+      guild,
+      [],
+      { correlationId: "corr-4", command: "contestactivity", guildId: "guild-1", userId: "u1" },
+      { noHandles: "No handles configured." }
+    );
+
+    expect(result.status).toBe("empty");
+    if (result.status === "empty") {
+      expect(result.message).toBe("No handles configured.");
+    }
+  });
 });
