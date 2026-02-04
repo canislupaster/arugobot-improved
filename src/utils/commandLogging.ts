@@ -21,11 +21,10 @@ export function logCommandError(
   correlationId?: string,
   extra?: LogContext
 ): void {
-  logError(message, {
+  const baseContext = buildCommandLogContext(
+    interaction,
     correlationId,
-    command: interaction.commandName,
-    guildId: interaction.guildId ?? undefined,
-    userId: interaction.user.id,
-    ...extra,
-  });
+    extra?.guildId as string | undefined
+  );
+  logError(message, { ...baseContext, ...extra });
 }
