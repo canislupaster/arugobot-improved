@@ -5,7 +5,7 @@ import { Client, Events, GatewayIntentBits } from "discord.js";
 import { sql } from "kysely";
 
 import { handleCommandInteraction } from "./commands/handler.js";
-import { commandData, commandList, commandMap } from "./commands/index.js";
+import { commandData, commandList, commandMap, commandOptionOrderIssues } from "./commands/index.js";
 import { loadConfig, validateConfig } from "./config/env.js";
 import { initDb, destroyDb } from "./db/database.js";
 import { migrateToLatest } from "./db/migrator.js";
@@ -226,6 +226,11 @@ async function main() {
 
     if (client.application) {
       try {
+        if (commandOptionOrderIssues.length > 0) {
+          logError("Command data has invalid required option ordering.", {
+            issues: commandOptionOrderIssues,
+          });
+        }
         if (config.discordGuildId) {
           const guild = await client.guilds.fetch(config.discordGuildId).catch(() => null);
           if (guild) {

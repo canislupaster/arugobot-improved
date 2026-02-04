@@ -1,10 +1,17 @@
 type CommandOptionLike = {
+  name?: string;
   required?: boolean;
   options?: CommandOptionLike[];
 };
 
 type CommandDataLike = {
+  name?: string;
   options?: CommandOptionLike[];
+};
+
+export type CommandOptionOrderIssue = {
+  path: string;
+  optionName: string;
 };
 
 function normalizeCommandOptions<T extends CommandOptionLike>(options: T[]): T[] {
@@ -36,4 +43,42 @@ export function normalizeCommandData<T extends CommandDataLike>(data: T): T {
     return data;
   }
   return { ...data, options: normalizeCommandOptions(data.options) } as T;
+}
+
+function buildOptionPath(path: string[]): string {
+  return path.filter(Boolean).join(" > ");
+}
+
+function collectOrderIssues(
+  options: CommandOptionLike[] | undefined,
+  path: string[],
+  issues: CommandOptionOrderIssue[]
+): void {
+  if (!options || options.length === 0) {
+    return;
+  }
+  let seenOptional = false;
+  for (const option of options) {
+    const required = Boolean(option.required);
+    if (!required) {
+      seenOptional = true;
+    } else if (seenOptional) {
+      issues.push({
+        path: buildOptionPath(path),
+        optionName: option.name ?? "unknown",
+      });
+    }
+    if (option.options && option.options.length > 0) {
+      collectOrderIssues(option.options, [...path, option.name ?? "unknown"], issues);
+    }
+  }
+}
+
+export function findCommandOptionOrderIssues<T extends CommandDataLike>(
+  data: T
+): CommandOptionOrderIssue[] {
+  const issues: CommandOptionOrderIssue[] = [];
+  const rootName = data.name ?? "command";
+  collectOrderIssues(data.options, [rootName], issues);
+  return issues;
 }

@@ -1,4 +1,4 @@
-import { normalizeCommandData } from "../utils/commandData.js";
+import { findCommandOptionOrderIssues, normalizeCommandData } from "../utils/commandData.js";
 
 import { activityCommand } from "./activity.js";
 import { challengeCommand } from "./challenge.js";
@@ -95,4 +95,8 @@ export const commandMap = new Map(commandList.map((command) => [command.data.nam
 
 export const commandData = commandList.map((command) =>
   normalizeCommandData(command.data.toJSON())
+);
+
+export const commandOptionOrderIssues = commandData.flatMap((command) =>
+  findCommandOptionOrderIssues(command)
 );

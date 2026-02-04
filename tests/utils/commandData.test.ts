@@ -1,4 +1,8 @@
-import { normalizeCommandData } from "../../src/utils/commandData.js";
+import { commandData } from "../../src/commands/index.js";
+import {
+  findCommandOptionOrderIssues,
+  normalizeCommandData,
+} from "../../src/utils/commandData.js";
 
 type Option = {
   name: string;
@@ -53,4 +57,24 @@ test("normalizeCommandData recurses into nested option arrays", () => {
   const nestedNames = normalized.options?.[0]?.options?.map((option) => option.name);
 
   expect(nestedNames).toEqual(["required", "optional"]);
+});
+
+test("findCommandOptionOrderIssues reports required options after optional ones", () => {
+  const data = {
+    name: "test",
+    options: [
+      { name: "optional", required: false },
+      { name: "required", required: true },
+    ],
+  };
+
+  const issues = findCommandOptionOrderIssues(data);
+
+  expect(issues).toEqual([{ path: "test", optionName: "required" }]);
+});
+
+test("commandData has valid required option ordering", () => {
+  const issues = commandData.flatMap((command) => findCommandOptionOrderIssues(command));
+
+  expect(issues).toEqual([]);
 });
