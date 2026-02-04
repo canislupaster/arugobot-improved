@@ -19,6 +19,22 @@ type HandleTargetOptions = {
   includeLinkedUserId?: boolean;
 };
 
+async function resolveExplicitHandleTarget(
+  store: HandleTargetStore,
+  options: { guildId?: string; handleInput: string; includeLinkedUserId?: boolean }
+): Promise<HandleTargetResolution> {
+  const handleInfo = await store.resolveHandle(options.handleInput);
+  if (!handleInfo.exists) {
+    return { error: "Invalid handle." };
+  }
+  const handle = handleInfo.canonicalHandle ?? options.handleInput;
+  if (options.includeLinkedUserId && options.guildId && store.getUserIdByHandle) {
+    const linkedUserId = await store.getUserIdByHandle(options.guildId, handle);
+    return { handle, linkedUserId };
+  }
+  return { handle, linkedUserId: null };
+}
+
 export function normalizeHandleInput(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) {
@@ -92,16 +108,11 @@ export async function resolveHandleTarget(
 ): Promise<HandleTargetResolution> {
   const { guildId, targetId, handleInput, includeLinkedUserId = false } = options;
   if (handleInput) {
-    const handleInfo = await store.resolveHandle(handleInput);
-    if (!handleInfo.exists) {
-      return { error: "Invalid handle." };
-    }
-    const handle = handleInfo.canonicalHandle ?? handleInput;
-    if (includeLinkedUserId && store.getUserIdByHandle) {
-      const linkedUserId = await store.getUserIdByHandle(guildId, handle);
-      return { handle, linkedUserId };
-    }
-    return { handle, linkedUserId: null };
+    return resolveExplicitHandleTarget(store, {
+      guildId,
+      handleInput,
+      includeLinkedUserId,
+    });
   }
 
   const linkedHandle = await store.getHandle(guildId, targetId);
@@ -127,11 +138,7 @@ export async function resolveHandleTargetWithOptionalGuild(
     if (!handleInput) {
       return { error: "Provide a handle when using this command in DMs." };
     }
-    const handleInfo = await store.resolveHandle(handleInput);
-    if (!handleInfo.exists) {
-      return { error: "Invalid handle." };
-    }
-    return { handle: handleInfo.canonicalHandle ?? handleInput, linkedUserId: null };
+    return resolveExplicitHandleTarget(store, { handleInput });
   }
   return resolveHandleTarget(store, { guildId, targetId, handleInput, includeLinkedUserId });
 }
