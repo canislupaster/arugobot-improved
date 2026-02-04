@@ -297,11 +297,7 @@ export const contestRatingAlertsCommand: Command = {
       }
 
       if (subcommand === "remove") {
-        const subscription = await resolveSubscriptionSelectionFromInteraction(
-          interaction,
-          () => context.services.contestRatingAlerts.listSubscriptions(guildId),
-          selectionMessages
-        );
+        const subscription = await selectSubscription();
         if (!subscription) {
           return;
         }

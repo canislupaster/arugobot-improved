@@ -518,11 +518,7 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "remove") {
-        const subscription = await resolveSubscriptionSelectionFromInteraction(
-          interaction,
-          () => context.services.contestReminders.listSubscriptions(guildId),
-          selectionMessages
-        );
+        const subscription = await resolveSubscription();
         if (!subscription) {
           return;
         }
