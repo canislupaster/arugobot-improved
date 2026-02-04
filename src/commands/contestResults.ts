@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
+import { addContestTargetOptions } from "../utils/commandOptions.js";
 import { resolveContestContextOrReply } from "../utils/contestCommand.js";
 import { addRankedLinesField, formatTargetLabel } from "../utils/contestEntries.js";
 import { buildContestEmbed, formatContestTag } from "../utils/contestLookup.js";
@@ -10,7 +11,6 @@ import {
   partitionTargetsByHandle,
   resolveContestTargetsFromContextOrReply,
 } from "../utils/contestTargets.js";
-import { addContestTargetOptions } from "../utils/commandOptions.js";
 
 import type { Command } from "./types.js";
 
