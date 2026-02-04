@@ -29,6 +29,10 @@ export type RosterMessages = {
   noMembers?: string;
 };
 
+type RosterReplyInteraction = {
+  editReply: (message: string) => Promise<unknown>;
+};
+
 const NO_LINKED_HANDLES_MESSAGE =
   "No linked handles yet. Use /register to link a Codeforces handle.";
 const NO_MEMBER_HANDLES_MESSAGE = "No linked handles found for current server members.";
@@ -75,4 +79,19 @@ export async function resolveGuildRoster<T extends RosterEntryBase>(
     };
   }
   return { status: "ok", roster: filtered, excludedCount };
+}
+
+export async function resolveGuildRosterOrReply<T extends RosterEntryBase>(
+  guild: Guild,
+  roster: T[],
+  context: LogContext,
+  interaction: RosterReplyInteraction,
+  messages: RosterMessages = {}
+): Promise<{ status: "ok"; roster: T[]; excludedCount: number } | { status: "replied" }> {
+  const result = await resolveGuildRoster(guild, roster, context, messages);
+  if (result.status === "empty") {
+    await interaction.editReply(result.message);
+    return { status: "replied" };
+  }
+  return result;
 }

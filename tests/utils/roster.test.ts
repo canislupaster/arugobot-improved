@@ -1,6 +1,10 @@
 import type { Guild } from "discord.js";
 
-import { formatRatedRosterLines, resolveGuildRoster } from "../../src/utils/roster.js";
+import {
+  formatRatedRosterLines,
+  resolveGuildRoster,
+  resolveGuildRosterOrReply,
+} from "../../src/utils/roster.js";
 
 const createGuild = (members: Array<{ id: string }>): Guild =>
   ({
@@ -78,6 +82,42 @@ describe("resolveGuildRoster", () => {
       expect(result.excludedCount).toBe(0);
       expect(result.message).toBe("No handles configured.");
     }
+  });
+});
+
+describe("resolveGuildRosterOrReply", () => {
+  it("replies when the roster is empty", async () => {
+    const guild = createGuild([]);
+    const interaction = { editReply: jest.fn().mockResolvedValue(undefined) };
+    const result = await resolveGuildRosterOrReply(
+      guild,
+      [],
+      { correlationId: "corr-5", command: "contestactivity", guildId: "guild-1", userId: "u1" },
+      interaction
+    );
+
+    expect(result.status).toBe("replied");
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No linked handles yet. Use /register to link a Codeforces handle."
+    );
+  });
+
+  it("returns the roster when entries are valid", async () => {
+    const guild = createGuild([{ id: "user-1" }]);
+    const interaction = { editReply: jest.fn().mockResolvedValue(undefined) };
+    const result = await resolveGuildRosterOrReply(
+      guild,
+      [{ userId: "user-1", handle: "Alice" }],
+      { correlationId: "corr-6", command: "contestdeltas", guildId: "guild-1", userId: "u1" },
+      interaction
+    );
+
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.roster).toHaveLength(1);
+      expect(result.excludedCount).toBe(0);
+    }
+    expect(interaction.editReply).not.toHaveBeenCalled();
   });
 });
 

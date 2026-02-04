@@ -10,7 +10,7 @@ import {
 import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild } from "../utils/interaction.js";
-import { resolveGuildRoster } from "../utils/roster.js";
+import { resolveGuildRosterOrReply } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -153,13 +153,13 @@ export const contestActivityCommand: Command = {
 
     try {
       const roster = await context.services.store.getServerRoster(guild.id);
-      const rosterResult = await resolveGuildRoster(
+      const rosterResult = await resolveGuildRosterOrReply(
         guild,
         roster,
-        buildCommandLogContext(interaction, context.correlationId, guild.id)
+        buildCommandLogContext(interaction, context.correlationId, guild.id),
+        interaction
       );
-      if (rosterResult.status === "empty") {
-        await interaction.editReply(rosterResult.message);
+      if (rosterResult.status === "replied") {
         return;
       }
       const activity = await context.services.contestActivity.getContestActivityForRoster(
