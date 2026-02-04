@@ -22,7 +22,7 @@ import { parseHandleFilterInput } from "../utils/handles.js";
 import { requireGuild, resolveBooleanOption } from "../utils/interaction.js";
 import {
   appendSubscriptionIdField,
-  resolveSubscriptionSelectionFromInteraction,
+  createSubscriptionSelectionResolver,
 } from "../utils/subscriptionSelection.js";
 import {
   buildSubscriptionListEmbed,
@@ -183,13 +183,11 @@ export const contestRatingAlertsCommand: Command = {
 
     const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
-    const selectSubscription = async (): Promise<ContestRatingAlertSubscription | null> => {
-      return resolveSubscriptionSelectionFromInteraction(
-        interaction,
-        () => context.services.contestRatingAlerts.listSubscriptions(guildId),
-        selectionMessages
-      );
-    };
+    const selectSubscription = createSubscriptionSelectionResolver(
+      interaction,
+      () => context.services.contestRatingAlerts.listSubscriptions(guildId),
+      selectionMessages
+    );
 
     try {
       if (subcommand === "status" || subcommand === "list") {

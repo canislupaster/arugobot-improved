@@ -2,6 +2,7 @@ import { EmbedBuilder } from "discord.js";
 
 import {
   appendSubscriptionIdField,
+  createSubscriptionSelectionResolver,
   resolveSubscriptionId,
   resolveSubscriptionSelectionFromInteraction,
   resolveSubscriptionSelectionOrReply,
@@ -105,6 +106,21 @@ describe("subscriptionSelection", () => {
     expect(result).toBeNull();
     expect(listSubscriptions).toHaveBeenCalledTimes(1);
     expect(reply).toHaveBeenCalledWith({ content: "none" });
+  });
+
+  test("createSubscriptionSelectionResolver delegates to listSubscriptions", async () => {
+    const reply = jest.fn().mockResolvedValue(undefined);
+    const options = { getString: jest.fn().mockReturnValue("abc") };
+    const interaction = { reply, options } as unknown as { reply: typeof reply; options: typeof options };
+    const listSubscriptions = jest.fn().mockResolvedValue(subscriptions);
+    const resolver = createSubscriptionSelectionResolver(
+      interaction as never,
+      listSubscriptions,
+      selectionMessages
+    );
+    const result = await resolver();
+    expect(result).toEqual(subscriptions[0]);
+    expect(listSubscriptions).toHaveBeenCalledTimes(1);
   });
 
   test("appendSubscriptionIdField adds a subscription id field", () => {

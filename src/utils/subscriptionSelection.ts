@@ -93,6 +93,16 @@ export async function resolveSubscriptionSelectionFromInteraction<T extends { id
   return resolveSubscriptionSelectionOrReply(interaction, subscriptions, inputId, messages);
 }
 
+export function createSubscriptionSelectionResolver<T extends { id: string }>(
+  interaction: ChatInputCommandInteraction,
+  listSubscriptions: () => Promise<T[]>,
+  messages: SubscriptionSelectionMessages,
+  optionName = "id"
+): () => Promise<T | null> {
+  return () =>
+    resolveSubscriptionSelectionFromInteraction(interaction, listSubscriptions, messages, optionName);
+}
+
 export function appendSubscriptionIdField(
   embed: EmbedBuilder,
   subscriptionId: string

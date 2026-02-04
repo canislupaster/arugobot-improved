@@ -40,7 +40,7 @@ import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild, resolveBooleanOption } from "../utils/interaction.js";
 import {
   appendSubscriptionIdField,
-  resolveSubscriptionSelectionFromInteraction,
+  createSubscriptionSelectionResolver,
 } from "../utils/subscriptionSelection.js";
 import {
   buildSubscriptionListEmbed,
@@ -341,13 +341,11 @@ export const contestRemindersCommand: Command = {
 
     const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
-    const resolveSubscription = async () => {
-      return resolveSubscriptionSelectionFromInteraction(
-        interaction,
-        () => context.services.contestReminders.listSubscriptions(guildId),
-        selectionMessages
-      );
-    };
+    const resolveSubscription = createSubscriptionSelectionResolver(
+      interaction,
+      () => context.services.contestReminders.listSubscriptions(guildId),
+      selectionMessages
+    );
 
     try {
       if (subcommand === "status" || subcommand === "list") {
