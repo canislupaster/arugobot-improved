@@ -12,7 +12,7 @@ import {
   getTotalPages,
   runPaginatedInteraction,
 } from "../utils/pagination.js";
-import { resolveGuildRoster } from "../utils/roster.js";
+import { resolveGuildRosterFromStoreOrReply } from "../utils/roster.js";
 import { formatStreakEmojis } from "../utils/streaks.js";
 
 import type { Command } from "./types.js";
@@ -157,10 +157,13 @@ export const leaderboardCommand: Command = {
       }
 
       if (metric === "contests") {
-        const roster = await context.services.store.getServerRoster(guild.id);
-        const rosterResult = await resolveGuildRoster(guild, roster, logContext);
-        if (rosterResult.status === "empty") {
-          await interaction.editReply(rosterResult.message);
+        const rosterResult = await resolveGuildRosterFromStoreOrReply({
+          guild,
+          interaction,
+          store: context.services.store,
+          correlationId: context.correlationId,
+        });
+        if (rosterResult.status === "replied") {
           return;
         }
         const activity = await context.services.contestActivity.getContestActivityForRoster(
