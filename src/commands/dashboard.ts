@@ -1,7 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { replyEphemeral, requireGuildIdEphemeral } from "../utils/interaction.js";
+import { replyEphemeral, requireGuildIdAndSubcommand } from "../utils/interaction.js";
 import { formatUpdatedAt } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -67,14 +67,14 @@ export const dashboardCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    const guildId = await requireGuildIdEphemeral(
+    const commandContext = await requireGuildIdAndSubcommand(
       interaction,
       "This command can only be used in a server."
     );
-    if (!guildId) {
+    if (!commandContext) {
       return;
     }
-    const subcommand = interaction.options.getSubcommand();
+    const { guildId, subcommand } = commandContext;
 
     try {
       if (subcommand === "status") {

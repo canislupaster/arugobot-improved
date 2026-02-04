@@ -122,6 +122,17 @@ export async function requireGuildIdEphemeral(
   return null;
 }
 
+export async function requireGuildIdAndSubcommand(
+  interaction: ChatInputCommandInteraction,
+  content: string
+): Promise<{ guildId: string; subcommand: string } | null> {
+  const guildId = await requireGuildIdEphemeral(interaction, content);
+  if (!guildId) {
+    return null;
+  }
+  return { guildId, subcommand: interaction.options.getSubcommand() };
+}
+
 export async function requireGuildAndPage(
   interaction: ChatInputCommandInteraction & IntegerOptionResolver & RepliableInteraction,
   options: {
