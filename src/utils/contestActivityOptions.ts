@@ -192,6 +192,16 @@ type ContestActivityRosterInteraction = ContestActivityContextInteraction<Guild>
   editReply: (message: string) => Promise<unknown>;
 };
 
+export type ContestActivityRosterContextOk = {
+  status: "ok";
+  guild: Guild;
+  days: number;
+  limit: number;
+  scope: ContestScopeFilter;
+  roster: RosterEntry[];
+  excludedCount: number;
+};
+
 type ContestActivityRosterContextResult =
   | {
       status: "ok";
@@ -259,5 +269,41 @@ export async function resolveContestActivityRosterContextWithDefaultsOrReply(
   return resolveContestActivityRosterContextOrReply(interaction, config, {
     guildMessage: messages.guildMessage,
     ...options,
+  });
+}
+
+export async function resolveContestActivityRosterContextWithDefaultsOrNull(
+  interaction: ContestActivityRosterInteraction,
+  messages: { daysErrorMessage: string; limitErrorMessage: string; guildMessage: string },
+  options: {
+    store: ContestActivityRosterStore;
+    correlationId?: string;
+    rosterMessages?: RosterMessages;
+  }
+): Promise<ContestActivityRosterContextOk | null> {
+  const result = await resolveContestActivityRosterContextWithDefaultsOrReply(
+    interaction,
+    messages,
+    options
+  );
+  if (result.status === "replied") {
+    return null;
+  }
+  return result;
+}
+
+type ContestActivityCommandContext = {
+  services: { store: ContestActivityRosterStore };
+  correlationId?: string;
+};
+
+export async function resolveContestActivityRosterContextForCommand(
+  interaction: ContestActivityRosterInteraction,
+  context: ContestActivityCommandContext,
+  messages: { daysErrorMessage: string; limitErrorMessage: string; guildMessage: string }
+): Promise<ContestActivityRosterContextOk | null> {
+  return resolveContestActivityRosterContextWithDefaultsOrNull(interaction, messages, {
+    store: context.services.store,
+    correlationId: context.correlationId,
   });
 }

@@ -5,7 +5,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import {
   CONTEST_ACTIVITY_DEFAULTS,
   addContestActivityCommandOptions,
-  resolveContestActivityRosterContextWithDefaultsOrReply,
+  resolveContestActivityRosterContextForCommand,
 } from "../utils/contestActivityOptions.js";
 import { buildContestSummaryEmbedBase } from "../utils/contestEmbeds.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -13,6 +13,12 @@ import { appendRosterExcludedField } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+
+const contestActivityRosterMessages = {
+  daysErrorMessage: "Invalid lookback window.",
+  limitErrorMessage: "Invalid participant limit.",
+  guildMessage: "This command can only be used in a server.",
+};
 
 function formatScopeSummary(
   label: string,
@@ -109,16 +115,12 @@ export const contestActivityCommand: Command = {
     }
   ),
   async execute(interaction, context) {
-    const optionResult = await resolveContestActivityRosterContextWithDefaultsOrReply(
+    const optionResult = await resolveContestActivityRosterContextForCommand(
       interaction,
-      {
-        daysErrorMessage: "Invalid lookback window.",
-        limitErrorMessage: "Invalid participant limit.",
-        guildMessage: "This command can only be used in a server.",
-      },
-      { store: context.services.store, correlationId: context.correlationId }
+      context,
+      contestActivityRosterMessages
     );
-    if (optionResult.status === "replied") {
+    if (!optionResult) {
       return;
     }
     const { days, limit, scope, roster, excludedCount } = optionResult;
