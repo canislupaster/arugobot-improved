@@ -51,18 +51,20 @@ export class DatabaseBackupService {
       const baseSeconds = Math.floor(startedAt / 1000);
       const { backupPath } = await this.copyBackupFile(this.databasePath, baseSeconds);
       const deletedCount = await this.cleanupOldBackups(startedAt);
-      this.lastBackupAt = new Date().toISOString();
+      const finishedAt = Date.now();
+      const durationMs = finishedAt - startedAt;
+      this.lastBackupAt = new Date(finishedAt).toISOString();
       this.lastError = null;
       logInfo("Database backup created.", {
         path: backupPath,
         deletedCount,
-        durationMs: Date.now() - startedAt,
+        durationMs,
       });
       return {
         status: "success",
         filePath: backupPath,
         deletedCount,
-        durationMs: Date.now() - startedAt,
+        durationMs,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
