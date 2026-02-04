@@ -85,6 +85,17 @@ function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, la
   existing.set(key, { handle, label });
 }
 
+type LinkedUserHandle = { userId: string; handle: string };
+
+function addLinkedUsers(
+  targets: Map<string, TargetHandle>,
+  linkedUsers: LinkedUserHandle[]
+): void {
+  for (const linked of linkedUsers) {
+    addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
+  }
+}
+
 type NormalizedHandleInput = {
   raw: string;
   normalized: string;
@@ -169,9 +180,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
       if (maxLinkedHandles && linkedUsers.length > maxLinkedHandles) {
         return errorResult(formatTooManyHandlesMessage(linkedUsers.length));
       }
-      for (const linked of linkedUsers) {
-        addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
-      }
+      addLinkedUsers(targets, linkedUsers);
       const targetList = Array.from(targets.values());
       if (targetList.length === 0) {
         return errorResult("No handles found to check.");
@@ -196,9 +205,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     if (maxLinkedHandles && rosterResult.roster.length > maxLinkedHandles) {
       return errorResult(formatTooManyHandlesMessage(rosterResult.roster.length));
     }
-    for (const linked of rosterResult.roster) {
-      addTargetHandle(targets, linked.handle, `<@${linked.userId}>`);
-    }
+    addLinkedUsers(targets, rosterResult.roster);
   }
 
   const targetList = Array.from(targets.values());
