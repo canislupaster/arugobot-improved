@@ -12,8 +12,8 @@ import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
-  addPostSubcommand,
-  addPreviewSubcommand,
+  addPreviewAndPostSubcommands,
+  buildPreviewPostOptions,
 } from "../utils/commandOptions.js";
 import {
   filterContestsByKeywords,
@@ -245,91 +245,88 @@ const selectionMessages = {
   ambiguous: (matches: string[]) =>
     `Subscription id matches multiple entries. Use the full id. Matches: ${matches.join(", ")}`,
 };
+const previewPostOptions = buildPreviewPostOptions({
+  previewDescription: "Preview the next scheduled reminder",
+  postDescription: "Post a contest reminder immediately",
+  forceDescription: "Send even if a reminder was already posted",
+  previewIdDescription: "Subscription id (from list)",
+  postIdDescription: "Subscription id (from list)",
+});
 
 export const contestRemindersCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("contestreminders")
-    .setDescription("Configure Codeforces contest reminders for this server")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addSubcommand((subcommand) =>
-      addReminderOptions(
-        subcommand.setName("add").setDescription("Add a contest reminder subscription")
-      )
-    )
-    .addSubcommand((subcommand) =>
-      addReminderOptions(
-        subcommand.setName("set").setDescription("Add a contest reminder subscription (legacy)")
-      )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("status")
-        .setDescription("List current reminder subscriptions")
-        .addBooleanOption((option) =>
-          option
-            .setName("only_issues")
-            .setDescription("Only show reminders with missing channels or permissions")
+  data: addPreviewAndPostSubcommands(
+    new SlashCommandBuilder()
+      .setName("contestreminders")
+      .setDescription("Configure Codeforces contest reminders for this server")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addSubcommand((subcommand) =>
+        addReminderOptions(
+          subcommand.setName("add").setDescription("Add a contest reminder subscription")
         )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("list")
-        .setDescription("List current reminder subscriptions")
-        .addBooleanOption((option) =>
-          option
-            .setName("only_issues")
-            .setDescription("Only show reminders with missing channels or permissions")
-        )
-    )
-    .addSubcommand((subcommand) => {
-      const withPreset = subcommand
-        .setName("preset")
-        .setDescription("Add a reminder preset (Div 1, Div 2, Div 3, Div 4, Educational)")
-        .addStringOption((option) => {
-          const choice = option
-            .setName("preset")
-            .setDescription("Reminder preset")
-            .setRequired(true);
-          for (const preset of listContestReminderPresets()) {
-            choice.addChoices({ name: preset.name, value: preset.value });
-          }
-          return choice;
-        });
-      return addReminderChannelOptions(withPreset).addStringOption((option) =>
-        addContestScopeOption(option, "Which contests to include")
-      );
-    })
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("remove")
-        .setDescription("Remove a reminder subscription")
-        .addStringOption((option) =>
-          option.setName("id").setDescription("Subscription id (from list)").setRequired(true)
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand.setName("clear").setDescription("Remove all contest reminders")
-    )
-    .addSubcommand((subcommand) =>
-      addCleanupSubcommand(
-        subcommand,
-        "Remove contest reminders targeting deleted channels",
-        "Also remove subscriptions where the bot lacks permissions"
       )
-    )
-    .addSubcommand((subcommand) =>
-      addPreviewSubcommand(subcommand, {
-        description: "Preview the next scheduled reminder",
-        idDescription: "Subscription id (from list)",
+      .addSubcommand((subcommand) =>
+        addReminderOptions(
+          subcommand.setName("set").setDescription("Add a contest reminder subscription (legacy)")
+        )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("status")
+          .setDescription("List current reminder subscriptions")
+          .addBooleanOption((option) =>
+            option
+              .setName("only_issues")
+              .setDescription("Only show reminders with missing channels or permissions")
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("list")
+          .setDescription("List current reminder subscriptions")
+          .addBooleanOption((option) =>
+            option
+              .setName("only_issues")
+              .setDescription("Only show reminders with missing channels or permissions")
+          )
+      )
+      .addSubcommand((subcommand) => {
+        const withPreset = subcommand
+          .setName("preset")
+          .setDescription("Add a reminder preset (Div 1, Div 2, Div 3, Div 4, Educational)")
+          .addStringOption((option) => {
+            const choice = option
+              .setName("preset")
+              .setDescription("Reminder preset")
+              .setRequired(true);
+            for (const preset of listContestReminderPresets()) {
+              choice.addChoices({ name: preset.name, value: preset.value });
+            }
+            return choice;
+          });
+        return addReminderChannelOptions(withPreset).addStringOption((option) =>
+          addContestScopeOption(option, "Which contests to include")
+        );
       })
-    )
-    .addSubcommand((subcommand) =>
-      addPostSubcommand(subcommand, {
-        description: "Post a contest reminder immediately",
-        forceDescription: "Send even if a reminder was already posted",
-        idDescription: "Subscription id (from list)",
-      })
-    ),
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("remove")
+          .setDescription("Remove a reminder subscription")
+          .addStringOption((option) =>
+            option.setName("id").setDescription("Subscription id (from list)").setRequired(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("clear").setDescription("Remove all contest reminders")
+      )
+      .addSubcommand((subcommand) =>
+        addCleanupSubcommand(
+          subcommand,
+          "Remove contest reminders targeting deleted channels",
+          "Also remove subscriptions where the bot lacks permissions"
+        )
+      ),
+    previewPostOptions
+  ),
   adminOnly: true,
   async execute(interaction, context) {
     const guild = await requireGuild(interaction, {

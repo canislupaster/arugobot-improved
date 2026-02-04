@@ -8,8 +8,8 @@ import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
-  addPostSubcommand,
-  addPreviewSubcommand,
+  addPreviewAndPostSubcommands,
+  buildPreviewPostOptions,
 } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
@@ -74,6 +74,13 @@ const selectionMessages = {
   ambiguous: (matches: string[]) =>
     `Subscription id matches multiple entries. Use the full id. Matches: ${matches.join(", ")}`,
 };
+const previewPostOptions = buildPreviewPostOptions({
+  previewDescription: "Preview the next contest rating change alert",
+  postDescription: "Post the latest contest rating changes immediately",
+  forceDescription: "Send even if an alert was already posted",
+  previewIdDescription: "Subscription id (from list)",
+  postIdDescription: "Subscription id (from list)",
+});
 
 function getAlertStatusMessage(status: string, contestName?: string): string | null {
   switch (status) {
@@ -91,87 +98,77 @@ function getAlertStatusMessage(status: string, contestName?: string): string | n
 }
 
 export const contestRatingAlertsCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("contestratingalerts")
-    .setDescription("Configure contest rating change alerts for this server")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("set")
-        .setDescription("Enable contest rating change alerts in a channel")
-        .addChannelOption((option) =>
-          option
-            .setName("channel")
-            .setDescription("Channel to post rating change alerts in")
-            .setRequired(true)
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-        )
-        .addRoleOption((option) =>
-          option.setName("role").setDescription("Role to mention for alerts")
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("min_delta")
-            .setDescription("Minimum rating delta to include in alerts")
-            .setMinValue(0)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("handles")
-            .setDescription("Comma-separated handles to include (linked handles only)")
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("status")
-        .setDescription("List current rating alert subscriptions")
-        .addBooleanOption((option) =>
-          option
-            .setName("only_issues")
-            .setDescription("Only show alerts with missing channels or permissions")
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("list")
-        .setDescription("List current rating alert subscriptions")
-        .addBooleanOption((option) =>
-          option
-            .setName("only_issues")
-            .setDescription("Only show alerts with missing channels or permissions")
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("remove")
-        .setDescription("Remove a rating change alert subscription")
-        .addStringOption((option) =>
-          option.setName("id").setDescription("Subscription id (from list)").setRequired(true)
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand.setName("clear").setDescription("Remove all rating change alerts")
-    )
-    .addSubcommand((subcommand) =>
-      addCleanupSubcommand(
-        subcommand,
-        "Remove rating alerts targeting deleted channels",
-        "Also remove subscriptions where the bot lacks permissions"
+  data: addPreviewAndPostSubcommands(
+    new SlashCommandBuilder()
+      .setName("contestratingalerts")
+      .setDescription("Configure contest rating change alerts for this server")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("set")
+          .setDescription("Enable contest rating change alerts in a channel")
+          .addChannelOption((option) =>
+            option
+              .setName("channel")
+              .setDescription("Channel to post rating change alerts in")
+              .setRequired(true)
+              .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+          )
+          .addRoleOption((option) =>
+            option.setName("role").setDescription("Role to mention for alerts")
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("min_delta")
+              .setDescription("Minimum rating delta to include in alerts")
+              .setMinValue(0)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("handles")
+              .setDescription("Comma-separated handles to include (linked handles only)")
+          )
       )
-    )
-    .addSubcommand((subcommand) =>
-      addPreviewSubcommand(subcommand, {
-        description: "Preview the next contest rating change alert",
-        idDescription: "Subscription id (from list)",
-      })
-    )
-    .addSubcommand((subcommand) =>
-      addPostSubcommand(subcommand, {
-        description: "Post the latest contest rating changes immediately",
-        forceDescription: "Send even if an alert was already posted",
-        idDescription: "Subscription id (from list)",
-      })
-    ),
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("status")
+          .setDescription("List current rating alert subscriptions")
+          .addBooleanOption((option) =>
+            option
+              .setName("only_issues")
+              .setDescription("Only show alerts with missing channels or permissions")
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("list")
+          .setDescription("List current rating alert subscriptions")
+          .addBooleanOption((option) =>
+            option
+              .setName("only_issues")
+              .setDescription("Only show alerts with missing channels or permissions")
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("remove")
+          .setDescription("Remove a rating change alert subscription")
+          .addStringOption((option) =>
+            option.setName("id").setDescription("Subscription id (from list)").setRequired(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("clear").setDescription("Remove all rating change alerts")
+      )
+      .addSubcommand((subcommand) =>
+        addCleanupSubcommand(
+          subcommand,
+          "Remove rating alerts targeting deleted channels",
+          "Also remove subscriptions where the bot lacks permissions"
+        )
+      ),
+    previewPostOptions
+  ),
   adminOnly: true,
   async execute(interaction, context) {
     const guild = await requireGuild(interaction, {
