@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { resolveContestContextOrReply } from "../utils/contestCommand.js";
+import { buildRankedLines, formatTargetLabel } from "../utils/contestEntries.js";
 import { buildContestEmbed, formatContestTag } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
 import {
@@ -9,7 +10,6 @@ import {
   partitionTargetsByHandle,
   resolveContestTargetsFromInteractionOrReply,
 } from "../utils/contestTargets.js";
-import { buildRankedLines, formatTargetLabel } from "../utils/contestEntries.js";
 
 import type { Command } from "./types.js";
 
