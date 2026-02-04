@@ -25,6 +25,24 @@ function buildDashboardUrlLine(
   return dashboardUrl ? ` Dashboard URL: ${dashboardUrl}.` : "";
 }
 
+function formatDashboardVisibilityMessage(options: {
+  isPublic: boolean;
+  baseUrl: string | undefined;
+  guildId: string;
+  updatedAt?: string;
+}): string {
+  const visibility = options.isPublic ? "public" : "private";
+  const urlLine = buildDashboardUrlLine(
+    options.baseUrl,
+    options.guildId,
+    options.isPublic
+  );
+  const updatedAtLine = options.updatedAt
+    ? ` Last updated ${formatUpdatedAt(options.updatedAt)}.`
+    : "";
+  return `Dashboard visibility is ${visibility}.${updatedAtLine}${urlLine}`;
+}
+
 export const dashboardCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("dashboard")
@@ -68,17 +86,14 @@ export const dashboardCommand: Command = {
           );
           return;
         }
-        const urlLine = buildDashboardUrlLine(
-          context.config.webPublicUrl,
-          guildId,
-          settings.isPublic
-        );
-        const visibility = settings.isPublic ? "public" : "private";
         await replyEphemeral(
           interaction,
-          `Dashboard visibility is ${visibility}. Last updated ${formatUpdatedAt(
-            settings.updatedAt
-          )}.${urlLine}`
+          formatDashboardVisibilityMessage({
+            isPublic: settings.isPublic,
+            baseUrl: context.config.webPublicUrl,
+            guildId,
+            updatedAt: settings.updatedAt,
+          })
         );
         return;
       }
@@ -91,10 +106,13 @@ export const dashboardCommand: Command = {
 
       const isPublic = interaction.options.getBoolean("public", true);
       await context.services.guildSettings.setDashboardPublic(guildId, isPublic);
-      const urlLine = buildDashboardUrlLine(context.config.webPublicUrl, guildId, isPublic);
       await replyEphemeral(
         interaction,
-        `Dashboard visibility updated: ${isPublic ? "public" : "private"}.${urlLine}`
+        `Dashboard visibility updated: ${isPublic ? "public" : "private"}.${buildDashboardUrlLine(
+          context.config.webPublicUrl,
+          guildId,
+          isPublic
+        )}`
       );
     } catch (error) {
       logCommandError("Dashboard command failed.", interaction, context.correlationId, {
