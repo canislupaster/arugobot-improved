@@ -1,9 +1,18 @@
 import {
   beginServiceTick,
+  createAsyncTaskTracker,
   createServiceTickState,
   createServiceTickTracker,
   runServiceTick,
 } from "../../src/utils/serviceTicks.js";
+
+const createDeferred = <T>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolveFn) => {
+    resolve = resolveFn;
+  });
+  return { promise, resolve };
+};
 
 describe("beginServiceTick", () => {
   it("starts a tick when idle and clears on finish", () => {
@@ -130,5 +139,30 @@ describe("createServiceTickTracker", () => {
     expect(tracker.getLastError()?.message).toBe("boom");
 
     finish?.();
+  });
+});
+
+describe("createAsyncTaskTracker", () => {
+  it("tracks pending tasks and clears after resolution", async () => {
+    const tracker = createAsyncTaskTracker();
+    const deferred = createDeferred<void>();
+    tracker.track(deferred.promise);
+
+    expect(tracker.getPendingCount()).toBe(1);
+
+    deferred.resolve();
+    await deferred.promise;
+
+    expect(tracker.getPendingCount()).toBe(0);
+  });
+
+  it("returns timeout when tasks are still running", async () => {
+    const tracker = createAsyncTaskTracker();
+    tracker.track(new Promise<void>(() => {}));
+
+    const result = await tracker.waitForIdle(5);
+
+    expect(result.status).toBe("timeout");
+    expect(result.pending).toBeGreaterThan(0);
   });
 });

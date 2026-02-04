@@ -43,6 +43,7 @@ import { WeeklyDigestService, weeklyDigestIntervalMs } from "./services/weeklyDi
 import type { WebServerStatus } from "./types/webStatus.js";
 import { CooldownManager } from "./utils/cooldown.js";
 import { logError, logInfo, logWarn, setLogSink } from "./utils/logger.js";
+import { createAsyncTaskTracker } from "./utils/serviceTicks.js";
 import { startWebServer } from "./web/server.js";
 
 type ContestListResponse = Array<{ id: number }>;
@@ -123,6 +124,7 @@ async function main() {
   });
 
   const cooldowns = new CooldownManager(3, 1);
+  const taskTracker = createAsyncTaskTracker();
   const webStatus: WebServerStatus = {
     status: "starting",
     host: config.webHost,
@@ -144,6 +146,15 @@ async function main() {
   let shuttingDown = false;
   let isChallengeTicking = false;
   let isBackingUp = false;
+  const trackTask = <T>(promise: Promise<T>) => taskTracker.track(promise);
+  const runBackgroundTask = (name: string, promise: Promise<unknown>) => {
+    void trackTask(promise).catch((error) => {
+      logWarn("Background task failed.", {
+        task: name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  };
 
   async function validateConnectivity() {
     try {
@@ -249,8 +260,11 @@ async function main() {
       }
     }
 
-    await parseData();
-    parseInterval = setInterval(parseData, 60 * 60 * 1000);
+    await trackTask(parseData());
+    parseInterval = setInterval(
+      () => runBackgroundTask("parseData", parseData()),
+      60 * 60 * 1000
+    );
 
     const tickChallenges = async () => {
       if (shuttingDown || isChallengeTicking) {
@@ -263,8 +277,11 @@ async function main() {
         isChallengeTicking = false;
       }
     };
-    await tickChallenges();
-    challengeInterval = setInterval(tickChallenges, challengeUpdateIntervalMs);
+    await trackTask(tickChallenges());
+    challengeInterval = setInterval(
+      () => runBackgroundTask("challengeTick", tickChallenges()),
+      challengeUpdateIntervalMs
+    );
 
     const tickContestReminders = async () => {
       if (shuttingDown) {
@@ -272,8 +289,11 @@ async function main() {
       }
       await contestReminders.runTick(client);
     };
-    await tickContestReminders();
-    contestReminderInterval = setInterval(tickContestReminders, contestReminderIntervalMs);
+    await trackTask(tickContestReminders());
+    contestReminderInterval = setInterval(
+      () => runBackgroundTask("contestReminders", tickContestReminders()),
+      contestReminderIntervalMs
+    );
 
     const tickPracticeReminders = async () => {
       if (shuttingDown) {
@@ -281,8 +301,11 @@ async function main() {
       }
       await practiceReminders.runTick(client);
     };
-    await tickPracticeReminders();
-    practiceReminderInterval = setInterval(tickPracticeReminders, practiceReminderIntervalMs);
+    await trackTask(tickPracticeReminders());
+    practiceReminderInterval = setInterval(
+      () => runBackgroundTask("practiceReminders", tickPracticeReminders()),
+      practiceReminderIntervalMs
+    );
 
     const tickWeeklyDigest = async () => {
       if (shuttingDown) {
@@ -290,8 +313,11 @@ async function main() {
       }
       await weeklyDigest.runTick(client);
     };
-    await tickWeeklyDigest();
-    weeklyDigestInterval = setInterval(tickWeeklyDigest, weeklyDigestIntervalMs);
+    await trackTask(tickWeeklyDigest());
+    weeklyDigestInterval = setInterval(
+      () => runBackgroundTask("weeklyDigest", tickWeeklyDigest()),
+      weeklyDigestIntervalMs
+    );
 
     const tickContestRatingAlerts = async () => {
       if (shuttingDown) {
@@ -299,8 +325,11 @@ async function main() {
       }
       await contestRatingAlerts.runTick(client);
     };
-    await tickContestRatingAlerts();
-    contestRatingAlertInterval = setInterval(tickContestRatingAlerts, contestRatingAlertIntervalMs);
+    await trackTask(tickContestRatingAlerts());
+    contestRatingAlertInterval = setInterval(
+      () => runBackgroundTask("contestRatingAlerts", tickContestRatingAlerts()),
+      contestRatingAlertIntervalMs
+    );
 
     const tickArena = async () => {
       if (shuttingDown) {
@@ -329,8 +358,11 @@ async function main() {
         });
       }
     };
-    await tickArena();
-    tournamentArenaInterval = setInterval(tickArena, tournamentArenaIntervalMs);
+    await trackTask(tickArena());
+    tournamentArenaInterval = setInterval(
+      () => runBackgroundTask("tournamentArena", tickArena()),
+      tournamentArenaIntervalMs
+    );
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
@@ -418,6 +450,10 @@ async function main() {
     if (tokenUsageInterval) {
       clearInterval(tokenUsageInterval);
     }
+    const waitResult = await taskTracker.waitForIdle(10_000);
+    if (waitResult.status === "timeout") {
+      logWarn("Shutdown timed out waiting for tasks.", { pending: waitResult.pending });
+    }
     if (webServer) {
       await new Promise<void>((resolve) => {
         webServer?.close(() => resolve());
@@ -456,16 +492,25 @@ async function main() {
   }
 
   if (config.logRetentionDays > 0) {
-    await runLogCleanup();
-    logCleanupInterval = setInterval(runLogCleanup, logCleanupIntervalMs);
+    await trackTask(runLogCleanup());
+    logCleanupInterval = setInterval(
+      () => runBackgroundTask("logCleanup", runLogCleanup()),
+      logCleanupIntervalMs
+    );
   }
   if (config.databaseBackupDir) {
-    await runDatabaseBackup();
-    databaseBackupInterval = setInterval(runDatabaseBackup, databaseBackupIntervalMs);
+    await trackTask(runDatabaseBackup());
+    databaseBackupInterval = setInterval(
+      () => runBackgroundTask("databaseBackup", runDatabaseBackup()),
+      databaseBackupIntervalMs
+    );
   }
   if (config.codexLogPath) {
-    await tokenUsage.refresh();
-    tokenUsageInterval = setInterval(() => tokenUsage.refresh(), 60 * 1000);
+    await trackTask(tokenUsage.refresh());
+    tokenUsageInterval = setInterval(
+      () => runBackgroundTask("tokenUsage", tokenUsage.refresh()),
+      60 * 1000
+    );
   }
 
   await validateConnectivity();
