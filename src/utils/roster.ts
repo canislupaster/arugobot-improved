@@ -61,6 +61,20 @@ export function buildRosterExcludedField(
   return { name: label, value: `${excludedCount} not in server`, inline: true };
 }
 
+type EmbedFieldTarget = {
+  addFields: (...fields: Array<{ name: string; value: string; inline?: boolean }>) => unknown;
+};
+
+export function appendRosterExcludedField(
+  target: EmbedFieldTarget,
+  excludedCount: number
+): void {
+  const field = buildRosterExcludedField(excludedCount);
+  if (field) {
+    target.addFields(field);
+  }
+}
+
 export async function resolveGuildRoster<T extends RosterEntryBase>(
   guild: Guild,
   roster: T[],

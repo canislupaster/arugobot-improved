@@ -15,7 +15,7 @@ import {
 import { formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
-import { buildRosterExcludedField } from "../utils/roster.js";
+import { appendRosterExcludedField } from "../utils/roster.js";
 import { formatDiscordRelativeTime } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -126,10 +126,7 @@ export const contestDeltasCommand: Command = {
       }
 
       const embed = buildSummaryEmbed(summary, days, scope);
-      const excludedField = buildRosterExcludedField(excludedCount);
-      if (excludedField) {
-        embed.addFields(excludedField);
-      }
+      appendRosterExcludedField(embed, excludedCount);
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       logCommandError(

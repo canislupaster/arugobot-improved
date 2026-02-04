@@ -1,6 +1,7 @@
 import type { Guild } from "discord.js";
 
 import {
+  appendRosterExcludedField,
   formatRatedRosterLines,
   resolveGuildRoster,
   resolveGuildRosterOrReply,
@@ -181,5 +182,27 @@ describe("formatRatedRosterLines", () => {
 
     expect(lines).toContain("1. <@user-1> - tourist (3500)");
     expect(lines).not.toContain("petr");
+  });
+});
+
+describe("appendRosterExcludedField", () => {
+  it("adds the excluded field when the count is positive", () => {
+    const target = { addFields: jest.fn() };
+
+    appendRosterExcludedField(target, 2);
+
+    expect(target.addFields).toHaveBeenCalledWith({
+      name: "Excluded handles",
+      value: "2 not in server",
+      inline: true,
+    });
+  });
+
+  it("does nothing when the count is zero", () => {
+    const target = { addFields: jest.fn() };
+
+    appendRosterExcludedField(target, 0);
+
+    expect(target.addFields).not.toHaveBeenCalled();
   });
 });
