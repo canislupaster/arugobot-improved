@@ -2,7 +2,11 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatKeywordFilterClauses, parseKeywordFilters } from "../utils/contestFilters.js";
-import { addContestScopeOption, parseContestScope } from "../utils/contestScope.js";
+import {
+  addContestScopeOption,
+  formatContestScopeLabel,
+  parseContestScope,
+} from "../utils/contestScope.js";
 import { replyEphemeral } from "../utils/interaction.js";
 import { formatUpdatedAt } from "../utils/time.js";
 
@@ -20,13 +24,7 @@ function formatScope(scope: string | null): string {
   if (!scope) {
     return "Official (default)";
   }
-  if (scope === "gym") {
-    return "Gym";
-  }
-  if (scope === "all") {
-    return "Official + Gym";
-  }
-  return "Official";
+  return formatContestScopeLabel(parseContestScope(scope));
 }
 
 function buildFilterSummary(include: string | null, exclude: string | null): string {
@@ -124,7 +122,7 @@ export const contestFiltersCommand: Command = {
       });
       await replyEphemeral(
         interaction,
-        `Default contest filters updated. Include: ${buildFilterSummary(
+        `Default contest filters updated. Filters: ${buildFilterSummary(
           includeRaw,
           excludeRaw
         )}. Scope: ${formatScope(scope)}.`
