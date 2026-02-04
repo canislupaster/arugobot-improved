@@ -344,6 +344,67 @@ describe("contestUpsolveCommand", () => {
     );
   });
 
+  it("includes linked user info for handle input in a server", async () => {
+    const interaction = createInteraction({ query: "1234", handle: "tourist" });
+    const context = {
+      services: {
+        contests: {
+          refresh: jest.fn().mockResolvedValue(undefined),
+          getLastRefreshAt: jest.fn().mockReturnValue(1),
+          getContestById: jest.fn().mockReturnValue({
+            id: 1234,
+            name: "Codeforces Round #1234",
+            phase: "FINISHED",
+            startTimeSeconds: 1_700_000_000,
+            durationSeconds: 7200,
+          }),
+          searchContests: jest.fn().mockReturnValue([]),
+        },
+        problems: {
+          ensureProblemsLoaded: jest.fn().mockResolvedValue([
+            {
+              contestId: 1234,
+              index: "A",
+              name: "Problem A",
+              rating: 800,
+              tags: [],
+            },
+          ]),
+        },
+        store: {
+          resolveHandle: jest.fn().mockResolvedValue({
+            exists: true,
+            canonicalHandle: "tourist",
+          }),
+          getUserIdByHandle: jest.fn().mockResolvedValue("user-99"),
+          getHandle: jest.fn(),
+          getContestSolvesResult: jest.fn().mockResolvedValue({
+            solves: [
+              {
+                id: 1,
+                handle: "tourist",
+                contestId: 1234,
+                index: "A",
+                creationTimeSeconds: 1_700_000_100,
+              },
+            ],
+            source: "api",
+            isStale: false,
+          }),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await contestUpsolveCommand.execute(interaction, context);
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    const embed = payload.embeds[0].data;
+    const targetField = embed.fields?.find(
+      (field: { name: string; value: string }) => field.name === "Target"
+    );
+    expect(targetField?.value).toContain("linked to <@user-99>");
+  });
+
   it("rejects missing handles outside a server", async () => {
     const interaction = createInteraction({ query: "1234", guildId: null });
     const context = {
