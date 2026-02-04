@@ -3,7 +3,7 @@ import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.
 
 import type { CommandContext } from "../types/commandContext.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { requireGuildEphemeral } from "../utils/interaction.js";
+import { requireGuildIdEphemeral } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -110,15 +110,14 @@ export const handleAdminCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    const guild = await requireGuildEphemeral(
+    const guildId = await requireGuildIdEphemeral(
       interaction,
       "This command can only be used in a server."
     );
-    if (!guild) {
+    if (!guildId) {
       return;
     }
 
-    const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
     const user = interaction.options.getUser("user", true);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });

@@ -10,6 +10,7 @@ import {
   resolveTargetLabels,
   replyEphemeral,
   requireGuild,
+  requireGuildIdEphemeral,
   requireGuildAndPage,
   safeInteractionDefer,
   safeInteractionEdit,
@@ -171,6 +172,38 @@ describe("requireGuild", () => {
     ).resolves.toEqual({ id: "guild-1" });
 
     expect(interaction.reply).not.toHaveBeenCalled();
+  });
+});
+
+describe("requireGuildIdEphemeral", () => {
+  const createInteraction = (overrides: Record<string, unknown> = {}) =>
+    ({
+      deferred: false,
+      replied: false,
+      guild: { id: "guild-1" },
+      reply: jest.fn().mockResolvedValue(undefined),
+      followUp: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    }) as unknown as ChatInputCommandInteraction & RepliableInteraction;
+
+  it("replies ephemerally and returns null when no guild", async () => {
+    const interaction = createInteraction({ guild: null });
+
+    await expect(requireGuildIdEphemeral(interaction, "Server only.")).resolves.toBeNull();
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Server only.",
+      flags: MessageFlags.Ephemeral,
+    });
+  });
+
+  it("returns guild id when present", async () => {
+    const interaction = createInteraction();
+
+    await expect(requireGuildIdEphemeral(interaction, "Server only.")).resolves.toBe("guild-1");
+
+    expect(interaction.reply).not.toHaveBeenCalled();
+    expect(interaction.followUp).not.toHaveBeenCalled();
   });
 });
 

@@ -12,7 +12,7 @@ import {
   formatCannotPostPermissionsMessage,
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
-import { requireGuildEphemeral } from "../utils/interaction.js";
+import { requireGuildIdEphemeral } from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,
   formatHourMinute,
@@ -147,15 +147,13 @@ export const digestCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    const guild = await requireGuildEphemeral(
+    const guildId = await requireGuildIdEphemeral(
       interaction,
       "This command can only be used in a server."
     );
-    if (!guild) {
+    if (!guildId) {
       return;
     }
-
-    const guildId = guild.id;
     const subcommand = interaction.options.getSubcommand();
 
     try {
