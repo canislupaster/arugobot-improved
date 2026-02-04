@@ -75,12 +75,13 @@ export async function resolveContestTargetInputsOrReply(
 > {
   const handleInputs = parseHandleList(handlesRaw.trim());
   const userOptions = getContestUserOptions(interaction);
-  const targetContextResult = await validateContestTargetContextOrReply(interaction, {
+  const contextError = getContestTargetContextError({
     guild: interaction.guild,
     userOptions,
     handleInputs,
   });
-  if (targetContextResult.status === "replied") {
+  if (contextError) {
+    await interaction.reply({ content: contextError });
     return { status: "replied" };
   }
   return { status: "ok", handleInputs, userOptions };
@@ -100,27 +101,6 @@ export function getContestTargetContextError(options: {
     return "Provide at least one handle or run this command in a server.";
   }
   return null;
-}
-
-type ContestTargetContextInteraction = {
-  reply: (options: { content: string }) => Promise<unknown>;
-};
-
-export async function validateContestTargetContextOrReply(
-  interaction: ContestTargetContextInteraction,
-  options: {
-    guild: Guild | null;
-    guildId?: string | null;
-    userOptions: User[];
-    handleInputs: string[];
-  }
-): Promise<{ status: "ok" } | { status: "replied" }> {
-  const error = getContestTargetContextError(options);
-  if (!error) {
-    return { status: "ok" };
-  }
-  await interaction.reply({ content: error });
-  return { status: "replied" };
 }
 
 function dedupeUsersById(users: User[]): User[] {

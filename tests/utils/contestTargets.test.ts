@@ -7,7 +7,6 @@ import {
   resolveContestTargets,
   resolveContestTargetsFromInteractionOrReply,
   resolveContestTargetsOrReply,
-  validateContestTargetContextOrReply,
 } from "../../src/utils/contestTargets.js";
 
 describe("getContestUserOptions", () => {
@@ -445,42 +444,6 @@ describe("resolveContestTargetInputsOrReply", () => {
       expect(result.handleInputs).toEqual(["tourist", "petr"]);
       expect(result.userOptions).toEqual([]);
     }
-  });
-});
-
-describe("validateContestTargetContextOrReply", () => {
-  it("replies when context is invalid", async () => {
-    const reply = jest.fn().mockResolvedValue(undefined);
-
-    const result = await validateContestTargetContextOrReply(
-      { reply },
-      {
-        guild: null,
-        userOptions: [{ id: "user-1" } as User],
-        handleInputs: [],
-      }
-    );
-
-    expect(result).toEqual({ status: "replied" });
-    expect(reply).toHaveBeenCalledWith({
-      content: "Specify handles directly when using this command outside a server.",
-    });
-  });
-
-  it("returns ok when context is valid", async () => {
-    const reply = jest.fn().mockResolvedValue(undefined);
-
-    const result = await validateContestTargetContextOrReply(
-      { reply },
-      {
-        guild: null,
-        userOptions: [],
-        handleInputs: ["tourist"],
-      }
-    );
-
-    expect(result).toEqual({ status: "ok" });
-    expect(reply).not.toHaveBeenCalled();
   });
 });
 
