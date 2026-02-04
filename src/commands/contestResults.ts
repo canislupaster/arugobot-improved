@@ -4,10 +4,10 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestEmbed, formatContestTag, resolveContestOrReply } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
-  getContestTargetContextError,
   getContestUserOptions,
   resolveContestTargetsOrReply,
   type TargetHandle,
+  validateContestTargetContextOrReply,
 } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
 
@@ -75,13 +75,12 @@ export const contestResultsCommand: Command = {
     const handleInputs = parseHandleList(handlesRaw);
     const userOptions = getContestUserOptions(interaction);
 
-    const targetContextError = getContestTargetContextError({
+    const targetContextResult = await validateContestTargetContextOrReply(interaction, {
       guild: interaction.guild,
       userOptions,
       handleInputs,
     });
-    if (targetContextError) {
-      await interaction.reply({ content: targetContextError });
+    if (targetContextResult.status === "replied") {
       return;
     }
 

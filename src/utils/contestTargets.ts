@@ -73,6 +73,27 @@ export function getContestTargetContextError(options: {
   return null;
 }
 
+type ContestTargetContextInteraction = {
+  reply: (options: { content: string }) => Promise<unknown>;
+};
+
+export async function validateContestTargetContextOrReply(
+  interaction: ContestTargetContextInteraction,
+  options: {
+    guild: Guild | null;
+    guildId?: string | null;
+    userOptions: User[];
+    handleInputs: string[];
+  }
+): Promise<{ status: "ok" } | { status: "replied" }> {
+  const error = getContestTargetContextError(options);
+  if (!error) {
+    return { status: "ok" };
+  }
+  await interaction.reply({ content: error });
+  return { status: "replied" };
+}
+
 function dedupeUsersById(users: User[]): User[] {
   const seen = new Set<string>();
   const result: User[] = [];

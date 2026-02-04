@@ -15,9 +15,9 @@ import {
   resolveContestSolvesPayloadOrReply,
 } from "../utils/contestSolvesData.js";
 import {
-  getContestTargetContextError,
   getContestUserOptions,
   resolveContestTargetsOrReply,
+  validateContestTargetContextOrReply,
 } from "../utils/contestTargets.js";
 import { parseHandleList } from "../utils/handles.js";
 
@@ -68,13 +68,12 @@ export const contestSolvesCommand: Command = {
     const forceRefresh = interaction.options.getBoolean("force_refresh") ?? false;
     const userOptions = getContestUserOptions(interaction);
 
-    const targetContextError = getContestTargetContextError({
+    const targetContextResult = await validateContestTargetContextOrReply(interaction, {
       guild: interaction.guild,
       userOptions,
       handleInputs,
     });
-    if (targetContextError) {
-      await interaction.reply({ content: targetContextError });
+    if (targetContextResult.status === "replied") {
       return;
     }
 
