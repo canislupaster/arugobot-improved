@@ -26,29 +26,23 @@ function formatScopeSummary(
   return `${label}: ${summary.contestCount} contests • ${summary.participantCount} participants • last ${last}`;
 }
 
-function formatContestLine(contest: {
-  contestId: number;
-  contestName: string;
-  ratingUpdateTimeSeconds: number;
-  scope: "official" | "gym";
-}): string {
+function formatContestLine(
+  contest: {
+    contestId: number;
+    contestName: string;
+    ratingUpdateTimeSeconds: number;
+    scope: "official" | "gym";
+  },
+  participantCount?: number
+): string {
   const scopeLabel = contest.scope === "gym" ? "Gym" : "Official";
-  return `${contest.contestName} (${contest.contestId}) • ${scopeLabel} • ${formatDiscordRelativeTime(
-    contest.ratingUpdateTimeSeconds
-  )}`;
-}
-
-function formatTopContestLine(contest: {
-  contestId: number;
-  contestName: string;
-  participantCount: number;
-  ratingUpdateTimeSeconds: number;
-  scope: "official" | "gym";
-}): string {
-  const scopeLabel = contest.scope === "gym" ? "Gym" : "Official";
-  return `${contest.contestName} (${contest.contestId}) • ${contest.participantCount} participants • ${scopeLabel} • ${formatDiscordRelativeTime(
-    contest.ratingUpdateTimeSeconds
-  )}`;
+  const parts = [
+    `${contest.contestName} (${contest.contestId})`,
+    participantCount !== undefined ? `${participantCount} participants` : null,
+    scopeLabel,
+    formatDiscordRelativeTime(contest.ratingUpdateTimeSeconds),
+  ].filter((part): part is string => Boolean(part));
+  return parts.join(" • ");
 }
 
 function getParticipantCountForScope(
@@ -207,7 +201,9 @@ export const contestActivityCommand: Command = {
       if (activity.topContests.length > 0) {
         const filtered = filterRecentContests(activity.topContests, scope);
         if (filtered.length > 0) {
-          const lines = filtered.map(formatTopContestLine).join("\n");
+          const lines = filtered
+            .map((contest) => formatContestLine(contest, contest.participantCount))
+            .join("\n");
           embed.addFields({ name: "Top contests", value: lines, inline: false });
         }
       }
@@ -215,7 +211,7 @@ export const contestActivityCommand: Command = {
       if (activity.recentContests.length > 0) {
         const filtered = filterRecentContests(activity.recentContests, scope);
         if (filtered.length > 0) {
-          const lines = filtered.map(formatContestLine).join("\n");
+          const lines = filtered.map((contest) => formatContestLine(contest)).join("\n");
           embed.addFields({ name: "Recent contests", value: lines, inline: false });
         }
       }
