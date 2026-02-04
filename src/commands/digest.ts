@@ -9,9 +9,8 @@ import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
-  addPostSubcommand,
-  addPreviewSubcommand,
   addScheduleOptions,
+  addPreviewAndPostSubcommands,
 } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
@@ -116,52 +115,49 @@ function getManualDigestReply(result: ManualWeeklyDigestResult): string | null {
 }
 
 export const digestCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("digest")
-    .setDescription("Configure weekly digest posts")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addSubcommand((subcommand) =>
-      addScheduleOptions(subcommand.setName("set").setDescription("Enable weekly digests"), {
-        channelDescription: "Channel to post the digest in",
-        roleDescription: "Role to mention for weekly digests",
-      }).addStringOption((option) =>
-        option
-          .setName("day")
-          .setDescription("Day of the week to post")
-          .addChoices(
-            { name: "Sunday", value: "sun" },
-            { name: "Monday", value: "mon" },
-            { name: "Tuesday", value: "tue" },
-            { name: "Wednesday", value: "wed" },
-            { name: "Thursday", value: "thu" },
-            { name: "Friday", value: "fri" },
-            { name: "Saturday", value: "sat" }
-          )
+  data: addPreviewAndPostSubcommands(
+    new SlashCommandBuilder()
+      .setName("digest")
+      .setDescription("Configure weekly digest posts")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addSubcommand((subcommand) =>
+        addScheduleOptions(subcommand.setName("set").setDescription("Enable weekly digests"), {
+          channelDescription: "Channel to post the digest in",
+          roleDescription: "Role to mention for weekly digests",
+        }).addStringOption((option) =>
+          option
+            .setName("day")
+            .setDescription("Day of the week to post")
+            .addChoices(
+              { name: "Sunday", value: "sun" },
+              { name: "Monday", value: "mon" },
+              { name: "Tuesday", value: "tue" },
+              { name: "Wednesday", value: "wed" },
+              { name: "Thursday", value: "thu" },
+              { name: "Friday", value: "fri" },
+              { name: "Saturday", value: "sat" }
+            )
+        )
       )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand.setName("status").setDescription("Show the current digest schedule")
-    )
-    .addSubcommand((subcommand) =>
-      subcommand.setName("clear").setDescription("Disable weekly digests")
-    )
-    .addSubcommand((subcommand) =>
-      addCleanupSubcommand(
-        subcommand,
-        "Remove digests pointing at missing channels"
+      .addSubcommand((subcommand) =>
+        subcommand.setName("status").setDescription("Show the current digest schedule")
       )
-    )
-    .addSubcommand((subcommand) =>
-      addPreviewSubcommand(subcommand, {
+      .addSubcommand((subcommand) =>
+        subcommand.setName("clear").setDescription("Disable weekly digests")
+      )
+      .addSubcommand((subcommand) =>
+        addCleanupSubcommand(subcommand, "Remove digests pointing at missing channels")
+      ),
+    {
+      preview: {
         description: "Show a preview of the weekly digest for this server",
-      })
-    )
-    .addSubcommand((subcommand) =>
-      addPostSubcommand(subcommand, {
+      },
+      post: {
         description: "Send the digest immediately",
         forceDescription: "Send even if a digest was already sent this week",
-      })
-    ),
+      },
+    }
+  ),
   adminOnly: true,
   async execute(interaction, context) {
     const commandContext = await requireGuildIdAndSubcommand(

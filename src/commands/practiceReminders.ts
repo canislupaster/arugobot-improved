@@ -8,8 +8,7 @@ import {
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
-  addPostSubcommand,
-  addPreviewSubcommand,
+  addPreviewAndPostSubcommands,
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
@@ -210,51 +209,48 @@ function getManualReminderReply(result: ManualReminderResult): string {
 }
 
 export const practiceRemindersCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("practicereminders")
-    .setDescription("Configure practice problem reminders")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addSubcommand((subcommand) =>
-      addTagOptions(
-        addRatingRangeOptions(
-          addScheduleOptions(
-            subcommand.setName("set").setDescription("Enable practice reminders"),
-            {
-              channelDescription: "Channel to post practice problems in",
-              roleDescription: "Role to mention for practice reminders",
-            }
+  data: addPreviewAndPostSubcommands(
+    new SlashCommandBuilder()
+      .setName("practicereminders")
+      .setDescription("Configure practice problem reminders")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addSubcommand((subcommand) =>
+        addTagOptions(
+          addRatingRangeOptions(
+            addScheduleOptions(
+              subcommand.setName("set").setDescription("Enable practice reminders"),
+              {
+                channelDescription: "Channel to post practice problems in",
+                roleDescription: "Role to mention for practice reminders",
+              }
+            )
           )
         )
+          .addStringOption((option) =>
+            option
+              .setName("days")
+              .setDescription("Days to post (e.g. mon,wed,fri, weekdays, weekends)")
+          )
       )
-        .addStringOption((option) =>
-          option
-            .setName("days")
-            .setDescription("Days to post (e.g. mon,wed,fri, weekdays, weekends)")
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand.setName("status").setDescription("Show current practice reminder settings")
-    )
-    .addSubcommand((subcommand) =>
-      subcommand.setName("clear").setDescription("Disable daily practice reminders")
-    )
-    .addSubcommand((subcommand) =>
-      addCleanupSubcommand(
-        subcommand,
-        "Remove reminders pointing at missing channels"
+      .addSubcommand((subcommand) =>
+        subcommand.setName("status").setDescription("Show current practice reminder settings")
       )
-    )
-    .addSubcommand((subcommand) =>
-      addPreviewSubcommand(subcommand, {
+      .addSubcommand((subcommand) =>
+        subcommand.setName("clear").setDescription("Disable daily practice reminders")
+      )
+      .addSubcommand((subcommand) =>
+        addCleanupSubcommand(subcommand, "Remove reminders pointing at missing channels")
+      ),
+    {
+      preview: {
         description: "Preview the next practice reminder",
-      })
-    )
-    .addSubcommand((subcommand) =>
-      addPostSubcommand(subcommand, {
+      },
+      post: {
         description: "Post a practice problem immediately",
         forceDescription: "Send even if a reminder was already posted today",
-      })
-    ),
+      },
+    }
+  ),
   adminOnly: true,
   async execute(interaction, context) {
     const commandContext = await requireGuildIdAndSubcommand(

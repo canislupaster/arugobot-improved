@@ -3,6 +3,7 @@ import {
   type SlashCommandBuilder,
   type SlashCommandOptionsOnlyBuilder,
   type SlashCommandSubcommandBuilder,
+  type SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 
 import { addContestScopeOption } from "./contestScope.js";
@@ -152,6 +153,32 @@ export function addPreviewSubcommand(
   const builder = subcommand.setName("preview").setDescription(options.description);
   addOptionalStringOption(builder, "id", options.idDescription);
   return builder;
+}
+
+export function addPreviewAndPostSubcommands(
+  builder: SlashCommandBuilder,
+  options: {
+    preview: { description: string; idDescription?: string };
+    post: { description: string; forceDescription?: string; idDescription?: string };
+  }
+): SlashCommandSubcommandsOnlyBuilder;
+export function addPreviewAndPostSubcommands(
+  builder: SlashCommandSubcommandsOnlyBuilder,
+  options: {
+    preview: { description: string; idDescription?: string };
+    post: { description: string; forceDescription?: string; idDescription?: string };
+  }
+): SlashCommandSubcommandsOnlyBuilder;
+export function addPreviewAndPostSubcommands(
+  builder: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder,
+  options: {
+    preview: { description: string; idDescription?: string };
+    post: { description: string; forceDescription?: string; idDescription?: string };
+  }
+): SlashCommandSubcommandsOnlyBuilder {
+  return builder
+    .addSubcommand((subcommand) => addPreviewSubcommand(subcommand, options.preview))
+    .addSubcommand((subcommand) => addPostSubcommand(subcommand, options.post));
 }
 
 function addOptionalBooleanOption(
