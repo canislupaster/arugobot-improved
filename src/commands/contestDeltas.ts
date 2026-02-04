@@ -9,8 +9,7 @@ import { logCommandError } from "../utils/commandLogging.js";
 import {
   CONTEST_ACTIVITY_DEFAULTS,
   addContestActivityCommandOptions,
-  buildContestActivityOptionConfig,
-  resolveContestActivityRosterContextOrReply,
+  resolveContestActivityRosterContextWithDefaultsOrReply,
 } from "../utils/contestActivityOptions.js";
 import { formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
@@ -95,17 +94,14 @@ export const contestDeltasCommand: Command = {
     }
   ),
   async execute(interaction, context) {
-    const optionResult = await resolveContestActivityRosterContextOrReply(
+    const optionResult = await resolveContestActivityRosterContextWithDefaultsOrReply(
       interaction,
-      buildContestActivityOptionConfig({
+      {
         daysErrorMessage: "Invalid lookback window.",
         limitErrorMessage: "Invalid limit.",
-      }),
-      {
         guildMessage: "This command can only be used in a server.",
-        store: context.services.store,
-        correlationId: context.correlationId,
-      }
+      },
+      { store: context.services.store, correlationId: context.correlationId }
     );
     if (optionResult.status === "replied") {
       return;

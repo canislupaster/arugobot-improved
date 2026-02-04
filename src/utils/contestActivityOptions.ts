@@ -238,3 +238,33 @@ export async function resolveContestActivityRosterContextOrReply(
     excludedCount: rosterResult.excludedCount,
   };
 }
+
+export async function resolveContestActivityRosterContextWithDefaultsOrReply(
+  interaction: ContestActivityRosterInteraction,
+  messages: { daysErrorMessage: string; limitErrorMessage: string; guildMessage: string },
+  options: {
+    store: ContestActivityRosterStore;
+    correlationId?: string;
+    rosterMessages?: RosterMessages;
+  }
+): Promise<
+  | {
+      status: "ok";
+      guild: Guild;
+      days: number;
+      limit: number;
+      scope: ContestScopeFilter;
+      roster: RosterEntry[];
+      excludedCount: number;
+    }
+  | { status: "replied" }
+> {
+  const config = buildContestActivityOptionConfig({
+    daysErrorMessage: messages.daysErrorMessage,
+    limitErrorMessage: messages.limitErrorMessage,
+  });
+  return resolveContestActivityRosterContextOrReply(interaction, config, {
+    guildMessage: messages.guildMessage,
+    ...options,
+  });
+}

@@ -3,6 +3,7 @@ import {
   buildContestActivityOptionConfig,
   resolveContestActivityContextOrReply,
   resolveContestActivityRosterContextOrReply,
+  resolveContestActivityRosterContextWithDefaultsOrReply,
   resolveContestActivityOptionsOrReply,
 } from "../../src/utils/contestActivityOptions.js";
 
@@ -177,5 +178,24 @@ describe("resolveContestActivityRosterContextOrReply", () => {
       expect(result.limit).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultLimit);
       expect(result.scope).toBe(CONTEST_ACTIVITY_DEFAULTS.defaultScope);
     }
+  });
+});
+
+describe("resolveContestActivityRosterContextWithDefaultsOrReply", () => {
+  it("replies with the provided guild message outside a guild", async () => {
+    const interaction = createRosterInteraction({ guild: null });
+
+    const result = await resolveContestActivityRosterContextWithDefaultsOrReply(
+      interaction,
+      {
+        daysErrorMessage: "Invalid lookback window.",
+        limitErrorMessage: "Invalid limit.",
+        guildMessage: "Server only.",
+      },
+      { store: { getServerRoster: jest.fn().mockResolvedValue([]) } }
+    );
+
+    expect(result.status).toBe("replied");
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "Server only." });
   });
 });
