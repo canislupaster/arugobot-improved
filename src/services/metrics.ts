@@ -23,6 +23,16 @@ type CommandMetricRow = {
   last_seen_at: string;
 };
 
+const COMMAND_METRIC_COLUMNS = [
+  "command",
+  "count",
+  "success_count",
+  "failure_count",
+  "total_latency_ms",
+  "max_latency_ms",
+  "last_seen_at",
+] as const;
+
 function toCommandMetricSummary(row: CommandMetricRow): CommandMetricSummary {
   const count = Number(row.count ?? 0);
   const successCount = Number(row.success_count ?? 0);
@@ -110,15 +120,7 @@ export class MetricsService {
     }
     const rows = await this.db
       .selectFrom("command_metrics")
-      .select([
-        "command",
-        "count",
-        "success_count",
-        "failure_count",
-        "total_latency_ms",
-        "max_latency_ms",
-        "last_seen_at",
-      ])
+      .select(COMMAND_METRIC_COLUMNS)
       .orderBy("count", "desc")
       .orderBy("command", "asc")
       .limit(limit)
@@ -130,15 +132,7 @@ export class MetricsService {
   async getCommandSummary(command: string): Promise<CommandMetricSummary | null> {
     const row = await this.db
       .selectFrom("command_metrics")
-      .select([
-        "command",
-        "count",
-        "success_count",
-        "failure_count",
-        "total_latency_ms",
-        "max_latency_ms",
-        "last_seen_at",
-      ])
+      .select(COMMAND_METRIC_COLUMNS)
       .where("command", "=", command)
       .executeTakeFirst();
     if (!row) {

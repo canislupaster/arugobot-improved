@@ -11,6 +11,7 @@ import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
+import type { CommandMetricSummary } from "../services/metrics.js";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 20;
@@ -23,14 +24,7 @@ function formatLastSeen(lastSeenAt: string): string {
   return formatDiscordTimestamp(Math.floor(ms / 1000));
 }
 
-function formatSummaryLine(summary: {
-  name: string;
-  count: number;
-  successRate: number;
-  avgLatencyMs: number;
-  maxLatencyMs: number;
-  lastSeenAt: string;
-}): string {
+function formatSummaryLine(summary: CommandMetricSummary): string {
   return `/${summary.name}: ${summary.count} (ok ${summary.successRate}%, avg ${summary.avgLatencyMs}ms, max ${summary.maxLatencyMs}ms, last ${formatLastSeen(summary.lastSeenAt)})`;
 }
 
