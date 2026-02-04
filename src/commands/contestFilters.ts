@@ -8,17 +8,10 @@ import {
   parseContestScope,
 } from "../utils/contestScope.js";
 import { replyEphemeral, requireGuildIdEphemeral } from "../utils/interaction.js";
+import { normalizeOptionalString } from "../utils/text.js";
 import { formatUpdatedAt } from "../utils/time.js";
 
 import type { Command } from "./types.js";
-
-function normalizeKeywordInput(value: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
 
 function formatScope(scope: string | null): string {
   if (!scope) {
@@ -93,8 +86,8 @@ export const contestFiltersCommand: Command = {
         return;
       }
 
-      const includeRaw = normalizeKeywordInput(interaction.options.getString("include"));
-      const excludeRaw = normalizeKeywordInput(interaction.options.getString("exclude"));
+      const includeRaw = normalizeOptionalString(interaction.options.getString("include"));
+      const excludeRaw = normalizeOptionalString(interaction.options.getString("exclude"));
       const scopeRaw = interaction.options.getString("scope");
       const scope = scopeRaw ? parseContestScope(scopeRaw) : null;
 

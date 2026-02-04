@@ -4,6 +4,7 @@ import { LOG_ENTRY_LIMIT } from "../services/logs.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import type { LogLevel } from "../utils/logger.js";
+import { normalizeOptionalString } from "../utils/text.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -17,11 +18,6 @@ type LogCommandFilters = {
   message?: string;
   user?: { id: string; username: string };
 };
-
-function normalizeFilterValue(value: string | null): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
-}
 
 function formatFilterFooter(filters: LogCommandFilters): string | null {
   const items: string[] = [];
@@ -115,9 +111,12 @@ export const logsCommand: Command = {
 
     const limit = interaction.options.getInteger("limit") ?? DEFAULT_LIMIT;
     const level = interaction.options.getString("level") as LogLevel | null;
-    const command = normalizeFilterValue(interaction.options.getString("command"));
-    const correlationId = normalizeFilterValue(interaction.options.getString("correlation"));
-    const message = normalizeFilterValue(interaction.options.getString("message"));
+    const command =
+      normalizeOptionalString(interaction.options.getString("command")) ?? undefined;
+    const correlationId =
+      normalizeOptionalString(interaction.options.getString("correlation")) ?? undefined;
+    const message =
+      normalizeOptionalString(interaction.options.getString("message")) ?? undefined;
     const user = interaction.options.getUser("user") ?? undefined;
     const filters: LogCommandFilters = {
       level: level ?? undefined,

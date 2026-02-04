@@ -9,6 +9,7 @@ import type { CommandMetricSummary } from "../services/metrics.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveBoundedIntegerOption } from "../utils/interaction.js";
+import { normalizeOptionalString } from "../utils/text.js";
 import { formatUpdatedAt } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -39,7 +40,8 @@ export const metricsCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    const commandNameRaw = interaction.options.getString("command")?.trim() ?? "";
+    const commandNameRaw =
+      normalizeOptionalString(interaction.options.getString("command")) ?? "";
     const commandName = commandNameRaw.replace(/^\/+/, "");
     const limitResult = resolveBoundedIntegerOption(interaction, {
       name: "limit",
