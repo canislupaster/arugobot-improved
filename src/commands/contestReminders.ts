@@ -32,7 +32,6 @@ import { buildContestUrl } from "../utils/contestUrl.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
-  getSendableChannelStatuses,
   resolveSendableChannelOrReply,
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
@@ -42,6 +41,10 @@ import {
   resolveSubscriptionId,
   resolveSubscriptionSelectionOrReply,
 } from "../utils/subscriptionSelection.js";
+import {
+  buildChannelSubscriptionEntries,
+  filterChannelSubscriptionEntries,
+} from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -370,18 +373,12 @@ export const contestRemindersCommand: Command = {
         const lastNotifiedMap = await context.services.contestReminders.getLastNotificationMap(
           subscriptions.map((subscription) => subscription.id)
         );
-        const channelStatuses = await getSendableChannelStatuses(
+        const entries = await buildChannelSubscriptionEntries(
           context.client,
-          subscriptions.map((subscription) => subscription.channelId)
+          subscriptions,
+          lastNotifiedMap
         );
-        const entries = subscriptions.map((subscription, index) => ({
-          subscription,
-          channelStatus: channelStatuses[index] ?? null,
-          lastNotifiedAt: lastNotifiedMap.get(subscription.id) ?? null,
-        }));
-        const filteredEntries = onlyIssues
-          ? entries.filter((entry) => entry.channelStatus?.status !== "ok")
-          : entries;
+        const filteredEntries = filterChannelSubscriptionEntries(entries, onlyIssues);
         if (filteredEntries.length === 0) {
           await interaction.reply({
             content: onlyIssues ? NO_ISSUES_MESSAGE : NO_SUBSCRIPTIONS_MESSAGE,
