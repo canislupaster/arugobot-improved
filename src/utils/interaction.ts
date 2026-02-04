@@ -9,6 +9,7 @@ import type {
 import { DiscordAPIError, MessageFlags } from "discord.js";
 
 import { getErrorMessage } from "./errors.js";
+import { normalizeHandleInput } from "./handles.js";
 import type { LogContext } from "./logger.js";
 import { logWarn } from "./logger.js";
 
@@ -228,7 +229,8 @@ export function resolveHandleUserOptions(
 ): HandleUserOptionResult {
   const handleOptionName = options.handleOptionName ?? "handle";
   const userOptionName = options.userOptionName ?? "user";
-  const handleInput = interaction.options.getString(handleOptionName)?.trim() ?? "";
+  const rawHandleInput = interaction.options.getString(handleOptionName)?.trim() ?? "";
+  const handleInput = normalizeHandleInput(rawHandleInput);
   const userOption = interaction.options.getUser(userOptionName);
   const member = interaction.options.getMember(userOptionName);
 

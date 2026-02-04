@@ -376,10 +376,10 @@ describe("resolveHandleUserOptions", () => {
     expect(result.error).toBe("Provide either a handle or a user, not both.");
   });
 
-  it("trims handle input and returns user option when present", () => {
+  it("normalizes handle input and returns user option when present", () => {
     const interaction = createInteraction({
       options: {
-        getString: jest.fn().mockReturnValue("  tourist "),
+        getString: jest.fn().mockReturnValue("  https://codeforces.com/profile/tourist "),
         getUser: jest.fn().mockReturnValue(null),
         getMember: jest.fn().mockReturnValue(null),
       },
@@ -389,6 +389,20 @@ describe("resolveHandleUserOptions", () => {
 
     expect(result.handleInput).toBe("tourist");
     expect(result.userOption).toBeNull();
+  });
+
+  it("strips @ prefixes from handle inputs", () => {
+    const interaction = createInteraction({
+      options: {
+        getString: jest.fn().mockReturnValue("@Petr"),
+        getUser: jest.fn().mockReturnValue(null),
+        getMember: jest.fn().mockReturnValue(null),
+      },
+    });
+
+    const result = resolveHandleUserOptions(interaction);
+
+    expect(result.handleInput).toBe("Petr");
   });
 });
 
