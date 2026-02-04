@@ -20,6 +20,7 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
+import { resolveBooleanOption } from "../utils/interaction.js";
 import { resolveSubscriptionSelectionOrReply } from "../utils/subscriptionSelection.js";
 import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
 
@@ -371,7 +372,7 @@ export const contestRatingAlertsCommand: Command = {
       }
 
       if (subcommand === "post") {
-        const force = interaction.options.getBoolean("force") ?? false;
+        const force = resolveBooleanOption(interaction, "force");
         const subscription = await selectSubscription();
         if (!subscription) {
           return;

@@ -13,7 +13,7 @@ import {
   formatCannotPostPermissionsMessage,
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
-import { requireGuildIdAndSubcommand } from "../utils/interaction.js";
+import { requireGuildIdAndSubcommand, resolveBooleanOption } from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,
   formatHourMinute,
@@ -264,7 +264,7 @@ export const digestCommand: Command = {
 
       if (subcommand === "post") {
         await interaction.deferReply();
-        const force = interaction.options.getBoolean("force") ?? false;
+        const force = resolveBooleanOption(interaction, "force");
         const result = await context.services.weeklyDigest.sendManualDigest(
           guildId,
           context.client,

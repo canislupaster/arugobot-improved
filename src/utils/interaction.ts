@@ -153,6 +153,14 @@ export async function requireGuildAndPage(
   return { guild, page };
 }
 
+export function resolveBooleanOption(
+  interaction: ChatInputCommandInteraction,
+  name: string,
+  defaultValue = false
+): boolean {
+  return interaction.options.getBoolean(name) ?? defaultValue;
+}
+
 async function safeInteractionAction(
   action: () => Promise<unknown>,
   labels: { skipMessage: string; errorMessage: string },

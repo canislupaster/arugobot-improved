@@ -33,7 +33,7 @@ import {
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild } from "../utils/interaction.js";
+import { requireGuild, resolveBooleanOption } from "../utils/interaction.js";
 import { resolveSubscriptionSelectionOrReply } from "../utils/subscriptionSelection.js";
 import { resolveSubscriptionEntriesFromService } from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
@@ -650,7 +650,7 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "post") {
-        const force = interaction.options.getBoolean("force") ?? false;
+        const force = resolveBooleanOption(interaction, "force");
         const subscription = await resolveSubscription();
         if (!subscription) {
           return;

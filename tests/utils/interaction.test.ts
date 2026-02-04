@@ -2,6 +2,7 @@ import { MessageFlags, type ChatInputCommandInteraction, type RepliableInteracti
 
 import {
   resolveBoundedIntegerOption,
+  resolveBooleanOption,
   resolveHandleTargetLabels,
   resolveHandleTargetLabelsOrReply,
   resolveHandleUserOptions,
@@ -140,6 +141,28 @@ describe("safe interaction helpers", () => {
     await expect(safeInteractionDefer(interaction as never)).resolves.toBe(false);
 
     expect(interaction.deferReply).toHaveBeenCalled();
+  });
+});
+
+describe("resolveBooleanOption", () => {
+  const createInteraction = (value: boolean | null) =>
+    ({
+      options: {
+        getBoolean: jest.fn().mockReturnValue(value),
+      },
+    }) as unknown as ChatInputCommandInteraction;
+
+  it("returns the provided value when set", () => {
+    const interaction = createInteraction(true);
+
+    expect(resolveBooleanOption(interaction, "force")).toBe(true);
+  });
+
+  it("falls back to the default value when null", () => {
+    const interaction = createInteraction(null);
+
+    expect(resolveBooleanOption(interaction, "force", true)).toBe(true);
+    expect(resolveBooleanOption(interaction, "force")).toBe(false);
   });
 });
 

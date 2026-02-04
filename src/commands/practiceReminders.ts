@@ -16,7 +16,13 @@ import {
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild, safeInteractionDefer, safeInteractionEdit, safeInteractionReply } from "../utils/interaction.js";
+import {
+  requireGuild,
+  resolveBooleanOption,
+  safeInteractionDefer,
+  safeInteractionEdit,
+  safeInteractionReply,
+} from "../utils/interaction.js";
 import { buildProblemUrl } from "../utils/problemReference.js";
 import {
   formatRatingRangesWithDefaults,
@@ -519,7 +525,7 @@ export const practiceRemindersCommand: Command = {
       }
 
       if (subcommand === "post") {
-        const force = interaction.options.getBoolean("force") ?? false;
+        const force = resolveBooleanOption(interaction, "force");
         await interaction.deferReply();
         const result = await context.services.practiceReminders.sendManualReminder(
           guildId,
