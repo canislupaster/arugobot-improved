@@ -81,6 +81,28 @@ describe("resolveContestActivityOptionsOrReply", () => {
       content: "Invalid lookback window.",
     });
   });
+
+  it("replies on invalid limit", async () => {
+    const interaction = createInteraction({
+      options: {
+        getInteger: jest.fn((name: string) =>
+          name === "limit" ? CONTEST_ACTIVITY_DEFAULTS.maxLimit + 1 : null
+        ),
+        getString: jest.fn().mockReturnValue(null),
+      },
+    });
+    const config = buildContestActivityOptionConfig({
+      daysErrorMessage: "Invalid lookback window.",
+      limitErrorMessage: "Invalid limit.",
+    });
+
+    const result = await resolveContestActivityOptionsOrReply(interaction, config);
+
+    expect(result.status).toBe("replied");
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: "Invalid limit.",
+    });
+  });
 });
 
 describe("resolveContestActivityContextOrReply", () => {

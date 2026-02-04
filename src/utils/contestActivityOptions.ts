@@ -143,6 +143,19 @@ type ContestActivityContextInteraction<GuildType extends { id: string }> =
     guild: GuildType | null;
   };
 
+function buildContestActivityContextResult<GuildType>(
+  guild: GuildType,
+  options: { days: number; limit: number; scope: ContestScopeFilter }
+): { status: "ok"; guild: GuildType; days: number; limit: number; scope: ContestScopeFilter } {
+  return {
+    status: "ok",
+    guild,
+    days: options.days,
+    limit: options.limit,
+    scope: options.scope,
+  };
+}
+
 export async function resolveContestActivityContextOrReply<GuildType extends { id: string }>(
   interaction: ContestActivityContextInteraction<GuildType>,
   config: ContestActivityOptionConfig,
@@ -165,13 +178,7 @@ export async function resolveContestActivityContextOrReply<GuildType extends { i
   if (result.status === "replied") {
     return { status: "replied" };
   }
-  return {
-    status: "ok",
-    guild: interaction.guild,
-    days: result.days,
-    limit: result.limit,
-    scope: result.scope,
-  };
+  return buildContestActivityContextResult(interaction.guild, result);
 }
 
 type ContestActivityRosterStore = {
@@ -229,11 +236,7 @@ export async function resolveContestActivityRosterContextOrReply(
   }
 
   return {
-    status: "ok",
-    guild: contextResult.guild,
-    days: contextResult.days,
-    limit: contextResult.limit,
-    scope: contextResult.scope,
+    ...buildContestActivityContextResult(contextResult.guild, contextResult),
     roster: rosterResult.roster,
     excludedCount: rosterResult.excludedCount,
   };
