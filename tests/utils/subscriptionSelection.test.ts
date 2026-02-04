@@ -3,6 +3,7 @@ import { EmbedBuilder } from "discord.js";
 import {
   appendSubscriptionIdField,
   createSubscriptionSelectionResolver,
+  resolveGuildSubscriptionContext,
   resolveSubscriptionId,
   resolveSubscriptionSelectionFromInteraction,
   resolveSubscriptionSelectionOrReply,
@@ -80,7 +81,10 @@ describe("subscriptionSelection", () => {
   test("resolveSubscriptionSelectionFromInteraction returns subscription", async () => {
     const reply = jest.fn().mockResolvedValue(undefined);
     const options = { getString: jest.fn().mockReturnValue("abc") };
-    const interaction = { reply, options } as unknown as { reply: typeof reply; options: typeof options };
+    const interaction = { reply, options } as unknown as {
+      reply: typeof reply;
+      options: typeof options;
+    };
     const listSubscriptions = jest.fn().mockResolvedValue(subscriptions);
     const result = await resolveSubscriptionSelectionFromInteraction(
       interaction as never,
@@ -96,7 +100,10 @@ describe("subscriptionSelection", () => {
   test("resolveSubscriptionSelectionFromInteraction replies when none", async () => {
     const reply = jest.fn().mockResolvedValue(undefined);
     const options = { getString: jest.fn().mockReturnValue(null) };
-    const interaction = { reply, options } as unknown as { reply: typeof reply; options: typeof options };
+    const interaction = { reply, options } as unknown as {
+      reply: typeof reply;
+      options: typeof options;
+    };
     const listSubscriptions = jest.fn().mockResolvedValue([]);
     const result = await resolveSubscriptionSelectionFromInteraction(
       interaction as never,
@@ -111,7 +118,10 @@ describe("subscriptionSelection", () => {
   test("createSubscriptionSelectionResolver delegates to listSubscriptions", async () => {
     const reply = jest.fn().mockResolvedValue(undefined);
     const options = { getString: jest.fn().mockReturnValue("abc") };
-    const interaction = { reply, options } as unknown as { reply: typeof reply; options: typeof options };
+    const interaction = { reply, options } as unknown as {
+      reply: typeof reply;
+      options: typeof options;
+    };
     const listSubscriptions = jest.fn().mockResolvedValue(subscriptions);
     const resolver = createSubscriptionSelectionResolver(
       interaction as never,
@@ -121,6 +131,34 @@ describe("subscriptionSelection", () => {
     const result = await resolver();
     expect(result).toEqual(subscriptions[0]);
     expect(listSubscriptions).toHaveBeenCalledTimes(1);
+  });
+
+  test("resolveGuildSubscriptionContext provides guild context and selector", async () => {
+    const interaction = {
+      guild: { id: "guild-1" },
+      options: {
+        getSubcommand: jest.fn().mockReturnValue("status"),
+        getString: jest.fn().mockReturnValue("abc"),
+      },
+      reply: jest.fn(),
+    } as unknown as {
+      guild: { id: string };
+      options: { getSubcommand: () => string; getString: () => string };
+      reply: () => Promise<void>;
+    };
+    const listSubscriptions = jest.fn().mockResolvedValue(subscriptions);
+
+    const context = await resolveGuildSubscriptionContext(interaction as never, {
+      content: "Guild only",
+      listSubscriptions,
+      messages: selectionMessages,
+    });
+
+    expect(context?.guildId).toBe("guild-1");
+    expect(context?.subcommand).toBe("status");
+    const selected = await context?.selectSubscription();
+    expect(selected).toEqual(subscriptions[0]);
+    expect(listSubscriptions).toHaveBeenCalledWith("guild-1");
   });
 
   test("appendSubscriptionIdField adds a subscription id field", () => {

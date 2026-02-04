@@ -1,4 +1,8 @@
-import { MessageFlags, type ChatInputCommandInteraction, type RepliableInteraction } from "discord.js";
+import {
+  MessageFlags,
+  type ChatInputCommandInteraction,
+  type RepliableInteraction,
+} from "discord.js";
 
 import {
   resolveBoundedIntegerOption,
@@ -20,6 +24,7 @@ import {
   safeInteractionEdit,
   safeInteractionReply,
   validateHandleTargetContext,
+  withGuildIdAndSubcommand,
 } from "../../src/utils/interaction.js";
 
 type FakeUser = { username: string; toString: () => string };
@@ -137,7 +142,9 @@ describe("safe interaction helpers", () => {
 
   it("returns false for ignorable defer errors", async () => {
     const interaction = createInteraction({
-      deferReply: jest.fn().mockRejectedValue(new Error("Interaction has already been acknowledged")),
+      deferReply: jest
+        .fn()
+        .mockRejectedValue(new Error("Interaction has already been acknowledged")),
     });
 
     await expect(safeInteractionDefer(interaction as never)).resolves.toBe(false);
@@ -165,6 +172,20 @@ describe("resolveBooleanOption", () => {
 
     expect(resolveBooleanOption(interaction, "force", true)).toBe(true);
     expect(resolveBooleanOption(interaction, "force")).toBe(false);
+  });
+});
+
+describe("withGuildIdAndSubcommand", () => {
+  it("calls the handler when a guild is present", async () => {
+    const handler = jest.fn().mockResolvedValue(undefined);
+    const interaction = {
+      guild: { id: "guild-1" },
+      options: { getSubcommand: jest.fn().mockReturnValue("status") },
+    } as unknown as ChatInputCommandInteraction;
+
+    await expect(withGuildIdAndSubcommand(interaction, "Guild only", handler)).resolves.toBe(true);
+
+    expect(handler).toHaveBeenCalledWith({ guildId: "guild-1", subcommand: "status" });
   });
 });
 
@@ -290,9 +311,7 @@ describe("requireGuildIdAndSubcommand", () => {
   it("replies ephemerally and returns null when no guild", async () => {
     const interaction = createInteraction({ guild: null });
 
-    await expect(
-      requireGuildIdAndSubcommand(interaction, "Server only.")
-    ).resolves.toBeNull();
+    await expect(requireGuildIdAndSubcommand(interaction, "Server only.")).resolves.toBeNull();
 
     expect(interaction.reply).toHaveBeenCalledWith({
       content: "Server only.",
@@ -471,7 +490,10 @@ describe("resolveHandleTargetLabels", () => {
 
     const result = resolveHandleTargetLabels(interaction);
 
-    expect(result).toEqual({ status: "error", error: "Provide either a handle or a user, not both." });
+    expect(result).toEqual({
+      status: "error",
+      error: "Provide either a handle or a user, not both.",
+    });
   });
 
   it("returns custom DM errors", () => {

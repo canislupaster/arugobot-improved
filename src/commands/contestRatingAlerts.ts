@@ -4,7 +4,7 @@ import {
   buildContestRatingAlertEmbed,
   type ContestRatingAlertSubscription,
 } from "../services/contestRatingAlerts.js";
-import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
+import { replyWithChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
@@ -19,15 +19,15 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
-import { requireGuild, resolveBooleanOption } from "../utils/interaction.js";
 import {
   appendSubscriptionIdField,
-  createSubscriptionSelectionResolver,
+  resolveGuildSubscriptionContext,
 } from "../utils/subscriptionSelection.js";
 import {
   buildSubscriptionListEmbed,
   resolveSubscriptionEntriesFromInteraction,
 } from "../utils/subscriptionStatus.js";
+import { resolveBooleanOption } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -171,20 +171,17 @@ export const contestRatingAlertsCommand: Command = {
   ),
   adminOnly: true,
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction, {
+    const subscriptionContext = await resolveGuildSubscriptionContext(interaction, {
       content: "This command can only be used in a server.",
+      listSubscriptions: (guildId) =>
+        context.services.contestRatingAlerts.listSubscriptions(guildId),
+      messages: selectionMessages,
     });
-    if (!guild) {
+    if (!subscriptionContext) {
       return;
     }
 
-    const guildId = guild.id;
-    const subcommand = interaction.options.getSubcommand();
-    const selectSubscription = createSubscriptionSelectionResolver(
-      interaction,
-      () => context.services.contestRatingAlerts.listSubscriptions(guildId),
-      selectionMessages
-    );
+    const { guildId, subcommand, selectSubscription } = subscriptionContext;
 
     try {
       if (subcommand === "status" || subcommand === "list") {
@@ -225,12 +222,10 @@ export const contestRatingAlertsCommand: Command = {
       }
 
       if (subcommand === "cleanup") {
-        const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        const includePermissions = resolveBooleanOption(interaction, "include_permissions");
-        const message = await runChannelCleanupSummary({
+        await replyWithChannelCleanupSummary({
+          interaction,
           client: context.client,
-          subscriptions,
-          includePermissions,
+          listSubscriptions: () => context.services.contestRatingAlerts.listSubscriptions(guildId),
           removeSubscription: (id) =>
             context.services.contestRatingAlerts.removeSubscription(guildId, id),
           emptyMessage: NO_SUBSCRIPTIONS_MESSAGE,
@@ -241,7 +236,6 @@ export const contestRatingAlertsCommand: Command = {
               "Use /contestratingalerts cleanup include_permissions:true to remove them.",
           },
         });
-        await interaction.reply({ content: message });
         return;
       }
 

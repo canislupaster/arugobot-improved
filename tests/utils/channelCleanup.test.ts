@@ -1,4 +1,9 @@
-import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
+import {
+  ChannelType,
+  PermissionFlagsBits,
+  type ChatInputCommandInteraction,
+  type Client,
+} from "discord.js";
 
 import {
   buildSingleChannelCleanupMessages,
@@ -7,6 +12,7 @@ import {
   cleanupSingleChannelSubscription,
   getSingleChannelCleanupReply,
   formatPermissionIssueSummary,
+  replyWithChannelCleanupSummary,
   runChannelCleanupSummary,
 } from "../../src/utils/channelCleanup.js";
 
@@ -218,6 +224,30 @@ describe("buildChannelCleanupSummary", () => {
   });
 });
 
+describe("replyWithChannelCleanupSummary", () => {
+  it("replies with the empty message when there are no subscriptions", async () => {
+    const interaction = {
+      options: { getBoolean: jest.fn().mockReturnValue(false) },
+      reply: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ChatInputCommandInteraction;
+    const client = createClient({});
+
+    await replyWithChannelCleanupSummary({
+      interaction,
+      client,
+      listSubscriptions: async () => [],
+      removeSubscription: jest.fn(),
+      emptyMessage: "No subscriptions.",
+      summary: {
+        label: "contest reminder subscription",
+        allGoodMessage: "All contest reminder channels look good.",
+      },
+    });
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: "No subscriptions." });
+  });
+});
+
 describe("runChannelCleanupSummary", () => {
   it("returns the empty message when there are no subscriptions", async () => {
     const client = createClient({});
@@ -309,8 +339,7 @@ describe("cleanupSingleChannelSubscription", () => {
       channelId: "channel-perms",
       includePermissions: false,
       healthyMessage: "Healthy channel.",
-      missingPermissionsMessage: (status) =>
-        `Missing: ${status.missingPermissions.join(", ")}`,
+      missingPermissionsMessage: (status) => `Missing: ${status.missingPermissions.join(", ")}`,
       remove,
       removedMessage: () => "Removed.",
       failedMessage: "Failed.",

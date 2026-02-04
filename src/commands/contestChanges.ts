@@ -3,7 +3,10 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addContestTargetOptions } from "../utils/commandOptions.js";
+import {
+  addContestQueryAndLimitOptions,
+  addContestTargetOptions,
+} from "../utils/commandOptions.js";
 import { resolveContestContextOrReply } from "../utils/contestCommand.js";
 import { addRankedLinesField, formatTargetLabel } from "../utils/contestEntries.js";
 import { buildContestEmbed } from "../utils/contestLookup.js";
@@ -54,22 +57,15 @@ function mapChangesByHandle(changes: RatingChange[]): Map<string, RatingChange> 
 
 export const contestChangesCommand: Command = {
   data: addContestTargetOptions(
-    new SlashCommandBuilder()
-      .setName("contestchanges")
-      .setDescription("Shows rating changes for linked users in a contest")
-      .addStringOption((option) =>
-        option
-          .setName("query")
-          .setDescription("Contest id, URL, name, or latest")
-          .setRequired(true)
-      )
-      .addIntegerOption((option) =>
-        option
-          .setName("limit")
-          .setDescription(`Number of results to show (1-${MAX_LIMIT})`)
-          .setMinValue(1)
-          .setMaxValue(MAX_LIMIT)
-      )
+    addContestQueryAndLimitOptions(
+      new SlashCommandBuilder()
+        .setName("contestchanges")
+        .setDescription("Shows rating changes for linked users in a contest"),
+      {
+        queryDescription: "Contest id, URL, name, or latest",
+        maxLimit: MAX_LIMIT,
+      }
+    )
   ).addStringOption((option) => addContestScopeOption(option)),
   async execute(interaction, context) {
     const queryRaw = interaction.options.getString("query", true).trim();

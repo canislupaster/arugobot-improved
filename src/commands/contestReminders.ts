@@ -8,7 +8,7 @@ import {
 
 import type { ContestReminder } from "../services/contestReminders.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
-import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
+import { replyWithChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
@@ -37,16 +37,16 @@ import {
   type SendableChannelStatus,
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { requireGuild, resolveBooleanOption } from "../utils/interaction.js";
 import {
   appendSubscriptionIdField,
-  createSubscriptionSelectionResolver,
+  resolveGuildSubscriptionContext,
 } from "../utils/subscriptionSelection.js";
 import {
   buildSubscriptionListEmbed,
   resolveSubscriptionEntriesFromInteraction,
 } from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
+import { resolveBooleanOption } from "../utils/interaction.js";
 
 import type { Command } from "./types.js";
 
@@ -329,20 +329,16 @@ export const contestRemindersCommand: Command = {
   ),
   adminOnly: true,
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction, {
+    const subscriptionContext = await resolveGuildSubscriptionContext(interaction, {
       content: "This command can only be used in a server.",
+      listSubscriptions: (guildId) => context.services.contestReminders.listSubscriptions(guildId),
+      messages: selectionMessages,
     });
-    if (!guild) {
+    if (!subscriptionContext) {
       return;
     }
 
-    const guildId = guild.id;
-    const subcommand = interaction.options.getSubcommand();
-    const resolveSubscription = createSubscriptionSelectionResolver(
-      interaction,
-      () => context.services.contestReminders.listSubscriptions(guildId),
-      selectionMessages
-    );
+    const { guildId, subcommand, selectSubscription: resolveSubscription } = subscriptionContext;
 
     try {
       if (subcommand === "status" || subcommand === "list") {
@@ -409,12 +405,10 @@ export const contestRemindersCommand: Command = {
       }
 
       if (subcommand === "cleanup") {
-        const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-        const includePermissions = resolveBooleanOption(interaction, "include_permissions");
-        const message = await runChannelCleanupSummary({
+        await replyWithChannelCleanupSummary({
+          interaction,
           client: context.client,
-          subscriptions,
-          includePermissions,
+          listSubscriptions: () => context.services.contestReminders.listSubscriptions(guildId),
           removeSubscription: (id) =>
             context.services.contestReminders.removeSubscription(guildId, id),
           emptyMessage: NO_SUBSCRIPTIONS_MESSAGE,
@@ -424,7 +418,6 @@ export const contestRemindersCommand: Command = {
             cleanupHint: "Use /contestreminders cleanup include_permissions:true to remove them.",
           },
         });
-        await interaction.reply({ content: message });
         return;
       }
 

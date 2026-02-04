@@ -41,13 +41,13 @@ export function addScheduleOptions(
         .setMaxValue(59)
     )
     .addStringOption((option) =>
-      option.setName("utc_offset").setDescription("UTC offset for local time (e.g. +02:00, -05:30, Z)")
+      option
+        .setName("utc_offset")
+        .setDescription("UTC offset for local time (e.g. +02:00, -05:30, Z)")
     );
 }
 
-export function addRatingRangeOptions(
-  builder: SlashCommandBuilder
-): SlashCommandOptionsOnlyBuilder;
+export function addRatingRangeOptions(builder: SlashCommandBuilder): SlashCommandOptionsOnlyBuilder;
 export function addRatingRangeOptions(
   builder: SlashCommandSubcommandBuilder
 ): SlashCommandSubcommandBuilder;
@@ -69,9 +69,7 @@ export function addRatingRangeOptions(
     );
 }
 
-export function addTagOptions(
-  builder: SlashCommandBuilder
-): SlashCommandOptionsOnlyBuilder;
+export function addTagOptions(builder: SlashCommandBuilder): SlashCommandOptionsOnlyBuilder;
 export function addTagOptions(
   builder: SlashCommandOptionsOnlyBuilder
 ): SlashCommandOptionsOnlyBuilder;
@@ -103,7 +101,9 @@ export function addContestFilterOptions(
 ): SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder {
   return builder
     .addStringOption((option) =>
-      option.setName("include").setDescription("Only show contests matching keywords (comma-separated)")
+      option
+        .setName("include")
+        .setDescription("Only show contests matching keywords (comma-separated)")
     )
     .addStringOption((option) =>
       option.setName("exclude").setDescription("Hide contests matching keywords (comma-separated)")
@@ -130,6 +130,23 @@ export function addContestTargetOptions(
     .addUserOption((option) => option.setName("user4").setDescription("User to include"))
     .addStringOption((option) =>
       option.setName("handles").setDescription("Comma or space separated handles to include")
+    );
+}
+
+export function addContestQueryAndLimitOptions(
+  builder: SlashCommandBuilder,
+  options: { queryDescription: string; maxLimit: number }
+): SlashCommandOptionsOnlyBuilder {
+  return builder
+    .addStringOption((option) =>
+      option.setName("query").setDescription(options.queryDescription).setRequired(true)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("limit")
+        .setDescription(`Number of results to show (1-${options.maxLimit})`)
+        .setMinValue(1)
+        .setMaxValue(options.maxLimit)
     );
 }
 
@@ -251,6 +268,60 @@ export function buildPreviewPostOptions(params: {
   };
 }
 
+export function addStatusClearCleanupPreviewPostSubcommands(
+  builder: SlashCommandBuilder,
+  statusOptions: {
+    statusDescription: string;
+    clearDescription: string;
+    cleanupDescription: string;
+    cleanupIncludePermissionsDescription?: string;
+  },
+  previewPostOptions: {
+    previewDescription: string;
+    postDescription: string;
+    forceDescription?: string;
+    previewIdDescription?: string;
+    postIdDescription?: string;
+  }
+): SlashCommandSubcommandsOnlyBuilder;
+export function addStatusClearCleanupPreviewPostSubcommands(
+  builder: SlashCommandSubcommandsOnlyBuilder,
+  statusOptions: {
+    statusDescription: string;
+    clearDescription: string;
+    cleanupDescription: string;
+    cleanupIncludePermissionsDescription?: string;
+  },
+  previewPostOptions: {
+    previewDescription: string;
+    postDescription: string;
+    forceDescription?: string;
+    previewIdDescription?: string;
+    postIdDescription?: string;
+  }
+): SlashCommandSubcommandsOnlyBuilder;
+export function addStatusClearCleanupPreviewPostSubcommands(
+  builder: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder,
+  statusOptions: {
+    statusDescription: string;
+    clearDescription: string;
+    cleanupDescription: string;
+    cleanupIncludePermissionsDescription?: string;
+  },
+  previewPostOptions: {
+    previewDescription: string;
+    postDescription: string;
+    forceDescription?: string;
+    previewIdDescription?: string;
+    postIdDescription?: string;
+  }
+): SlashCommandSubcommandsOnlyBuilder {
+  return addPreviewAndPostSubcommands(
+    addStatusClearCleanupSubcommands(builder, statusOptions),
+    buildPreviewPostOptions(previewPostOptions)
+  );
+}
+
 function addOptionalBooleanOption(
   builder: SlashCommandSubcommandBuilder,
   name: string,
@@ -259,9 +330,7 @@ function addOptionalBooleanOption(
   if (!description) {
     return builder;
   }
-  return builder.addBooleanOption((option) =>
-    option.setName(name).setDescription(description)
-  );
+  return builder.addBooleanOption((option) => option.setName(name).setDescription(description));
 }
 
 function addOptionalStringOption(
@@ -272,14 +341,10 @@ function addOptionalStringOption(
   if (!description) {
     return builder;
   }
-  return builder.addStringOption((option) =>
-    option.setName(name).setDescription(description)
-  );
+  return builder.addStringOption((option) => option.setName(name).setDescription(description));
 }
 
-export function addPageOption(
-  builder: SlashCommandBuilder
-): SlashCommandOptionsOnlyBuilder;
+export function addPageOption(builder: SlashCommandBuilder): SlashCommandOptionsOnlyBuilder;
 export function addPageOption(
   builder: SlashCommandOptionsOnlyBuilder
 ): SlashCommandOptionsOnlyBuilder;

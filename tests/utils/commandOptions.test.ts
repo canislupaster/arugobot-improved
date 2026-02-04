@@ -2,6 +2,7 @@ import type { APIApplicationCommandSubcommandOption } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
 
 import {
+  addContestQueryAndLimitOptions,
   addContestFilterOptions,
   addContestTargetOptions,
   addCleanupSubcommand,
@@ -10,6 +11,7 @@ import {
   addPreviewSubcommand,
   addRatingRangeOptions,
   addScheduleOptions,
+  addStatusClearCleanupPreviewPostSubcommands,
   addStatusClearCleanupSubcommands,
   addTagOptions,
 } from "../../src/utils/commandOptions.js";
@@ -46,9 +48,7 @@ test("addRatingRangeOptions adds rating inputs and ranges", () => {
 });
 
 test("addTagOptions adds tags input", () => {
-  const builder = addTagOptions(
-    new SlashCommandBuilder().setName("tags").setDescription("tags")
-  );
+  const builder = addTagOptions(new SlashCommandBuilder().setName("tags").setDescription("tags"));
 
   const json = builder.toJSON();
   const names = json.options?.map((option) => option.name);
@@ -79,10 +79,20 @@ test("addContestTargetOptions adds contest target options", () => {
   expect(names).toEqual(["user1", "user2", "user3", "user4", "handles"]);
 });
 
-test("addPageOption adds page input", () => {
-  const builder = addPageOption(
-    new SlashCommandBuilder().setName("pages").setDescription("pages")
+test("addContestQueryAndLimitOptions adds query and limit", () => {
+  const builder = addContestQueryAndLimitOptions(
+    new SlashCommandBuilder().setName("contest").setDescription("contest"),
+    { queryDescription: "Contest id", maxLimit: 25 }
   );
+
+  const json = builder.toJSON();
+  const names = json.options?.map((option) => option.name);
+
+  expect(names).toEqual(["query", "limit"]);
+});
+
+test("addPageOption adds page input", () => {
+  const builder = addPageOption(new SlashCommandBuilder().setName("pages").setDescription("pages"));
 
   const json = builder.toJSON();
   const names = json.options?.map((option) => option.name);
@@ -94,9 +104,7 @@ test("addCleanupSubcommand adds cleanup with include_permissions", () => {
   const builder = new SlashCommandBuilder()
     .setName("cleanup")
     .setDescription("cleanup")
-    .addSubcommand((subcommand) =>
-      addCleanupSubcommand(subcommand, "Cleanup subscriptions")
-    );
+    .addSubcommand((subcommand) => addCleanupSubcommand(subcommand, "Cleanup subscriptions"));
 
   const json = builder.toJSON();
   const subcommand = json.options?.[0] as APIApplicationCommandSubcommandOption | undefined;
@@ -123,6 +131,32 @@ test("addStatusClearCleanupSubcommands adds status, clear, and cleanup", () => {
   expect(names).toEqual(["status", "clear", "cleanup"]);
   const cleanup = options[2] as APIApplicationCommandSubcommandOption | undefined;
   expect(cleanup?.options?.map((option) => option.name)).toEqual(["include_permissions"]);
+});
+
+test("addStatusClearCleanupPreviewPostSubcommands adds status/clear/cleanup + preview/post", () => {
+  const builder = addStatusClearCleanupPreviewPostSubcommands(
+    new SlashCommandBuilder().setName("digest").setDescription("digest"),
+    {
+      statusDescription: "Status",
+      clearDescription: "Clear",
+      cleanupDescription: "Cleanup",
+    },
+    {
+      previewDescription: "Preview",
+      postDescription: "Post",
+      forceDescription: "Force",
+    }
+  );
+
+  const json = builder.toJSON();
+  const options = json.options ?? [];
+  const names = options.map((option) => option.name);
+
+  expect(names).toEqual(["status", "clear", "cleanup", "preview", "post"]);
+  const cleanup = options[2] as APIApplicationCommandSubcommandOption | undefined;
+  expect(cleanup?.options?.map((option) => option.name)).toEqual(["include_permissions"]);
+  const post = options[4] as APIApplicationCommandSubcommandOption | undefined;
+  expect(post?.options?.map((option) => option.name)).toEqual(["force"]);
 });
 
 test("addPostSubcommand adds force and id options when provided", () => {

@@ -54,11 +54,7 @@ export async function replyEphemeral(
   content: string,
   context?: LogContext
 ): Promise<boolean> {
-  return safeInteractionReply(
-    interaction,
-    { content, flags: MessageFlags.Ephemeral },
-    context
-  );
+  return safeInteractionReply(interaction, { content, flags: MessageFlags.Ephemeral }, context);
 }
 
 export async function safeInteractionEdit(
@@ -132,6 +128,19 @@ export async function requireGuildIdAndSubcommand(
     return null;
   }
   return { guildId, subcommand: interaction.options.getSubcommand() };
+}
+
+export async function withGuildIdAndSubcommand(
+  interaction: ChatInputCommandInteraction,
+  content: string,
+  handler: (context: { guildId: string; subcommand: string }) => Promise<void>
+): Promise<boolean> {
+  const commandContext = await requireGuildIdAndSubcommand(interaction, content);
+  if (!commandContext) {
+    return false;
+  }
+  await handler(commandContext);
+  return true;
 }
 
 export async function requireGuildAndSubcommand(
@@ -227,7 +236,7 @@ type DisplayNameMember = {
 export function resolveTargetLabels(user: User, member: unknown) {
   const displayName =
     member && typeof member === "object" && "displayName" in member
-      ? (member as DisplayNameMember).displayName ?? user.username
+      ? ((member as DisplayNameMember).displayName ?? user.username)
       : user.username;
   const memberToString =
     member && typeof member === "object" && "toString" in member

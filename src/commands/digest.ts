@@ -8,21 +8,19 @@ import {
 import { replyWithSingleChannelCleanup } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
-  addPreviewAndPostSubcommands,
   addScheduleOptions,
-  addStatusClearCleanupSubcommands,
-  buildPreviewPostOptions,
+  addStatusClearCleanupPreviewPostSubcommands,
 } from "../utils/commandOptions.js";
 import {
   formatCannotPostPermissionsMessage,
   resolveSendableChannelOrReply,
 } from "../utils/discordChannels.js";
 import {
-  requireGuildIdAndSubcommand,
   runManualPostWithForce,
   safeInteractionDefer,
   safeInteractionEdit,
   safeInteractionReply,
+  withGuildIdAndSubcommand,
 } from "../utils/interaction.js";
 import {
   formatDiscordTimestamp,
@@ -121,202 +119,197 @@ function getManualDigestReply(result: ManualWeeklyDigestResult): string | null {
 }
 
 export const digestCommand: Command = {
-  data: addPreviewAndPostSubcommands(
-    addStatusClearCleanupSubcommands(
-      new SlashCommandBuilder()
-        .setName("digest")
-        .setDescription("Configure weekly digest posts")
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-        .addSubcommand((subcommand) =>
-          addScheduleOptions(subcommand.setName("set").setDescription("Enable weekly digests"), {
-            channelDescription: "Channel to post the digest in",
-            roleDescription: "Role to mention for weekly digests",
-          }).addStringOption((option) =>
-            option
-              .setName("day")
-              .setDescription("Day of the week to post")
-              .addChoices(
-                { name: "Sunday", value: "sun" },
-                { name: "Monday", value: "mon" },
-                { name: "Tuesday", value: "tue" },
-                { name: "Wednesday", value: "wed" },
-                { name: "Thursday", value: "thu" },
-                { name: "Friday", value: "fri" },
-                { name: "Saturday", value: "sat" }
-              )
-          )
-        ),
-      {
-        statusDescription: "Show the current digest schedule",
-        clearDescription: "Disable weekly digests",
-        cleanupDescription: "Remove digests pointing at missing channels",
-      }
-    ),
-    buildPreviewPostOptions({
+  data: addStatusClearCleanupPreviewPostSubcommands(
+    new SlashCommandBuilder()
+      .setName("digest")
+      .setDescription("Configure weekly digest posts")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addSubcommand((subcommand) =>
+        addScheduleOptions(subcommand.setName("set").setDescription("Enable weekly digests"), {
+          channelDescription: "Channel to post the digest in",
+          roleDescription: "Role to mention for weekly digests",
+        }).addStringOption((option) =>
+          option
+            .setName("day")
+            .setDescription("Day of the week to post")
+            .addChoices(
+              { name: "Sunday", value: "sun" },
+              { name: "Monday", value: "mon" },
+              { name: "Tuesday", value: "tue" },
+              { name: "Wednesday", value: "wed" },
+              { name: "Thursday", value: "thu" },
+              { name: "Friday", value: "fri" },
+              { name: "Saturday", value: "sat" }
+            )
+        )
+      ),
+    {
+      statusDescription: "Show the current digest schedule",
+      clearDescription: "Disable weekly digests",
+      cleanupDescription: "Remove digests pointing at missing channels",
+    },
+    {
       previewDescription: "Show a preview of the weekly digest for this server",
       postDescription: "Send the digest immediately",
       forceDescription: "Send even if a digest was already sent this week",
-    })
+    }
   ),
   adminOnly: true,
   async execute(interaction, context) {
-    const commandContext = await requireGuildIdAndSubcommand(
+    await withGuildIdAndSubcommand(
       interaction,
-      "This command can only be used in a server."
+      "This command can only be used in a server.",
+      async ({ guildId, subcommand }) => {
+        try {
+          if (subcommand === "status") {
+            const subscription = await getSubscriptionOrReply(
+              interaction,
+              context.services.weeklyDigest,
+              guildId
+            );
+            if (!subscription) {
+              return;
+            }
+            const dayKey = Object.entries(DAY_INDEX).find(
+              ([, value]) => value === subscription.dayOfWeek
+            )?.[0];
+            const scheduleLabel = formatScheduleLabel(
+              dayKey ?? DEFAULT_DAY,
+              subscription.hourUtc,
+              subscription.minuteUtc,
+              subscription.utcOffsetMinutes
+            );
+            const nextValue = getNextWeeklyScheduledUtcMs(
+              new Date(),
+              subscription.dayOfWeek,
+              subscription.hourUtc,
+              subscription.minuteUtc,
+              subscription.utcOffsetMinutes
+            );
+            const nextLabel = nextValue
+              ? formatDiscordTimestamp(Math.floor(nextValue / 1000))
+              : "Unknown";
+            await interaction.reply({
+              content: `Weekly digests are enabled in <#${subscription.channelId}> (${scheduleLabel}). Next post: ${nextLabel}.`,
+            });
+            return;
+          }
+
+          if (subcommand === "clear") {
+            const removed = await context.services.weeklyDigest.clearSubscription(guildId);
+            await interaction.reply({
+              content: removed
+                ? "Weekly digests disabled."
+                : "No weekly digests were configured for this server.",
+            });
+            return;
+          }
+
+          if (subcommand === "cleanup") {
+            const subscription = await getSubscriptionOrReply(
+              interaction,
+              context.services.weeklyDigest,
+              guildId
+            );
+            if (!subscription) {
+              return;
+            }
+
+            await replyWithSingleChannelCleanup({
+              interaction,
+              client: context.client,
+              channelId: subscription.channelId,
+              channelLabel: "Weekly digest",
+              subjectLabel: "Weekly digest",
+              subject: "weekly digest",
+              setCommand: "/digest set",
+              subjectVerb: "points",
+              remove: () => context.services.weeklyDigest.clearSubscription(guildId),
+            });
+            return;
+          }
+
+          if (subcommand === "preview") {
+            const deferred = await safeInteractionDefer(interaction);
+            if (!deferred) {
+              return;
+            }
+            const preview = await context.services.weeklyDigest.getPreview(guildId);
+            if (!preview) {
+              await safeInteractionEdit(interaction, NO_SUBSCRIPTION_MESSAGE);
+              return;
+            }
+            await safeInteractionEdit(interaction, {
+              content: `Next scheduled post: ${formatDiscordTimestamp(
+                Math.floor(preview.nextScheduledAt / 1000)
+              )}`,
+              embeds: [preview.embed],
+            });
+            return;
+          }
+
+          if (subcommand === "post") {
+            await runManualPostWithForce(interaction, {
+              action: (force) =>
+                context.services.weeklyDigest.sendManualDigest(guildId, context.client, force),
+              reply: getManualDigestReply,
+              defaultReply: "Weekly digest sent.",
+            });
+            return;
+          }
+
+          const channel = await resolveSendableChannelOrReply(
+            interaction,
+            context.client,
+            interaction.options.getChannel("channel", true),
+            { invalidTypeMessage: "Select a text or announcement channel." }
+          );
+          if (!channel) {
+            return;
+          }
+
+          const day = resolveDay(interaction.options.getString("day"));
+          const hourInput = interaction.options.getInteger("hour_utc") ?? DEFAULT_HOUR_UTC;
+          const minuteInput = interaction.options.getInteger("minute_utc") ?? DEFAULT_MINUTE_UTC;
+          const utcOffsetRaw = interaction.options.getString("utc_offset")?.trim() ?? "";
+          const role = interaction.options.getRole("role");
+
+          const utcOffsetResult = resolveUtcOffsetMinutes(utcOffsetRaw);
+          if ("error" in utcOffsetResult) {
+            await interaction.reply({ content: utcOffsetResult.error });
+            return;
+          }
+          const utcOffsetMinutes = utcOffsetResult.minutes;
+
+          const utcTime = toUtcTime(hourInput, minuteInput, utcOffsetMinutes);
+          const dayIndex = DAY_INDEX[day] ?? DAY_INDEX[DEFAULT_DAY];
+          await context.services.weeklyDigest.setSubscription(
+            guildId,
+            channel.id,
+            dayIndex,
+            utcTime.hour,
+            utcTime.minute,
+            utcOffsetMinutes,
+            role?.id ?? null
+          );
+          const scheduleLabel = formatScheduleLabel(
+            day,
+            utcTime.hour,
+            utcTime.minute,
+            utcOffsetMinutes
+          );
+          const roleMention = role ? ` <@&${role.id}>` : "";
+          await interaction.reply({
+            content: `Weekly digests enabled in <#${channel.id}> (${scheduleLabel})${roleMention}.`,
+            allowedMentions: role ? { roles: [role.id] } : { parse: [] },
+          });
+        } catch (error) {
+          logCommandError("Digest command failed.", interaction, context.correlationId, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          await safeInteractionReply(interaction, { content: "Failed to update digest settings." });
+        }
+      }
     );
-    if (!commandContext) {
-      return;
-    }
-    const { guildId, subcommand } = commandContext;
-
-    try {
-      if (subcommand === "status") {
-        const subscription = await getSubscriptionOrReply(
-          interaction,
-          context.services.weeklyDigest,
-          guildId
-        );
-        if (!subscription) {
-          return;
-        }
-        const dayKey = Object.entries(DAY_INDEX).find(
-          ([, value]) => value === subscription.dayOfWeek
-        )?.[0];
-        const scheduleLabel = formatScheduleLabel(
-          dayKey ?? DEFAULT_DAY,
-          subscription.hourUtc,
-          subscription.minuteUtc,
-          subscription.utcOffsetMinutes
-        );
-        const nextValue = getNextWeeklyScheduledUtcMs(
-          new Date(),
-          subscription.dayOfWeek,
-          subscription.hourUtc,
-          subscription.minuteUtc,
-          subscription.utcOffsetMinutes
-        );
-        const nextLabel = nextValue
-          ? formatDiscordTimestamp(Math.floor(nextValue / 1000))
-          : "Unknown";
-        await interaction.reply({
-          content: `Weekly digests are enabled in <#${subscription.channelId}> (${scheduleLabel}). Next post: ${nextLabel}.`,
-        });
-        return;
-      }
-
-      if (subcommand === "clear") {
-        const removed = await context.services.weeklyDigest.clearSubscription(guildId);
-        await interaction.reply({
-          content: removed
-            ? "Weekly digests disabled."
-            : "No weekly digests were configured for this server.",
-        });
-        return;
-      }
-
-      if (subcommand === "cleanup") {
-        const subscription = await getSubscriptionOrReply(
-          interaction,
-          context.services.weeklyDigest,
-          guildId
-        );
-        if (!subscription) {
-          return;
-        }
-
-        await replyWithSingleChannelCleanup({
-          interaction,
-          client: context.client,
-          channelId: subscription.channelId,
-          channelLabel: "Weekly digest",
-          subjectLabel: "Weekly digest",
-          subject: "weekly digest",
-          setCommand: "/digest set",
-          subjectVerb: "points",
-          remove: () => context.services.weeklyDigest.clearSubscription(guildId),
-        });
-        return;
-      }
-
-      if (subcommand === "preview") {
-        const deferred = await safeInteractionDefer(interaction);
-        if (!deferred) {
-          return;
-        }
-        const preview = await context.services.weeklyDigest.getPreview(guildId);
-        if (!preview) {
-          await safeInteractionEdit(interaction, NO_SUBSCRIPTION_MESSAGE);
-          return;
-        }
-        await safeInteractionEdit(interaction, {
-          content: `Next scheduled post: ${formatDiscordTimestamp(
-            Math.floor(preview.nextScheduledAt / 1000)
-          )}`,
-          embeds: [preview.embed],
-        });
-        return;
-      }
-
-      if (subcommand === "post") {
-        await runManualPostWithForce(interaction, {
-          action: (force) =>
-            context.services.weeklyDigest.sendManualDigest(guildId, context.client, force),
-          reply: getManualDigestReply,
-          defaultReply: "Weekly digest sent.",
-        });
-        return;
-      }
-
-      const channel = await resolveSendableChannelOrReply(
-        interaction,
-        context.client,
-        interaction.options.getChannel("channel", true),
-        { invalidTypeMessage: "Select a text or announcement channel." }
-      );
-      if (!channel) {
-        return;
-      }
-
-      const day = resolveDay(interaction.options.getString("day"));
-      const hourInput = interaction.options.getInteger("hour_utc") ?? DEFAULT_HOUR_UTC;
-      const minuteInput = interaction.options.getInteger("minute_utc") ?? DEFAULT_MINUTE_UTC;
-      const utcOffsetRaw = interaction.options.getString("utc_offset")?.trim() ?? "";
-      const role = interaction.options.getRole("role");
-
-      const utcOffsetResult = resolveUtcOffsetMinutes(utcOffsetRaw);
-      if ("error" in utcOffsetResult) {
-        await interaction.reply({ content: utcOffsetResult.error });
-        return;
-      }
-      const utcOffsetMinutes = utcOffsetResult.minutes;
-
-      const utcTime = toUtcTime(hourInput, minuteInput, utcOffsetMinutes);
-      const dayIndex = DAY_INDEX[day] ?? DAY_INDEX[DEFAULT_DAY];
-      await context.services.weeklyDigest.setSubscription(
-        guildId,
-        channel.id,
-        dayIndex,
-        utcTime.hour,
-        utcTime.minute,
-        utcOffsetMinutes,
-        role?.id ?? null
-      );
-      const scheduleLabel = formatScheduleLabel(
-        day,
-        utcTime.hour,
-        utcTime.minute,
-        utcOffsetMinutes
-      );
-      const roleMention = role ? ` <@&${role.id}>` : "";
-      await interaction.reply({
-        content: `Weekly digests enabled in <#${channel.id}> (${scheduleLabel})${roleMention}.`,
-        allowedMentions: role ? { roles: [role.id] } : { parse: [] },
-      });
-    } catch (error) {
-      logCommandError("Digest command failed.", interaction, context.correlationId, {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      await safeInteractionReply(interaction, { content: "Failed to update digest settings." });
-    }
   },
 };

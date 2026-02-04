@@ -6,6 +6,7 @@ import {
   resolveChannelCleanupDecision,
   type SendableChannelStatus,
 } from "./discordChannels.js";
+import { resolveBooleanOption } from "./interaction.js";
 
 export type ChannelSubscription = {
   id: string;
@@ -301,4 +302,29 @@ export async function runChannelCleanupSummary(options: {
     removeSubscription: options.removeSubscription,
   });
   return buildChannelCleanupSummary(cleanup, options.summary);
+}
+
+export async function replyWithChannelCleanupSummary(params: {
+  interaction: ChatInputCommandInteraction;
+  client: Client;
+  listSubscriptions: () => Promise<ChannelSubscription[]>;
+  removeSubscription: (id: string) => Promise<boolean>;
+  emptyMessage: string;
+  summary: ChannelCleanupSummaryOptions;
+  includePermissionsOption?: string;
+}): Promise<void> {
+  const subscriptions = await params.listSubscriptions();
+  const includePermissions = resolveBooleanOption(
+    params.interaction,
+    params.includePermissionsOption ?? "include_permissions"
+  );
+  const message = await runChannelCleanupSummary({
+    client: params.client,
+    subscriptions,
+    includePermissions,
+    removeSubscription: params.removeSubscription,
+    emptyMessage: params.emptyMessage,
+    summary: params.summary,
+  });
+  await params.interaction.reply({ content: message });
 }

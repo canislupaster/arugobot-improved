@@ -1,7 +1,10 @@
 import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
-import { addContestTargetOptions } from "../utils/commandOptions.js";
+import {
+  addContestQueryAndLimitOptions,
+  addContestTargetOptions,
+} from "../utils/commandOptions.js";
 import { resolveContestContextOrReply } from "../utils/contestCommand.js";
 import { addRankedLinesField, formatTargetLabel } from "../utils/contestEntries.js";
 import { buildContestEmbed, formatContestTag } from "../utils/contestLookup.js";
@@ -43,22 +46,15 @@ function formatPoints(points: number): string {
 
 export const contestResultsCommand: Command = {
   data: addContestTargetOptions(
-    new SlashCommandBuilder()
-      .setName("contestresults")
-      .setDescription("Shows standings for linked users in a contest")
-      .addStringOption((option) =>
-        option
-          .setName("query")
-          .setDescription("Contest id, URL, name, or latest")
-          .setRequired(true)
-      )
-      .addIntegerOption((option) =>
-        option
-          .setName("limit")
-          .setDescription(`Number of results to show (1-${MAX_LIMIT})`)
-          .setMinValue(1)
-          .setMaxValue(MAX_LIMIT)
-      )
+    addContestQueryAndLimitOptions(
+      new SlashCommandBuilder()
+        .setName("contestresults")
+        .setDescription("Shows standings for linked users in a contest"),
+      {
+        queryDescription: "Contest id, URL, name, or latest",
+        maxLimit: MAX_LIMIT,
+      }
+    )
   )
     .addBooleanOption((option) =>
       option

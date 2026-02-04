@@ -1,5 +1,7 @@
 import { EmbedBuilder, type ChatInputCommandInteraction } from "discord.js";
 
+import { requireGuildAndSubcommand } from "./interaction.js";
+
 export type SubscriptionIdResolution =
   | { status: "not_found" }
   | { status: "ambiguous"; matches: string[] }
@@ -100,7 +102,45 @@ export function createSubscriptionSelectionResolver<T extends { id: string }>(
   optionName = "id"
 ): () => Promise<T | null> {
   return () =>
-    resolveSubscriptionSelectionFromInteraction(interaction, listSubscriptions, messages, optionName);
+    resolveSubscriptionSelectionFromInteraction(
+      interaction,
+      listSubscriptions,
+      messages,
+      optionName
+    );
+}
+
+export async function resolveGuildSubscriptionContext<T extends { id: string }>(
+  interaction: ChatInputCommandInteraction,
+  options: {
+    content: string;
+    listSubscriptions: (guildId: string) => Promise<T[]>;
+    messages: SubscriptionSelectionMessages;
+    optionName?: string;
+  }
+): Promise<{
+  guildId: string;
+  subcommand: string;
+  selectSubscription: () => Promise<T | null>;
+} | null> {
+  const guildContext = await requireGuildAndSubcommand(interaction, {
+    content: options.content,
+  });
+  if (!guildContext) {
+    return null;
+  }
+  const guildId = guildContext.guild.id;
+  return {
+    guildId,
+    subcommand: guildContext.subcommand,
+    selectSubscription: () =>
+      resolveSubscriptionSelectionFromInteraction(
+        interaction,
+        () => options.listSubscriptions(guildId),
+        options.messages,
+        options.optionName
+      ),
+  };
 }
 
 export function appendSubscriptionIdField(

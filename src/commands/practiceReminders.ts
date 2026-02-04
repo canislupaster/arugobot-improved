@@ -4,12 +4,10 @@ import { getNextScheduledUtcMs, type ManualReminderResult } from "../services/pr
 import { replyWithSingleChannelCleanup } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
-  addPreviewAndPostSubcommands,
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
-  addStatusClearCleanupSubcommands,
-  buildPreviewPostOptions,
+  addStatusClearCleanupPreviewPostSubcommands,
 } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
@@ -19,11 +17,11 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
-  requireGuildIdAndSubcommand,
   runManualPostWithForce,
   safeInteractionDefer,
   safeInteractionEdit,
   safeInteractionReply,
+  withGuildIdAndSubcommand,
 } from "../utils/interaction.js";
 import { buildProblemUrl } from "../utils/problemReference.js";
 import {
@@ -48,8 +46,7 @@ const DEFAULT_MAX_RATING = 3500;
 const DEFAULT_HOUR_UTC = 9;
 const DEFAULT_MINUTE_UTC = 0;
 const NO_PRACTICE_REMINDERS_MESSAGE = "No practice reminders configured for this server.";
-const NO_PRACTICE_REMINDERS_WERE_MESSAGE =
-  "No practice reminders were configured for this server.";
+const NO_PRACTICE_REMINDERS_WERE_MESSAGE = "No practice reminders were configured for this server.";
 const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_TOKEN_MAP: Record<string, number> = {
@@ -199,342 +196,345 @@ function getManualReminderReply(result: ManualReminderResult): string {
 }
 
 export const practiceRemindersCommand: Command = {
-  data: addPreviewAndPostSubcommands(
-    addStatusClearCleanupSubcommands(
-      new SlashCommandBuilder()
-        .setName("practicereminders")
-        .setDescription("Configure practice problem reminders")
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-        .addSubcommand((subcommand) =>
-          addTagOptions(
-            addRatingRangeOptions(
-              addScheduleOptions(
-                subcommand.setName("set").setDescription("Enable practice reminders"),
-                {
-                  channelDescription: "Channel to post practice problems in",
-                  roleDescription: "Role to mention for practice reminders",
-                }
-              )
+  data: addStatusClearCleanupPreviewPostSubcommands(
+    new SlashCommandBuilder()
+      .setName("practicereminders")
+      .setDescription("Configure practice problem reminders")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addSubcommand((subcommand) =>
+        addTagOptions(
+          addRatingRangeOptions(
+            addScheduleOptions(
+              subcommand.setName("set").setDescription("Enable practice reminders"),
+              {
+                channelDescription: "Channel to post practice problems in",
+                roleDescription: "Role to mention for practice reminders",
+              }
             )
           )
-            .addStringOption((option) =>
-              option
-                .setName("days")
-                .setDescription("Days to post (e.g. mon,wed,fri, weekdays, weekends)")
-            )
-        ),
-      {
-        statusDescription: "Show current practice reminder settings",
-        clearDescription: "Disable daily practice reminders",
-        cleanupDescription: "Remove reminders pointing at missing channels",
-      }
-    ),
-    buildPreviewPostOptions({
+        ).addStringOption((option) =>
+          option
+            .setName("days")
+            .setDescription("Days to post (e.g. mon,wed,fri, weekdays, weekends)")
+        )
+      ),
+    {
+      statusDescription: "Show current practice reminder settings",
+      clearDescription: "Disable daily practice reminders",
+      cleanupDescription: "Remove reminders pointing at missing channels",
+    },
+    {
       previewDescription: "Preview the next practice reminder",
       postDescription: "Post a practice problem immediately",
       forceDescription: "Send even if a reminder was already posted today",
-    })
+    }
   ),
   adminOnly: true,
   async execute(interaction, context) {
-    const commandContext = await requireGuildIdAndSubcommand(
+    await withGuildIdAndSubcommand(
       interaction,
-      "This command can only be used in a server."
+      "This command can only be used in a server.",
+      async ({ guildId, subcommand }) => {
+        try {
+          if (subcommand === "status") {
+            const subscription = await context.services.practiceReminders.getSubscription(guildId);
+            if (!subscription) {
+              await interaction.reply({ content: NO_PRACTICE_REMINDERS_MESSAGE });
+              return;
+            }
+
+            const channelStatus = await getSendableChannelStatus(
+              context.client,
+              subscription.channelId
+            );
+            const nextScheduledMs = getNextScheduledUtcMs(
+              new Date(),
+              subscription.hourUtc,
+              subscription.minuteUtc,
+              subscription.daysOfWeek,
+              subscription.utcOffsetMinutes
+            );
+            const scheduleFields = buildScheduleFields(
+              subscription.hourUtc,
+              subscription.minuteUtc,
+              subscription.utcOffsetMinutes
+            );
+            const nextScheduledSeconds = Math.floor(nextScheduledMs / 1000);
+            const embed = new EmbedBuilder()
+              .setTitle("Practice reminders")
+              .setColor(EMBED_COLORS.success)
+              .addFields(
+                { name: "Channel", value: `<#${subscription.channelId}>`, inline: true },
+                scheduleFields.utcField,
+                ...scheduleFields.localFields,
+                {
+                  name: "Ranges",
+                  value: formatRatingRangesWithDefaults(
+                    subscription.ratingRanges,
+                    DEFAULT_MIN_RATING,
+                    DEFAULT_MAX_RATING
+                  ),
+                  inline: false,
+                },
+                {
+                  name: "Tags",
+                  value: subscription.tags.trim() ? subscription.tags.trim() : "None",
+                  inline: false,
+                },
+                { name: "Days", value: formatDaysLabel(subscription.daysOfWeek), inline: true },
+                {
+                  name: "Next run",
+                  value: `${formatDiscordTimestamp(nextScheduledSeconds)} (${formatDiscordRelativeTime(
+                    nextScheduledSeconds
+                  )})`,
+                  inline: false,
+                }
+              );
+
+            if (channelStatus.status !== "ok") {
+              embed.addFields({
+                name: "Channel status",
+                value: describeSendableChannelStatus(channelStatus),
+                inline: false,
+              });
+            }
+            if (subscription.lastSentAt) {
+              embed.addFields({
+                name: "Last sent",
+                value: subscription.lastSentAt,
+                inline: false,
+              });
+            }
+            if (subscription.roleId) {
+              embed.addFields({ name: "Role", value: `<@&${subscription.roleId}>`, inline: true });
+            }
+
+            await interaction.reply({ embeds: [embed] });
+            return;
+          }
+
+          if (subcommand === "clear") {
+            const removed = await context.services.practiceReminders.clearSubscription(guildId);
+            await interaction.reply({
+              content: removed
+                ? "Practice reminders disabled for this server."
+                : NO_PRACTICE_REMINDERS_WERE_MESSAGE,
+            });
+            return;
+          }
+
+          if (subcommand === "cleanup") {
+            const subscription = await context.services.practiceReminders.getSubscription(guildId);
+            if (!subscription) {
+              await interaction.reply({ content: NO_PRACTICE_REMINDERS_WERE_MESSAGE });
+              return;
+            }
+
+            await replyWithSingleChannelCleanup({
+              interaction,
+              client: context.client,
+              channelId: subscription.channelId,
+              channelLabel: "Practice reminder",
+              subjectLabel: "Practice reminders",
+              subject: "practice reminders",
+              setCommand: "/practicereminders set",
+              remove: () => context.services.practiceReminders.clearSubscription(guildId),
+            });
+            return;
+          }
+
+          if (subcommand === "set") {
+            const channel = await resolveSendableChannelOrReply(
+              interaction,
+              context.client,
+              interaction.options.getChannel("channel", true),
+              { invalidTypeMessage: "Pick a text channel for practice reminders." }
+            );
+            if (!channel) {
+              return;
+            }
+
+            const hourInput = interaction.options.getInteger("hour_utc") ?? DEFAULT_HOUR_UTC;
+            const minuteInput = interaction.options.getInteger("minute_utc") ?? DEFAULT_MINUTE_UTC;
+            const utcOffsetRaw = interaction.options.getString("utc_offset")?.trim() ?? "";
+            const { rating, minRating, maxRating, rangesRaw } = readRatingRangeOptions(interaction);
+            const tags = interaction.options.getString("tags")?.trim() ?? "";
+            const daysRaw = interaction.options.getString("days");
+            const role = interaction.options.getRole("role");
+            const roleId = role?.id ?? null;
+            const utcOffsetResult = resolveUtcOffsetMinutes(utcOffsetRaw);
+            if ("error" in utcOffsetResult) {
+              await interaction.reply({ content: utcOffsetResult.error });
+              return;
+            }
+            const utcOffsetMinutes = utcOffsetResult.minutes;
+
+            const rangeResult = resolveRatingRanges({
+              rating,
+              minRating,
+              maxRating,
+              rangesRaw,
+              defaultMin: DEFAULT_MIN_RATING,
+              defaultMax: DEFAULT_MAX_RATING,
+            });
+            if (rangeResult.error) {
+              await interaction.reply({ content: rangeResult.error });
+              return;
+            }
+
+            const parsedDays = parseDaysInput(daysRaw);
+            if ("error" in parsedDays) {
+              await interaction.reply({ content: parsedDays.error });
+              return;
+            }
+
+            const utcTime = toUtcTime(hourInput, minuteInput, utcOffsetMinutes);
+            await context.services.practiceReminders.setSubscription(
+              guildId,
+              channel.id,
+              utcTime.hour,
+              utcTime.minute,
+              utcOffsetMinutes,
+              parsedDays.days,
+              rangeResult.ranges,
+              tags,
+              roleId
+            );
+
+            const utcLabel = `${formatHourMinute(utcTime.hour, utcTime.minute)} UTC`;
+            const localLabel = `${formatHourMinute(hourInput, minuteInput)} (${formatUtcOffset(
+              utcOffsetMinutes
+            )})`;
+            const dayLabel = formatDaysLabel(parsedDays.days);
+            const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
+            await interaction.reply({
+              content:
+                utcOffsetMinutes === 0
+                  ? `Practice reminders enabled in <#${channel.id}> (${dayLabel.toLowerCase()} at ${utcLabel})${roleMention}.`
+                  : `Practice reminders enabled in <#${channel.id}> (${dayLabel.toLowerCase()} at ${localLabel}; ${utcLabel})${roleMention}.`,
+            });
+            return;
+          }
+
+          if (subcommand === "preview") {
+            const deferred = await safeInteractionDefer(interaction);
+            if (!deferred) {
+              return;
+            }
+            const preview = await context.services.practiceReminders.getPreview(guildId);
+            if (!preview) {
+              await safeInteractionEdit(interaction, NO_PRACTICE_REMINDERS_MESSAGE);
+              return;
+            }
+
+            const nextScheduledSeconds = Math.floor(preview.nextScheduledAt / 1000);
+            const scheduleFields = buildScheduleFields(
+              preview.subscription.hourUtc,
+              preview.subscription.minuteUtc,
+              preview.subscription.utcOffsetMinutes
+            );
+            const embed = new EmbedBuilder()
+              .setTitle("Practice reminder preview")
+              .setColor(EMBED_COLORS.success)
+              .addFields(
+                { name: "Channel", value: `<#${preview.subscription.channelId}>`, inline: true },
+                {
+                  name: "Next run",
+                  value: `${formatDiscordTimestamp(nextScheduledSeconds)} (${formatDiscordRelativeTime(
+                    nextScheduledSeconds
+                  )})`,
+                  inline: false,
+                },
+                scheduleFields.utcField,
+                {
+                  name: "Days",
+                  value: formatDaysLabel(preview.subscription.daysOfWeek),
+                  inline: true,
+                },
+                ...scheduleFields.localFields,
+                {
+                  name: "Ranges",
+                  value: formatRatingRangesWithDefaults(
+                    preview.subscription.ratingRanges,
+                    DEFAULT_MIN_RATING,
+                    DEFAULT_MAX_RATING
+                  ),
+                  inline: false,
+                },
+                {
+                  name: "Tags",
+                  value: preview.subscription.tags.trim()
+                    ? preview.subscription.tags.trim()
+                    : "None",
+                  inline: false,
+                }
+              );
+            embed.addFields({
+              name: "Candidate pool",
+              value: String(preview.candidateCount),
+              inline: true,
+            });
+
+            if (preview.problem) {
+              embed.addFields({
+                name: "Sample problem",
+                value: `[${preview.problem.index}. ${preview.problem.name}](${buildProblemUrl(
+                  preview.problem.contestId,
+                  preview.problem.index
+                )})`,
+                inline: false,
+              });
+            } else {
+              embed.addFields({
+                name: "Sample problem",
+                value: "No suitable problems found with the current filters.",
+                inline: false,
+              });
+            }
+            if (preview.subscription.roleId) {
+              embed.addFields({
+                name: "Role",
+                value: `<@&${preview.subscription.roleId}>`,
+                inline: true,
+              });
+            }
+
+            if (preview.skippedHandles > 0 || preview.staleHandles > 0) {
+              const notes = [];
+              if (preview.skippedHandles > 0) {
+                notes.push(`${preview.skippedHandles} handle(s) skipped`);
+              }
+              if (preview.staleHandles > 0) {
+                notes.push(`${preview.staleHandles} handle(s) used cached solves`);
+              }
+              embed.setFooter({ text: notes.join(" • ") });
+            }
+
+            await safeInteractionEdit(interaction, { embeds: [embed] });
+            return;
+          }
+
+          if (subcommand === "post") {
+            await runManualPostWithForce(interaction, {
+              action: (force) =>
+                context.services.practiceReminders.sendManualReminder(
+                  guildId,
+                  context.client,
+                  force
+                ),
+              reply: getManualReminderReply,
+            });
+            return;
+          }
+        } catch (error) {
+          logCommandError(
+            `Practice reminders failed: ${String(error)}`,
+            interaction,
+            context.correlationId
+          );
+          await safeInteractionReply(interaction, { content: "Something went wrong." });
+        }
+      }
     );
-    if (!commandContext) {
-      return;
-    }
-
-    const { guildId, subcommand } = commandContext;
-
-    try {
-      if (subcommand === "status") {
-        const subscription = await context.services.practiceReminders.getSubscription(guildId);
-        if (!subscription) {
-          await interaction.reply({ content: NO_PRACTICE_REMINDERS_MESSAGE });
-          return;
-        }
-
-        const channelStatus = await getSendableChannelStatus(
-          context.client,
-          subscription.channelId
-        );
-        const nextScheduledMs = getNextScheduledUtcMs(
-          new Date(),
-          subscription.hourUtc,
-          subscription.minuteUtc,
-          subscription.daysOfWeek,
-          subscription.utcOffsetMinutes
-        );
-        const scheduleFields = buildScheduleFields(
-          subscription.hourUtc,
-          subscription.minuteUtc,
-          subscription.utcOffsetMinutes
-        );
-        const nextScheduledSeconds = Math.floor(nextScheduledMs / 1000);
-        const embed = new EmbedBuilder()
-          .setTitle("Practice reminders")
-          .setColor(EMBED_COLORS.success)
-          .addFields(
-            { name: "Channel", value: `<#${subscription.channelId}>`, inline: true },
-            scheduleFields.utcField,
-            ...scheduleFields.localFields,
-            {
-              name: "Ranges",
-              value: formatRatingRangesWithDefaults(
-                subscription.ratingRanges,
-                DEFAULT_MIN_RATING,
-                DEFAULT_MAX_RATING
-              ),
-              inline: false,
-            },
-            {
-              name: "Tags",
-              value: subscription.tags.trim() ? subscription.tags.trim() : "None",
-              inline: false,
-            },
-            { name: "Days", value: formatDaysLabel(subscription.daysOfWeek), inline: true },
-            {
-              name: "Next run",
-              value: `${formatDiscordTimestamp(nextScheduledSeconds)} (${formatDiscordRelativeTime(
-                nextScheduledSeconds
-              )})`,
-              inline: false,
-            }
-          );
-
-        if (channelStatus.status !== "ok") {
-          embed.addFields({
-            name: "Channel status",
-            value: describeSendableChannelStatus(channelStatus),
-            inline: false,
-          });
-        }
-        if (subscription.lastSentAt) {
-          embed.addFields({
-            name: "Last sent",
-            value: subscription.lastSentAt,
-            inline: false,
-          });
-        }
-        if (subscription.roleId) {
-          embed.addFields({ name: "Role", value: `<@&${subscription.roleId}>`, inline: true });
-        }
-
-        await interaction.reply({ embeds: [embed] });
-        return;
-      }
-
-      if (subcommand === "clear") {
-        const removed = await context.services.practiceReminders.clearSubscription(guildId);
-        await interaction.reply({
-          content: removed
-            ? "Practice reminders disabled for this server."
-            : NO_PRACTICE_REMINDERS_WERE_MESSAGE,
-        });
-        return;
-      }
-
-      if (subcommand === "cleanup") {
-        const subscription = await context.services.practiceReminders.getSubscription(guildId);
-        if (!subscription) {
-          await interaction.reply({ content: NO_PRACTICE_REMINDERS_WERE_MESSAGE });
-          return;
-        }
-
-        await replyWithSingleChannelCleanup({
-          interaction,
-          client: context.client,
-          channelId: subscription.channelId,
-          channelLabel: "Practice reminder",
-          subjectLabel: "Practice reminders",
-          subject: "practice reminders",
-          setCommand: "/practicereminders set",
-          remove: () => context.services.practiceReminders.clearSubscription(guildId),
-        });
-        return;
-      }
-
-      if (subcommand === "set") {
-        const channel = await resolveSendableChannelOrReply(
-          interaction,
-          context.client,
-          interaction.options.getChannel("channel", true),
-          { invalidTypeMessage: "Pick a text channel for practice reminders." }
-        );
-        if (!channel) {
-          return;
-        }
-
-        const hourInput = interaction.options.getInteger("hour_utc") ?? DEFAULT_HOUR_UTC;
-        const minuteInput = interaction.options.getInteger("minute_utc") ?? DEFAULT_MINUTE_UTC;
-        const utcOffsetRaw = interaction.options.getString("utc_offset")?.trim() ?? "";
-        const { rating, minRating, maxRating, rangesRaw } = readRatingRangeOptions(interaction);
-        const tags = interaction.options.getString("tags")?.trim() ?? "";
-        const daysRaw = interaction.options.getString("days");
-        const role = interaction.options.getRole("role");
-        const roleId = role?.id ?? null;
-        const utcOffsetResult = resolveUtcOffsetMinutes(utcOffsetRaw);
-        if ("error" in utcOffsetResult) {
-          await interaction.reply({ content: utcOffsetResult.error });
-          return;
-        }
-        const utcOffsetMinutes = utcOffsetResult.minutes;
-
-        const rangeResult = resolveRatingRanges({
-          rating,
-          minRating,
-          maxRating,
-          rangesRaw,
-          defaultMin: DEFAULT_MIN_RATING,
-          defaultMax: DEFAULT_MAX_RATING,
-        });
-        if (rangeResult.error) {
-          await interaction.reply({ content: rangeResult.error });
-          return;
-        }
-
-        const parsedDays = parseDaysInput(daysRaw);
-        if ("error" in parsedDays) {
-          await interaction.reply({ content: parsedDays.error });
-          return;
-        }
-
-        const utcTime = toUtcTime(hourInput, minuteInput, utcOffsetMinutes);
-        await context.services.practiceReminders.setSubscription(
-          guildId,
-          channel.id,
-          utcTime.hour,
-          utcTime.minute,
-          utcOffsetMinutes,
-          parsedDays.days,
-          rangeResult.ranges,
-          tags,
-          roleId
-        );
-
-        const utcLabel = `${formatHourMinute(utcTime.hour, utcTime.minute)} UTC`;
-        const localLabel = `${formatHourMinute(hourInput, minuteInput)} (${formatUtcOffset(
-          utcOffsetMinutes
-        )})`;
-        const dayLabel = formatDaysLabel(parsedDays.days);
-        const roleMention = roleId ? ` (mentioning <@&${roleId}>)` : "";
-        await interaction.reply({
-          content:
-            utcOffsetMinutes === 0
-              ? `Practice reminders enabled in <#${channel.id}> (${dayLabel.toLowerCase()} at ${utcLabel})${roleMention}.`
-              : `Practice reminders enabled in <#${channel.id}> (${dayLabel.toLowerCase()} at ${localLabel}; ${utcLabel})${roleMention}.`,
-        });
-        return;
-      }
-
-      if (subcommand === "preview") {
-        const deferred = await safeInteractionDefer(interaction);
-        if (!deferred) {
-          return;
-        }
-        const preview = await context.services.practiceReminders.getPreview(guildId);
-        if (!preview) {
-          await safeInteractionEdit(interaction, NO_PRACTICE_REMINDERS_MESSAGE);
-          return;
-        }
-
-        const nextScheduledSeconds = Math.floor(preview.nextScheduledAt / 1000);
-        const scheduleFields = buildScheduleFields(
-          preview.subscription.hourUtc,
-          preview.subscription.minuteUtc,
-          preview.subscription.utcOffsetMinutes
-        );
-        const embed = new EmbedBuilder()
-          .setTitle("Practice reminder preview")
-          .setColor(EMBED_COLORS.success)
-          .addFields(
-            { name: "Channel", value: `<#${preview.subscription.channelId}>`, inline: true },
-            {
-              name: "Next run",
-              value: `${formatDiscordTimestamp(nextScheduledSeconds)} (${formatDiscordRelativeTime(
-                nextScheduledSeconds
-              )})`,
-              inline: false,
-            },
-            scheduleFields.utcField,
-            { name: "Days", value: formatDaysLabel(preview.subscription.daysOfWeek), inline: true },
-            ...scheduleFields.localFields,
-            {
-              name: "Ranges",
-              value: formatRatingRangesWithDefaults(
-                preview.subscription.ratingRanges,
-                DEFAULT_MIN_RATING,
-                DEFAULT_MAX_RATING
-              ),
-              inline: false,
-            },
-            {
-              name: "Tags",
-              value: preview.subscription.tags.trim() ? preview.subscription.tags.trim() : "None",
-              inline: false,
-            }
-          );
-        embed.addFields({
-          name: "Candidate pool",
-          value: String(preview.candidateCount),
-          inline: true,
-        });
-
-        if (preview.problem) {
-          embed.addFields({
-            name: "Sample problem",
-            value: `[${preview.problem.index}. ${preview.problem.name}](${buildProblemUrl(
-              preview.problem.contestId,
-              preview.problem.index
-            )})`,
-            inline: false,
-          });
-        } else {
-          embed.addFields({
-            name: "Sample problem",
-            value: "No suitable problems found with the current filters.",
-            inline: false,
-          });
-        }
-        if (preview.subscription.roleId) {
-          embed.addFields({
-            name: "Role",
-            value: `<@&${preview.subscription.roleId}>`,
-            inline: true,
-          });
-        }
-
-        if (preview.skippedHandles > 0 || preview.staleHandles > 0) {
-          const notes = [];
-          if (preview.skippedHandles > 0) {
-            notes.push(`${preview.skippedHandles} handle(s) skipped`);
-          }
-          if (preview.staleHandles > 0) {
-            notes.push(`${preview.staleHandles} handle(s) used cached solves`);
-          }
-          embed.setFooter({ text: notes.join(" • ") });
-        }
-
-        await safeInteractionEdit(interaction, { embeds: [embed] });
-        return;
-      }
-
-      if (subcommand === "post") {
-        await runManualPostWithForce(interaction, {
-          action: (force) =>
-            context.services.practiceReminders.sendManualReminder(guildId, context.client, force),
-          reply: getManualReminderReply,
-        });
-        return;
-      }
-    } catch (error) {
-      logCommandError(
-        `Practice reminders failed: ${String(error)}`,
-        interaction,
-        context.correlationId
-      );
-      await safeInteractionReply(interaction, { content: "Something went wrong." });
-    }
   },
 };
