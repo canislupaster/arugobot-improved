@@ -4,9 +4,9 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestEmbed, formatContestTag, resolveContestOrReply } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
+  partitionTargetsByHandle,
   resolveContestTargetInputsOrReply,
   resolveContestTargetsFromInteractionOrReply,
-  type TargetHandle,
 } from "../utils/contestTargets.js";
 
 import type { Command } from "./types.js";
@@ -135,24 +135,7 @@ export const contestResultsCommand: Command = {
         standingsEntries.map((entry) => [entry.handle.toLowerCase(), entry])
       );
 
-      const found: Array<
-        TargetHandle & {
-          rank: number;
-          points: number;
-          penalty: number;
-          participantType: string;
-        }
-      > = [];
-      const missing: TargetHandle[] = [];
-
-      for (const target of targetList) {
-        const entry = entryMap.get(target.handle.toLowerCase());
-        if (!entry) {
-          missing.push(target);
-          continue;
-        }
-        found.push({ ...target, ...entry });
-      }
+      const { found, missing } = partitionTargetsByHandle(targetList, entryMap);
 
       const embed = buildContestEmbed({
         contest,

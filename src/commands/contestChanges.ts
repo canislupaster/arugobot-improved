@@ -6,9 +6,9 @@ import { logCommandError } from "../utils/commandLogging.js";
 import { buildContestEmbed, resolveContestOrReply } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
+  partitionTargetsByHandle,
   resolveContestTargetInputsOrReply,
   resolveContestTargetsFromInteractionOrReply,
-  type TargetHandle,
 } from "../utils/contestTargets.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 
@@ -167,16 +167,7 @@ export const contestChangesCommand: Command = {
 
       const changeMap = mapChangesByHandle(changes.changes);
 
-      const found: Array<TargetHandle & RatingChange> = [];
-      const missing: TargetHandle[] = [];
-      for (const target of targetList) {
-        const entry = changeMap.get(target.handle.toLowerCase());
-        if (!entry) {
-          missing.push(target);
-          continue;
-        }
-        found.push({ ...target, ...entry });
-      }
+      const { found, missing } = partitionTargetsByHandle(targetList, changeMap);
 
       const embed = buildContestChangesEmbed(contest, scope);
       const footerNotes: string[] = [];

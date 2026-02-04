@@ -124,6 +124,23 @@ function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, la
   existing.set(key, { handle, label });
 }
 
+export function partitionTargetsByHandle<T>(
+  targets: TargetHandle[],
+  entryMap: Map<string, T>
+): { found: Array<TargetHandle & T>; missing: TargetHandle[] } {
+  const found: Array<TargetHandle & T> = [];
+  const missing: TargetHandle[] = [];
+  for (const target of targets) {
+    const entry = entryMap.get(normalizeHandleKey(target.handle));
+    if (!entry) {
+      missing.push(target);
+      continue;
+    }
+    found.push({ ...target, ...entry });
+  }
+  return { found, missing };
+}
+
 type LinkedUserHandle = { userId: string; handle: string };
 
 function finalizeTargets(targets: Map<string, TargetHandle>): TargetResolution {

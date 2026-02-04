@@ -3,6 +3,7 @@ import type { ChatInputCommandInteraction, Guild, User } from "discord.js";
 import {
   getContestUserOptions,
   getContestTargetContextError,
+  partitionTargetsByHandle,
   resolveContestTargetInputsOrReply,
   resolveContestTargets,
   resolveContestTargetsFromInteractionOrReply,
@@ -444,6 +445,37 @@ describe("resolveContestTargetInputsOrReply", () => {
       expect(result.handleInputs).toEqual(["tourist", "petr"]);
       expect(result.userOptions).toEqual([]);
     }
+  });
+});
+
+describe("partitionTargetsByHandle", () => {
+  it("partitions found and missing targets using normalized handle keys", () => {
+    const targets = [
+      { handle: "Tourist", label: "Tourist" },
+      { handle: "petr", label: "<@petr>" },
+    ];
+    const entryMap = new Map<string, { rank: number }>([
+      ["tourist", { rank: 1 }],
+      ["petr", { rank: 2 }],
+    ]);
+
+    const result = partitionTargetsByHandle(targets, entryMap);
+
+    expect(result.found).toEqual([
+      { handle: "Tourist", label: "Tourist", rank: 1 },
+      { handle: "petr", label: "<@petr>", rank: 2 },
+    ]);
+    expect(result.missing).toEqual([]);
+  });
+
+  it("returns missing targets when entries are absent", () => {
+    const targets = [{ handle: "tourist", label: "tourist" }];
+    const entryMap = new Map<string, { rank: number }>();
+
+    const result = partitionTargetsByHandle(targets, entryMap);
+
+    expect(result.found).toEqual([]);
+    expect(result.missing).toEqual([{ handle: "tourist", label: "tourist" }]);
   });
 });
 
