@@ -27,17 +27,18 @@ type LogFilterOptions = {
 
 type LogFilterColumn = "level" | "guild_id" | "user_id" | "command" | "correlation_id";
 
-type LogEntriesRow = {
-  timestamp: string;
-  level: string;
-  message: string;
-  correlation_id: string | null;
-  command: string | null;
-  guild_id: string | null;
-  user_id: string | null;
-  latency_ms: number | null;
-  context_json: string | null;
-};
+type LogEntriesRow = Pick<
+  Database["log_entries"],
+  | "timestamp"
+  | "level"
+  | "message"
+  | "correlation_id"
+  | "command"
+  | "guild_id"
+  | "user_id"
+  | "latency_ms"
+  | "context_json"
+>;
 
 function splitContext(context?: LogContext): LogContextFields {
   if (!context) {
