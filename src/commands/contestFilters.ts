@@ -2,8 +2,8 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { formatKeywordFilterClauses, parseKeywordFilters } from "../utils/contestFilters.js";
+import { addContestFilterOptions } from "../utils/commandOptions.js";
 import {
-  addContestScopeOption,
   formatContestScopeLabel,
   parseContestScope,
 } from "../utils/contestScope.js";
@@ -45,20 +45,10 @@ export const contestFiltersCommand: Command = {
     .setDescription("Configure default contest filters for /contests")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("set")
-        .setDescription("Set default contest filters")
-        .addStringOption((option) =>
-          option
-            .setName("include")
-            .setDescription("Only show contests matching keywords (comma-separated)")
-        )
-        .addStringOption((option) =>
-          option
-            .setName("exclude")
-            .setDescription("Hide contests matching keywords (comma-separated)")
-        )
-        .addStringOption((option) => addContestScopeOption(option, "Default contest scope"))
+      addContestFilterOptions(
+        subcommand.setName("set").setDescription("Set default contest filters"),
+        "Default contest scope"
+      )
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("status").setDescription("Show the current contest filters")

@@ -2,6 +2,7 @@ import type { APIApplicationCommandSubcommandOption } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
 
 import {
+  addContestFilterOptions,
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
@@ -47,4 +48,16 @@ test("addTagOptions adds tags input", () => {
   const names = json.options?.map((option) => option.name);
 
   expect(names).toEqual(["tags"]);
+});
+
+test("addContestFilterOptions adds include/exclude/scope", () => {
+  const builder = addContestFilterOptions(
+    new SlashCommandBuilder().setName("contests").setDescription("contests"),
+    "Scope"
+  );
+
+  const json = builder.toJSON();
+  const names = json.options?.map((option) => option.name);
+
+  expect(names).toEqual(["include", "exclude", "scope"]);
 });

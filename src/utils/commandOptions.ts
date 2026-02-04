@@ -5,6 +5,8 @@ import {
   type SlashCommandSubcommandBuilder,
 } from "discord.js";
 
+import { addContestScopeOption } from "./contestScope.js";
+
 type ScheduleOptionText = {
   channelDescription: string;
   roleDescription: string;
@@ -81,4 +83,29 @@ export function addTagOptions(
   return builder.addStringOption((option) =>
     option.setName("tags").setDescription("Problem tags (e.g. dp, greedy, -math)")
   );
+}
+
+export function addContestFilterOptions(
+  builder: SlashCommandBuilder
+): SlashCommandOptionsOnlyBuilder;
+export function addContestFilterOptions(
+  builder: SlashCommandOptionsOnlyBuilder,
+  scopeDescription?: string
+): SlashCommandOptionsOnlyBuilder;
+export function addContestFilterOptions(
+  builder: SlashCommandSubcommandBuilder,
+  scopeDescription?: string
+): SlashCommandSubcommandBuilder;
+export function addContestFilterOptions(
+  builder: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder,
+  scopeDescription = "Which contests to show"
+): SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder {
+  return builder
+    .addStringOption((option) =>
+      option.setName("include").setDescription("Only show contests matching keywords (comma-separated)")
+    )
+    .addStringOption((option) =>
+      option.setName("exclude").setDescription("Hide contests matching keywords (comma-separated)")
+    )
+    .addStringOption((option) => addContestScopeOption(option, scopeDescription));
 }

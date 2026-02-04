@@ -6,7 +6,8 @@ import {
   formatKeywordFilterClauses,
   parseKeywordFilters,
 } from "../utils/contestFilters.js";
-import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
+import { addContestFilterOptions } from "../utils/commandOptions.js";
+import { parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import { buildContestUrl } from "../utils/contestUrl.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import {
@@ -75,25 +76,19 @@ function hasKeywordFilters(filters: ReturnType<typeof parseKeywordFilters>): boo
 }
 
 export const contestsCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("contests")
-    .setDescription("Shows upcoming and ongoing Codeforces contests")
-    .addIntegerOption((option) =>
-      option
-        .setName("limit")
-        .setDescription(`Number of upcoming contests to show (1-${MAX_CONTESTS})`)
-        .setMinValue(1)
-        .setMaxValue(MAX_CONTESTS)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("include")
-        .setDescription("Only show contests matching keywords (comma-separated)")
-    )
-    .addStringOption((option) =>
-      option.setName("exclude").setDescription("Hide contests matching keywords (comma-separated)")
-    )
-    .addStringOption((option) => addContestScopeOption(option, "Which contests to show")),
+  data: addContestFilterOptions(
+    new SlashCommandBuilder()
+      .setName("contests")
+      .setDescription("Shows upcoming and ongoing Codeforces contests")
+      .addIntegerOption((option) =>
+        option
+          .setName("limit")
+          .setDescription(`Number of upcoming contests to show (1-${MAX_CONTESTS})`)
+          .setMinValue(1)
+          .setMaxValue(MAX_CONTESTS)
+      ),
+    "Which contests to show"
+  ),
   async execute(interaction, context) {
     const limit = interaction.options.getInteger("limit") ?? MAX_CONTESTS;
     const includeRaw = interaction.options.getString("include");
