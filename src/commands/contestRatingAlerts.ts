@@ -11,7 +11,7 @@ import {
 } from "../services/contestRatingAlerts.js";
 import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addCleanupSubcommand } from "../utils/commandOptions.js";
+import { addCleanupSubcommand, addPostSubcommand } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostMessage,
@@ -163,15 +163,11 @@ export const contestRatingAlertsCommand: Command = {
         )
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("post")
-        .setDescription("Post the latest contest rating changes immediately")
-        .addBooleanOption((option) =>
-          option.setName("force").setDescription("Send even if an alert was already posted")
-        )
-        .addStringOption((option) =>
-          option.setName("id").setDescription("Subscription id (from list)")
-        )
+      addPostSubcommand(subcommand, {
+        description: "Post the latest contest rating changes immediately",
+        forceDescription: "Send even if an alert was already posted",
+        idDescription: "Subscription id (from list)",
+      })
     ),
   adminOnly: true,
   async execute(interaction, context) {

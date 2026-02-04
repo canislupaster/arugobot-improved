@@ -128,6 +128,30 @@ export function addCleanupSubcommand(
   return addCleanupIncludePermissionsOption(withDetails, includePermissionsDescription);
 }
 
+export function addPostSubcommand(
+  subcommand: SlashCommandSubcommandBuilder,
+  options: {
+    description: string;
+    forceDescription?: string;
+    idDescription?: string;
+  }
+): SlashCommandSubcommandBuilder {
+  const builder = subcommand.setName("post").setDescription(options.description);
+  const forceDescription = options.forceDescription;
+  if (forceDescription) {
+    builder.addBooleanOption((option) =>
+      option.setName("force").setDescription(forceDescription)
+    );
+  }
+  const idDescription = options.idDescription;
+  if (idDescription) {
+    builder.addStringOption((option) =>
+      option.setName("id").setDescription(idDescription)
+    );
+  }
+  return builder;
+}
+
 export function addPageOption(
   builder: SlashCommandBuilder
 ): SlashCommandOptionsOnlyBuilder;

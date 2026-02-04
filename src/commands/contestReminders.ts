@@ -10,7 +10,7 @@ import type { ContestReminder } from "../services/contestReminders.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import { runChannelCleanupSummary } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addCleanupSubcommand } from "../utils/commandOptions.js";
+import { addCleanupSubcommand, addPostSubcommand } from "../utils/commandOptions.js";
 import {
   filterContestsByKeywords,
   getContestReminderPreset,
@@ -316,16 +316,12 @@ export const contestRemindersCommand: Command = {
         )
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("post")
-        .setDescription("Post a contest reminder immediately")
-        .addBooleanOption((option) =>
-          option.setName("force").setDescription("Send even if a reminder was already posted")
-        )
-        .addStringOption((option) =>
-          option.setName("id").setDescription("Subscription id (from list)")
-        )
-  ),
+      addPostSubcommand(subcommand, {
+        description: "Post a contest reminder immediately",
+        forceDescription: "Send even if a reminder was already posted",
+        idDescription: "Subscription id (from list)",
+      })
+    ),
   adminOnly: true,
   async execute(interaction, context) {
     const guild = await requireGuild(interaction, {

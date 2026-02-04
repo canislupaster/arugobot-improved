@@ -5,6 +5,7 @@ import {
   addContestFilterOptions,
   addCleanupSubcommand,
   addPageOption,
+  addPostSubcommand,
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
@@ -89,4 +90,25 @@ test("addCleanupSubcommand adds cleanup with include_permissions", () => {
 
   expect(subcommand?.name).toBe("cleanup");
   expect(options.map((option) => option.name)).toEqual(["include_permissions"]);
+});
+
+test("addPostSubcommand adds force and id options when provided", () => {
+  const builder = new SlashCommandBuilder()
+    .setName("postable")
+    .setDescription("postable")
+    .addSubcommand((subcommand) =>
+      addPostSubcommand(subcommand, {
+        description: "Post now",
+        forceDescription: "Force post",
+        idDescription: "Subscription id",
+      })
+    );
+
+  const json = builder.toJSON();
+  const subcommand = json.options?.[0] as APIApplicationCommandSubcommandOption | undefined;
+  const options = subcommand?.options ?? [];
+
+  expect(subcommand?.name).toBe("post");
+  expect(subcommand?.description).toBe("Post now");
+  expect(options.map((option) => option.name)).toEqual(["force", "id"]);
 });
