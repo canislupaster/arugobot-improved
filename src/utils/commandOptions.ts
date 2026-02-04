@@ -181,6 +181,29 @@ export function addPreviewAndPostSubcommands(
     .addSubcommand((subcommand) => addPostSubcommand(subcommand, options.post));
 }
 
+export function buildPreviewPostOptions(params: {
+  previewDescription: string;
+  postDescription: string;
+  forceDescription?: string;
+  previewIdDescription?: string;
+  postIdDescription?: string;
+}): {
+  preview: { description: string; idDescription?: string };
+  post: { description: string; forceDescription?: string; idDescription?: string };
+} {
+  return {
+    preview: {
+      description: params.previewDescription,
+      idDescription: params.previewIdDescription,
+    },
+    post: {
+      description: params.postDescription,
+      forceDescription: params.forceDescription,
+      idDescription: params.postIdDescription,
+    },
+  };
+}
+
 function addOptionalBooleanOption(
   builder: SlashCommandSubcommandBuilder,
   name: string,

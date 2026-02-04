@@ -12,6 +12,7 @@ import {
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
+  buildPreviewPostOptions,
 } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
@@ -241,15 +242,11 @@ export const practiceRemindersCommand: Command = {
       .addSubcommand((subcommand) =>
         addCleanupSubcommand(subcommand, "Remove reminders pointing at missing channels")
       ),
-    {
-      preview: {
-        description: "Preview the next practice reminder",
-      },
-      post: {
-        description: "Post a practice problem immediately",
-        forceDescription: "Send even if a reminder was already posted today",
-      },
-    }
+    buildPreviewPostOptions({
+      previewDescription: "Preview the next practice reminder",
+      postDescription: "Post a practice problem immediately",
+      forceDescription: "Send even if a reminder was already posted today",
+    })
   ),
   adminOnly: true,
   async execute(interaction, context) {

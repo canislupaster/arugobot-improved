@@ -9,8 +9,9 @@ import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
-  addScheduleOptions,
   addPreviewAndPostSubcommands,
+  addScheduleOptions,
+  buildPreviewPostOptions,
 } from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
@@ -148,15 +149,11 @@ export const digestCommand: Command = {
       .addSubcommand((subcommand) =>
         addCleanupSubcommand(subcommand, "Remove digests pointing at missing channels")
       ),
-    {
-      preview: {
-        description: "Show a preview of the weekly digest for this server",
-      },
-      post: {
-        description: "Send the digest immediately",
-        forceDescription: "Send even if a digest was already sent this week",
-      },
-    }
+    buildPreviewPostOptions({
+      previewDescription: "Show a preview of the weekly digest for this server",
+      postDescription: "Send the digest immediately",
+      forceDescription: "Send even if a digest was already sent this week",
+    })
   ),
   adminOnly: true,
   async execute(interaction, context) {
