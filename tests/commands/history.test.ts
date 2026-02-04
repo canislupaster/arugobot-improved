@@ -55,7 +55,7 @@ describe("historyCommand", () => {
     expect(interaction.deferReply).toHaveBeenCalled();
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds).toBeDefined();
-    expect(payload.components).toHaveLength(1);
+    expect(payload.components).toHaveLength(0);
   });
 
   it("falls back to legacy history when no completed challenges exist", async () => {
@@ -90,7 +90,7 @@ describe("historyCommand", () => {
     expect(interaction.deferReply).toHaveBeenCalled();
     const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
     expect(payload.embeds).toBeDefined();
-    expect(payload.components).toHaveLength(1);
+    expect(payload.components).toHaveLength(0);
   });
 
   it("uses the selected user when provided", async () => {

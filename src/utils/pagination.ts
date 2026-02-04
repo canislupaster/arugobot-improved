@@ -91,6 +91,13 @@ export async function runPaginatedInteraction(options: {
     await interaction.editReply(emptyMessage);
     return;
   }
+  if (totalPages <= 1) {
+    await interaction.editReply({
+      embeds: [initial.embed],
+      components: [],
+    });
+    return;
+  }
   const response = await interaction.editReply({
     embeds: [initial.embed],
     components: [buildPaginationRow(paginationIds, currentPage, totalPages)],

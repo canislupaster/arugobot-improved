@@ -60,4 +60,29 @@ describe("runPaginatedInteraction", () => {
     });
     expect(collector.on).toHaveBeenCalledTimes(2);
   });
+
+  it("skips pagination controls when there is only one page", async () => {
+    const response = {
+      createMessageComponentCollector: jest.fn(),
+    };
+    const interaction = createInteraction({
+      editReply: jest.fn().mockResolvedValue(response),
+    });
+    const renderPage = jest.fn().mockResolvedValue({
+      embed: new EmbedBuilder().setTitle("Single"),
+    });
+
+    await runPaginatedInteraction({
+      interaction,
+      paginationIds: buildPaginationIds("test", interaction.id),
+      initialPage: 1,
+      totalPages: 1,
+      renderPage,
+    });
+
+    const payload = (interaction.editReply as jest.Mock).mock.calls[0][0];
+    expect(payload.embeds).toHaveLength(1);
+    expect(payload.components).toEqual([]);
+    expect(response.createMessageComponentCollector).not.toHaveBeenCalled();
+  });
 });
