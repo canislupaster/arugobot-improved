@@ -1,7 +1,7 @@
 import type { Guild, User } from "discord.js";
 
 import { filterEntriesByGuildMembers } from "./guildMembers.js";
-import { normalizeHandleKey } from "./handles.js";
+import { normalizeHandleInput, normalizeHandleKey } from "./handles.js";
 
 export type TargetHandle = {
   handle: string;
@@ -83,6 +83,29 @@ function addTargetHandle(existing: Map<string, TargetHandle>, handle: string, la
   existing.set(key, { handle, label });
 }
 
+type NormalizedHandleInput = {
+  raw: string;
+  normalized: string;
+};
+
+function normalizeHandleInputs(inputs: string[]): NormalizedHandleInput[] {
+  const seen = new Set<string>();
+  const result: NormalizedHandleInput[] = [];
+  for (const raw of inputs) {
+    const normalized = normalizeHandleInput(raw);
+    if (!normalized) {
+      continue;
+    }
+    const key = normalizeHandleKey(normalized);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push({ raw, normalized });
+  }
+  return result;
+}
+
 export async function resolveContestTargets(params: ResolveTargetsParams): Promise<TargetResolution> {
   const {
     guild,
@@ -98,12 +121,13 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
   const uniqueUserOptions = dedupeUsersById(userOptions);
   const targets = new Map<string, TargetHandle>();
   const resolvedGuildId = guildId ?? guild?.id ?? "";
+  const normalizedHandleInputs = normalizeHandleInputs(handleInputs);
 
   const contextError = getContestTargetContextError({
     guild,
     guildId,
     userOptions: uniqueUserOptions,
-    handleInputs,
+    handleInputs: normalizedHandleInputs.map((entry) => entry.normalized),
   });
   if (contextError) {
     return errorResult(contextError);
@@ -123,18 +147,18 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     }
   }
 
-  if (handleInputs.length > 0) {
-    for (const handleInput of handleInputs) {
-      const resolved = await store.resolveHandle(handleInput);
+  if (normalizedHandleInputs.length > 0) {
+    for (const handleInput of normalizedHandleInputs) {
+      const resolved = await store.resolveHandle(handleInput.normalized);
       if (!resolved.exists) {
-        return errorResult(`Invalid handle: ${handleInput}`);
+        return errorResult(`Invalid handle: ${handleInput.raw}`);
       }
-      const handle = resolved.canonicalHandle ?? handleInput;
+      const handle = resolved.canonicalHandle ?? handleInput.normalized;
       addTargetHandle(targets, handle, handle);
     }
   }
 
-  if (uniqueUserOptions.length === 0 && handleInputs.length === 0) {
+  if (uniqueUserOptions.length === 0 && normalizedHandleInputs.length === 0) {
     const linkedUsers = await store.getLinkedUsers(resolvedGuildId);
     if (linkedUsers.length === 0) {
       return errorResult(NO_LINKED_HANDLES_MESSAGE);

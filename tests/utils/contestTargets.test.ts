@@ -237,6 +237,32 @@ describe("resolveContestTargets", () => {
     }
   });
 
+  it("dedupes handle inputs before resolving", async () => {
+    const resolveHandle = jest
+      .fn()
+      .mockResolvedValue({ exists: true, canonicalHandle: "tourist" });
+    const store = {
+      getHandle: jest.fn(),
+      resolveHandle,
+      getLinkedUsers: jest.fn(),
+    };
+
+    const result = await resolveContestTargets({
+      ...baseParams,
+      userOptions: [],
+      handleInputs: [
+        "tourist",
+        "https://codeforces.com/profile/tourist",
+        "@tourist",
+      ],
+      store,
+    });
+
+    expect(result.status).toBe("ok");
+    expect(resolveHandle).toHaveBeenCalledTimes(1);
+    expect(resolveHandle).toHaveBeenCalledWith("tourist");
+  });
+
   it("replies when contest targets fail", async () => {
     const store = {
       getHandle: jest.fn(),
