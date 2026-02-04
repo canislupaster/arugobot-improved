@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 
+import { addPageOption } from "../utils/commandOptions.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { filterEntriesByGuildMembers, resolveMemberMentions } from "../utils/guildMembers.js";
@@ -19,31 +20,30 @@ import type { Command } from "./types.js";
 const PAGE_SIZE = 10;
 
 export const leaderboardCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("leaderboard")
-    .setDescription("Shows the server leaderboard")
-    .addStringOption((option) =>
-      option
-        .setName("metric")
-        .setDescription("What to rank")
-        .addChoices(
-          { name: "Rating", value: "rating" },
-          { name: "Solves", value: "solves" },
-          { name: "Contests (90d)", value: "contests" },
-          { name: "Current streak", value: "streak" },
-          { name: "Longest streak", value: "longest_streak" }
-        )
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("days")
-        .setDescription("Lookback window for contest leaderboard (1-365 days)")
-        .setMinValue(1)
-        .setMaxValue(365)
-    )
-    .addIntegerOption((option) =>
-      option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
-    ),
+  data: addPageOption(
+    new SlashCommandBuilder()
+      .setName("leaderboard")
+      .setDescription("Shows the server leaderboard")
+      .addStringOption((option) =>
+        option
+          .setName("metric")
+          .setDescription("What to rank")
+          .addChoices(
+            { name: "Rating", value: "rating" },
+            { name: "Solves", value: "solves" },
+            { name: "Contests (90d)", value: "contests" },
+            { name: "Current streak", value: "streak" },
+            { name: "Longest streak", value: "longest_streak" }
+          )
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("days")
+          .setDescription("Lookback window for contest leaderboard (1-365 days)")
+          .setMinValue(1)
+          .setMaxValue(365)
+      )
+  ),
   async execute(interaction, context) {
     const guildAndPage = await requireGuildAndPage(interaction, {
       guildMessage: "This command can only be used in a server.",

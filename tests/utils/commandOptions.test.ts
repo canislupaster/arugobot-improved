@@ -3,6 +3,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 import {
   addContestFilterOptions,
+  addPageOption,
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
@@ -60,4 +61,15 @@ test("addContestFilterOptions adds include/exclude/scope", () => {
   const names = json.options?.map((option) => option.name);
 
   expect(names).toEqual(["include", "exclude", "scope"]);
+});
+
+test("addPageOption adds page input", () => {
+  const builder = addPageOption(
+    new SlashCommandBuilder().setName("pages").setDescription("pages")
+  );
+
+  const json = builder.toJSON();
+  const names = json.options?.map((option) => option.name);
+
+  expect(names).toEqual(["page"]);
 });

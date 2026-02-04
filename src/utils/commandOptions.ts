@@ -109,3 +109,20 @@ export function addContestFilterOptions(
     )
     .addStringOption((option) => addContestScopeOption(option, scopeDescription));
 }
+
+export function addPageOption(
+  builder: SlashCommandBuilder
+): SlashCommandOptionsOnlyBuilder;
+export function addPageOption(
+  builder: SlashCommandOptionsOnlyBuilder
+): SlashCommandOptionsOnlyBuilder;
+export function addPageOption(
+  builder: SlashCommandSubcommandBuilder
+): SlashCommandSubcommandBuilder;
+export function addPageOption(
+  builder: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder
+): SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandBuilder {
+  return builder.addIntegerOption((option) =>
+    option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
+  );
+}

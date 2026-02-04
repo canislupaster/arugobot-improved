@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { addPageOption } from "../utils/commandOptions.js";
 import { requireGuildAndPage } from "../utils/interaction.js";
 import {
   buildPageEmbed,
@@ -17,12 +18,11 @@ import type { Command } from "./types.js";
 const PAGE_SIZE = 10;
 
 export const handlesCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("handles")
-    .setDescription("Lists linked Codeforces handles for this server")
-    .addIntegerOption((option) =>
-      option.setName("page").setDescription("Page number (starting at 1)").setMinValue(1)
-    ),
+  data: addPageOption(
+    new SlashCommandBuilder()
+      .setName("handles")
+      .setDescription("Lists linked Codeforces handles for this server")
+  ),
   async execute(interaction, context) {
     const guildAndPage = await requireGuildAndPage(interaction, {
       guildMessage: "This command can only be used in a server.",
