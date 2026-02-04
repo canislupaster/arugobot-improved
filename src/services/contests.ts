@@ -64,6 +64,13 @@ export class ContestService {
     return this.store[scope].lastError;
   }
 
+  hasContests(scope: ContestScopeFilter = DEFAULT_SCOPE): boolean {
+    if (scope === "all") {
+      return this.store.official.contests.length > 0 || this.store.gym.contests.length > 0;
+    }
+    return this.store[scope].contests.length > 0;
+  }
+
   async refresh(force = false, scope: ContestScope = DEFAULT_SCOPE): Promise<void> {
     const store = this.store[scope];
     if (store.contests.length === 0) {

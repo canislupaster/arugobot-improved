@@ -6,7 +6,7 @@ import { logError, logWarn } from "../utils/logger.js";
 import type { CodeforcesClient } from "./codeforces.js";
 import type { CacheKey } from "./codeforcesCache.js";
 import type { ContestActivityService } from "./contestActivity.js";
-import type { Contest, ContestService } from "./contests.js";
+import type { Contest, ContestScope, ContestService } from "./contests.js";
 import type { GuildSettingsService } from "./guildSettings.js";
 import type { StoreService } from "./store.js";
 import type { TokenUsageSnapshot, TokenUsageService } from "./tokenUsage.js";
@@ -122,6 +122,7 @@ export type GuildLeaderboardExport = {
 const DEFAULT_ACTIVITY_DAYS = 30;
 const DEFAULT_TOURNAMENT_LIMIT = 4;
 const DEFAULT_CONTEST_ACTIVITY_DAYS = 90;
+const DEFAULT_CONTEST_REFRESH_TIMEOUT_MS = 2500;
 const CACHE_STATUS_KEYS: Array<{ key: CacheKey; label: string }> = [
   { key: "problemset", label: "Problemset cache" },
   { key: "contest_list", label: "Contest list cache" },
@@ -189,6 +190,7 @@ export class WebsiteService {
   private readonly codeforces: CodeforcesClient | null;
   private readonly tournaments: Pick<TournamentService, "getRecap"> | null;
   private readonly tokenUsage: TokenUsageService | null;
+  private readonly contestRefreshTimeoutMs: number | null;
 
   constructor(
     private readonly db: Kysely<Database>,
@@ -200,12 +202,58 @@ export class WebsiteService {
       contests?: ContestService | null;
       tournaments?: Pick<TournamentService, "getRecap"> | null;
       tokenUsage?: TokenUsageService | null;
+      contestRefreshTimeoutMs?: number | null;
     } = {}
   ) {
     this.codeforces = options.codeforces ?? null;
     this.contests = options.contests ?? null;
     this.tournaments = options.tournaments ?? null;
     this.tokenUsage = options.tokenUsage ?? null;
+    if (options.contestRefreshTimeoutMs === null) {
+      this.contestRefreshTimeoutMs = null;
+    } else if (typeof options.contestRefreshTimeoutMs === "number") {
+      this.contestRefreshTimeoutMs =
+        options.contestRefreshTimeoutMs > 0 ? options.contestRefreshTimeoutMs : null;
+    } else {
+      this.contestRefreshTimeoutMs = DEFAULT_CONTEST_REFRESH_TIMEOUT_MS;
+    }
+  }
+
+  private async refreshContestOverview(
+    scope: ContestScope,
+    timeoutMs: number | null
+  ): Promise<void> {
+    if (!this.contests) {
+      return;
+    }
+    const refreshPromise = this.contests.refresh(false, scope);
+    refreshPromise.catch((error) => {
+      logWarn("Contest refresh failed for web overview; using cached contests.", {
+        scope,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+    if (!timeoutMs) {
+      await refreshPromise;
+      return;
+    }
+    let timeoutId: NodeJS.Timeout | null = null;
+    const timeoutPromise = new Promise<"timeout">((resolve) => {
+      timeoutId = setTimeout(() => resolve("timeout"), timeoutMs);
+    });
+    const result = await Promise.race([
+      refreshPromise.then(() => "ok" as const),
+      timeoutPromise,
+    ]);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    if (result === "timeout") {
+      logWarn("Contest refresh timed out for web overview; using cached contests.", {
+        scope,
+        timeoutMs,
+      });
+    }
   }
 
   private async getPublicGuildStatus(
@@ -230,18 +278,12 @@ export class WebsiteService {
     if (!this.contests) {
       return { lastRefreshAt: null, official: [], gym: [] };
     }
-    const refreshResults = await Promise.allSettled([
-      this.contests.refresh(false, "official"),
-      this.contests.refresh(false, "gym"),
+    const hasCachedContests = this.contests.hasContests("official") || this.contests.hasContests("gym");
+    const timeoutMs = hasCachedContests ? this.contestRefreshTimeoutMs : null;
+    await Promise.all([
+      this.refreshContestOverview("official", timeoutMs),
+      this.refreshContestOverview("gym", timeoutMs),
     ]);
-    const failures = refreshResults.filter(
-      (result): result is PromiseRejectedResult => result.status === "rejected"
-    );
-    for (const failure of failures) {
-      logWarn("Contest refresh failed for web overview; using cached contests.", {
-        error: failure.reason instanceof Error ? failure.reason.message : String(failure.reason),
-      });
-    }
     const lastRefresh = this.contests.getLastRefreshAt("all");
     const lastRefreshAt =
       Number.isFinite(lastRefresh) && lastRefresh > 0

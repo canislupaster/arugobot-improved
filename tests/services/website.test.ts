@@ -10,6 +10,7 @@ import type { RatingChangesService } from "../../src/services/ratingChanges.js";
 import { StoreService } from "../../src/services/store.js";
 import type { TournamentRecap } from "../../src/services/tournaments.js";
 import { WebsiteService } from "../../src/services/website.js";
+import * as logger from "../../src/utils/logger.js";
 
 const mockCodeforces = {
   request: jest.fn(),
@@ -629,6 +630,7 @@ describe("WebsiteService", () => {
               ]
         ),
       getLastRefreshAt: jest.fn().mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z")),
+      hasContests: jest.fn().mockReturnValue(true),
     };
 
     const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
@@ -645,5 +647,65 @@ describe("WebsiteService", () => {
     expect(upcoming.lastRefreshAt).toBe("2024-02-01T00:00:00.000Z");
     expect(upcoming.official[0]?.name).toBe("Official Contest");
     expect(upcoming.gym[0]?.name).toBe("Gym Contest");
+  });
+
+  it("returns upcoming contests when refresh exceeds the web timeout", async () => {
+    jest.useFakeTimers();
+    const logWarnSpy = jest.spyOn(logger, "logWarn").mockImplementation(() => {});
+    const refreshPromise = new Promise<void>(() => {});
+    const contestService = {
+      refresh: jest.fn().mockReturnValue(refreshPromise),
+      getUpcoming: jest
+        .fn()
+        .mockImplementation((_limit: number, scope: "official" | "gym") =>
+          scope === "official"
+            ? [
+                {
+                  id: 3000,
+                  name: "Cached Official Contest",
+                  phase: "BEFORE",
+                  startTimeSeconds: 1_700_000_000,
+                  durationSeconds: 7200,
+                  isGym: false,
+                },
+              ]
+            : [
+                {
+                  id: 4000,
+                  name: "Cached Gym Contest",
+                  phase: "BEFORE",
+                  startTimeSeconds: 1_700_000_500,
+                  durationSeconds: 5400,
+                  isGym: true,
+                },
+              ]
+        ),
+      getLastRefreshAt: jest.fn().mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z")),
+      hasContests: jest.fn().mockReturnValue(true),
+    };
+
+    const contestActivity = new ContestActivityService(db, store, mockRatingChanges);
+    const websiteWithContests = new WebsiteService(db, store, settings, contestActivity, {
+      codeforces: mockCodeforces,
+      contests: contestService as never,
+      tournaments: mockTournaments,
+      contestRefreshTimeoutMs: 10,
+    });
+
+    const upcomingPromise = websiteWithContests.getUpcomingContests(3);
+    await jest.advanceTimersByTimeAsync(10);
+    const upcoming = await upcomingPromise;
+
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "official");
+    expect(contestService.refresh).toHaveBeenCalledWith(false, "gym");
+    expect(upcoming.lastRefreshAt).toBe("2024-02-01T00:00:00.000Z");
+    expect(upcoming.official[0]?.name).toBe("Cached Official Contest");
+    expect(upcoming.gym[0]?.name).toBe("Cached Gym Contest");
+    expect(logWarnSpy).toHaveBeenCalledWith(
+      "Contest refresh timed out for web overview; using cached contests.",
+      expect.objectContaining({ timeoutMs: 10 })
+    );
+
+    jest.useRealTimers();
   });
 });

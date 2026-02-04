@@ -50,6 +50,7 @@ const mockContestService = {
           ]
     ),
   getLastRefreshAt: jest.fn().mockReturnValue(Date.parse("2024-02-01T00:00:00.000Z")),
+  hasContests: jest.fn().mockReturnValue(true),
 };
 
 const mockTournaments = {

@@ -224,4 +224,24 @@ describe("ContestService", () => {
     const upcomingAll = service.getUpcoming(5, "all");
     expect(upcomingAll.map((contest) => contest.id)).toEqual([101, 9001]);
   });
+
+  it("reports whether contest data is loaded per scope", async () => {
+    mockClient.request.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: "Contest A",
+        phase: "FINISHED",
+        startTimeSeconds: 1_500_000_000,
+        durationSeconds: 7200,
+      },
+    ]);
+
+    const service = new ContestService(mockClient as never, cache);
+    expect(service.hasContests()).toBe(false);
+    expect(service.hasContests("all")).toBe(false);
+    await service.refresh(true, "official");
+    expect(service.hasContests()).toBe(true);
+    expect(service.hasContests("gym")).toBe(false);
+    expect(service.hasContests("all")).toBe(true);
+  });
 });
