@@ -21,7 +21,7 @@ import {
   recordReminderSendFailure,
   resolveManualChannel,
 } from "../utils/reminders.js";
-import { createServiceTickTracker, runServiceTick } from "../utils/serviceTicks.js";
+import { runServiceTick } from "../utils/serviceTicks.js";
 import {
   cleanupNotifications,
   clearSubscriptionsWithNotifications,
@@ -37,6 +37,7 @@ import {
 } from "../utils/time.js";
 
 import type { Contest, ContestScope, ContestScopeFilter, ContestService } from "./contests.js";
+import { TickTrackedService } from "./tickTrackedService.js";
 
 const NOTIFICATION_RETENTION_DAYS = 14;
 
@@ -83,20 +84,12 @@ function getRefreshScopes(subscriptions: ContestReminder[]): ContestScope[] {
   return Array.from(scopes);
 }
 
-export class ContestReminderService {
-  private readonly tickTracker = createServiceTickTracker();
-
+export class ContestReminderService extends TickTrackedService {
   constructor(
     private db: Kysely<Database>,
     private contests: ContestProvider
-  ) {}
-
-  getLastTickAt(): string | null {
-    return this.tickTracker.getLastTickAt();
-  }
-
-  getLastError(): { message: string; timestamp: string } | null {
-    return this.tickTracker.getLastError();
+  ) {
+    super();
   }
 
   async getSubscriptionById(

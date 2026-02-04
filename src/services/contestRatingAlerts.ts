@@ -16,7 +16,7 @@ import { logError, logInfo, logWarn } from "../utils/logger.js";
 import { buildRoleMentionOptions } from "../utils/mentions.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import { resolveManualChannel } from "../utils/reminders.js";
-import { createServiceTickTracker, runServiceTick } from "../utils/serviceTicks.js";
+import { runServiceTick } from "../utils/serviceTicks.js";
 import {
   cleanupNotifications,
   clearSubscriptionsWithNotifications,
@@ -31,6 +31,7 @@ import type { ContestRatingChangesService } from "./contestRatingChanges.js";
 import type { Contest, ContestService } from "./contests.js";
 import type { RatingChange } from "./ratingChanges.js";
 import type { StoreService } from "./store.js";
+import { TickTrackedService } from "./tickTrackedService.js";
 
 const ALERT_LOOKBACK_DAYS = 14;
 const ALERT_RETENTION_DAYS = 90;
@@ -178,22 +179,14 @@ export function buildContestRatingAlertEmbed(preview: ContestRatingAlertPreview)
   return embed;
 }
 
-export class ContestRatingAlertService {
-  private readonly tickTracker = createServiceTickTracker();
-
+export class ContestRatingAlertService extends TickTrackedService {
   constructor(
     private db: Kysely<Database>,
     private contests: ContestProvider,
     private ratingChanges: RatingChangesProvider,
     private store: StoreProvider
-  ) {}
-
-  getLastTickAt(): string | null {
-    return this.tickTracker.getLastTickAt();
-  }
-
-  getLastError(): { message: string; timestamp: string } | null {
-    return this.tickTracker.getLastError();
+  ) {
+    super();
   }
 
   async getSubscriptionById(

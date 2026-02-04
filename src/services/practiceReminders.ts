@@ -22,7 +22,8 @@ import {
   recordReminderSendFailure,
   resolveManualSendChannel,
 } from "../utils/reminders.js";
-import { createServiceTickTracker, runServiceTick } from "../utils/serviceTicks.js";
+import { runServiceTick } from "../utils/serviceTicks.js";
+import { TickTrackedService } from "./tickTrackedService.js";
 import { getLocalDayForUtcMs, getUtcScheduleMs, wasSentSince } from "../utils/time.js";
 
 import type { Problem, ProblemService } from "./problems.js";
@@ -226,21 +227,13 @@ function formatRatingRanges(ranges: RatingRange[]): string {
     .join(", ");
 }
 
-export class PracticeReminderService {
-  private readonly tickTracker = createServiceTickTracker();
-
+export class PracticeReminderService extends TickTrackedService {
   constructor(
     private db: Kysely<Database>,
     private problems: ProblemService,
     private store: StoreService
-  ) {}
-
-  getLastTickAt(): string | null {
-    return this.tickTracker.getLastTickAt();
-  }
-
-  getLastError(): { message: string; timestamp: string } | null {
-    return this.tickTracker.getLastError();
+  ) {
+    super();
   }
 
   async getSubscription(guildId: string): Promise<PracticeReminder | null> {
