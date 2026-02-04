@@ -3,6 +3,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import {
   getNextWeeklyScheduledUtcMs,
   type ManualWeeklyDigestResult,
+  type WeeklyDigestSubscription,
 } from "../services/weeklyDigest.js";
 import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
@@ -48,6 +49,19 @@ const DAY_INDEX: Record<string, number> = {
   fri: 5,
   sat: 6,
 };
+
+async function getSubscriptionOrReply(
+  interaction: { reply: (options: { content: string }) => Promise<unknown> },
+  service: { getSubscription: (guildId: string) => Promise<WeeklyDigestSubscription | null> },
+  guildId: string
+): Promise<WeeklyDigestSubscription | null> {
+  const subscription = await service.getSubscription(guildId);
+  if (!subscription) {
+    await interaction.reply({ content: NO_SUBSCRIPTION_MESSAGE });
+    return null;
+  }
+  return subscription;
+}
 
 function resolveDay(day: string | null): string {
   if (!day) {
@@ -159,9 +173,12 @@ export const digestCommand: Command = {
 
     try {
       if (subcommand === "status") {
-        const subscription = await context.services.weeklyDigest.getSubscription(guildId);
+        const subscription = await getSubscriptionOrReply(
+          interaction,
+          context.services.weeklyDigest,
+          guildId
+        );
         if (!subscription) {
-          await interaction.reply({ content: NO_SUBSCRIPTION_MESSAGE });
           return;
         }
         const dayKey = Object.entries(DAY_INDEX).find(
@@ -200,9 +217,12 @@ export const digestCommand: Command = {
       }
 
       if (subcommand === "cleanup") {
-        const subscription = await context.services.weeklyDigest.getSubscription(guildId);
+        const subscription = await getSubscriptionOrReply(
+          interaction,
+          context.services.weeklyDigest,
+          guildId
+        );
         if (!subscription) {
-          await interaction.reply({ content: NO_SUBSCRIPTION_MESSAGE });
           return;
         }
 
