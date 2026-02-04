@@ -1,6 +1,9 @@
+import type { SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from "discord.js";
+
 import type { ContestScopeFilter } from "../services/contests.js";
 
 import { parseContestScope } from "./contestScope.js";
+import { addContestScopeOption } from "./contestScope.js";
 import { resolveBoundedIntegerOption } from "./interaction.js";
 
 type ContestActivityOptions =
@@ -26,6 +29,36 @@ export const CONTEST_ACTIVITY_DEFAULTS = {
   maxLimit: 10,
   defaultScope: "all" as ContestScopeFilter,
 };
+
+export function addContestActivityCommandOptions(
+  builder: SlashCommandBuilder,
+  options: { limitDescription: string; scopeDescription?: string }
+): SlashCommandOptionsOnlyBuilder {
+  return builder
+    .addIntegerOption((option) =>
+      option
+        .setName("days")
+        .setDescription(
+          `Lookback window (${CONTEST_ACTIVITY_DEFAULTS.minDays}-${CONTEST_ACTIVITY_DEFAULTS.maxDays} days)`
+        )
+        .setMinValue(CONTEST_ACTIVITY_DEFAULTS.minDays)
+        .setMaxValue(CONTEST_ACTIVITY_DEFAULTS.maxDays)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("limit")
+        .setDescription(options.limitDescription)
+        .setMinValue(1)
+        .setMaxValue(CONTEST_ACTIVITY_DEFAULTS.maxLimit)
+    )
+    .addStringOption((option) =>
+      addContestScopeOption(
+        option,
+        options.scopeDescription ?? "Which contests to include",
+        ["all", "official", "gym"]
+      )
+    );
+}
 
 export function buildContestActivityOptionConfig(messages: {
   daysErrorMessage: string;

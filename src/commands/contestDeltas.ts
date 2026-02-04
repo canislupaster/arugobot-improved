@@ -8,10 +8,11 @@ import type { ContestScopeFilter } from "../services/contests.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   CONTEST_ACTIVITY_DEFAULTS,
+  addContestActivityCommandOptions,
   buildContestActivityOptionConfig,
   resolveContestActivityContextOrReply,
 } from "../utils/contestActivityOptions.js";
-import { addContestScopeOption, formatContestScopeLabel } from "../utils/contestScope.js";
+import { formatContestScopeLabel } from "../utils/contestScope.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { formatRatingDelta } from "../utils/ratingChanges.js";
 import {
@@ -88,28 +89,14 @@ function buildSummaryEmbed(
 }
 
 export const contestDeltasCommand: Command = {
-  data: new SlashCommandBuilder()
-    .setName("contestdeltas")
-    .setDescription("Shows recent contest rating changes for this server")
-    .addIntegerOption((option) =>
-      option
-        .setName("days")
-        .setDescription(
-          `Lookback window (${CONTEST_ACTIVITY_DEFAULTS.minDays}-${CONTEST_ACTIVITY_DEFAULTS.maxDays} days)`
-        )
-        .setMinValue(CONTEST_ACTIVITY_DEFAULTS.minDays)
-        .setMaxValue(CONTEST_ACTIVITY_DEFAULTS.maxDays)
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("limit")
-        .setDescription(`Top gainers/losers to show (1-${CONTEST_ACTIVITY_DEFAULTS.maxLimit})`)
-        .setMinValue(1)
-        .setMaxValue(CONTEST_ACTIVITY_DEFAULTS.maxLimit)
-    )
-    .addStringOption((option) =>
-      addContestScopeOption(option, "Which contests to include", ["all", "official", "gym"])
-    ),
+  data: addContestActivityCommandOptions(
+    new SlashCommandBuilder()
+      .setName("contestdeltas")
+      .setDescription("Shows recent contest rating changes for this server"),
+    {
+      limitDescription: `Top gainers/losers to show (1-${CONTEST_ACTIVITY_DEFAULTS.maxLimit})`,
+    }
+  ),
   async execute(interaction, context) {
     const optionResult = await resolveContestActivityContextOrReply(
       interaction,
