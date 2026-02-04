@@ -28,8 +28,8 @@ import { ContestReminderService, contestReminderIntervalMs } from "./services/co
 import { ContestService } from "./services/contests.js";
 import { ContestStandingsService } from "./services/contestStandings.js";
 import { DatabaseBackupService, databaseBackupIntervalMs } from "./services/databaseBackups.js";
-import { GuildSettingsService } from "./services/guildSettings.js";
 import { GitHubIssueAutomationService } from "./services/githubIssueAutomation.js";
+import { GuildSettingsService } from "./services/guildSettings.js";
 import { LogsService, logCleanupIntervalMs } from "./services/logs.js";
 import { MetricsService } from "./services/metrics.js";
 import {

@@ -4,8 +4,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import type { Client } from "discord.js";
 import { Hono } from "hono";
 
-import type { WebsiteService } from "../services/website.js";
 import type { GitHubIssueAutomationService } from "../services/githubIssueAutomation.js";
+import type { WebsiteService } from "../services/website.js";
 import { verifyGitHubSignature } from "../utils/githubWebhook.js";
 import { logError, logInfo } from "../utils/logger.js";
 
