@@ -96,6 +96,14 @@ function addLinkedUsers(
   }
 }
 
+function finalizeTargets(targets: Map<string, TargetHandle>): TargetResolution {
+  const targetList = Array.from(targets.values());
+  if (targetList.length === 0) {
+    return errorResult("No handles found to check.");
+  }
+  return { status: "ok", targets: targetList };
+}
+
 type NormalizedHandleInput = {
   raw: string;
   normalized: string;
@@ -181,11 +189,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
         return errorResult(formatTooManyHandlesMessage(linkedUsers.length));
       }
       addLinkedUsers(targets, linkedUsers);
-      const targetList = Array.from(targets.values());
-      if (targetList.length === 0) {
-        return errorResult("No handles found to check.");
-      }
-      return { status: "ok", targets: targetList };
+      return finalizeTargets(targets);
     }
 
     const rosterResult = await resolveGuildRoster(
@@ -208,12 +212,7 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     addLinkedUsers(targets, rosterResult.roster);
   }
 
-  const targetList = Array.from(targets.values());
-  if (targetList.length === 0) {
-    return errorResult("No handles found to check.");
-  }
-
-  return { status: "ok", targets: targetList };
+  return finalizeTargets(targets);
 }
 
 export async function resolveContestTargetsOrReply(
