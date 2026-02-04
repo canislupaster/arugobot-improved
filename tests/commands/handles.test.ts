@@ -52,4 +52,21 @@ describe("handlesCommand", () => {
     expect(payload.embeds[0].data.footer?.text ?? "").toContain("1 linked handle excluded");
     expect(payload.components).toHaveLength(0);
   });
+
+  it("responds when no handles are linked", async () => {
+    const interaction = createInteraction();
+    const context = {
+      services: {
+        store: {
+          getServerRoster: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as CommandContext;
+
+    await handlesCommand.execute(interaction, context);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      "No linked handles for current members."
+    );
+  });
 });

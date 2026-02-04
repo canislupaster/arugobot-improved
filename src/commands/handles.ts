@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
-import { filterEntriesByGuildMembers } from "../utils/guildMembers.js";
+import { resolveGuildRoster } from "../utils/roster.js";
 import { requireGuild, resolveBoundedIntegerOption } from "../utils/interaction.js";
 import {
   buildPageEmbed,
@@ -58,16 +58,25 @@ export const handlesCommand: Command = {
 
     try {
       const roster = await context.services.store.getServerRoster(guild.id);
-      const filteredRoster = await filterEntriesByGuildMembers(guild, roster, {
-        correlationId: context.correlationId,
-        command: interaction.commandName,
-        guildId: guild.id,
-        userId: interaction.user.id,
-      });
-      if (filteredRoster.length === 0) {
-        await interaction.editReply("No linked handles for current members.");
+      const rosterResult = await resolveGuildRoster(
+        guild,
+        roster,
+        {
+          correlationId: context.correlationId,
+          command: interaction.commandName,
+          guildId: guild.id,
+          userId: interaction.user.id,
+        },
+        {
+          noHandles: "No linked handles for current members.",
+          noMembers: "No linked handles for current members.",
+        }
+      );
+      if (rosterResult.status === "empty") {
+        await interaction.editReply(rosterResult.message);
         return;
       }
+      const filteredRoster = rosterResult.roster;
 
       const excludedCount = Math.max(0, roster.length - filteredRoster.length);
       const totalPages = Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE));
