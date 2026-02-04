@@ -5,11 +5,12 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 
-import type { CommandMetricSummary } from "../services/metrics.js";
 import { logCommandError } from "../utils/commandLogging.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { resolveBoundedIntegerOption } from "../utils/interaction.js";
 import { formatDiscordTimestamp } from "../utils/time.js";
+
+import type { CommandMetricSummary } from "../services/metrics.js";
 import type { Command } from "./types.js";
 
 const DEFAULT_LIMIT = 10;
