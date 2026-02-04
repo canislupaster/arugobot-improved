@@ -35,6 +35,13 @@ async function resolveExplicitHandleTarget(
   return { handle, linkedUserId: null };
 }
 
+function stripAtSign(value: string): string {
+  if (value.startsWith("@")) {
+    return value.slice(1).trim();
+  }
+  return value;
+}
+
 export function normalizeHandleInput(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) {
@@ -46,13 +53,13 @@ export function normalizeHandleInput(raw: string): string {
       : trimmed;
   const match = unwrapped.match(PROFILE_PATTERN);
   if (!match) {
-    return unwrapped.startsWith("@") ? unwrapped.slice(1).trim() : unwrapped;
+    return stripAtSign(unwrapped);
   }
   try {
     const decoded = decodeURIComponent(match[1]);
-    return decoded.startsWith("@") ? decoded.slice(1).trim() : decoded;
+    return stripAtSign(decoded);
   } catch {
-    return match[1].startsWith("@") ? match[1].slice(1).trim() : match[1];
+    return stripAtSign(match[1]);
   }
 }
 
