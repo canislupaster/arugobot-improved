@@ -8,6 +8,8 @@ import {
 import { logCommandError } from "../utils/commandLogging.js";
 import {
   addCleanupSubcommand,
+  addPostSubcommand,
+  addPreviewSubcommand,
   addRatingRangeOptions,
   addScheduleOptions,
   addTagOptions,
@@ -243,16 +245,16 @@ export const practiceRemindersCommand: Command = {
       )
     )
     .addSubcommand((subcommand) =>
-      subcommand.setName("preview").setDescription("Preview the next practice reminder")
+      addPreviewSubcommand(subcommand, {
+        description: "Preview the next practice reminder",
+      })
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("post")
-        .setDescription("Post a practice problem immediately")
-        .addBooleanOption((option) =>
-          option.setName("force").setDescription("Send even if a reminder was already posted today")
-        )
-  ),
+      addPostSubcommand(subcommand, {
+        description: "Post a practice problem immediately",
+        forceDescription: "Send even if a reminder was already posted today",
+      })
+    ),
   adminOnly: true,
   async execute(interaction, context) {
     const commandContext = await requireGuildIdAndSubcommand(

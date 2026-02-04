@@ -7,7 +7,12 @@ import {
 } from "../services/weeklyDigest.js";
 import { cleanupSingleChannelSubscription } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import { addCleanupSubcommand, addScheduleOptions } from "../utils/commandOptions.js";
+import {
+  addCleanupSubcommand,
+  addPostSubcommand,
+  addPreviewSubcommand,
+  addScheduleOptions,
+} from "../utils/commandOptions.js";
 import {
   describeSendableChannelStatus,
   formatCannotPostPermissionsMessage,
@@ -147,17 +152,15 @@ export const digestCommand: Command = {
       )
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("preview")
-        .setDescription("Show a preview of the weekly digest for this server")
+      addPreviewSubcommand(subcommand, {
+        description: "Show a preview of the weekly digest for this server",
+      })
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("post")
-        .setDescription("Send the digest immediately")
-        .addBooleanOption((option) =>
-          option.setName("force").setDescription("Send even if a digest was already sent this week")
-        )
+      addPostSubcommand(subcommand, {
+        description: "Send the digest immediately",
+        forceDescription: "Send even if a digest was already sent this week",
+      })
     ),
   adminOnly: true,
   async execute(interaction, context) {
