@@ -20,13 +20,19 @@ export async function refreshContestData(
   contests: Pick<ContestService, "refresh" | "getLastRefreshAt">,
   scope: ContestScopeFilter
 ): Promise<{ stale: boolean } | { error: string }> {
+  const hasCache = (value: ContestScopeFilter | "all") =>
+    contests.getLastRefreshAt(value) > 0;
+
+  const resolveFailure = (value: ContestScopeFilter | "all") =>
+    hasCache(value) ? { stale: true } : { error: CONTEST_UNAVAILABLE_MESSAGE };
+
   if (scope === "all") {
     const results = await Promise.allSettled([
       contests.refresh(false, "official"),
       contests.refresh(false, "gym"),
     ]);
     const stale = results.some((result) => result.status === "rejected");
-    if (contests.getLastRefreshAt("all") <= 0) {
+    if (!hasCache("all")) {
       return { error: CONTEST_UNAVAILABLE_MESSAGE };
     }
     return { stale };
@@ -36,10 +42,7 @@ export async function refreshContestData(
     await contests.refresh(false, scope as ContestScope);
     return { stale: false };
   } catch {
-    if (contests.getLastRefreshAt(scope) > 0) {
-      return { stale: true };
-    }
-    return { error: CONTEST_UNAVAILABLE_MESSAGE };
+    return resolveFailure(scope);
   }
 }
 
