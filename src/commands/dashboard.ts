@@ -55,6 +55,15 @@ export const dashboardCommand: Command = {
       return;
     }
     const { guildId, subcommand } = commandContext;
+    const buildVisibilityMessage = (options: {
+      isPublic: boolean;
+      updatedAt?: string;
+    }) =>
+      formatDashboardVisibilityMessage({
+        ...options,
+        baseUrl: context.config.webPublicUrl,
+        guildId,
+      });
 
     try {
       if (subcommand === "status") {
@@ -68,12 +77,7 @@ export const dashboardCommand: Command = {
         }
         await replyEphemeral(
           interaction,
-          formatDashboardVisibilityMessage({
-            isPublic: settings.isPublic,
-            baseUrl: context.config.webPublicUrl,
-            guildId,
-            updatedAt: settings.updatedAt,
-          })
+          buildVisibilityMessage({ isPublic: settings.isPublic, updatedAt: settings.updatedAt })
         );
         return;
       }
@@ -88,11 +92,7 @@ export const dashboardCommand: Command = {
       await context.services.guildSettings.setDashboardPublic(guildId, isPublic);
       await replyEphemeral(
         interaction,
-        formatDashboardVisibilityMessage({
-          isPublic,
-          baseUrl: context.config.webPublicUrl,
-          guildId,
-        })
+        buildVisibilityMessage({ isPublic })
       );
     } catch (error) {
       logCommandError("Dashboard command failed.", interaction, context.correlationId, {
