@@ -14,6 +14,7 @@ import {
   formatPermissionIssueSummary,
 } from "../utils/channelCleanup.js";
 import { logCommandError } from "../utils/commandLogging.js";
+import { addCleanupIncludePermissionsOption } from "../utils/commandOptions.js";
 import {
   filterContestsByKeywords,
   getContestReminderPreset,
@@ -22,7 +23,6 @@ import {
   serializeKeywords,
   type ContestReminderPreset,
 } from "../utils/contestFilters.js";
-import { addCleanupIncludePermissionsOption } from "../utils/commandOptions.js";
 import {
   addContestScopeOption,
   formatContestScopeLabel,
