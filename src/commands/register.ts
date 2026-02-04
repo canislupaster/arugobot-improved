@@ -13,6 +13,7 @@ import {
 
 import { waitForCompilationError } from "../services/verification.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
+import { replyEphemeral, requireGuildIdEphemeral } from "../utils/interaction.js";
 import { logError, type LogContext } from "../utils/logger.js";
 import { buildProblemUrl } from "../utils/problemReference.js";
 
@@ -42,25 +43,8 @@ type ResolvedHandle =
 type InsertResult = "ok" | "handle_exists" | "already_linked" | "error";
 type UpdateResult = "ok" | "handle_exists" | "not_linked" | "error";
 
-async function replyEphemeral(
-  interaction: ChatInputCommandInteraction,
-  content: string
-): Promise<void> {
-  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
-}
-
 async function replyButtonEphemeral(button: ButtonInteraction, content: string): Promise<void> {
   await button.reply({ content, flags: MessageFlags.Ephemeral });
-}
-
-async function requireGuild(
-  interaction: ChatInputCommandInteraction
-): Promise<{ guildId: string } | null> {
-  if (!interaction.guild) {
-    await replyEphemeral(interaction, "This command can only be used in a server.");
-    return null;
-  }
-  return { guildId: interaction.guild.id };
 }
 
 async function resolveCanonicalHandle(
@@ -285,11 +269,13 @@ export const registerCommand: Command = {
       option.setName("handle").setDescription("Your Codeforces handle").setRequired(true)
     ),
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction);
-    if (!guild) {
+    const guildId = await requireGuildIdEphemeral(
+      interaction,
+      "This command can only be used in a server."
+    );
+    if (!guildId) {
       return;
     }
-    const { guildId } = guild;
     const handle = interaction.options.getString("handle", true);
     const logContext = createLogContext(
       "register",
@@ -344,11 +330,13 @@ export const relinkCommand: Command = {
       option.setName("handle").setDescription("New Codeforces handle").setRequired(true)
     ),
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction);
-    if (!guild) {
+    const guildId = await requireGuildIdEphemeral(
+      interaction,
+      "This command can only be used in a server."
+    );
+    if (!guildId) {
       return;
     }
-    const { guildId } = guild;
     const newHandle = interaction.options.getString("handle", true);
     const logContext = createLogContext(
       "relink",
@@ -405,11 +393,13 @@ export const unlinkCommand: Command = {
     .setName("unlink")
     .setDescription("Unlinks your Codeforces handle and erases progress"),
   async execute(interaction, context) {
-    const guild = await requireGuild(interaction);
-    if (!guild) {
+    const guildId = await requireGuildIdEphemeral(
+      interaction,
+      "This command can only be used in a server."
+    );
+    if (!guildId) {
       return;
     }
-    const { guildId } = guild;
     if (!(await context.services.store.handleLinked(guildId, interaction.user.id))) {
       await replyEphemeral(interaction, "You have not linked a handle.");
       return;
