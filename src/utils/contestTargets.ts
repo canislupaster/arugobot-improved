@@ -43,6 +43,15 @@ const NO_CURRENT_MEMBERS_MESSAGE =
   "No linked handles found for current server members. Use /handles to review linked accounts.";
 const formatTooManyHandlesMessage = (count: number) =>
   `Too many linked handles (${count}). Provide specific handles or users.`;
+const getMaxLinkedHandlesError = (
+  count: number,
+  maxLinkedHandles?: number
+): TargetResolution | null => {
+  if (maxLinkedHandles && count > maxLinkedHandles) {
+    return errorResult(formatTooManyHandlesMessage(count));
+  }
+  return null;
+};
 
 export function getUserOptions(users: Array<User | null | undefined>): User[] {
   return users.filter((user): user is User => Boolean(user));
@@ -215,8 +224,9 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
       if (linkedUsers.length === 0) {
         return errorResult(NO_LINKED_HANDLES_MESSAGE);
       }
-      if (maxLinkedHandles && linkedUsers.length > maxLinkedHandles) {
-        return errorResult(formatTooManyHandlesMessage(linkedUsers.length));
+      const maxError = getMaxLinkedHandlesError(linkedUsers.length, maxLinkedHandles);
+      if (maxError) {
+        return maxError;
       }
       addLinkedUsers(targets, linkedUsers);
       return finalizeTargets(targets);
@@ -236,8 +246,9 @@ export async function resolveContestTargets(params: ResolveTargetsParams): Promi
     if (rosterResult.status === "empty") {
       return errorResult(rosterResult.message);
     }
-    if (maxLinkedHandles && rosterResult.roster.length > maxLinkedHandles) {
-      return errorResult(formatTooManyHandlesMessage(rosterResult.roster.length));
+    const maxError = getMaxLinkedHandlesError(rosterResult.roster.length, maxLinkedHandles);
+    if (maxError) {
+      return maxError;
     }
     addLinkedUsers(targets, rosterResult.roster);
   }
