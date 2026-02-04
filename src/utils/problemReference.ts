@@ -12,8 +12,13 @@ const URL_PATTERNS = [
 ];
 const ID_PATTERN = /^(\d+)([A-Za-z][A-Za-z0-9]*)$/;
 
-export function buildProblemUrl(contestId: number, index: string): string {
-  return `https://codeforces.com/problemset/problem/${contestId}/${index}`;
+export function buildProblemUrl(
+  contestId: number,
+  index: string,
+  options: { isGym?: boolean } = {}
+): string {
+  const base = options.isGym ? "https://codeforces.com/gym" : "https://codeforces.com/problemset/problem";
+  return options.isGym ? `${base}/${contestId}/problem/${index}` : `${base}/${contestId}/${index}`;
 }
 
 function buildReference(contestIdRaw: string, indexRaw: string): ProblemReference | null {

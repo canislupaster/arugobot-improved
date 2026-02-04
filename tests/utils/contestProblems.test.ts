@@ -40,10 +40,13 @@ describe("formatContestProblemLines", () => {
       },
     ];
 
-    const lines = formatContestProblemLines(entries, 1, (entry) => entry.solvedBy.size);
+    const lines = formatContestProblemLines(entries, 1, (entry) => entry.solvedBy.size, {
+      isGym: true,
+    });
 
     expect(lines).toContain("Alpha");
     expect(lines).toContain("2 solved");
+    expect(lines).toContain("https://codeforces.com/gym/1/problem/A");
     expect(lines).not.toContain("Beta");
   });
 });

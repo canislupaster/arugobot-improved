@@ -28,15 +28,19 @@ export function getContestProblems(problems: Problem[], contestId: number): Prob
   return problems.filter((problem) => problem.contestId === contestId).sort(compareProblemIndex);
 }
 
-export function buildProblemLink(problem: Pick<Problem, "contestId" | "index">): string {
-  return buildProblemUrl(problem.contestId, problem.index);
+export function buildProblemLink(
+  problem: Pick<Problem, "contestId" | "index">,
+  options: { isGym?: boolean } = {}
+): string {
+  return buildProblemUrl(problem.contestId, problem.index, options);
 }
 
 export function formatContestProblemLine(
   problem: Problem,
-  solvedCount?: number | null
+  solvedCount?: number | null,
+  options: { isGym?: boolean } = {}
 ): string {
-  const label = `[${problem.index}. ${problem.name}](${buildProblemLink(problem)})`;
+  const label = `[${problem.index}. ${problem.name}](${buildProblemLink(problem, options)})`;
   if (solvedCount === null || solvedCount === undefined) {
     return label;
   }
@@ -46,24 +50,26 @@ export function formatContestProblemLine(
 export function formatContestProblemLines(
   entries: ContestProblemSummary[],
   limit: number,
-  solvedCount?: (entry: ContestProblemSummary) => number | null
+  solvedCount?: (entry: ContestProblemSummary) => number | null,
+  options: { isGym?: boolean } = {}
 ): string {
   const resolveSolvedCount = solvedCount ?? (() => null);
   return entries
     .slice(0, limit)
-    .map((entry) => formatContestProblemLine(entry.problem, resolveSolvedCount(entry)))
+    .map((entry) => formatContestProblemLine(entry.problem, resolveSolvedCount(entry), options))
     .join("\n");
 }
 
 export function formatUnsolvedProblemsValue(
   unsolved: ContestProblemSummary[],
   limit: number,
-  emptyMessage: string
+  emptyMessage: string,
+  options: { isGym?: boolean } = {}
 ): string {
   if (unsolved.length === 0) {
     return emptyMessage;
   }
-  return formatContestProblemLines(unsolved, limit);
+  return formatContestProblemLines(unsolved, limit, undefined, options);
 }
 
 export function summarizeContestSolves(

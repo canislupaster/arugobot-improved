@@ -55,4 +55,10 @@ describe("buildProblemUrl", () => {
   it("builds Codeforces problem links", () => {
     expect(buildProblemUrl(1000, "A")).toBe("https://codeforces.com/problemset/problem/1000/A");
   });
+
+  it("builds gym problem links when flagged", () => {
+    expect(buildProblemUrl(500, "B", { isGym: true })).toBe(
+      "https://codeforces.com/gym/500/problem/B"
+    );
+  });
 });

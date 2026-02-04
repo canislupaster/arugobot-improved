@@ -56,6 +56,7 @@ export function buildContestSolvesSummaryFields(options: {
   unsolved: ContestProblemSummary[];
   limit: number;
   emptyMessage: string;
+  isGym?: boolean;
 }): Array<{ name: string; value: string; inline: boolean }> {
   return [
     {
@@ -70,7 +71,12 @@ export function buildContestSolvesSummaryFields(options: {
     },
     {
       name: "Unsolved problems",
-      value: formatUnsolvedProblemsValue(options.unsolved, options.limit, options.emptyMessage),
+      value: formatUnsolvedProblemsValue(
+        options.unsolved,
+        options.limit,
+        options.emptyMessage,
+        { isGym: options.isGym }
+      ),
       inline: false,
     },
   ];

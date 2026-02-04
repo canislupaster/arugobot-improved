@@ -146,6 +146,7 @@ export const contestSolvesCommand: Command = {
           unsolved,
           limit,
           emptyMessage: "All contest problems were solved by linked users.",
+          isGym: contest.isGym ?? false,
         })
       );
 
@@ -155,7 +156,8 @@ export const contestSolvesCommand: Command = {
             (a, b) => b.solvedBy.size - a.solvedBy.size || compareProblemIndex(a.problem, b.problem)
           ),
           limit,
-          (entry) => entry.solvedBy.size
+          (entry) => entry.solvedBy.size,
+          { isGym: contest.isGym ?? false }
         );
         embed.addFields({ name: "Solved problems", value: lines, inline: false });
       }
