@@ -116,7 +116,8 @@ export function formatIdList(ids: string[]): string {
 }
 
 export function formatPermissionIssueSummary(
-  permissionIssues: ChannelCleanupIssue[]
+  permissionIssues: ChannelCleanupIssue[],
+  options: { cleanupHint?: string } = {}
 ): string | null {
   if (permissionIssues.length === 0) {
     return null;
@@ -127,5 +128,7 @@ export function formatPermissionIssueSummary(
         issue.status
       )}`
   );
-  return `Subscriptions with missing permissions (not removed): ${issueLines.join("; ")}.`;
+  const summary = `Subscriptions with missing permissions (not removed): ${issueLines.join("; ")}.`;
+  const hint = options.cleanupHint?.trim();
+  return hint ? `${summary} ${hint}` : summary;
 }

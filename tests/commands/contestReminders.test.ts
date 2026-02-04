@@ -271,7 +271,7 @@ describe("contestRemindersCommand", () => {
     expect(interaction.reply).toHaveBeenCalledWith({
       content:
         "Removed 1 contest reminder subscription with missing channels: `sub-1`.\n" +
-        "Subscriptions with missing permissions (not removed): `sub-2` (<#channel-noperms>): Missing permissions (ViewChannel, SendMessages).",
+        "Subscriptions with missing permissions (not removed): `sub-2` (<#channel-noperms>): Missing permissions (ViewChannel, SendMessages). Use /contestreminders cleanup include_permissions:true to remove them.",
     });
   });
 

@@ -329,7 +329,10 @@ export const contestRatingAlertsCommand: Command = {
           );
         }
         if (permissionIssues.length > 0) {
-          const summary = formatPermissionIssueSummary(permissionIssues);
+          const summary = formatPermissionIssueSummary(permissionIssues, {
+            cleanupHint:
+              "Use /contestratingalerts cleanup include_permissions:true to remove them.",
+          });
           if (summary) {
             lines.push(summary);
           }

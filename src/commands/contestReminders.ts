@@ -502,7 +502,9 @@ export const contestRemindersCommand: Command = {
           );
         }
         if (permissionIssues.length > 0) {
-          const summary = formatPermissionIssueSummary(permissionIssues);
+          const summary = formatPermissionIssueSummary(permissionIssues, {
+            cleanupHint: "Use /contestreminders cleanup include_permissions:true to remove them.",
+          });
           if (summary) {
             lines.push(summary);
           }
