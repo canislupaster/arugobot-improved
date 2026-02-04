@@ -3,12 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Contest, ContestScopeFilter } from "../services/contests.js";
 import type { RatingChange } from "../services/ratingChanges.js";
 import { logCommandError } from "../utils/commandLogging.js";
-import {
-  buildContestMatchEmbed,
-  formatContestPhase,
-  formatContestTag,
-  resolveContestLookup,
-} from "../utils/contestLookup.js";
+import { formatContestPhase, formatContestTag, resolveContestOrReply } from "../utils/contestLookup.js";
 import { addContestScopeOption, parseContestScope, refreshContestData } from "../utils/contestScope.js";
 import {
   getUserOptions,
@@ -141,43 +136,24 @@ export const contestChangesCommand: Command = {
     const stale = refreshResult.stale;
 
     try {
-      const lookup = resolveContestLookup(
+      const lookup = await resolveContestOrReply(
+        interaction,
         queryRaw,
         scope,
         context.services.contests,
-        MAX_MATCHES
-      );
-      if (lookup.status !== "ok") {
-      switch (lookup.status) {
-        case "missing_latest":
-          await interaction.editReply("No finished contests found yet.");
-          return;
-        case "missing_upcoming":
-          await interaction.editReply("No upcoming contests found yet.");
-          return;
-        case "missing_ongoing":
-          await interaction.editReply("No ongoing contests found right now.");
-          return;
-        case "missing_id":
-          await interaction.editReply("No contest found with that ID.");
-          return;
-        case "missing_name":
-          await interaction.editReply("No contests found matching that name.");
-            return;
-          case "ambiguous": {
-            const embed = buildContestMatchEmbed({
-              query: queryRaw,
-              matches: lookup.matches,
-              scope,
-              footerText: "Use /contestchanges with the contest ID for rating changes.",
-            });
-            if (stale) {
-              embed.setFooter({ text: "Showing cached data due to a temporary Codeforces error." });
-            }
-            await interaction.editReply({ embeds: [embed] });
-            return;
-          }
+        {
+          maxMatches: MAX_MATCHES,
+          footerText: "Use /contestchanges with the contest ID for rating changes.",
+          refreshWasStale: stale,
+          missingLatestMessage: "No finished contests found yet.",
+          missingUpcomingMessage: "No upcoming contests found yet.",
+          missingOngoingMessage: "No ongoing contests found right now.",
+          missingIdMessage: "No contest found with that ID.",
+          missingNameMessage: "No contests found matching that name.",
         }
+      );
+      if (lookup.status === "replied") {
+        return;
       }
 
       const contest = lookup.contest;
