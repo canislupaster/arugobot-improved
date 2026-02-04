@@ -72,15 +72,24 @@ export function formatUnsolvedProblemsValue(
   return formatContestProblemLines(unsolved, limit, undefined, options);
 }
 
+function buildContestProblemKey(contestId: number, index: string): string {
+  return `${contestId}-${index}`;
+}
+
+function normalizeHandleMap(handleMap: Map<string, string>): Map<string, string> {
+  const normalized = new Map<string, string>();
+  for (const [handle, value] of handleMap.entries()) {
+    normalized.set(normalizeHandleKey(handle), value);
+  }
+  return normalized;
+}
+
 export function summarizeContestSolves(
   problems: Problem[],
   solves: ContestSolveEntry[],
   handleMap: Map<string, string>
 ): ContestProblemSummary[] {
-  const normalizedHandleMap = new Map<string, string>();
-  for (const [handle, value] of handleMap.entries()) {
-    normalizedHandleMap.set(normalizeHandleKey(handle), value);
-  }
+  const normalizedHandleMap = normalizeHandleMap(handleMap);
 
   const solvedByProblem = new Map<string, Set<string>>();
   for (const solve of solves) {
@@ -89,14 +98,14 @@ export function summarizeContestSolves(
     if (!mapped) {
       continue;
     }
-    const problemKey = `${solve.contestId}-${solve.index}`;
+    const problemKey = buildContestProblemKey(solve.contestId, solve.index);
     const entry = solvedByProblem.get(problemKey) ?? new Set<string>();
     entry.add(mapped);
     solvedByProblem.set(problemKey, entry);
   }
 
   return problems.map((problem) => {
-    const problemKey = `${problem.contestId}-${problem.index}`;
+    const problemKey = buildContestProblemKey(problem.contestId, problem.index);
     return {
       problem,
       solvedBy: solvedByProblem.get(problemKey) ?? new Set<string>(),
