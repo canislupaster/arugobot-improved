@@ -13,6 +13,10 @@ describe("normalizeHandleInput", () => {
     expect(normalizeHandleInput("https://codeforces.com/profile/tourist")).toBe("tourist");
   });
 
+  it("extracts a handle from a www profile URL", () => {
+    expect(normalizeHandleInput("https://www.codeforces.com/profile/tourist")).toBe("tourist");
+  });
+
   it("extracts a handle from a short profile URL", () => {
     expect(normalizeHandleInput("https://codeforces.com/u/Petr")).toBe("Petr");
   });

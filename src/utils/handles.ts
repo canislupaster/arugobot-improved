@@ -1,4 +1,4 @@
-const PROFILE_PATTERN = /codeforces\.com\/(?:profile|u)\/([^/?#\s]+)/i;
+const PROFILE_PATTERN = /(?:www\.)?codeforces\.com\/(?:profile|u)\/([^/?#\s]+)/i;
 
 export type HandleTargetResolution =
   | { handle: string; linkedUserId: string | null }
