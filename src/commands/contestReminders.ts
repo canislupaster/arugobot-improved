@@ -34,10 +34,7 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { requireGuild } from "../utils/interaction.js";
-import {
-  resolveSubscriptionId,
-  resolveSubscriptionSelectionOrReply,
-} from "../utils/subscriptionSelection.js";
+import { resolveSubscriptionSelectionOrReply } from "../utils/subscriptionSelection.js";
 import { resolveSubscriptionEntriesOrReply } from "../utils/subscriptionStatus.js";
 import { formatDiscordRelativeTime, formatDiscordTimestamp } from "../utils/time.js";
 
@@ -531,27 +528,22 @@ export const contestRemindersCommand: Command = {
       if (subcommand === "remove") {
         const id = interaction.options.getString("id", true);
         const subscriptions = await context.services.contestReminders.listSubscriptions(guildId);
-        if (subscriptions.length === 0) {
-          await interaction.reply({ content: NO_SUBSCRIPTIONS_MESSAGE });
+        const subscription = await resolveSubscriptionSelectionOrReply(
+          interaction,
+          subscriptions,
+          id,
+          selectionMessages
+        );
+        if (!subscription) {
           return;
         }
-        const resolution = resolveSubscriptionId(subscriptions, id);
-        if (resolution.status === "not_found") {
-          await interaction.reply({ content: selectionMessages.notFound });
-          return;
-        }
-        if (resolution.status === "ambiguous") {
-          await interaction.reply({ content: selectionMessages.ambiguous(resolution.matches) });
-          return;
-        }
-        const resolvedId = resolution.id;
         const removed = await context.services.contestReminders.removeSubscription(
           guildId,
-          resolvedId
+          subscription.id
         );
         await interaction.reply({
           content: removed
-            ? `Removed contest reminder subscription \`${resolvedId}\`.`
+            ? `Removed contest reminder subscription \`${subscription.id}\`.`
             : "Subscription not found.",
         });
         return;

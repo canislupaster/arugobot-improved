@@ -20,10 +20,7 @@ import {
 } from "../utils/discordChannels.js";
 import { EMBED_COLORS } from "../utils/embedColors.js";
 import { parseHandleFilterInput } from "../utils/handles.js";
-import {
-  resolveSubscriptionId,
-  resolveSubscriptionSelectionOrReply,
-} from "../utils/subscriptionSelection.js";
+import { resolveSubscriptionSelectionOrReply } from "../utils/subscriptionSelection.js";
 import { resolveSubscriptionEntriesOrReply } from "../utils/subscriptionStatus.js";
 
 import type { Command } from "./types.js";
@@ -319,28 +316,22 @@ export const contestRatingAlertsCommand: Command = {
       if (subcommand === "remove") {
         const id = interaction.options.getString("id", true);
         const subscriptions = await context.services.contestRatingAlerts.listSubscriptions(guildId);
-        if (subscriptions.length === 0) {
-          await interaction.reply({
-            content: NO_SUBSCRIPTIONS_MESSAGE,
-          });
-          return;
-        }
-        const resolution = resolveSubscriptionId(subscriptions, id);
-        if (resolution.status === "not_found") {
-          await interaction.reply({ content: selectionMessages.notFound });
-          return;
-        }
-        if (resolution.status === "ambiguous") {
-          await interaction.reply({ content: selectionMessages.ambiguous(resolution.matches) });
+        const subscription = await resolveSubscriptionSelectionOrReply(
+          interaction,
+          subscriptions,
+          id,
+          selectionMessages
+        );
+        if (!subscription) {
           return;
         }
         const removed = await context.services.contestRatingAlerts.removeSubscription(
           guildId,
-          resolution.id
+          subscription.id
         );
         await interaction.reply({
           content: removed
-            ? `Removed contest rating alert subscription \`${resolution.id}\`.`
+            ? `Removed contest rating alert subscription \`${subscription.id}\`.`
             : "Subscription not found.",
         });
         return;
