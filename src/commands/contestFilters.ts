@@ -7,7 +7,7 @@ import {
   formatContestScopeLabel,
   parseContestScope,
 } from "../utils/contestScope.js";
-import { replyEphemeral } from "../utils/interaction.js";
+import { replyEphemeral, requireGuildIdEphemeral } from "../utils/interaction.js";
 import { formatUpdatedAt } from "../utils/time.js";
 
 import type { Command } from "./types.js";
@@ -58,12 +58,13 @@ export const contestFiltersCommand: Command = {
     ),
   adminOnly: true,
   async execute(interaction, context) {
-    if (!interaction.guild) {
-      await replyEphemeral(interaction, "This command can only be used in a server.");
+    const guildId = await requireGuildIdEphemeral(
+      interaction,
+      "This command can only be used in a server."
+    );
+    if (!guildId) {
       return;
     }
-
-    const guildId = interaction.guild.id;
     const subcommand = interaction.options.getSubcommand();
 
     try {

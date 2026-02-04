@@ -111,6 +111,17 @@ export async function requireGuildEphemeral(
   return requireGuild(interaction, { content, flags: MessageFlags.Ephemeral });
 }
 
+export async function requireGuildIdEphemeral(
+  interaction: ChatInputCommandInteraction,
+  content: string
+): Promise<string | null> {
+  if (interaction.guild) {
+    return interaction.guild.id;
+  }
+  await replyEphemeral(interaction, content);
+  return null;
+}
+
 export async function requireGuildAndPage(
   interaction: ChatInputCommandInteraction & IntegerOptionResolver & RepliableInteraction,
   options: {
